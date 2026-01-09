@@ -1,0 +1,164 @@
+# agent-dashboard
+
+CLI tool to monitor agent status in real-time. Works with Claude Code, multi-agent workflows, and any AI agent system.
+
+## Overview
+
+```bash
+$ agent-dashboard --watch
+
+┌─ agent-dashboard ──────────────────────────┐
+│ Agent: Claude Code                         │
+│ Branch: feat/123-auth                      │
+│ Plan: 3/5 steps done                       │
+├─ Today ────────────────────────────────────┤
+│ +3 commits  +142 lines  -23 lines          │
+├─ Tests ────────────────────────────────────┤
+│ ✓ 12 passed  ✗ 1 failed                    │
+└────────────────────────────────────────────┘
+```
+
+## Tech Stack
+
+- Runtime: Node.js (ES Modules)
+- Language: TypeScript
+- UI: Ink (React for CLI)
+- Build: tsup
+- Test: Vitest
+- Package: npm (publishable as `npx agent-dashboard`)
+
+## Project Structure
+
+```
+agent-dashboard/
+├── package.json
+├── tsconfig.json
+├── src/
+│   ├── index.ts          # Entry point
+│   ├── cli.ts            # CLI argument parsing
+│   ├── ui/
+│   │   ├── App.tsx       # Main Ink component
+│   │   ├── Dashboard.tsx # Dashboard layout
+│   │   ├── GitPanel.tsx  # Git info panel
+│   │   ├── PlanPanel.tsx # Plan status panel
+│   │   └── TestPanel.tsx # Test results panel
+│   ├── data/
+│   │   ├── git.ts        # Git data collection
+│   │   ├── plan.ts       # Read .agent/plan.json
+│   │   ├── tests.ts      # Parse test results
+│   │   └── watcher.ts    # File watcher for live updates
+│   └── types/
+│       └── index.ts      # Type definitions
+└── tests/
+    ├── git.test.ts
+    ├── plan.test.ts
+    └── ui.test.ts
+```
+
+## Data Sources
+
+| Data | Source | Method |
+|------|--------|--------|
+| Branch | git | `git branch --show-current` |
+| Commits today | git | `git log --since=midnight --oneline` |
+| Lines changed | git | `git diff --stat HEAD~n` |
+| Plan | `.agent/plan.json` | File read + watch |
+| Decisions | `.agent/decisions.json` | File read |
+| Tests | `test-results.json` | Jest/Vitest JSON output |
+
+## .agent/ Directory Schema
+
+### plan.json
+
+```json
+{
+  "goal": "Implement user authentication",
+  "updatedAt": "2025-01-09T10:30:00Z",
+  "steps": [
+    { "step": "Create auth module", "status": "done" },
+    { "step": "Write tests", "status": "done" },
+    { "step": "Implement login", "status": "in-progress" },
+    { "step": "Add session handling", "status": "pending" }
+  ]
+}
+```
+
+### decisions.json
+
+```json
+{
+  "decisions": [
+    {
+      "timestamp": "2025-01-09T09:00:00Z",
+      "decision": "Use JWT for session management",
+      "reason": "Stateless, scalable"
+    }
+  ]
+}
+```
+
+## CLI Interface
+
+```bash
+# Watch mode (default) - live updates
+agent-dashboard
+agent-dashboard --watch
+agent-dashboard -w
+
+# One-shot - print and exit
+agent-dashboard --once
+
+# Specify project directory
+agent-dashboard --dir /path/to/project
+
+# JSON output (for scripting)
+agent-dashboard --json
+```
+
+## Development
+
+### TDD Required
+
+1. Write tests first
+2. Review test before implementation
+3. Implement code that passes tests
+
+### Workflow
+
+1. Create Issue before work
+2. Discuss design, get confirmation
+3. Create branch (never commit to main)
+4. Write tests for all features
+5. Verify tests pass before commit
+6. Update documentation
+7. Link Issue in PR
+
+### Commit Convention
+
+- feat: new feature
+- fix: bug fix
+- docs: documentation
+- refactor: refactoring
+- test: tests
+
+### Do Not
+
+- Commit directly to main
+- Add features without tests
+- Make big changes without confirmation
+- Leave documentation outdated
+
+## State Files
+
+When working on any project with agent-dashboard, maintain `.agent/` directory:
+
+- Update `plan.json` when plan changes
+- Append to `decisions.json` when making important choices
+
+## Future Extensions
+
+- Multi-agent workflow monitoring
+- n8n / LangGraph / CrewAI integration
+- Web dashboard mode
+- Remote agent monitoring
+- Metrics export (Prometheus)

@@ -71,3 +71,37 @@ import { GitPanel } from "./ui/GitPanel.js";
 | `branch` | `string \| null` | Current branch name |
 | `commits` | `Commit[]` | Today's commits (max 5 shown) |
 | `stats` | `GitStats` | Lines added/deleted |
+
+## CLI Entry Point
+
+- **Added**: 2026-01-09
+- **Issue**: #5
+- **Status**: Complete
+- **Tests**: `tests/cli.test.ts`, `tests/App.test.tsx`
+- **Source**: `src/cli.ts`, `src/index.ts`, `src/ui/App.tsx`
+
+### Usage
+
+```bash
+# Watch mode (default) - refreshes every 5 seconds
+agent-dashboard
+agent-dashboard --watch
+agent-dashboard -w
+
+# One-shot mode - print and exit
+agent-dashboard --once
+```
+
+### Keyboard Shortcuts (watch mode)
+
+| Key | Action |
+|-----|--------|
+| `q` | Quit |
+| `r` | Refresh immediately |
+
+### Building
+
+```bash
+npm run build
+node dist/index.js --once
+```

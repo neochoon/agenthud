@@ -50,28 +50,26 @@ export function getTodayCommits(): Commit[] {
 
 export function getTodayStats(): GitStats {
   try {
-    const result = execFn(
-      "git diff --stat HEAD~$(git log --since=midnight --oneline | wc -l) 2>/dev/null || echo ''",
-      { encoding: "utf-8", shell: "/bin/bash" }
-    );
+    const result = execFn('git log --since=midnight --numstat --format=""', {
+      encoding: "utf-8",
+    });
 
-    const match = result.match(
-      /(\d+) insertions?\(\+\).*?(\d+) deletions?\(-\)|(\d+) insertions?\(\+\)|(\d+) deletions?\(-\)/
-    );
+    const lines = result.trim().split("\n").filter(Boolean);
 
-    if (!match) {
-      return { added: 0, deleted: 0 };
+    let added = 0;
+    let deleted = 0;
+
+    for (const line of lines) {
+      const [addedStr, deletedStr] = line.split("\t");
+      // Skip binary files (shown as "-" in numstat)
+      if (addedStr === "-" || deletedStr === "-") {
+        continue;
+      }
+      added += parseInt(addedStr, 10) || 0;
+      deleted += parseInt(deletedStr, 10) || 0;
     }
 
-    if (match[1] && match[2]) {
-      return { added: parseInt(match[1], 10), deleted: parseInt(match[2], 10) };
-    } else if (match[3]) {
-      return { added: parseInt(match[3], 10), deleted: 0 };
-    } else if (match[4]) {
-      return { added: 0, deleted: parseInt(match[4], 10) };
-    }
-
-    return { added: 0, deleted: 0 };
+    return { added, deleted };
   } catch {
     return { added: 0, deleted: 0 };
   }

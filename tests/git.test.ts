@@ -107,16 +107,23 @@ describe("git data module", () => {
   });
 
   describe("getTodayStats", () => {
-    it("returns lines added and deleted", () => {
-      const gitOutput = " 3 files changed, 142 insertions(+), 23 deletions(-)";
+    // Uses git log --since=midnight --numstat --format=""
+    // Output format: <added>\t<deleted>\t<filename>
+
+    it("sums lines added and deleted from numstat output", () => {
+      const gitOutput = [
+        "10\t2\tsrc/index.ts",
+        "50\t10\tsrc/app.ts",
+        "82\t11\ttests/app.test.ts",
+      ].join("\n");
 
       mockExec.mockReturnValue(gitOutput + "\n");
 
       const result = getTodayStats();
 
       expect(result).toEqual({
-        added: 142,
-        deleted: 23,
+        added: 142,   // 10 + 50 + 82
+        deleted: 23,  // 2 + 10 + 11
       });
     });
 
@@ -132,7 +139,10 @@ describe("git data module", () => {
     });
 
     it("handles only insertions", () => {
-      const gitOutput = " 1 file changed, 50 insertions(+)";
+      const gitOutput = [
+        "30\t0\tsrc/new-file.ts",
+        "20\t0\tsrc/another.ts",
+      ].join("\n");
 
       mockExec.mockReturnValue(gitOutput + "\n");
 
@@ -145,7 +155,10 @@ describe("git data module", () => {
     });
 
     it("handles only deletions", () => {
-      const gitOutput = " 1 file changed, 10 deletions(-)";
+      const gitOutput = [
+        "0\t5\tsrc/old-file.ts",
+        "0\t5\tsrc/removed.ts",
+      ].join("\n");
 
       mockExec.mockReturnValue(gitOutput + "\n");
 
@@ -154,6 +167,24 @@ describe("git data module", () => {
       expect(result).toEqual({
         added: 0,
         deleted: 10,
+      });
+    });
+
+    it("handles binary files (shown as - in numstat)", () => {
+      const gitOutput = [
+        "10\t5\tsrc/code.ts",
+        "-\t-\tassets/image.png",
+        "20\t3\tsrc/other.ts",
+      ].join("\n");
+
+      mockExec.mockReturnValue(gitOutput + "\n");
+
+      const result = getTodayStats();
+
+      // Binary files should be skipped
+      expect(result).toEqual({
+        added: 30,
+        deleted: 8,
       });
     });
 

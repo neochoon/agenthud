@@ -1,0 +1,16 @@
+{
+  "goal": "Build agent-dashboard CLI tool",
+  "updatedAt": "2026-01-09T16:00:00Z",
+  "steps": [
+    { "step": "Set up project (npm, TypeScript, Vitest)", "status": "done" },
+    { "step": "Implement git data collection module", "status": "done" },
+    { "step": "Create GitPanel UI component", "status": "done" },
+    { "step": "Add CLI entry point with watch mode", "status": "done" },
+    { "step": "Fix getTodayStats bug", "status": "done" },
+    { "step": "Add --dir flag for project directory", "status": "pending" },
+    { "step": "Add --json flag for JSON output", "status": "pending" },
+    { "step": "Add PlanPanel component", "status": "done" },
+    { "step": "Add TestPanel component", "status": "pending" },
+    { "step": "Publish to npm", "status": "pending" }
+  ]
+}

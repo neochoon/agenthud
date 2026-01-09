@@ -1,0 +1,19 @@
+{
+  "decisions": [
+    {
+      "timestamp": "2026-01-09T13:40:00Z",
+      "decision": "Use dependency injection for git module testing",
+      "reason": "ESM mocking with Vitest is complex; setExecFn/resetExecFn pattern is simpler and more reliable"
+    },
+    {
+      "timestamp": "2026-01-09T14:30:00Z",
+      "decision": "Use Ink for terminal UI",
+      "reason": "React-based, good testing support with ink-testing-library, matches project spec"
+    },
+    {
+      "timestamp": "2026-01-09T15:30:00Z",
+      "decision": "Use git log --numstat for stats instead of git diff --stat",
+      "reason": "git diff --stat returns empty for clean working tree; numstat correctly sums committed changes"
+    }
+  ]
+}

@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Box, Text, useApp, useInput } from "ink";
 import { GitPanel } from "./GitPanel.js";
+import { PlanPanel } from "./PlanPanel.js";
 import { getCurrentBranch, getTodayCommits, getTodayStats } from "../data/git.js";
-import type { Commit, GitStats } from "../types/index.js";
+import { getPlanData } from "../data/plan.js";
+import type { Commit, GitStats, PlanData } from "../types/index.js";
 
 interface AppProps {
   mode: "watch" | "once";
@@ -34,28 +36,44 @@ function useGitData(): [GitData, () => void] {
   return [data, refresh];
 }
 
+function usePlanData(): [PlanData, () => void] {
+  const [data, setData] = useState<PlanData>(() => getPlanData());
+
+  const refresh = useCallback(() => {
+    setData(getPlanData());
+  }, []);
+
+  return [data, refresh];
+}
+
 export function App({ mode }: AppProps): React.ReactElement {
   const { exit } = useApp();
-  const [data, refresh] = useGitData();
+  const [gitData, refreshGit] = useGitData();
+  const [planData, refreshPlan] = usePlanData();
+
+  const refreshAll = useCallback(() => {
+    refreshGit();
+    refreshPlan();
+  }, [refreshGit, refreshPlan]);
 
   // Watch mode: refresh every 5 seconds
   useEffect(() => {
     if (mode !== "watch") return;
 
-    const interval = setInterval(refresh, REFRESH_INTERVAL);
+    const interval = setInterval(refreshAll, REFRESH_INTERVAL);
     return () => clearInterval(interval);
-  }, [mode, refresh]);
+  }, [mode, refreshAll]);
 
   // Keyboard shortcuts (watch mode only)
   useInput(
-    (input, key) => {
+    (input) => {
       if (mode !== "watch") return;
 
       if (input === "q") {
         exit();
       }
       if (input === "r") {
-        refresh();
+        refreshAll();
       }
     },
     { isActive: mode === "watch" }
@@ -64,10 +82,17 @@ export function App({ mode }: AppProps): React.ReactElement {
   return (
     <Box flexDirection="column">
       <GitPanel
-        branch={data.branch}
-        commits={data.commits}
-        stats={data.stats}
+        branch={gitData.branch}
+        commits={gitData.commits}
+        stats={gitData.stats}
       />
+      <Box marginTop={1}>
+        <PlanPanel
+          plan={planData.plan}
+          decisions={planData.decisions}
+          error={planData.error}
+        />
+      </Box>
       {mode === "watch" && (
         <Box marginTop={1}>
           <Text dimColor>

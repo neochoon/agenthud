@@ -105,3 +105,52 @@ agent-dashboard --once
 npm run build
 node dist/index.js --once
 ```
+
+## PlanPanel Component
+
+- **Added**: 2026-01-09
+- **Issue**: #9
+- **Status**: Complete
+- **Tests**: `tests/plan.test.ts`, `tests/PlanPanel.test.tsx`
+- **Source**: `src/data/plan.ts`, `src/ui/PlanPanel.tsx`
+
+### Display
+
+```
+┌─ Plan ───────────────────────────────────┐
+│ Build agent-dashboard CLI tool           │
+├──────────────────────────────────────────┤
+│ ✓ Set up project                         │
+│ ✓ Implement git data collection          │
+│ → Create GitPanel UI component           │
+│ ○ Add CLI entry point                    │
+├──────────────────────────────────────────┤
+│ 2/4 steps done                           │
+├─ Decisions ──────────────────────────────┤
+│ • Use Ink for terminal UI                │
+│ • Use dependency injection for testing   │
+└──────────────────────────────────────────┘
+```
+
+### Data Sources
+
+| File | Required | On Missing |
+|------|----------|------------|
+| `.agent/plan.json` | Yes | "No plan found" |
+| `.agent/decisions.json` | No | Hide section |
+
+### Status Icons
+
+| Status | Icon | Color |
+|--------|------|-------|
+| done | ✓ | green |
+| in-progress | → | yellow |
+| pending | ○ | dim |
+
+### Props
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `plan` | `Plan \| null` | Plan data |
+| `decisions` | `Decision[]` | Recent decisions (max 3) |
+| `error` | `string?` | Error message |

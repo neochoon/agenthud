@@ -40,14 +40,21 @@ export function GitPanel({ branch, commits, stats, uncommitted = 0, countdown }:
   const fileWord = stats.files === 1 ? "file" : "files";
   const hasUncommitted = uncommitted > 0;
 
-  // Calculate content length for padding (plain text, no ANSI codes)
-  let branchLineLength = 1 + branch.length; // " " + branch
+  // Calculate stats suffix length first
+  let statsSuffix = "";
   if (hasCommits) {
-    branchLineLength += ` · +${stats.added} -${stats.deleted} · ${commits.length} ${commitWord} · ${stats.files} ${fileWord}`.length;
+    statsSuffix = ` · +${stats.added} -${stats.deleted} · ${commits.length} ${commitWord} · ${stats.files} ${fileWord}`;
   }
   if (hasUncommitted) {
-    branchLineLength += ` · ${uncommitted} dirty`.length;
+    statsSuffix += ` · ${uncommitted} dirty`;
   }
+
+  // Truncate branch name to fit within INNER_WIDTH
+  const availableForBranch = INNER_WIDTH - 1 - statsSuffix.length; // 1 for leading space
+  const displayBranch = availableForBranch > 3 ? truncate(branch, availableForBranch) : truncate(branch, 10);
+
+  // Calculate content length for padding (plain text, no ANSI codes)
+  const branchLineLength = 1 + displayBranch.length + statsSuffix.length; // " " + branch + stats
   const branchPadding = Math.max(0, INNER_WIDTH - branchLineLength);
 
   return (
@@ -58,7 +65,7 @@ export function GitPanel({ branch, commits, stats, uncommitted = 0, countdown }:
       {/* Branch and stats with colors */}
       <Text>
         {BOX.v}{" "}
-        <Text color="green">{branch}</Text>
+        <Text color="green">{displayBranch}</Text>
         {hasCommits && (
           <>
             <Text dimColor> · </Text>

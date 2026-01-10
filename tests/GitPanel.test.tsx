@@ -194,4 +194,54 @@ describe("GitPanel", () => {
       expect(lastFrame()).toContain("5 dirty");
     });
   });
+
+  describe("long content handling", () => {
+    it("truncates long branch name with stats", () => {
+      const { lastFrame } = render(
+        <GitPanel
+          branch="feat/21-generic-panel-with-very-long-name"
+          commits={mockCommits}
+          stats={{ added: 4993, deleted: 586, files: 44 }}
+        />
+      );
+
+      const output = lastFrame() || "";
+      const lines = output.split("\n");
+
+      // Each line should end with │ (box character)
+      // No line should have content after the closing │
+      for (const line of lines) {
+        if (line.includes("│")) {
+          const lastBoxChar = line.lastIndexOf("│");
+          const afterBox = line.slice(lastBoxChar + 1);
+          expect(afterBox.trim()).toBe("");
+        }
+      }
+    });
+
+    it("does not wrap branch line to multiple lines", () => {
+      const { lastFrame } = render(
+        <GitPanel
+          branch="feat/21-generic-panel"
+          commits={Array(30).fill(null).map((_, i) => ({
+            hash: `abc${i.toString().padStart(4, "0")}`,
+            message: `Commit ${i}`,
+            timestamp: new Date(),
+          }))}
+          stats={{ added: 4993, deleted: 586, files: 44 }}
+        />
+      );
+
+      const output = lastFrame() || "";
+      const lines = output.split("\n");
+
+      // Find the branch line (contains stats with files)
+      const branchLine = lines.find(l => l.includes("files") && l.includes("+4993"));
+      expect(branchLine).toBeDefined();
+
+      // Should contain both branch (possibly truncated) and files on same line
+      expect(branchLine).toContain("feat/21");
+      expect(branchLine).toContain("files");
+    });
+  });
 });

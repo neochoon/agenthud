@@ -55,7 +55,6 @@ export function PlanPanel({ plan, decisions, error }: PlanPanelProps): React.Rea
 
   const doneCount = plan.steps.filter((s) => s.status === "done").length;
   const totalCount = plan.steps.length;
-  const stepWord = totalCount === 1 ? "step" : "steps";
 
   return (
     <Box flexDirection="column" borderStyle="single" paddingX={1} width={PANEL_WIDTH}>
@@ -64,8 +63,13 @@ export function PlanPanel({ plan, decisions, error }: PlanPanelProps): React.Rea
         <Text> Plan </Text>
       </Box>
 
-      {/* Goal */}
-      <Text>{truncate(plan.goal, CONTENT_WIDTH)}</Text>
+      {/* Goal with progress */}
+      <Text>
+        {truncate(plan.goal, CONTENT_WIDTH - 18)}
+        <Text dimColor> · </Text>
+        <Text color="green">{createProgressBar(doneCount, totalCount)}</Text>
+        <Text dimColor> {doneCount}/{totalCount}</Text>
+      </Text>
 
       {/* Steps */}
       {plan.steps.map((step, index) => (
@@ -73,12 +77,6 @@ export function PlanPanel({ plan, decisions, error }: PlanPanelProps): React.Rea
           <StatusIcon status={step.status} /> {truncate(step.step, MAX_STEP_LENGTH)}
         </Text>
       ))}
-
-      {/* Progress bar */}
-      <Text>
-        <Text color="green">{createProgressBar(doneCount, totalCount)}</Text>
-        <Text dimColor> {doneCount}/{totalCount}</Text>
-      </Text>
 
       {/* Decisions section (only if there are decisions) */}
       {decisions.length > 0 && (

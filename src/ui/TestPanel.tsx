@@ -62,11 +62,11 @@ export function TestPanel({
       {/* Summary line */}
       <Text>
         <Text color="green">✓ {results.passed} passed</Text>
-        {"  "}
-        {results.failed > 0 ? (
-          <Text color="red">✗ {results.failed} failed</Text>
-        ) : (
-          <Text dimColor>✗ 0 failed</Text>
+        {results.failed > 0 && (
+          <>
+            {"  "}
+            <Text color="red">✗ {results.failed} failed</Text>
+          </>
         )}
         {results.skipped > 0 && (
           <>
@@ -74,9 +74,8 @@ export function TestPanel({
             <Text dimColor>○ {results.skipped} skipped</Text>
           </>
         )}
-        {"  "}
         <Text dimColor>
-          · {results.hash} · {relativeTime}
+          {" "}· {results.hash} · {relativeTime}
         </Text>
       </Text>
 

@@ -7,7 +7,7 @@
  *   npm run test:save
  *
  * Output:
- *   .agent/test-results.json
+ *   .agenthud/test-results.json
  */
 
 import { execSync } from "child_process";
@@ -106,8 +106,8 @@ function main(): void {
     failures: extractFailures(vitestResult),
   };
 
-  // Ensure .agent directory exists
-  const agentDir = join(process.cwd(), ".agent");
+  // Ensure .agenthud directory exists
+  const agentDir = join(process.cwd(), ".agenthud");
   if (!existsSync(agentDir)) {
     mkdirSync(agentDir, { recursive: true });
   }

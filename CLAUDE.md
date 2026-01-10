@@ -48,7 +48,7 @@ agenthud/
 │   │   └── TestPanel.tsx # Test results panel
 │   ├── data/
 │   │   ├── git.ts        # Git data collection
-│   │   ├── plan.ts       # Read .agent/plan.json
+│   │   ├── plan.ts       # Read .agenthud/plan.json
 │   │   ├── tests.ts      # Parse test results
 │   │   └── watcher.ts    # File watcher for live updates
 │   └── types/
@@ -66,11 +66,11 @@ agenthud/
 | Branch | git | `git branch --show-current` |
 | Commits today | git | `git log --since=midnight --oneline` |
 | Lines changed | git | `git diff --stat HEAD~n` |
-| Plan | `.agent/plan.json` | File read + watch |
-| Decisions | `.agent/decisions.json` | File read |
+| Plan | `.agenthud/plan.json` | File read + watch |
+| Decisions | `.agenthud/decisions.json` | File read |
 | Tests | `test-results.json` | Jest/Vitest JSON output |
 
-## .agent/ Directory Schema
+## .agenthud/ Directory Schema
 
 ### plan.json
 
@@ -153,7 +153,7 @@ agenthud --json
 - Leave documentation outdated
 ## State Files
 
-When working on any project with agenthud, maintain `.agent/` directory:
+When working on any project with agenthud, maintain `.agenthud/` directory:
 
 - Update `plan.json` when plan changes
 - Append to `decisions.json` when making important choices
@@ -168,6 +168,6 @@ When working on any project with agenthud, maintain `.agent/` directory:
 
 ## Agent State
 
-Maintain `.agent/` directory:
+Maintain `.agenthud/` directory:
 - Update `plan.json` when plan changes
 - Append to `decisions.json` for key decisions

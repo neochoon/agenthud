@@ -7,7 +7,7 @@ type ReadFileFn = (path: string) => string;
 type GetHeadHashFn = () => string;
 type GetCommitCountFn = (fromHash: string) => number;
 
-const AGENT_DIR = ".agent";
+const AGENT_DIR = ".agenthud";
 const TEST_RESULTS_FILE = "test-results.json";
 
 let readFileFn: ReadFileFn = (path) => nodeReadFileSync(path, "utf-8");

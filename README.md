@@ -44,14 +44,14 @@ npx agenthud
 ## Features
 
 - **Git**: Branch, commits, line changes
-- **Plan**: Progress, decisions from `.agent/plan.json`
+- **Plan**: Progress, decisions from `.agenthud/plan.json`
 - **Tests**: Results with outdated detection
 
 ## Setup
 
 Add to your `CLAUDE.md`:
 ```markdown
-Maintain `.agent/` directory:
+Maintain `.agenthud/` directory:
 - Update `plan.json` when plan changes
 - Update `decisions.json` for key decisions
 ```

@@ -25,14 +25,14 @@ if (options.command === "init") {
   }
 
   console.log("\nNext steps:");
-  console.log("  1. Edit .agent/plan.json to add your project plan");
+  console.log("  1. Edit .agenthud/plan.json to add your project plan");
   console.log("  2. Run: npx agenthud\n");
 
   process.exit(0);
 }
 
-// Check if .agent/ directory exists
-const agentDirExists = existsSync(".agent");
+// Check if .agenthud/ directory exists
+const agentDirExists = existsSync(".agenthud");
 
 // Clear screen in watch mode for clean display
 if (options.mode === "watch") {

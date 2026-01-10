@@ -4,7 +4,7 @@ import type { Plan, Decision, PlanData } from "../types/index.js";
 
 type ReadFileFn = (path: string) => string;
 
-const AGENT_DIR = ".agent";
+const AGENT_DIR = ".agenthud";
 const PLAN_FILE = "plan.json";
 const DECISIONS_FILE = "decisions.json";
 const MAX_DECISIONS = 3;

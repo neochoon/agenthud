@@ -10,10 +10,10 @@ describe("WelcomePanel", () => {
     expect(lastFrame()).toContain("Welcome to agenthud");
   });
 
-  it("shows no .agent/ directory message", () => {
+  it("shows no .agenthud/ directory message", () => {
     const { lastFrame } = render(<WelcomePanel />);
 
-    expect(lastFrame()).toContain("No .agent/ directory found");
+    expect(lastFrame()).toContain("No .agenthud/ directory found");
   });
 
   it("shows init command instruction", () => {

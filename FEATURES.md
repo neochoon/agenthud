@@ -136,8 +136,8 @@ node dist/index.js --once
 
 | File | Required | On Missing |
 |------|----------|------------|
-| `.agent/plan.json` | Yes | "No plan found" |
-| `.agent/decisions.json` | No | Hide section |
+| `.agenthud/plan.json` | Yes | "No plan found" |
+| `.agenthud/decisions.json` | No | Hide section |
 
 ### Status Icons
 
@@ -194,7 +194,7 @@ Outdated (hash differs from HEAD):
 npm run test:save
 ```
 
-Creates `.agent/test-results.json`:
+Creates `.agenthud/test-results.json`:
 ```json
 {
   "hash": "abc1234",
@@ -231,11 +231,11 @@ npx agenthud init
 
 ### Behavior
 
-1. **Welcome screen**: When running `agenthud` without `.agent/` directory:
+1. **Welcome screen**: When running `agenthud` without `.agenthud/` directory:
 ```
 ┌─ Welcome to agenthud ────────────────────────────────────┐
 │                                                          │
-│   No .agent/ directory found.                            │
+│   No .agenthud/ directory found.                            │
 │                                                          │
 │   Quick setup:                                           │
 │      npx agenthud init                                   │
@@ -247,16 +247,18 @@ npx agenthud init
 ```
 
 2. **Init command** creates:
-   - `.agent/plan.json`: `{}`
-   - `.agent/decisions.json`: `[]`
+   - `.agenthud/plan.json`: `{}`
+   - `.agenthud/decisions.json`: `[]`
+   - `.gitignore` with `.agenthud/` (or appends if exists)
    - `CLAUDE.md` with Agent State section (or appends if exists)
 
 ### Files Created
 
 | File | Content |
 |------|---------|
-| `.agent/plan.json` | `{}` |
-| `.agent/decisions.json` | `[]` |
+| `.agenthud/plan.json` | `{}` |
+| `.agenthud/decisions.json` | `[]` |
+| `.gitignore` | `.agenthud/` |
 | `CLAUDE.md` | Agent State section |
 
 ### CLAUDE.md Section
@@ -264,7 +266,7 @@ npx agenthud init
 ```markdown
 ## Agent State
 
-Maintain `.agent/` directory:
+Maintain `.agenthud/` directory:
 - Update `plan.json` when plan changes
 - Append to `decisions.json` for key decisions
 ```

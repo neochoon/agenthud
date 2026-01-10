@@ -11,7 +11,7 @@ export function WelcomePanel(): React.ReactElement {
       </Box>
 
       <Text> </Text>
-      <Text>  No .agent/ directory found.</Text>
+      <Text>  No .agenthud/ directory found.</Text>
       <Text> </Text>
       <Text>  Quick setup:</Text>
       <Text color="cyan">     npx agenthud init</Text>

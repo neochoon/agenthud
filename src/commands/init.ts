@@ -39,7 +39,7 @@ export function resetFsMock(): void {
 
 const AGENT_STATE_SECTION = `## Agent State
 
-Maintain \`.agent/\` directory:
+Maintain \`.agenthud/\` directory:
 - Update \`plan.json\` when plan changes
 - Append to \`decisions.json\` for key decisions
 `;
@@ -55,28 +55,42 @@ export function runInit(): InitResult {
     skipped: [],
   };
 
-  // Create .agent/ directory
-  if (!fs.existsSync(".agent")) {
-    fs.mkdirSync(".agent", { recursive: true });
-    result.created.push(".agent/");
+  // Create .agenthud/ directory
+  if (!fs.existsSync(".agenthud")) {
+    fs.mkdirSync(".agenthud", { recursive: true });
+    result.created.push(".agenthud/");
   } else {
-    result.skipped.push(".agent/");
+    result.skipped.push(".agenthud/");
   }
 
   // Create plan.json
-  if (!fs.existsSync(".agent/plan.json")) {
-    fs.writeFileSync(".agent/plan.json", "{}\n");
-    result.created.push(".agent/plan.json");
+  if (!fs.existsSync(".agenthud/plan.json")) {
+    fs.writeFileSync(".agenthud/plan.json", "{}\n");
+    result.created.push(".agenthud/plan.json");
   } else {
-    result.skipped.push(".agent/plan.json");
+    result.skipped.push(".agenthud/plan.json");
   }
 
   // Create decisions.json
-  if (!fs.existsSync(".agent/decisions.json")) {
-    fs.writeFileSync(".agent/decisions.json", "[]\n");
-    result.created.push(".agent/decisions.json");
+  if (!fs.existsSync(".agenthud/decisions.json")) {
+    fs.writeFileSync(".agenthud/decisions.json", "[]\n");
+    result.created.push(".agenthud/decisions.json");
   } else {
-    result.skipped.push(".agent/decisions.json");
+    result.skipped.push(".agenthud/decisions.json");
+  }
+
+  // Handle .gitignore
+  if (!fs.existsSync(".gitignore")) {
+    fs.writeFileSync(".gitignore", ".agenthud/\n");
+    result.created.push(".gitignore");
+  } else {
+    const content = fs.readFileSync(".gitignore");
+    if (!content.includes(".agenthud/")) {
+      fs.appendFileSync(".gitignore", "\n.agenthud/\n");
+      result.created.push(".gitignore");
+    } else {
+      result.skipped.push(".gitignore");
+    }
   }
 
   // Handle CLAUDE.md

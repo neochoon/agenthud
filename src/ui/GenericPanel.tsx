@@ -66,7 +66,7 @@ function ListRenderer({ data, width }: { data: GenericPanelData; width: number }
         <Text>{BOX.v}{padLine(" " + truncate(data.summary, contentWidth), width)}{BOX.v}</Text>
       )}
       {items.map((item, index) => (
-        <Text key={index}>{BOX.v}{padLine(" • " + truncate(item.text, contentWidth - 3), width)}{BOX.v}</Text>
+        <Text key={`list-item-${index}`}>{BOX.v}{padLine(" • " + truncate(item.text, contentWidth - 3), width)}{BOX.v}</Text>
       ))}
       {items.length === 0 && data.summary && null}
     </>
@@ -86,7 +86,7 @@ function ProgressRenderer({ data, width }: { data: GenericPanelData; width: numb
         const icon = item.status === "done" ? "✓" : item.status === "failed" ? "✗" : "○";
         const line = ` ${icon} ${truncate(item.text, contentWidth - 3)}`;
         return (
-          <Text key={index}>{BOX.v}{padLine(line, width)}{BOX.v}</Text>
+          <Text key={`progress-item-${index}`}>{BOX.v}{padLine(line, width)}{BOX.v}</Text>
         );
       })}
       {items.length === 0 && !data.summary && (
@@ -135,7 +135,7 @@ function StatusRenderer({ data, width }: { data: GenericPanelData; width: number
         {" ".repeat(summaryPadding)}{BOX.v}
       </Text>
       {items.length > 0 && items.map((item, index) => (
-        <Text key={index}>{BOX.v}{padLine(" • " + truncate(item.text, contentWidth - 3), width)}{BOX.v}</Text>
+        <Text key={`status-item-${index}`}>{BOX.v}{padLine(" • " + truncate(item.text, contentWidth - 3), width)}{BOX.v}</Text>
       ))}
     </>
   );

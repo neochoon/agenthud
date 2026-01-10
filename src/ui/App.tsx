@@ -458,7 +458,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
         if (panelName === "git" && config.panels.git.enabled) {
           const gitVisual = visualStates.git || DEFAULT_VISUAL_STATE;
           return (
-            <Box key="git" marginTop={isFirst ? 0 : 1}>
+            <Box key={`panel-git-${index}`} marginTop={isFirst ? 0 : 1}>
               <GitPanel
                 branch={gitData.branch}
                 commits={gitData.commits}
@@ -477,7 +477,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
         if (panelName === "plan" && config.panels.plan.enabled) {
           const planVisual = visualStates.plan || DEFAULT_VISUAL_STATE;
           return (
-            <Box key="plan" marginTop={isFirst ? 0 : 1}>
+            <Box key={`panel-plan-${index}`} marginTop={isFirst ? 0 : 1}>
               <PlanPanel
                 plan={planData.plan}
                 decisions={planData.decisions}
@@ -494,7 +494,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
         if (panelName === "tests" && config.panels.tests.enabled) {
           const testsVisual = visualStates.tests || DEFAULT_VISUAL_STATE;
           return (
-            <Box key="tests" marginTop={isFirst ? 0 : 1}>
+            <Box key={`panel-tests-${index}`} marginTop={isFirst ? 0 : 1}>
               <TestPanel
                 results={testData.results}
                 isOutdated={testData.isOutdated}
@@ -520,7 +520,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
           const countdown = !isManual && mode === "watch" ? countdowns[panelName] : null;
 
           return (
-            <Box key={panelName} marginTop={isFirst ? 0 : 1}>
+            <Box key={`panel-${panelName}-${index}`} marginTop={isFirst ? 0 : 1}>
               <GenericPanel
                 data={result.data}
                 renderer={customConfig.renderer}

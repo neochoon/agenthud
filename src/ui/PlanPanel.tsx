@@ -95,7 +95,7 @@ export function PlanPanel({ plan, decisions, error, countdown, width = DEFAULT_P
       {plan.steps.map((step, index) => {
         const stepText = " " + (step.status === "done" ? "✓" : step.status === "in-progress" ? "→" : "○") + " " + truncate(step.step, maxStepLength);
         return (
-          <Text key={index}>{BOX.v}{padLine(stepText, width)}{BOX.v}</Text>
+          <Text key={`step-${index}`}>{BOX.v}{padLine(stepText, width)}{BOX.v}</Text>
         );
       })}
 
@@ -106,7 +106,7 @@ export function PlanPanel({ plan, decisions, error, countdown, width = DEFAULT_P
           {decisions.map((decision, index) => {
             const decText = " • " + truncate(decision.decision, maxDecisionLength);
             return (
-              <Text key={index}>{BOX.v}<Text dimColor>{padLine(decText, width)}</Text>{BOX.v}</Text>
+              <Text key={`decision-${index}`}>{BOX.v}<Text dimColor>{padLine(decText, width)}</Text>{BOX.v}</Text>
             );
           })}
         </>

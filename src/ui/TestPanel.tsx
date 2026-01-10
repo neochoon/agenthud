@@ -122,7 +122,7 @@ export function TestPanel({
             const testName = truncate(failure.name, contentWidth - 5);
             const testPadding = Math.max(0, innerWidth - 5 - testName.length); // "   • " + name
             return (
-              <Box key={index} flexDirection="column">
+              <Box key={`failure-${index}`} flexDirection="column">
                 <Text>
                   {BOX.v}{" "}
                   <Text color="red">✗ {fileName}</Text>

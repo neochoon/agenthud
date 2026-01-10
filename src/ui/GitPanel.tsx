@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import type { Commit, GitStats } from "../types/index.js";
+import { PANEL_WIDTH, SEPARATOR } from "./constants.js";
 
 interface GitPanelProps {
   branch: string | null;
@@ -14,7 +15,7 @@ export function GitPanel({ branch, commits, stats }: GitPanelProps): React.React
   // Not a git repository
   if (branch === null) {
     return (
-      <Box flexDirection="column" borderStyle="single" paddingX={1}>
+      <Box flexDirection="column" borderStyle="single" paddingX={1} width={PANEL_WIDTH}>
         <Box marginTop={-1}>
           <Text> Git </Text>
         </Box>
@@ -28,7 +29,7 @@ export function GitPanel({ branch, commits, stats }: GitPanelProps): React.React
   const commitWord = commits.length === 1 ? "commit" : "commits";
 
   return (
-    <Box flexDirection="column" borderStyle="single" paddingX={1}>
+    <Box flexDirection="column" borderStyle="single" paddingX={1} width={PANEL_WIDTH}>
       {/* Header */}
       <Box marginTop={-1}>
         <Text> Git </Text>
@@ -41,7 +42,7 @@ export function GitPanel({ branch, commits, stats }: GitPanelProps): React.React
 
       {/* Separator */}
       <Box marginY={0}>
-        <Text dimColor>──────────────────────────────────────────</Text>
+        <Text dimColor>{SEPARATOR}</Text>
       </Box>
 
       {hasCommits ? (

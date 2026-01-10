@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import type { TestResults } from "../types/index.js";
+import { PANEL_WIDTH, SEPARATOR } from "./constants.js";
 
 interface TestPanelProps {
   results: TestResults | null;
@@ -32,7 +33,7 @@ export function TestPanel({
   // Error state
   if (error || !results) {
     return (
-      <Box flexDirection="column" borderStyle="single" paddingX={1}>
+      <Box flexDirection="column" borderStyle="single" paddingX={1} width={PANEL_WIDTH}>
         <Box marginTop={-1}>
           <Text> Tests </Text>
         </Box>
@@ -45,7 +46,7 @@ export function TestPanel({
   const relativeTime = formatRelativeTime(results.timestamp);
 
   return (
-    <Box flexDirection="column" borderStyle="single" paddingX={1}>
+    <Box flexDirection="column" borderStyle="single" paddingX={1} width={PANEL_WIDTH}>
       {/* Header */}
       <Box marginTop={-1}>
         <Text> Tests </Text>
@@ -83,7 +84,7 @@ export function TestPanel({
       {hasFailures && (
         <>
           <Box marginY={0}>
-            <Text dimColor>──────────────────────────────────────────</Text>
+            <Text dimColor>{SEPARATOR}</Text>
           </Box>
           {results.failures.map((failure, index) => (
             <Box key={index} flexDirection="column">

@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import type { Plan, Decision } from "../types/index.js";
+import { PANEL_WIDTH, SEPARATOR } from "./constants.js";
 
 interface PlanPanelProps {
   plan: Plan | null;
@@ -23,7 +24,7 @@ export function PlanPanel({ plan, decisions, error }: PlanPanelProps): React.Rea
   // Error state
   if (error || !plan) {
     return (
-      <Box flexDirection="column" borderStyle="single" paddingX={1}>
+      <Box flexDirection="column" borderStyle="single" paddingX={1} width={PANEL_WIDTH}>
         <Box marginTop={-1}>
           <Text> Plan </Text>
         </Box>
@@ -37,7 +38,7 @@ export function PlanPanel({ plan, decisions, error }: PlanPanelProps): React.Rea
   const stepWord = totalCount === 1 ? "step" : "steps";
 
   return (
-    <Box flexDirection="column" borderStyle="single" paddingX={1}>
+    <Box flexDirection="column" borderStyle="single" paddingX={1} width={PANEL_WIDTH}>
       {/* Header */}
       <Box marginTop={-1}>
         <Text> Plan </Text>
@@ -48,7 +49,7 @@ export function PlanPanel({ plan, decisions, error }: PlanPanelProps): React.Rea
 
       {/* Separator */}
       <Box marginY={0}>
-        <Text dimColor>──────────────────────────────────────────</Text>
+        <Text dimColor>{SEPARATOR}</Text>
       </Box>
 
       {/* Steps */}
@@ -60,7 +61,7 @@ export function PlanPanel({ plan, decisions, error }: PlanPanelProps): React.Rea
 
       {/* Progress */}
       <Box marginY={0}>
-        <Text dimColor>──────────────────────────────────────────</Text>
+        <Text dimColor>{SEPARATOR}</Text>
       </Box>
       <Text dimColor>
         {doneCount}/{totalCount} {stepWord} done
@@ -70,7 +71,7 @@ export function PlanPanel({ plan, decisions, error }: PlanPanelProps): React.Rea
       {decisions.length > 0 && (
         <>
           <Box marginY={0}>
-            <Text dimColor>─ Decisions ─────────────────────────────</Text>
+            <Text dimColor>─ Decisions {SEPARATOR.slice(12)}</Text>
           </Box>
           {decisions.map((decision, index) => (
             <Text key={index} dimColor>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Box, Text, useApp, useInput } from "ink";
 import { GitPanel } from "./GitPanel.js";
 import { PlanPanel } from "./PlanPanel.js";
@@ -7,6 +7,7 @@ import { WelcomePanel } from "./WelcomePanel.js";
 import { getCurrentBranch, getTodayCommits, getTodayStats, getUncommittedCount } from "../data/git.js";
 import { getPlanData } from "../data/plan.js";
 import { getTestData } from "../data/tests.js";
+import { parseConfig, type Config } from "../config/parser.js";
 import { PANEL_WIDTH } from "./constants.js";
 import type { Commit, GitStats, PlanData, TestData } from "../types/index.js";
 
@@ -71,27 +72,47 @@ function WelcomeApp(): React.ReactElement {
 
 function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   const { exit } = useApp();
+
+  // Parse config once at startup
+  const { config, warnings } = useMemo(() => parseConfig(), []);
+
   const [gitData, refreshGit] = useGitData();
   const [planData, refreshPlan] = usePlanData();
   const [testData, refreshTest] = useTestData();
   const [countdown, setCountdown] = useState(REFRESH_SECONDS);
 
   const refreshAll = useCallback(() => {
-    refreshGit();
-    refreshPlan();
-    refreshTest();
+    if (config.panels.git.enabled) refreshGit();
+    if (config.panels.plan.enabled) refreshPlan();
+    if (config.panels.tests.enabled) refreshTest();
     setCountdown(REFRESH_SECONDS);
-  }, [refreshGit, refreshPlan, refreshTest]);
+  }, [refreshGit, refreshPlan, refreshTest, config]);
 
-  // Watch mode: refresh every 5 seconds
+  // Per-panel refresh timers
   useEffect(() => {
     if (mode !== "watch") return;
 
-    const interval = setInterval(refreshAll, REFRESH_INTERVAL);
-    return () => clearInterval(interval);
-  }, [mode, refreshAll]);
+    const timers: NodeJS.Timeout[] = [];
 
-  // Countdown timer (1 second ticks)
+    // Git panel timer
+    if (config.panels.git.enabled && config.panels.git.interval !== null) {
+      timers.push(setInterval(refreshGit, config.panels.git.interval));
+    }
+
+    // Plan panel timer
+    if (config.panels.plan.enabled && config.panels.plan.interval !== null) {
+      timers.push(setInterval(refreshPlan, config.panels.plan.interval));
+    }
+
+    // Tests panel timer (null = manual, no timer)
+    if (config.panels.tests.enabled && config.panels.tests.interval !== null) {
+      timers.push(setInterval(refreshTest, config.panels.tests.interval));
+    }
+
+    return () => timers.forEach((t) => clearInterval(t));
+  }, [mode, config, refreshGit, refreshPlan, refreshTest]);
+
+  // Countdown timer - use shortest interval for display
   useEffect(() => {
     if (mode !== "watch") return;
 
@@ -116,29 +137,40 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
 
   return (
     <Box flexDirection="column">
-      <Box>
-        <GitPanel
-          branch={gitData.branch}
-          commits={gitData.commits}
-          stats={gitData.stats}
-          uncommitted={gitData.uncommitted}
-        />
-      </Box>
-      <Box marginTop={1}>
-        <PlanPanel
-          plan={planData.plan}
-          decisions={planData.decisions}
-          error={planData.error}
-        />
-      </Box>
-      <Box marginTop={1}>
-        <TestPanel
-          results={testData.results}
-          isOutdated={testData.isOutdated}
-          commitsBehind={testData.commitsBehind}
-          error={testData.error}
-        />
-      </Box>
+      {warnings.length > 0 && (
+        <Box marginBottom={1}>
+          <Text color="yellow">⚠ {warnings.join(", ")}</Text>
+        </Box>
+      )}
+      {config.panels.git.enabled && (
+        <Box>
+          <GitPanel
+            branch={gitData.branch}
+            commits={gitData.commits}
+            stats={gitData.stats}
+            uncommitted={gitData.uncommitted}
+          />
+        </Box>
+      )}
+      {config.panels.plan.enabled && (
+        <Box marginTop={config.panels.git.enabled ? 1 : 0}>
+          <PlanPanel
+            plan={planData.plan}
+            decisions={planData.decisions}
+            error={planData.error}
+          />
+        </Box>
+      )}
+      {config.panels.tests.enabled && (
+        <Box marginTop={config.panels.git.enabled || config.panels.plan.enabled ? 1 : 0}>
+          <TestPanel
+            results={testData.results}
+            isOutdated={testData.isOutdated}
+            commitsBehind={testData.commitsBehind}
+            error={testData.error}
+          />
+        </Box>
+      )}
       {mode === "watch" && (
         <Box marginTop={1} width={PANEL_WIDTH}>
           <Text dimColor>

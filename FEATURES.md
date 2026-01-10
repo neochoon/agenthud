@@ -249,6 +249,7 @@ npx agenthud init
 2. **Init command** creates:
    - `.agenthud/plan.json`: `{}`
    - `.agenthud/decisions.json`: `[]`
+   - `.agenthud/config.yaml`: Default config
    - `.gitignore` with `.agenthud/` (or appends if exists)
    - `CLAUDE.md` with Agent State section (or appends if exists)
 
@@ -258,6 +259,7 @@ npx agenthud init
 |------|---------|
 | `.agenthud/plan.json` | `{}` |
 | `.agenthud/decisions.json` | `[]` |
+| `.agenthud/config.yaml` | Default config |
 | `.gitignore` | `.agenthud/` |
 | `CLAUDE.md` | Agent State section |
 
@@ -270,3 +272,77 @@ Maintain `.agenthud/` directory:
 - Update `plan.json` when plan changes
 - Append to `decisions.json` for key decisions
 ```
+
+## Config System
+
+- **Added**: 2026-01-10
+- **Issue**: #17
+- **Status**: Complete
+- **Tests**: `tests/config.test.ts`, `tests/config-integration.test.tsx`, `tests/runner.test.ts`
+- **Source**: `src/config/parser.ts`, `src/runner/command.ts`
+
+### Configuration File
+
+Create `.agenthud/config.yaml`:
+
+```yaml
+# agenthud configuration
+panels:
+  git:
+    enabled: true
+    interval: 30s
+
+  plan:
+    enabled: true
+    interval: 10s
+
+  tests:
+    enabled: true
+    interval: manual
+    # command: npm test -- --reporter=json
+```
+
+### Panel Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `enabled` | `boolean` | Show/hide panel |
+| `interval` | `string` | Refresh interval (`30s`, `5m`, `manual`) |
+| `source` | `string` | (plan only) Path to plan.json |
+| `command` | `string` | (tests only) Command to run |
+
+### Interval Values
+
+| Value | Description |
+|-------|-------------|
+| `30s` | Refresh every 30 seconds |
+| `5m` | Refresh every 5 minutes |
+| `manual` | Only refresh on 'r' key press |
+
+### Per-Panel Refresh
+
+Each panel refreshes independently based on its `interval`:
+- Git: Default 30s (doesn't change often)
+- Plan: Default 10s (Claude updates it frequently)
+- Tests: Default manual (expensive to run)
+
+### Command Runner
+
+When `command` is specified for tests panel, agenthud will:
+1. Execute the command
+2. Parse JSON output (Vitest format)
+3. Display results in Tests panel
+
+```yaml
+panels:
+  tests:
+    enabled: true
+    interval: manual
+    command: npm test -- --reporter=json
+```
+
+### Default Behavior
+
+- No config.yaml: Uses hardcoded defaults
+- Missing field: Uses default silently
+- Invalid field: Shows warning, uses default

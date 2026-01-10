@@ -178,6 +178,48 @@ Maintain \`.agenthud/\` directory:
     });
   });
 
+  describe("creates config.yaml", () => {
+    const defaultConfig = `# agenthud configuration
+panels:
+  git:
+    enabled: true
+    interval: 30s
+
+  plan:
+    enabled: true
+    interval: 10s
+
+  tests:
+    enabled: true
+    interval: manual
+    # command: npm test -- --reporter=json
+`;
+
+    it("creates config.yaml with default content when it doesn't exist", () => {
+      fsMock.existsSync.mockReturnValue(false);
+
+      runInit();
+
+      expect(fsMock.writeFileSync).toHaveBeenCalledWith(
+        ".agenthud/config.yaml",
+        defaultConfig
+      );
+    });
+
+    it("skips config.yaml when it exists", () => {
+      fsMock.existsSync.mockImplementation((path: string) =>
+        path === ".agenthud/config.yaml"
+      );
+
+      runInit();
+
+      expect(fsMock.writeFileSync).not.toHaveBeenCalledWith(
+        ".agenthud/config.yaml",
+        expect.any(String)
+      );
+    });
+  });
+
   describe("return value", () => {
     it("returns list of created files", () => {
       fsMock.existsSync.mockReturnValue(false);
@@ -187,6 +229,7 @@ Maintain \`.agenthud/\` directory:
       expect(result.created).toContain(".agenthud/");
       expect(result.created).toContain(".agenthud/plan.json");
       expect(result.created).toContain(".agenthud/decisions.json");
+      expect(result.created).toContain(".agenthud/config.yaml");
       expect(result.created).toContain(".gitignore");
       expect(result.created).toContain("CLAUDE.md");
     });
@@ -204,6 +247,7 @@ Maintain \`.agenthud/\` directory:
       expect(result.skipped).toContain(".agenthud/");
       expect(result.skipped).toContain(".agenthud/plan.json");
       expect(result.skipped).toContain(".agenthud/decisions.json");
+      expect(result.skipped).toContain(".agenthud/config.yaml");
       expect(result.skipped).toContain(".gitignore");
       expect(result.skipped).toContain("CLAUDE.md");
     });

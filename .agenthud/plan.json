@@ -1,14 +1,16 @@
 {
-  "goal": "Add init command for onboarding",
-  "updatedAt": "2026-01-10T18:25:00Z",
+  "goal": "Add config system with per-panel refresh",
+  "updatedAt": "2026-01-10T21:30:00Z",
   "steps": [
     { "step": "Create issue and branch", "status": "done" },
-    { "step": "Write tests for init command", "status": "done" },
-    { "step": "Write tests for WelcomePanel", "status": "done" },
-    { "step": "Implement init command", "status": "done" },
-    { "step": "Implement WelcomePanel", "status": "done" },
-    { "step": "Update App.tsx to show welcome", "status": "done" },
-    { "step": "Update documentation", "status": "done" },
-    { "step": "Commit and create PR", "status": "in-progress" }
+    { "step": "Add yaml dependency", "status": "done" },
+    { "step": "Write config parser tests", "status": "done" },
+    { "step": "Implement config parser", "status": "done" },
+    { "step": "Write per-panel refresh tests", "status": "done" },
+    { "step": "Implement per-panel refresh", "status": "done" },
+    { "step": "Write command runner tests", "status": "done" },
+    { "step": "Implement command runner", "status": "done" },
+    { "step": "Update init command", "status": "done" },
+    { "step": "Update documentation", "status": "done" }
   ]
 }

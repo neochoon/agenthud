@@ -44,6 +44,22 @@ Maintain \`.agenthud/\` directory:
 - Append to \`decisions.json\` for key decisions
 `;
 
+const DEFAULT_CONFIG = `# agenthud configuration
+panels:
+  git:
+    enabled: true
+    interval: 30s
+
+  plan:
+    enabled: true
+    interval: 10s
+
+  tests:
+    enabled: true
+    interval: manual
+    # command: npm test -- --reporter=json
+`;
+
 export interface InitResult {
   created: string[];
   skipped: string[];
@@ -77,6 +93,14 @@ export function runInit(): InitResult {
     result.created.push(".agenthud/decisions.json");
   } else {
     result.skipped.push(".agenthud/decisions.json");
+  }
+
+  // Create config.yaml
+  if (!fs.existsSync(".agenthud/config.yaml")) {
+    fs.writeFileSync(".agenthud/config.yaml", DEFAULT_CONFIG);
+    result.created.push(".agenthud/config.yaml");
+  } else {
+    result.skipped.push(".agenthud/config.yaml");
   }
 
   // Handle .gitignore

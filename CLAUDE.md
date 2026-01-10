@@ -165,3 +165,9 @@ When working on any project with agenthud, maintain `.agent/` directory:
 - Web dashboard mode
 - Remote agent monitoring
 - Metrics export (Prometheus)
+
+## Agent State
+
+Maintain `.agent/` directory:
+- Update `plan.json` when plan changes
+- Append to `decisions.json` for key decisions

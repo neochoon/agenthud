@@ -71,8 +71,8 @@ function createDecisionsHeader(): string {
 }
 
 export function PlanPanel({ plan, decisions, error }: PlanPanelProps): React.ReactElement {
-  // Error state
-  if (error || !plan) {
+  // Error state - also handle empty plan object
+  if (error || !plan || !plan.goal || !plan.steps) {
     return (
       <Box flexDirection="column" width={PANEL_WIDTH}>
         <Text>{BOX.tl}{BOX.h} Plan {BOX.h.repeat(INNER_WIDTH - 7)}{BOX.tr}</Text>

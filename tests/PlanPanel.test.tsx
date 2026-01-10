@@ -135,6 +135,17 @@ describe("PlanPanel", () => {
       expect(lastFrame()).toContain("░░░░░░░░░░");
     });
 
+    it("handles empty plan object (no goal, no steps)", () => {
+      const emptyPlan = {} as Plan;
+
+      const { lastFrame } = render(
+        <PlanPanel plan={emptyPlan} decisions={[]} />
+      );
+
+      // Should show "No plan" message, not crash
+      expect(lastFrame()).toContain("No plan");
+    });
+
     it("handles all steps done", () => {
       const allDonePlan: Plan = {
         goal: "Complete",

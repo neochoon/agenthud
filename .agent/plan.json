@@ -1,5 +1,5 @@
 {
-  "goal": "Build agent-dashboard CLI tool",
+  "goal": "Build agenthud CLI tool",
   "updatedAt": "2026-01-09T16:30:00Z",
   "steps": [
     { "step": "Set up project (npm, TypeScript, Vitest)", "status": "done" },

@@ -1,13 +1,13 @@
-# agent-dashboard
+# agenthud
 
 CLI tool to monitor agent status in real-time. Works with Claude Code, multi-agent workflows, and any AI agent system.
 
 ## Overview
 
 ```bash
-$ agent-dashboard --watch
+$ agenthud --watch
 
-┌─ agent-dashboard ──────────────────────────┐
+┌─ agenthud ──────────────────────────┐
 │ Agent: Claude Code                         │
 │ Branch: feat/123-auth                      │
 │ Plan: 3/5 steps done                       │

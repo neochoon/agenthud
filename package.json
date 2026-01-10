@@ -1,11 +1,11 @@
 {
-  "name": "agent-dashboard",
+  "name": "agenthud",
   "version": "0.1.0",
   "description": "CLI tool to monitor agent status in real-time. Works with Claude Code, multi-agent workflows, and any AI agent system.",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "agent-dashboard": "dist/index.js"
+    "agenthud": "dist/index.js"
   },
   "files": [
     "dist",
@@ -23,7 +23,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/neochoon/agent-dashboard.git"
+    "url": "git+https://github.com/neochoon/agenthud.git"
   },
   "keywords": [
     "cli",
@@ -37,9 +37,9 @@
   "author": "",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/neochoon/agent-dashboard/issues"
+    "url": "https://github.com/neochoon/agenthud/issues"
   },
-  "homepage": "https://github.com/neochoon/agent-dashboard#readme",
+  "homepage": "https://github.com/neochoon/agenthud#readme",
   "devDependencies": {
     "@types/node": "^25.0.3",
     "@types/react": "^19.2.7",

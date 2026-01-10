@@ -1,13 +1,13 @@
-# agent-dashboard
+# agenthud
 
 CLI tool to monitor agent status in real-time. Works with Claude Code, multi-agent workflows, and any AI agent system.
 
 ## Overview
 
 ```bash
-$ agent-dashboard --watch
+$ agenthud --watch
 
-┌─ agent-dashboard ──────────────────────────┐
+┌─ agenthud ──────────────────────────┐
 │ Agent: Claude Code                         │
 │ Branch: feat/123-auth                      │
 │ Plan: 3/5 steps done                       │
@@ -29,12 +29,12 @@ All source code, comments, commit messages, and documentation must be written in
 - UI: Ink (React for CLI)
 - Build: tsup
 - Test: Vitest
-- Package: npm (publishable as `npx agent-dashboard`)
+- Package: npm (publishable as `npx agenthud`)
 
 ## Project Structure
 
 ```
-agent-dashboard/
+agenthud/
 ├── package.json
 ├── tsconfig.json
 ├── src/
@@ -105,18 +105,18 @@ agent-dashboard/
 
 ```bash
 # Watch mode (default) - live updates
-agent-dashboard
-agent-dashboard --watch
-agent-dashboard -w
+agenthud
+agenthud --watch
+agenthud -w
 
 # One-shot - print and exit
-agent-dashboard --once
+agenthud --once
 
 # Specify project directory
-agent-dashboard --dir /path/to/project
+agenthud --dir /path/to/project
 
 # JSON output (for scripting)
-agent-dashboard --json
+agenthud --json
 ```
 
 ## Development
@@ -153,7 +153,7 @@ agent-dashboard --json
 - Leave documentation outdated
 ## State Files
 
-When working on any project with agent-dashboard, maintain `.agent/` directory:
+When working on any project with agenthud, maintain `.agent/` directory:
 
 - Update `plan.json` when plan changes
 - Append to `decisions.json` when making important choices

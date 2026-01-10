@@ -6,7 +6,7 @@ import type { Plan, Decision } from "../src/types/index.js";
 
 describe("PlanPanel", () => {
   const mockPlan: Plan = {
-    goal: "Build agent-dashboard CLI tool",
+    goal: "Build agenthud CLI tool",
     steps: [
       { step: "Set up project", status: "done" },
       { step: "Add git module", status: "done" },
@@ -26,7 +26,7 @@ describe("PlanPanel", () => {
         <PlanPanel plan={mockPlan} decisions={[]} />
       );
 
-      expect(lastFrame()).toContain("Build agent-dashboard CLI tool");
+      expect(lastFrame()).toContain("Build agenthud CLI tool");
     });
 
     it("shows done steps with checkmark", () => {

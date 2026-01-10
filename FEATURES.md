@@ -84,12 +84,12 @@ import { GitPanel } from "./ui/GitPanel.js";
 
 ```bash
 # Watch mode (default) - refreshes every 5 seconds
-agent-dashboard
-agent-dashboard --watch
-agent-dashboard -w
+agenthud
+agenthud --watch
+agenthud -w
 
 # One-shot mode - print and exit
-agent-dashboard --once
+agenthud --once
 ```
 
 ### Keyboard Shortcuts (watch mode)
@@ -118,7 +118,7 @@ node dist/index.js --once
 
 ```
 ┌─ Plan ───────────────────────────────────┐
-│ Build agent-dashboard CLI tool           │
+│ Build agenthud CLI tool           │
 ├──────────────────────────────────────────┤
 │ ✓ Set up project                         │
 │ ✓ Implement git data collection          │

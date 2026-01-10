@@ -1,7 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import type { Commit, GitStats } from "../types/index.js";
-import { PANEL_WIDTH, SEPARATOR } from "./constants.js";
+import { PANEL_WIDTH, CONTENT_WIDTH, truncate } from "./constants.js";
 
 interface GitPanelProps {
   branch: string | null;
@@ -10,6 +10,8 @@ interface GitPanelProps {
 }
 
 const MAX_COMMITS = 5;
+// "• abc1234 " = 10 chars, rest for message
+const MAX_MESSAGE_LENGTH = CONTENT_WIDTH - 10;
 
 export function GitPanel({ branch, commits, stats }: GitPanelProps): React.ReactElement {
   // Not a git repository
@@ -35,29 +37,26 @@ export function GitPanel({ branch, commits, stats }: GitPanelProps): React.React
         <Text> Git </Text>
       </Box>
 
-      {/* Branch */}
+      {/* Branch and stats */}
       <Text>
-        Branch: <Text color="green">{branch}</Text>
+        <Text color="green">{branch}</Text>
+        {hasCommits && (
+          <>
+            <Text dimColor> · </Text>
+            <Text color="green">+{stats.added}</Text>
+            <Text> </Text>
+            <Text color="red">-{stats.deleted}</Text>
+            <Text dimColor> · {commits.length} {commitWord}</Text>
+          </>
+        )}
       </Text>
-
-      {/* Separator */}
-      <Box marginY={0}>
-        <Text dimColor>{SEPARATOR}</Text>
-      </Box>
 
       {hasCommits ? (
         <>
-          {/* Stats line */}
-          <Text>
-            Today: <Text color="green">+{stats.added}</Text>{" "}
-            <Text color="red">-{stats.deleted}</Text>{" "}
-            <Text>({commits.length} {commitWord})</Text>
-          </Text>
-
           {/* Commit list */}
           {displayCommits.map((commit) => (
             <Text key={commit.hash}>
-              • <Text dimColor>{commit.hash.slice(0, 7)}</Text> {commit.message}
+              • <Text dimColor>{commit.hash.slice(0, 7)}</Text> {truncate(commit.message, MAX_MESSAGE_LENGTH)}
             </Text>
           ))}
         </>

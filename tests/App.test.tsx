@@ -35,7 +35,6 @@ describe("App", () => {
       const { lastFrame } = render(<App mode="once" />);
 
       expect(lastFrame()).toContain("Git");
-      expect(lastFrame()).toContain("Branch:");
       expect(lastFrame()).toContain("main");
     });
 

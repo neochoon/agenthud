@@ -23,7 +23,6 @@ describe("GitPanel", () => {
         />
       );
 
-      expect(lastFrame()).toContain("Branch:");
       expect(lastFrame()).toContain("feat/1-git-data");
     });
 
@@ -107,7 +106,6 @@ describe("GitPanel", () => {
         />
       );
 
-      expect(lastFrame()).toContain("Branch:");
       expect(lastFrame()).toContain("main");
       expect(lastFrame()).toContain("No commits today");
     });

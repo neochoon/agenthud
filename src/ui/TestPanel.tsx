@@ -1,7 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import type { TestResults } from "../types/index.js";
-import { PANEL_WIDTH, SEPARATOR } from "./constants.js";
+import { PANEL_WIDTH, CONTENT_WIDTH, SEPARATOR, truncate } from "./constants.js";
 
 interface TestPanelProps {
   results: TestResults | null;
@@ -83,14 +83,12 @@ export function TestPanel({
       {/* Failures section */}
       {hasFailures && (
         <>
-          <Box marginY={0}>
-            <Text dimColor>{SEPARATOR}</Text>
-          </Box>
+          <Text dimColor>{SEPARATOR}</Text>
           {results.failures.map((failure, index) => (
             <Box key={index} flexDirection="column">
-              <Text color="red">✗ {failure.file}</Text>
+              <Text color="red">✗ {truncate(failure.file, CONTENT_WIDTH - 2)}</Text>
               <Text>
-                {"  "}• {failure.name}
+                {"  "}• {truncate(failure.name, CONTENT_WIDTH - 4)}
               </Text>
             </Box>
           ))}

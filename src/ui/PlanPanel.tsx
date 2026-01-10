@@ -1,7 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import type { Plan, Decision } from "../types/index.js";
-import { PANEL_WIDTH, SEPARATOR } from "./constants.js";
+import { PANEL_WIDTH, CONTENT_WIDTH, truncate } from "./constants.js";
 
 interface PlanPanelProps {
   plan: Plan | null;
@@ -21,12 +21,23 @@ function StatusIcon({ status }: { status: string }): React.ReactElement {
 }
 
 const PROGRESS_BAR_WIDTH = 10;
+// "✓ " = 2 chars, rest for step text
+const MAX_STEP_LENGTH = CONTENT_WIDTH - 2;
+// "• " = 2 chars, rest for decision text
+const MAX_DECISION_LENGTH = CONTENT_WIDTH - 2;
 
 function createProgressBar(done: number, total: number): string {
   if (total === 0) return "░".repeat(PROGRESS_BAR_WIDTH);
   const filled = Math.round((done / total) * PROGRESS_BAR_WIDTH);
   const empty = PROGRESS_BAR_WIDTH - filled;
   return "█".repeat(filled) + "░".repeat(empty);
+}
+
+// Create decisions header: "── Decisions ────────────────────────────────────"
+function createDecisionsHeader(): string {
+  const label = "── Decisions ";
+  const remaining = CONTENT_WIDTH - label.length;
+  return label + "─".repeat(remaining);
 }
 
 export function PlanPanel({ plan, decisions, error }: PlanPanelProps): React.ReactElement {
@@ -54,24 +65,16 @@ export function PlanPanel({ plan, decisions, error }: PlanPanelProps): React.Rea
       </Box>
 
       {/* Goal */}
-      <Text>{plan.goal}</Text>
-
-      {/* Separator */}
-      <Box marginY={0}>
-        <Text dimColor>{SEPARATOR}</Text>
-      </Box>
+      <Text>{truncate(plan.goal, CONTENT_WIDTH)}</Text>
 
       {/* Steps */}
       {plan.steps.map((step, index) => (
         <Text key={index}>
-          <StatusIcon status={step.status} /> {step.step}
+          <StatusIcon status={step.status} /> {truncate(step.step, MAX_STEP_LENGTH)}
         </Text>
       ))}
 
-      {/* Progress */}
-      <Box marginY={0}>
-        <Text dimColor>{SEPARATOR}</Text>
-      </Box>
+      {/* Progress bar */}
       <Text>
         <Text color="green">{createProgressBar(doneCount, totalCount)}</Text>
         <Text dimColor> {doneCount}/{totalCount}</Text>
@@ -80,12 +83,10 @@ export function PlanPanel({ plan, decisions, error }: PlanPanelProps): React.Rea
       {/* Decisions section (only if there are decisions) */}
       {decisions.length > 0 && (
         <>
-          <Box marginY={0}>
-            <Text dimColor>─ Decisions {SEPARATOR.slice(12)}</Text>
-          </Box>
+          <Text dimColor>{createDecisionsHeader()}</Text>
           {decisions.map((decision, index) => (
             <Text key={index} dimColor>
-              • {decision.decision}
+              • {truncate(decision.decision, MAX_DECISION_LENGTH)}
             </Text>
           ))}
         </>

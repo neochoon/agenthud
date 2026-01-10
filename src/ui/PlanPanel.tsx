@@ -1,26 +1,13 @@
 import React from "react";
 import { Box, Text } from "ink";
 import type { Plan, Decision } from "../types/index.js";
-import { PANEL_WIDTH, CONTENT_WIDTH, truncate } from "./constants.js";
-
-// Border characters
-const BOX = { tl: "┌", tr: "┐", bl: "└", br: "┘", h: "─", v: "│" };
+import { PANEL_WIDTH, CONTENT_WIDTH, INNER_WIDTH, BOX, createBottomLine, padLine, truncate } from "./constants.js";
 
 interface PlanPanelProps {
   plan: Plan | null;
   decisions: Decision[];
   error?: string;
-}
-
-function StatusIcon({ status }: { status: string }): React.ReactElement {
-  switch (status) {
-    case "done":
-      return <Text color="green">✓</Text>;
-    case "in-progress":
-      return <Text color="yellow">→</Text>;
-    default:
-      return <Text dimColor>○</Text>;
-  }
+  countdown?: number | null;
 }
 
 const PROGRESS_BAR_WIDTH = 10;
@@ -36,30 +23,33 @@ function createProgressBar(done: number, total: number): string {
   return "█".repeat(filled) + "░".repeat(empty);
 }
 
-// Inner width = PANEL_WIDTH - 2 (for left and right borders)
-const INNER_WIDTH = PANEL_WIDTH - 2;
+function formatCountdown(seconds: number | null | undefined): string {
+  if (seconds == null) return "";
+  return `↻ ${seconds}s`;
+}
 
-// Create title line: "┌─ Plan ──────────────────── 7/10 ███████░░░┐"
-function createTitleLine(done: number, total: number): string {
+// Create title line: "┌─ Plan ─────────── 7/10 ███████░░░ · ↻ 8s ─┐"
+function createPlanTitleLine(done: number, total: number, countdown?: number | null): string {
   const label = " Plan ";
   const count = ` ${done}/${total} `;
   const bar = createProgressBar(done, total);
-  // Total = ┌(1) + ─(1) + label + dashes + count + bar + ┐(1) = PANEL_WIDTH
-  // dashes = PANEL_WIDTH - 3 - label - count - bar
-  const dashCount = PANEL_WIDTH - 3 - label.length - count.length - bar.length;
+  const countdownStr = formatCountdown(countdown);
+  const suffix = countdownStr ? ` · ${countdownStr} ` + BOX.h : "";
+
+  // Total = ┌(1) + ─(1) + label + dashes + count + bar + suffix + ┐(1) = PANEL_WIDTH
+  const dashCount = PANEL_WIDTH - 3 - label.length - count.length - bar.length - suffix.length;
   const dashes = BOX.h.repeat(Math.max(0, dashCount));
-  return BOX.tl + BOX.h + label + dashes + count + bar + BOX.tr;
+  return BOX.tl + BOX.h + label + dashes + count + bar + suffix + BOX.tr;
 }
 
-// Create bottom line
-function createBottomLine(): string {
-  return BOX.bl + BOX.h.repeat(INNER_WIDTH) + BOX.br;
-}
-
-// Pad content to fit inner width (content goes between │ and │)
-function padLine(content: string): string {
-  const padding = INNER_WIDTH - content.length;
-  return content + " ".repeat(Math.max(0, padding));
+// Create simple title line without progress (for error state)
+function createSimpleTitleLine(countdown?: number | null): string {
+  const label = " Plan ";
+  const countdownStr = formatCountdown(countdown);
+  const suffix = countdownStr ? ` ${countdownStr} ` + BOX.h : "";
+  const dashCount = PANEL_WIDTH - 3 - label.length - suffix.length;
+  const dashes = BOX.h.repeat(Math.max(0, dashCount));
+  return BOX.tl + BOX.h + label + dashes + suffix + BOX.tr;
 }
 
 // Create decisions header: "├─ Decisions ────────────────────────────────────┤"
@@ -70,12 +60,12 @@ function createDecisionsHeader(): string {
   return label + "─".repeat(dashCount) + "┤";
 }
 
-export function PlanPanel({ plan, decisions, error }: PlanPanelProps): React.ReactElement {
+export function PlanPanel({ plan, decisions, error, countdown }: PlanPanelProps): React.ReactElement {
   // Error state - also handle empty plan object
   if (error || !plan || !plan.goal || !plan.steps) {
     return (
       <Box flexDirection="column" width={PANEL_WIDTH}>
-        <Text>{BOX.tl}{BOX.h} Plan {BOX.h.repeat(INNER_WIDTH - 7)}{BOX.tr}</Text>
+        <Text>{createSimpleTitleLine(countdown)}</Text>
         <Text>{BOX.v}{padLine(" " + (error || "No plan found"))}{BOX.v}</Text>
         <Text>{createBottomLine()}</Text>
       </Box>
@@ -87,8 +77,8 @@ export function PlanPanel({ plan, decisions, error }: PlanPanelProps): React.Rea
 
   return (
     <Box flexDirection="column" width={PANEL_WIDTH}>
-      {/* Title line with progress bar */}
-      <Text>{createTitleLine(doneCount, totalCount)}</Text>
+      {/* Title line with progress bar and countdown */}
+      <Text>{createPlanTitleLine(doneCount, totalCount, countdown)}</Text>
 
       {/* Goal */}
       <Text>{BOX.v}{padLine(" " + truncate(plan.goal, CONTENT_WIDTH))}{BOX.v}</Text>

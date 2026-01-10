@@ -17,8 +17,44 @@ interface AppProps {
   agentDirExists?: boolean;
 }
 
-const REFRESH_INTERVAL = 5000; // 5 seconds
-const REFRESH_SECONDS = REFRESH_INTERVAL / 1000;
+interface PanelCountdowns {
+  git: number | null;
+  plan: number | null;
+}
+
+interface Hotkey {
+  key: string;
+  label: string;
+  action: () => void;
+}
+
+// Generate hotkeys for manual panels
+function generateHotkeys(
+  config: Config,
+  actions: { tests?: () => void }
+): Hotkey[] {
+  const hotkeys: Hotkey[] = [];
+  const usedKeys = new Set<string>();
+
+  // Tests panel - manual by default
+  if (config.panels.tests.enabled && config.panels.tests.interval === null && actions.tests) {
+    // Use first available letter from "tests"
+    const name = "tests";
+    for (const char of name.toLowerCase()) {
+      if (!usedKeys.has(char)) {
+        usedKeys.add(char);
+        hotkeys.push({
+          key: char,
+          label: "run tests",
+          action: actions.tests,
+        });
+        break;
+      }
+    }
+  }
+
+  return hotkeys;
+}
 
 function WelcomeApp(): React.ReactElement {
   return <WelcomePanel />;
@@ -29,6 +65,10 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
 
   // Parse config once at startup
   const { config, warnings } = useMemo(() => parseConfig(), []);
+
+  // Calculate interval in seconds for display
+  const gitIntervalSeconds = config.panels.git.interval ? config.panels.git.interval / 1000 : null;
+  const planIntervalSeconds = config.panels.plan.interval ? config.panels.plan.interval / 1000 : null;
 
   // Git data - uses config commands
   const [gitData, setGitData] = useState<GitData>(() => getGitData(config.panels.git));
@@ -55,14 +95,31 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
     setTestData(getTestDataFromConfig());
   }, [getTestDataFromConfig]);
 
-  const [countdown, setCountdown] = useState(REFRESH_SECONDS);
+  // Per-panel countdowns
+  const [countdowns, setCountdowns] = useState<PanelCountdowns>({
+    git: gitIntervalSeconds,
+    plan: planIntervalSeconds,
+  });
 
   const refreshAll = useCallback(() => {
-    if (config.panels.git.enabled) refreshGit();
-    if (config.panels.plan.enabled) refreshPlan();
-    if (config.panels.tests.enabled) refreshTest();
-    setCountdown(REFRESH_SECONDS);
-  }, [refreshGit, refreshPlan, refreshTest, config]);
+    if (config.panels.git.enabled) {
+      refreshGit();
+      setCountdowns((prev) => ({ ...prev, git: gitIntervalSeconds }));
+    }
+    if (config.panels.plan.enabled) {
+      refreshPlan();
+      setCountdowns((prev) => ({ ...prev, plan: planIntervalSeconds }));
+    }
+    if (config.panels.tests.enabled) {
+      refreshTest();
+    }
+  }, [refreshGit, refreshPlan, refreshTest, config, gitIntervalSeconds, planIntervalSeconds]);
+
+  // Generate hotkeys for manual panels
+  const hotkeys = useMemo(
+    () => generateHotkeys(config, { tests: refreshTest }),
+    [config, refreshTest]
+  );
 
   // Per-panel refresh timers
   useEffect(() => {
@@ -72,12 +129,22 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
 
     // Git panel timer
     if (config.panels.git.enabled && config.panels.git.interval !== null) {
-      timers.push(setInterval(refreshGit, config.panels.git.interval));
+      timers.push(
+        setInterval(() => {
+          refreshGit();
+          setCountdowns((prev) => ({ ...prev, git: gitIntervalSeconds }));
+        }, config.panels.git.interval)
+      );
     }
 
     // Plan panel timer
     if (config.panels.plan.enabled && config.panels.plan.interval !== null) {
-      timers.push(setInterval(refreshPlan, config.panels.plan.interval));
+      timers.push(
+        setInterval(() => {
+          refreshPlan();
+          setCountdowns((prev) => ({ ...prev, plan: planIntervalSeconds }));
+        }, config.panels.plan.interval)
+      );
     }
 
     // Tests panel timer (null = manual, no timer)
@@ -86,14 +153,17 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
     }
 
     return () => timers.forEach((t) => clearInterval(t));
-  }, [mode, config, refreshGit, refreshPlan, refreshTest]);
+  }, [mode, config, refreshGit, refreshPlan, refreshTest, gitIntervalSeconds, planIntervalSeconds]);
 
-  // Countdown timer - use shortest interval for display
+  // Countdown ticker - decrements every second
   useEffect(() => {
     if (mode !== "watch") return;
 
     const tick = setInterval(() => {
-      setCountdown((prev) => (prev > 1 ? prev - 1 : REFRESH_SECONDS));
+      setCountdowns((prev) => ({
+        git: prev.git !== null && prev.git > 1 ? prev.git - 1 : prev.git,
+        plan: prev.plan !== null && prev.plan > 1 ? prev.plan - 1 : prev.plan,
+      }));
     }, 1000);
     return () => clearInterval(tick);
   }, [mode]);
@@ -107,9 +177,24 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
       if (input === "r") {
         refreshAll();
       }
+      // Handle dynamic hotkeys
+      for (const hotkey of hotkeys) {
+        if (input === hotkey.key) {
+          hotkey.action();
+          break;
+        }
+      }
     },
     { isActive: mode === "watch" }
   );
+
+  // Build status bar content
+  const statusBarItems: string[] = [];
+  for (const hotkey of hotkeys) {
+    statusBarItems.push(`${hotkey.key}: ${hotkey.label}`);
+  }
+  statusBarItems.push("r: refresh");
+  statusBarItems.push("q: quit");
 
   return (
     <Box flexDirection="column">
@@ -125,6 +210,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
             commits={gitData.commits}
             stats={gitData.stats}
             uncommitted={gitData.uncommitted}
+            countdown={mode === "watch" ? countdowns.git : null}
           />
         </Box>
       )}
@@ -134,6 +220,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
             plan={planData.plan}
             decisions={planData.decisions}
             error={planData.error}
+            countdown={mode === "watch" ? countdowns.plan : null}
           />
         </Box>
       )}
@@ -150,7 +237,13 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
       {mode === "watch" && (
         <Box marginTop={1} width={PANEL_WIDTH}>
           <Text dimColor>
-            ↻ {countdown}s · <Text color="cyan">q:</Text> quit · <Text color="cyan">r:</Text> refresh
+            {statusBarItems.map((item, index) => (
+              <React.Fragment key={index}>
+                {index > 0 && " · "}
+                <Text color="cyan">{item.split(":")[0]}:</Text>
+                {item.split(":").slice(1).join(":")}
+              </React.Fragment>
+            ))}
           </Text>
         </Box>
       )}

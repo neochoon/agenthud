@@ -49,10 +49,13 @@ export function GitPanel({ branch, commits, stats, uncommitted = 0 }: GitPanelPr
             <Text color="green">+{stats.added}</Text>
             <Text> </Text>
             <Text color="red">-{stats.deleted}</Text>
-            <Text dimColor> · {commits.length} {commitWord} · {stats.files} {fileWord}{hasUncommitted ? ` · ` : ""}</Text>
-            {hasUncommitted && (
-              <Text color="yellow">{uncommitted} dirty</Text>
-            )}
+            <Text dimColor> · {commits.length} {commitWord} · {stats.files} {fileWord}</Text>
+          </>
+        )}
+        {hasUncommitted && (
+          <>
+            <Text dimColor> · </Text>
+            <Text color="yellow">{uncommitted} dirty</Text>
           </>
         )}
       </Text>

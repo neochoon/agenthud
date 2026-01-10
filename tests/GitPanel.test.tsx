@@ -180,5 +180,18 @@ describe("GitPanel", () => {
 
       expect(lastFrame()).toContain("1 dirty");
     });
+
+    it("shows dirty count even when no commits today", () => {
+      const { lastFrame } = render(
+        <GitPanel
+          branch="main"
+          commits={[]}
+          stats={{ added: 0, deleted: 0, files: 0 }}
+          uncommitted={5}
+        />
+      );
+
+      expect(lastFrame()).toContain("5 dirty");
+    });
   });
 });

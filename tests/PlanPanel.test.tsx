@@ -62,7 +62,15 @@ describe("PlanPanel", () => {
       );
 
       expect(lastFrame()).toContain("2/4");
-      expect(lastFrame()).toMatch(/steps?\s+done/i);
+    });
+
+    it("shows progress bar with filled and empty blocks", () => {
+      const { lastFrame } = render(
+        <PlanPanel plan={mockPlan} decisions={[]} />
+      );
+
+      // 2/4 = 50% = 5 filled blocks out of 10
+      expect(lastFrame()).toContain("█████░░░░░");
     });
   });
 
@@ -123,6 +131,8 @@ describe("PlanPanel", () => {
 
       expect(lastFrame()).toContain("Empty plan");
       expect(lastFrame()).toContain("0/0");
+      // Empty progress bar
+      expect(lastFrame()).toContain("░░░░░░░░░░");
     });
 
     it("handles all steps done", () => {
@@ -139,6 +149,8 @@ describe("PlanPanel", () => {
       );
 
       expect(lastFrame()).toContain("2/2");
+      // Full progress bar
+      expect(lastFrame()).toContain("██████████");
     });
   });
 });

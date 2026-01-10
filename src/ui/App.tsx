@@ -6,6 +6,7 @@ import { TestPanel } from "./TestPanel.js";
 import { getCurrentBranch, getTodayCommits, getTodayStats } from "../data/git.js";
 import { getPlanData } from "../data/plan.js";
 import { getTestData } from "../data/tests.js";
+import { PANEL_WIDTH } from "./constants.js";
 import type { Commit, GitStats, PlanData, TestData } from "../types/index.js";
 
 interface AppProps {
@@ -19,6 +20,7 @@ interface GitData {
 }
 
 const REFRESH_INTERVAL = 5000; // 5 seconds
+const REFRESH_SECONDS = REFRESH_INTERVAL / 1000;
 
 function useGitData(): [GitData, () => void] {
   const [data, setData] = useState<GitData>(() => ({
@@ -63,11 +65,13 @@ export function App({ mode }: AppProps): React.ReactElement {
   const [gitData, refreshGit] = useGitData();
   const [planData, refreshPlan] = usePlanData();
   const [testData, refreshTest] = useTestData();
+  const [countdown, setCountdown] = useState(REFRESH_SECONDS);
 
   const refreshAll = useCallback(() => {
     refreshGit();
     refreshPlan();
     refreshTest();
+    setCountdown(REFRESH_SECONDS);
   }, [refreshGit, refreshPlan, refreshTest]);
 
   // Watch mode: refresh every 5 seconds
@@ -77,6 +81,16 @@ export function App({ mode }: AppProps): React.ReactElement {
     const interval = setInterval(refreshAll, REFRESH_INTERVAL);
     return () => clearInterval(interval);
   }, [mode, refreshAll]);
+
+  // Countdown timer (1 second ticks)
+  useEffect(() => {
+    if (mode !== "watch") return;
+
+    const tick = setInterval(() => {
+      setCountdown((prev) => (prev > 1 ? prev - 1 : REFRESH_SECONDS));
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [mode]);
 
   // Keyboard shortcuts (watch mode only)
   useInput(
@@ -118,9 +132,9 @@ export function App({ mode }: AppProps): React.ReactElement {
         />
       </Box>
       {mode === "watch" && (
-        <Box marginTop={1}>
+        <Box marginTop={1} width={PANEL_WIDTH}>
           <Text dimColor>
-            Press <Text color="cyan">q</Text> to quit, <Text color="cyan">r</Text> to refresh
+            ↻ {countdown}s · <Text color="cyan">q:</Text> quit · <Text color="cyan">r:</Text> refresh
           </Text>
         </Box>
       )}

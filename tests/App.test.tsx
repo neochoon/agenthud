@@ -61,23 +61,33 @@ describe("App", () => {
     });
   });
 
-  describe("keyboard shortcuts", () => {
-    it("shows help text for keyboard shortcuts in watch mode", () => {
+  describe("status bar", () => {
+    it("shows status bar with countdown in watch mode", () => {
       mockExec.mockReturnValue("main\n");
 
       const { lastFrame } = render(<App mode="watch" />);
 
-      expect(lastFrame()).toContain("q");
+      expect(lastFrame()).toContain("↻");
+      expect(lastFrame()).toMatch(/\ds/); // countdown like "5s" or "3s"
+    });
+
+    it("shows keyboard shortcuts in status bar", () => {
+      mockExec.mockReturnValue("main\n");
+
+      const { lastFrame } = render(<App mode="watch" />);
+
+      expect(lastFrame()).toContain("q:");
       expect(lastFrame()).toContain("quit");
-      expect(lastFrame()).toContain("r");
+      expect(lastFrame()).toContain("r:");
       expect(lastFrame()).toContain("refresh");
     });
 
-    it("does not show keyboard help in once mode", () => {
+    it("does not show status bar in once mode", () => {
       mockExec.mockReturnValue("main\n");
 
       const { lastFrame } = render(<App mode="once" />);
 
+      expect(lastFrame()).not.toContain("↻");
       expect(lastFrame()).not.toContain("quit");
     });
   });

@@ -20,6 +20,15 @@ function StatusIcon({ status }: { status: string }): React.ReactElement {
   }
 }
 
+const PROGRESS_BAR_WIDTH = 10;
+
+function createProgressBar(done: number, total: number): string {
+  if (total === 0) return "░".repeat(PROGRESS_BAR_WIDTH);
+  const filled = Math.round((done / total) * PROGRESS_BAR_WIDTH);
+  const empty = PROGRESS_BAR_WIDTH - filled;
+  return "█".repeat(filled) + "░".repeat(empty);
+}
+
 export function PlanPanel({ plan, decisions, error }: PlanPanelProps): React.ReactElement {
   // Error state
   if (error || !plan) {
@@ -63,8 +72,9 @@ export function PlanPanel({ plan, decisions, error }: PlanPanelProps): React.Rea
       <Box marginY={0}>
         <Text dimColor>{SEPARATOR}</Text>
       </Box>
-      <Text dimColor>
-        {doneCount}/{totalCount} {stepWord} done
+      <Text>
+        <Text color="green">{createProgressBar(doneCount, totalCount)}</Text>
+        <Text dimColor> {doneCount}/{totalCount}</Text>
       </Text>
 
       {/* Decisions section (only if there are decisions) */}

@@ -12,6 +12,7 @@ describe("CLI argument parsing", () => {
       const result = parseArgs([]);
 
       expect(result.mode).toBe("watch");
+      expect(result.command).toBeUndefined();
     });
 
     it("returns watch mode with --watch flag", () => {
@@ -35,6 +36,19 @@ describe("CLI argument parsing", () => {
     it("once flag takes precedence over watch", () => {
       const result = parseArgs(["--watch", "--once"]);
 
+      expect(result.mode).toBe("once");
+    });
+
+    it("returns init command when first arg is 'init'", () => {
+      const result = parseArgs(["init"]);
+
+      expect(result.command).toBe("init");
+    });
+
+    it("ignores init if not first argument", () => {
+      const result = parseArgs(["--once", "init"]);
+
+      expect(result.command).toBeUndefined();
       expect(result.mode).toBe("once");
     });
   });

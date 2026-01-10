@@ -1,16 +1,14 @@
 {
-  "goal": "Build agenthud CLI tool",
-  "updatedAt": "2026-01-09T16:30:00Z",
+  "goal": "Add init command for onboarding",
+  "updatedAt": "2026-01-10T18:25:00Z",
   "steps": [
-    { "step": "Set up project (npm, TypeScript, Vitest)", "status": "done" },
-    { "step": "Implement git data collection module", "status": "done" },
-    { "step": "Create GitPanel UI component", "status": "done" },
-    { "step": "Add CLI entry point with watch mode", "status": "done" },
-    { "step": "Fix getTodayStats bug", "status": "done" },
-    { "step": "Add --dir flag for project directory", "status": "pending" },
-    { "step": "Add --json flag for JSON output", "status": "pending" },
-    { "step": "Add PlanPanel component", "status": "done" },
-    { "step": "Add TestPanel component", "status": "done" },
-    { "step": "Publish to npm", "status": "pending" }
+    { "step": "Create issue and branch", "status": "done" },
+    { "step": "Write tests for init command", "status": "done" },
+    { "step": "Write tests for WelcomePanel", "status": "done" },
+    { "step": "Implement init command", "status": "done" },
+    { "step": "Implement WelcomePanel", "status": "done" },
+    { "step": "Update App.tsx to show welcome", "status": "done" },
+    { "step": "Update documentation", "status": "done" },
+    { "step": "Commit and create PR", "status": "in-progress" }
   ]
 }

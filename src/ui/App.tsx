@@ -3,6 +3,7 @@ import { Box, Text, useApp, useInput } from "ink";
 import { GitPanel } from "./GitPanel.js";
 import { PlanPanel } from "./PlanPanel.js";
 import { TestPanel } from "./TestPanel.js";
+import { WelcomePanel } from "./WelcomePanel.js";
 import { getCurrentBranch, getTodayCommits, getTodayStats, getUncommittedCount } from "../data/git.js";
 import { getPlanData } from "../data/plan.js";
 import { getTestData } from "../data/tests.js";
@@ -11,6 +12,7 @@ import type { Commit, GitStats, PlanData, TestData } from "../types/index.js";
 
 interface AppProps {
   mode: "watch" | "once";
+  agentDirExists?: boolean;
 }
 
 interface GitData {
@@ -63,7 +65,11 @@ function useTestData(): [TestData, () => void] {
   return [data, refresh];
 }
 
-export function App({ mode }: AppProps): React.ReactElement {
+function WelcomeApp(): React.ReactElement {
+  return <WelcomePanel />;
+}
+
+function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   const { exit } = useApp();
   const [gitData, refreshGit] = useGitData();
   const [planData, refreshPlan] = usePlanData();
@@ -95,11 +101,9 @@ export function App({ mode }: AppProps): React.ReactElement {
     return () => clearInterval(tick);
   }, [mode]);
 
-  // Keyboard shortcuts (watch mode only)
+  // Keyboard shortcuts
   useInput(
     (input) => {
-      if (mode !== "watch") return;
-
       if (input === "q") {
         exit();
       }
@@ -144,4 +148,11 @@ export function App({ mode }: AppProps): React.ReactElement {
       )}
     </Box>
   );
+}
+
+export function App({ mode, agentDirExists = true }: AppProps): React.ReactElement {
+  if (!agentDirExists) {
+    return <WelcomeApp />;
+  }
+  return <DashboardApp mode={mode} />;
 }

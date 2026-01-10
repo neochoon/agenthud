@@ -30,7 +30,13 @@ export interface PanelConfig {
   interval: number | null; // null = manual
 }
 
-export interface GitPanelConfig extends PanelConfig {}
+export interface GitPanelConfig extends PanelConfig {
+  command?: {
+    branch?: string;
+    commits?: string;
+    stats?: string;
+  };
+}
 
 export interface PlanPanelConfig extends PanelConfig {
   source: string;

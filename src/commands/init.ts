@@ -49,10 +49,15 @@ panels:
   git:
     enabled: true
     interval: 30s
+    command:
+      branch: git branch --show-current
+      commits: git log --since=midnight --pretty=format:"%h|%aI|%s"
+      stats: git log --since=midnight --numstat --pretty=format:""
 
   plan:
     enabled: true
     interval: 10s
+    source: .agenthud/plan.json
 
   tests:
     enabled: true

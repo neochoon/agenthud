@@ -10,6 +10,8 @@ interface GenericPanelProps {
   relativeTime?: string;
   error?: string;
   width?: number;
+  isRunning?: boolean;
+  justRefreshed?: boolean;
 }
 
 const PROGRESS_BAR_WIDTH = 10;
@@ -146,8 +148,12 @@ export function GenericPanel({
   relativeTime,
   error,
   width = DEFAULT_PANEL_WIDTH,
+  isRunning = false,
+  justRefreshed = false,
 }: GenericPanelProps): React.ReactElement {
-  const suffix = formatTitleSuffix(countdown, relativeTime);
+  // Determine suffix based on running state
+  const suffix = isRunning ? "running..." : formatTitleSuffix(countdown, relativeTime);
+  const suffixColor = isRunning ? "yellow" : justRefreshed ? "green" : undefined;
   const progress = data.progress || { done: 0, total: 0 };
 
   // Error state

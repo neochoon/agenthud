@@ -153,4 +153,30 @@ describe("TestPanel", () => {
       expect(lastFrame()).toMatch(/skipped/i);
     });
   });
+
+  describe("visual feedback", () => {
+    it("shows 'running...' when isRunning is true", () => {
+      const { lastFrame } = render(
+        <TestPanel results={null} isOutdated={false} commitsBehind={0} isRunning={true} />
+      );
+
+      expect(lastFrame()).toContain("running...");
+    });
+
+    it("shows relative time when isRunning is false", () => {
+      const { lastFrame } = render(
+        <TestPanel results={mockResults} isOutdated={false} commitsBehind={0} isRunning={false} />
+      );
+
+      expect(lastFrame()).not.toContain("running...");
+    });
+
+    it("shows 'just now' when justCompleted is true", () => {
+      const { lastFrame } = render(
+        <TestPanel results={mockResults} isOutdated={false} commitsBehind={0} justCompleted={true} />
+      );
+
+      expect(lastFrame()).toContain("just now");
+    });
+  });
 });

@@ -9,6 +9,8 @@ interface PlanPanelProps {
   error?: string;
   countdown?: number | null;
   width?: number;
+  justRefreshed?: boolean;
+  relativeTime?: string;
 }
 
 const PROGRESS_BAR_WIDTH = 10;
@@ -27,12 +29,13 @@ function formatCountdown(seconds: number | null | undefined): string {
 }
 
 // Create title line: "┌─ Plan ─────────── 7/10 ███████░░░ · ↻ 8s ─┐"
-function createPlanTitleLine(done: number, total: number, countdown: number | null | undefined, panelWidth: number): string {
+function createPlanTitleLine(done: number, total: number, countdown: number | null | undefined, panelWidth: number, suffixOverride?: string): string {
   const label = " Plan ";
   const count = ` ${done}/${total} `;
   const bar = createProgressBar(done, total);
-  const countdownStr = formatCountdown(countdown);
-  const suffix = countdownStr ? ` · ${countdownStr} ` + BOX.h : "";
+  // Use suffixOverride if provided, otherwise use countdown
+  const suffixStr = suffixOverride || formatCountdown(countdown);
+  const suffix = suffixStr ? ` · ${suffixStr} ` + BOX.h : "";
 
   // Total = ┌(1) + ─(1) + label + dashes + count + bar + suffix + ┐(1) = panelWidth
   const dashCount = panelWidth - 3 - label.length - count.length - bar.length - suffix.length;
@@ -58,7 +61,7 @@ function createDecisionsHeader(panelWidth: number): string {
   return label + "─".repeat(dashCount) + "┤";
 }
 
-export function PlanPanel({ plan, decisions, error, countdown, width = DEFAULT_PANEL_WIDTH }: PlanPanelProps): React.ReactElement {
+export function PlanPanel({ plan, decisions, error, countdown, width = DEFAULT_PANEL_WIDTH, justRefreshed = false, relativeTime }: PlanPanelProps): React.ReactElement {
   const contentWidth = getContentWidth(width);
   const maxStepLength = contentWidth - 2; // "✓ " = 2 chars
   const maxDecisionLength = contentWidth - 2; // "• " = 2 chars
@@ -77,10 +80,13 @@ export function PlanPanel({ plan, decisions, error, countdown, width = DEFAULT_P
   const doneCount = plan.steps.filter((s) => s.status === "done").length;
   const totalCount = plan.steps.length;
 
+  // Determine suffix: "just now" when justRefreshed, relativeTime if provided, otherwise countdown
+  const titleSuffix = justRefreshed ? "just now" : relativeTime || undefined;
+
   return (
     <Box flexDirection="column" width={width}>
       {/* Title line with progress bar and countdown */}
-      <Text>{createPlanTitleLine(doneCount, totalCount, countdown, width)}</Text>
+      <Text>{createPlanTitleLine(doneCount, totalCount, countdown, width, titleSuffix)}</Text>
 
       {/* Goal */}
       <Text>{BOX.v}{padLine(" " + truncate(plan.goal, contentWidth), width)}{BOX.v}</Text>

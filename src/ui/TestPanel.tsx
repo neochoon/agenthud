@@ -9,6 +9,8 @@ interface TestPanelProps {
   commitsBehind: number;
   error?: string;
   width?: number;
+  isRunning?: boolean;
+  justCompleted?: boolean;
 }
 
 function formatRelativeTime(timestamp: string): string {
@@ -36,15 +38,26 @@ export function TestPanel({
   commitsBehind,
   error,
   width = DEFAULT_PANEL_WIDTH,
+  isRunning = false,
+  justCompleted = false,
 }: TestPanelProps): React.ReactElement {
   const innerWidth = getInnerWidth(width);
   const contentWidth = getContentWidth(width);
+
+  // Determine title suffix: "running..." when running, "just now" when justCompleted
+  const getTitleSuffix = (): string => {
+    if (isRunning) return "running...";
+    if (justCompleted) return "just now";
+    if (results) return formatRelativeTime(results.timestamp);
+    return "";
+  };
+  const titleSuffix = getTitleSuffix();
 
   // Error state
   if (error || !results) {
     return (
       <Box flexDirection="column" width={width}>
-        <Text>{createTitleLine("Tests", "", width)}</Text>
+        <Text>{createTitleLine("Tests", titleSuffix, width)}</Text>
         <Text>{BOX.v}<Text dimColor>{padLine(" " + (error || "No test results"), width)}</Text>{BOX.v}</Text>
         <Text>{createBottomLine(width)}</Text>
       </Box>
@@ -52,7 +65,7 @@ export function TestPanel({
   }
 
   const hasFailures = results.failures.length > 0;
-  const relativeTime = formatRelativeTime(results.timestamp);
+  const relativeTime = titleSuffix;
 
   // Calculate summary line length for padding
   let summaryLength = 1 + 2 + String(results.passed).length + " passed".length; // " ✓ X passed"

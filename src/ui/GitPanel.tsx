@@ -10,6 +10,8 @@ interface GitPanelProps {
   uncommitted?: number;
   countdown?: number | null;
   width?: number;
+  isRunning?: boolean;
+  justRefreshed?: boolean;
 }
 
 const MAX_COMMITS = 5;
@@ -20,8 +22,9 @@ function formatCountdown(seconds: number | null | undefined): string {
   return `↻ ${padded}s`;
 }
 
-export function GitPanel({ branch, commits, stats, uncommitted = 0, countdown, width = DEFAULT_PANEL_WIDTH }: GitPanelProps): React.ReactElement {
-  const countdownSuffix = formatCountdown(countdown);
+export function GitPanel({ branch, commits, stats, uncommitted = 0, countdown, width = DEFAULT_PANEL_WIDTH, isRunning = false, justRefreshed = false }: GitPanelProps): React.ReactElement {
+  // When running, show "running..." instead of countdown
+  const countdownSuffix = isRunning ? "running..." : formatCountdown(countdown);
   const innerWidth = getInnerWidth(width);
   const contentWidth = getContentWidth(width);
   const maxMessageLength = contentWidth - 10; // "• abc1234 " = 10 chars

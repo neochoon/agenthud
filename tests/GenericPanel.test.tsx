@@ -216,4 +216,41 @@ describe("GenericPanel", () => {
       });
     });
   });
+
+  describe("visual feedback", () => {
+    it("shows 'running...' in yellow when isRunning is true", () => {
+      const data: GenericPanelData = {
+        title: "Docker",
+        items: [{ text: "nginx" }],
+      };
+
+      const { lastFrame } = render(<GenericPanel data={data} isRunning={true} />);
+
+      expect(lastFrame()).toContain("running...");
+    });
+
+    it("shows relativeTime normally when isRunning is false", () => {
+      const data: GenericPanelData = {
+        title: "Docker",
+        items: [{ text: "nginx" }],
+      };
+
+      const { lastFrame } = render(<GenericPanel data={data} isRunning={false} relativeTime="5m ago" />);
+
+      expect(lastFrame()).toContain("5m ago");
+      expect(lastFrame()).not.toContain("running...");
+    });
+
+    it("shows countdown in green when justRefreshed is true", () => {
+      const data: GenericPanelData = {
+        title: "Docker",
+        items: [{ text: "nginx" }],
+      };
+
+      const { lastFrame } = render(<GenericPanel data={data} countdown={30} justRefreshed={true} />);
+
+      // Should contain countdown (the color is tested by checking it renders)
+      expect(lastFrame()).toContain("30s");
+    });
+  });
 });

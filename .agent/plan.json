@@ -1,13 +1,13 @@
 {
-  "goal": "Generic panel component for custom panels",
-  "updatedAt": "2026-01-10T21:00:00Z",
+  "goal": "Visual feedback for refresh/run",
+  "updatedAt": "2026-01-10T22:40:00Z",
   "steps": [
-    { "step": "Create issue and branch", "status": "in-progress" },
-    { "step": "Write GenericPanel tests", "status": "pending" },
-    { "step": "Implement GenericPanel component", "status": "pending" },
-    { "step": "Update config parser for custom panels", "status": "pending" },
-    { "step": "Update App.tsx to render custom panels", "status": "pending" },
-    { "step": "Update documentation", "status": "pending" },
-    { "step": "Create PR", "status": "pending" }
+    { "step": "Create issue and branch", "status": "done" },
+    { "step": "Write tests for visual feedback", "status": "done" },
+    { "step": "Implement visual feedback in panels", "status": "done" },
+    { "step": "Implement async command execution", "status": "done" },
+    { "step": "Integrate visual feedback in App.tsx", "status": "done" },
+    { "step": "Update documentation", "status": "done" },
+    { "step": "Create PR", "status": "done" }
   ]
 }

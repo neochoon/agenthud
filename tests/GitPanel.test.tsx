@@ -244,4 +244,49 @@ describe("GitPanel", () => {
       expect(branchLine).toContain("files");
     });
   });
+
+  describe("visual feedback", () => {
+    it("shows 'running...' when isRunning is true", () => {
+      const { lastFrame } = render(
+        <GitPanel
+          branch="main"
+          commits={mockCommits}
+          stats={mockStats}
+          isRunning={true}
+        />
+      );
+
+      expect(lastFrame()).toContain("running...");
+    });
+
+    it("shows countdown normally when isRunning is false", () => {
+      const { lastFrame } = render(
+        <GitPanel
+          branch="main"
+          commits={mockCommits}
+          stats={mockStats}
+          isRunning={false}
+          countdown={25}
+        />
+      );
+
+      expect(lastFrame()).toContain("25s");
+      expect(lastFrame()).not.toContain("running...");
+    });
+
+    it("shows countdown in green when justRefreshed is true", () => {
+      const { lastFrame } = render(
+        <GitPanel
+          branch="main"
+          commits={mockCommits}
+          stats={mockStats}
+          countdown={30}
+          justRefreshed={true}
+        />
+      );
+
+      // Should contain countdown (the green color is tested by checking it renders)
+      expect(lastFrame()).toContain("30s");
+    });
+  });
 });

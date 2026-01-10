@@ -520,3 +520,77 @@ Status bar shows: `d: run docker · t: run tests · r: refresh · q: quit`
 | `countdown` | `number \| null` | Countdown seconds |
 | `relativeTime` | `string` | Relative time (for manual) |
 | `error` | `string` | Error message |
+
+## Visual Feedback for Refresh/Run
+
+- **Added**: 2026-01-10
+- **Issue**: #23
+- **Status**: Complete
+- **Tests**: `tests/GitPanel.test.tsx`, `tests/PlanPanel.test.tsx`, `tests/TestPanel.test.tsx`, `tests/GenericPanel.test.tsx`
+- **Source**: `src/ui/App.tsx`, `src/ui/GitPanel.tsx`, `src/ui/PlanPanel.tsx`, `src/ui/TestPanel.tsx`, `src/ui/GenericPanel.tsx`, `src/data/git.ts`, `src/data/custom.ts`
+
+### Overview
+
+Panels now provide visual feedback when refreshing or running commands:
+
+1. **"running..."** in yellow while command executes
+2. **"just now"** in green for 1.5s after completion
+3. **Countdown in green** for 1.5s when timer resets
+
+### Async Command Execution
+
+Commands now execute asynchronously, allowing the UI to remain responsive:
+- Git panel commands run in parallel
+- Custom panel commands run independently
+- UI updates immediately when command starts
+
+### Visual States
+
+| State | Display | Duration | Panels |
+|-------|---------|----------|--------|
+| Running | "running..." (yellow) | While executing | Git, Tests, Custom |
+| Just Completed | "just now" (green) | 1.5s | Tests |
+| Just Refreshed | Countdown in green | 1.5s | Git, Plan, Custom |
+
+### Props Added
+
+#### GitPanel
+| Prop | Type | Description |
+|------|------|-------------|
+| `isRunning` | `boolean` | Shows "running..." in title |
+| `justRefreshed` | `boolean` | Shows countdown in green |
+
+#### PlanPanel
+| Prop | Type | Description |
+|------|------|-------------|
+| `justRefreshed` | `boolean` | Shows "just now" in title |
+| `relativeTime` | `string` | Relative time display |
+
+#### TestPanel
+| Prop | Type | Description |
+|------|------|-------------|
+| `isRunning` | `boolean` | Shows "running..." in title |
+| `justCompleted` | `boolean` | Shows "just now" in title |
+
+#### GenericPanel
+| Prop | Type | Description |
+|------|------|-------------|
+| `isRunning` | `boolean` | Shows "running..." in title |
+| `justRefreshed` | `boolean` | Shows countdown in green |
+
+### Example Display
+
+Normal state:
+```
+┌─ Git ────────────────────────────────── ↻ 25s ─┐
+```
+
+Running:
+```
+┌─ Git ─────────────────────────────── running... ─┐
+```
+
+Just refreshed (countdown in green for 1.5s):
+```
+┌─ Git ────────────────────────────────── ↻ 30s ─┐
+```

@@ -164,4 +164,23 @@ describe("PlanPanel", () => {
       expect(lastFrame()).toContain("██████████");
     });
   });
+
+  describe("visual feedback", () => {
+    it("shows 'just now' when justRefreshed is true", () => {
+      const { lastFrame } = render(
+        <PlanPanel plan={mockPlan} decisions={[]} justRefreshed={true} />
+      );
+
+      expect(lastFrame()).toContain("just now");
+    });
+
+    it("shows relative time when justRefreshed is false", () => {
+      const { lastFrame } = render(
+        <PlanPanel plan={mockPlan} decisions={[]} relativeTime="5m ago" justRefreshed={false} />
+      );
+
+      expect(lastFrame()).toContain("5m ago");
+      expect(lastFrame()).not.toContain("just now");
+    });
+  });
 });

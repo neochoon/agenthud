@@ -197,7 +197,7 @@ panels:
   tests:
     enabled: true
     interval: manual
-    command: npm test -- --reporter=json
+    command: npx vitest run --reporter=json
 `;
 
     it("creates config.yaml with default content when it doesn't exist", () => {

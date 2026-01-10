@@ -62,7 +62,7 @@ panels:
   tests:
     enabled: true
     interval: manual
-    command: npm test -- --reporter=json
+    command: npx vitest run --reporter=json
 `;
 
 export interface InitResult {

@@ -214,3 +214,57 @@ Creates `.agent/test-results.json`:
 | `isOutdated` | `boolean` | Hash differs from HEAD |
 | `commitsBehind` | `number` | Commits since test run |
 | `error` | `string?` | Error message |
+
+## Init Command
+
+- **Added**: 2026-01-10
+- **Issue**: #13
+- **Status**: Complete
+- **Tests**: `tests/init.test.ts`, `tests/WelcomePanel.test.tsx`
+- **Source**: `src/commands/init.ts`, `src/ui/WelcomePanel.tsx`
+
+### Usage
+
+```bash
+npx agenthud init
+```
+
+### Behavior
+
+1. **Welcome screen**: When running `agenthud` without `.agent/` directory:
+```
+┌─ Welcome to agenthud ────────────────────────────────────┐
+│                                                          │
+│   No .agent/ directory found.                            │
+│                                                          │
+│   Quick setup:                                           │
+│      npx agenthud init                                   │
+│                                                          │
+│   Or visit: github.com/neochoon/agenthud                 │
+│                                                          │
+│   Press q to quit                                        │
+└──────────────────────────────────────────────────────────┘
+```
+
+2. **Init command** creates:
+   - `.agent/plan.json`: `{}`
+   - `.agent/decisions.json`: `[]`
+   - `CLAUDE.md` with Agent State section (or appends if exists)
+
+### Files Created
+
+| File | Content |
+|------|---------|
+| `.agent/plan.json` | `{}` |
+| `.agent/decisions.json` | `[]` |
+| `CLAUDE.md` | Agent State section |
+
+### CLAUDE.md Section
+
+```markdown
+## Agent State
+
+Maintain `.agent/` directory:
+- Update `plan.json` when plan changes
+- Append to `decisions.json` for key decisions
+```

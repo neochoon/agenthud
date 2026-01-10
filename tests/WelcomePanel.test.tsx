@@ -1,0 +1,36 @@
+import React from "react";
+import { describe, it, expect } from "vitest";
+import { render } from "ink-testing-library";
+import { WelcomePanel } from "../src/ui/WelcomePanel.js";
+
+describe("WelcomePanel", () => {
+  it("shows welcome title", () => {
+    const { lastFrame } = render(<WelcomePanel />);
+
+    expect(lastFrame()).toContain("Welcome to agenthud");
+  });
+
+  it("shows no .agent/ directory message", () => {
+    const { lastFrame } = render(<WelcomePanel />);
+
+    expect(lastFrame()).toContain("No .agent/ directory found");
+  });
+
+  it("shows init command instruction", () => {
+    const { lastFrame } = render(<WelcomePanel />);
+
+    expect(lastFrame()).toContain("npx agenthud init");
+  });
+
+  it("shows github link", () => {
+    const { lastFrame } = render(<WelcomePanel />);
+
+    expect(lastFrame()).toContain("github.com/neochoon/agenthud");
+  });
+
+  it("shows quit instruction", () => {
+    const { lastFrame } = render(<WelcomePanel />);
+
+    expect(lastFrame()).toContain("Press q to quit");
+  });
+});

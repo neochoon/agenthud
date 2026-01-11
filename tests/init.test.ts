@@ -19,8 +19,8 @@ describe("init command", () => {
     resetFsMock();
   });
 
-  describe("creates .agenthud/ directory", () => {
-    it("creates directory when it doesn't exist", () => {
+  describe("creates .agenthud/ directory structure", () => {
+    it("creates .agenthud directory when it doesn't exist", () => {
       fsMock.existsSync.mockReturnValue(false);
 
       runInit();
@@ -28,62 +28,78 @@ describe("init command", () => {
       expect(fsMock.mkdirSync).toHaveBeenCalledWith(".agenthud", { recursive: true });
     });
 
-    it("skips directory creation when it exists", () => {
+    it("creates .agenthud/plan directory", () => {
+      fsMock.existsSync.mockReturnValue(false);
+
+      runInit();
+
+      expect(fsMock.mkdirSync).toHaveBeenCalledWith(".agenthud/plan", { recursive: true });
+    });
+
+    it("creates .agenthud/tests directory", () => {
+      fsMock.existsSync.mockReturnValue(false);
+
+      runInit();
+
+      expect(fsMock.mkdirSync).toHaveBeenCalledWith(".agenthud/tests", { recursive: true });
+    });
+
+    it("skips directory creation when .agenthud exists", () => {
       fsMock.existsSync.mockImplementation((path: string) => path === ".agenthud");
 
       runInit();
 
-      expect(fsMock.mkdirSync).not.toHaveBeenCalled();
+      expect(fsMock.mkdirSync).not.toHaveBeenCalledWith(".agenthud", { recursive: true });
     });
   });
 
-  describe("creates plan.json", () => {
-    it("creates empty plan.json when it doesn't exist", () => {
+  describe("creates plan/plan.json", () => {
+    it("creates empty plan.json in plan folder when it doesn't exist", () => {
       fsMock.existsSync.mockReturnValue(false);
 
       runInit();
 
       expect(fsMock.writeFileSync).toHaveBeenCalledWith(
-        ".agenthud/plan.json",
+        ".agenthud/plan/plan.json",
         "{}\n"
       );
     });
 
     it("skips plan.json when it exists", () => {
       fsMock.existsSync.mockImplementation((path: string) =>
-        path === ".agenthud/plan.json"
+        path === ".agenthud/plan/plan.json"
       );
 
       runInit();
 
       expect(fsMock.writeFileSync).not.toHaveBeenCalledWith(
-        ".agenthud/plan.json",
+        ".agenthud/plan/plan.json",
         expect.any(String)
       );
     });
   });
 
-  describe("creates decisions.json", () => {
-    it("creates empty decisions.json when it doesn't exist", () => {
+  describe("creates plan/decisions.json", () => {
+    it("creates empty decisions.json in plan folder when it doesn't exist", () => {
       fsMock.existsSync.mockReturnValue(false);
 
       runInit();
 
       expect(fsMock.writeFileSync).toHaveBeenCalledWith(
-        ".agenthud/decisions.json",
+        ".agenthud/plan/decisions.json",
         "[]\n"
       );
     });
 
     it("skips decisions.json when it exists", () => {
       fsMock.existsSync.mockImplementation((path: string) =>
-        path === ".agenthud/decisions.json"
+        path === ".agenthud/plan/decisions.json"
       );
 
       runInit();
 
       expect(fsMock.writeFileSync).not.toHaveBeenCalledWith(
-        ".agenthud/decisions.json",
+        ".agenthud/plan/decisions.json",
         expect.any(String)
       );
     });
@@ -196,7 +212,7 @@ panels:
   plan:
     enabled: true
     interval: 10s
-    source: .agenthud/plan.json
+    source: .agenthud/plan/plan.json
 
   tests:
     enabled: true
@@ -236,8 +252,10 @@ panels:
       const result = runInit();
 
       expect(result.created).toContain(".agenthud/");
-      expect(result.created).toContain(".agenthud/plan.json");
-      expect(result.created).toContain(".agenthud/decisions.json");
+      expect(result.created).toContain(".agenthud/plan/");
+      expect(result.created).toContain(".agenthud/tests/");
+      expect(result.created).toContain(".agenthud/plan/plan.json");
+      expect(result.created).toContain(".agenthud/plan/decisions.json");
       expect(result.created).toContain(".agenthud/config.yaml");
       expect(result.created).toContain(".gitignore");
       expect(result.created).toContain("CLAUDE.md");
@@ -254,8 +272,10 @@ panels:
       const result = runInit();
 
       expect(result.skipped).toContain(".agenthud/");
-      expect(result.skipped).toContain(".agenthud/plan.json");
-      expect(result.skipped).toContain(".agenthud/decisions.json");
+      expect(result.skipped).toContain(".agenthud/plan/");
+      expect(result.skipped).toContain(".agenthud/tests/");
+      expect(result.skipped).toContain(".agenthud/plan/plan.json");
+      expect(result.skipped).toContain(".agenthud/plan/decisions.json");
       expect(result.skipped).toContain(".agenthud/config.yaml");
       expect(result.skipped).toContain(".gitignore");
       expect(result.skipped).toContain("CLAUDE.md");

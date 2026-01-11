@@ -44,7 +44,7 @@ describe("getDefaultConfig", () => {
 
     expect(config.panels.plan.enabled).toBe(true);
     expect(config.panels.plan.interval).toBe(10000); // 10s
-    expect(config.panels.plan.source).toBe(".agenthud/plan.json");
+    expect(config.panels.plan.source).toBe(".agenthud/plan/plan.json");
   });
 
   it("returns default tests config", () => {

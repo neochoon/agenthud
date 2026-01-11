@@ -117,7 +117,7 @@ export function getDefaultConfig(): Config {
       plan: {
         enabled: true,
         interval: 10000, // 10s
-        source: ".agenthud/plan.json",
+        source: ".agenthud/plan/plan.json",
       },
       tests: {
         enabled: true,

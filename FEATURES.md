@@ -681,3 +681,80 @@ panels:
 | `countdown` | `number \| null` | Countdown seconds |
 | `width` | `number` | Panel width |
 | `justRefreshed` | `boolean` | Shows countdown in green |
+
+## Panel-Based Folder Structure
+
+- **Added**: 2026-01-11
+- **Issue**: #27
+- **Status**: Complete
+- **Tests**: `tests/init.test.ts`, `tests/plan.test.ts`, `tests/tests.test.ts`
+- **Source**: `src/commands/init.ts`, `src/data/plan.ts`, `src/data/tests.ts`, `src/config/parser.ts`
+
+### Overview
+
+The `.agenthud/` folder now uses a panel-based structure:
+
+```
+.agenthud/
+├── config.yaml
+├── plan/
+│   ├── plan.json
+│   └── decisions.json
+└── tests/
+    └── results.json
+```
+
+### Backwards Compatibility
+
+- **New projects**: Get the new folder structure on `agenthud init`
+- **Old projects**: Keep working with old locations (`.agenthud/plan.json`, `.agenthud/decisions.json`)
+- **Fallback logic**: Checks new location first, falls back to old location
+- **No migration**: No auto-migration or warnings
+
+### Init Command
+
+Creates the new structure:
+
+| Path | Content |
+|------|---------|
+| `.agenthud/` | Root directory |
+| `.agenthud/plan/` | Plan panel directory |
+| `.agenthud/tests/` | Tests panel directory |
+| `.agenthud/config.yaml` | Configuration file |
+| `.agenthud/plan/plan.json` | Plan data |
+| `.agenthud/plan/decisions.json` | Decisions list |
+
+### Config Defaults
+
+```yaml
+panels:
+  plan:
+    enabled: true
+    interval: 10s
+    source: .agenthud/plan/plan.json  # New location
+
+  tests:
+    enabled: true
+    interval: manual
+    command: npx vitest run --reporter=json
+    # source: .agenthud/tests/results.json  # Optional
+```
+
+### Tests Panel Source Option
+
+The tests panel now supports both `command` and `source` options:
+
+| Option | Priority | Behavior |
+|--------|----------|----------|
+| `command` | 1 | Run command and parse output |
+| `source` | 2 | Read from JSON file |
+
+If both are set, `command` takes priority.
+
+### Plan Fallback Logic
+
+```
+1. Check .agenthud/plan/plan.json (new location)
+2. If not found, check .agenthud/plan.json (old location)
+3. Same fallback for decisions.json
+```

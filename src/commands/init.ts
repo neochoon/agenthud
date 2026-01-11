@@ -61,7 +61,7 @@ panels:
   plan:
     enabled: true
     interval: 10s
-    source: .agenthud/plan.json
+    source: .agenthud/plan/plan.json
 
   tests:
     enabled: true
@@ -88,20 +88,36 @@ export function runInit(): InitResult {
     result.skipped.push(".agenthud/");
   }
 
-  // Create plan.json
-  if (!fs.existsSync(".agenthud/plan.json")) {
-    fs.writeFileSync(".agenthud/plan.json", "{}\n");
-    result.created.push(".agenthud/plan.json");
+  // Create .agenthud/plan/ directory
+  if (!fs.existsSync(".agenthud/plan")) {
+    fs.mkdirSync(".agenthud/plan", { recursive: true });
+    result.created.push(".agenthud/plan/");
   } else {
-    result.skipped.push(".agenthud/plan.json");
+    result.skipped.push(".agenthud/plan/");
   }
 
-  // Create decisions.json
-  if (!fs.existsSync(".agenthud/decisions.json")) {
-    fs.writeFileSync(".agenthud/decisions.json", "[]\n");
-    result.created.push(".agenthud/decisions.json");
+  // Create .agenthud/tests/ directory
+  if (!fs.existsSync(".agenthud/tests")) {
+    fs.mkdirSync(".agenthud/tests", { recursive: true });
+    result.created.push(".agenthud/tests/");
   } else {
-    result.skipped.push(".agenthud/decisions.json");
+    result.skipped.push(".agenthud/tests/");
+  }
+
+  // Create plan/plan.json
+  if (!fs.existsSync(".agenthud/plan/plan.json")) {
+    fs.writeFileSync(".agenthud/plan/plan.json", "{}\n");
+    result.created.push(".agenthud/plan/plan.json");
+  } else {
+    result.skipped.push(".agenthud/plan/plan.json");
+  }
+
+  // Create plan/decisions.json
+  if (!fs.existsSync(".agenthud/plan/decisions.json")) {
+    fs.writeFileSync(".agenthud/plan/decisions.json", "[]\n");
+    result.created.push(".agenthud/plan/decisions.json");
+  } else {
+    result.skipped.push(".agenthud/plan/decisions.json");
   }
 
   // Create config.yaml

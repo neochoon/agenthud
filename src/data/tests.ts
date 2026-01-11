@@ -2,6 +2,7 @@ import { readFileSync as nodeReadFileSync } from "fs";
 import { execSync as nodeExecSync } from "child_process";
 import { join } from "path";
 import type { TestResults, TestData } from "../types/index.js";
+import type { TestsPanelConfig } from "../config/parser.js";
 
 type ReadFileFn = (path: string) => string;
 type GetHeadHashFn = () => string;
@@ -63,6 +64,44 @@ export function getTestData(dir: string = process.cwd()): TestData {
   let error: string | undefined;
 
   // Read test-results.json
+  try {
+    const content = readFileFn(testResultsPath);
+    results = JSON.parse(content) as TestResults;
+  } catch (e) {
+    if (e instanceof SyntaxError) {
+      error = "Invalid test-results.json";
+    } else {
+      error = "No test results";
+    }
+    return { results: null, isOutdated: false, commitsBehind: 0, error };
+  }
+
+  // Compare hash with current HEAD
+  try {
+    const currentHash = getHeadHashFn();
+    if (results.hash !== currentHash) {
+      isOutdated = true;
+      commitsBehind = getCommitCountFn(results.hash);
+    }
+  } catch {
+    // Git error - assume not outdated
+    isOutdated = false;
+    commitsBehind = 0;
+  }
+
+  return { results, isOutdated, commitsBehind, error };
+}
+
+export function getTestDataWithConfig(config: TestsPanelConfig): TestData {
+  // Use source from config if provided, otherwise use default path
+  const testResultsPath = config.source || join(process.cwd(), AGENT_DIR, TEST_RESULTS_FILE);
+
+  let results: TestResults | null = null;
+  let isOutdated = false;
+  let commitsBehind = 0;
+  let error: string | undefined;
+
+  // Read test results from source path
   try {
     const content = readFileFn(testResultsPath);
     results = JSON.parse(content) as TestResults;

@@ -46,6 +46,10 @@ Maintain \`.agenthud/\` directory:
 
 const DEFAULT_CONFIG = `# agenthud configuration
 panels:
+  project:
+    enabled: true
+    interval: 5m  # doesn't change often
+
   git:
     enabled: true
     interval: 30s

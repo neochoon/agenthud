@@ -5,6 +5,10 @@ import { existsSync } from "fs";
 import { App } from "./ui/App.js";
 import { parseArgs, clearScreen } from "./cli.js";
 import { runInit } from "./commands/init.js";
+import {
+  startPerformanceCleanup,
+  stopPerformanceCleanup,
+} from "./utils/performance.js";
 
 const options = parseArgs(process.argv.slice(2));
 
@@ -47,6 +51,12 @@ if (options.mode === "once") {
   // In once mode, exit after first render
   setTimeout(() => process.exit(0), 100);
 } else {
-  // In watch mode, wait until user quits
-  waitUntilExit().then(() => process.exit(0));
+  // In watch mode, start performance cleanup to prevent memory leak warnings
+  startPerformanceCleanup();
+
+  // Wait until user quits, then cleanup
+  waitUntilExit().then(() => {
+    stopPerformanceCleanup();
+    process.exit(0);
+  });
 }

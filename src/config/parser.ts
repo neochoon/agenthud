@@ -46,6 +46,10 @@ export interface TestsPanelConfig extends PanelConfig {
   command?: string;
 }
 
+export interface ProjectPanelConfig extends PanelConfig {
+  // Project panel has no special config, just enabled and interval
+}
+
 export interface CustomPanelConfig extends PanelConfig {
   command?: string;
   source?: string;
@@ -53,6 +57,7 @@ export interface CustomPanelConfig extends PanelConfig {
 }
 
 export interface PanelsConfig {
+  project: ProjectPanelConfig;
   git: GitPanelConfig;
   plan: PlanPanelConfig;
   tests: TestsPanelConfig;
@@ -101,6 +106,10 @@ export function parseInterval(interval: string): number | null {
 export function getDefaultConfig(): Config {
   return {
     panels: {
+      project: {
+        enabled: true,
+        interval: 300000, // 5 minutes (doesn't change often)
+      },
       git: {
         enabled: true,
         interval: 30000, // 30s
@@ -115,12 +124,12 @@ export function getDefaultConfig(): Config {
         interval: null, // manual
       },
     },
-    panelOrder: ["git", "plan", "tests"],
+    panelOrder: ["project", "git", "plan", "tests"],
     width: DEFAULT_WIDTH,
   };
 }
 
-const BUILTIN_PANELS = ["git", "plan", "tests"];
+const BUILTIN_PANELS = ["project", "git", "plan", "tests"];
 const VALID_RENDERERS = ["list", "progress", "status"];
 
 export function parseConfig(): ParseResult {
@@ -178,6 +187,21 @@ export function parseConfig(): ParseResult {
     }
 
     // Handle built-in panels
+    if (panelName === "project") {
+      if (typeof panelConfig.enabled === "boolean") {
+        config.panels.project.enabled = panelConfig.enabled;
+      }
+      if (typeof panelConfig.interval === "string") {
+        const interval = parseInterval(panelConfig.interval);
+        if (interval === null && panelConfig.interval !== "manual") {
+          warnings.push(`Invalid interval '${panelConfig.interval}' for project panel, using default`);
+        } else {
+          config.panels.project.interval = interval;
+        }
+      }
+      continue;
+    }
+
     if (panelName === "git") {
       if (typeof panelConfig.enabled === "boolean") {
         config.panels.git.enabled = panelConfig.enabled;

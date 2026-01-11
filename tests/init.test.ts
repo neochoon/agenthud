@@ -181,6 +181,10 @@ Maintain \`.agenthud/\` directory:
   describe("creates config.yaml", () => {
     const defaultConfig = `# agenthud configuration
 panels:
+  project:
+    enabled: true
+    interval: 5m  # doesn't change often
+
   git:
     enabled: true
     interval: 30s

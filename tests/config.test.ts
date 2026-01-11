@@ -395,7 +395,8 @@ panels:
 
       const { config } = parseConfig();
 
-      expect(config.panelOrder).toEqual(["git", "plan", "docker", "tests"]);
+      // Config order is preserved, missing built-in panels (project) added at end
+      expect(config.panelOrder).toEqual(["git", "plan", "docker", "tests", "project"]);
     });
 
     it("returns default order when no config file", () => {
@@ -403,7 +404,7 @@ panels:
 
       const { config } = parseConfig();
 
-      expect(config.panelOrder).toEqual(["git", "plan", "tests"]);
+      expect(config.panelOrder).toEqual(["project", "git", "plan", "tests"]);
     });
 
     it("includes only enabled panels in order", () => {
@@ -424,7 +425,8 @@ panels:
 
       // panelOrder should include all panels from config, regardless of enabled state
       // The enabled state is checked at render time
-      expect(config.panelOrder).toEqual(["git", "plan", "docker", "tests"]);
+      // Missing built-in panels (project) added at end
+      expect(config.panelOrder).toEqual(["git", "plan", "docker", "tests", "project"]);
     });
   });
 

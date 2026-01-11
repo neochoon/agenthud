@@ -594,3 +594,90 @@ Just refreshed (countdown in green for 1.5s):
 ```
 ┌─ Git ────────────────────────────────── ↻ 30s ─┐
 ```
+
+## ProjectPanel Component
+
+- **Added**: 2026-01-11
+- **Issue**: #25
+- **Status**: Complete
+- **Tests**: `tests/project.test.ts`, `tests/ProjectPanel.test.tsx`
+- **Source**: `src/data/project.ts`, `src/ui/ProjectPanel.tsx`
+
+### Overview
+
+ProjectPanel displays project information including name, language, license, stack, file/line counts, and dependency counts.
+
+### Display
+
+```
+┌─ Project ────────────────────────────── ↻ 300s ─┐
+│ agenthud · TypeScript · MIT                     │
+│ Stack: ink, react, vitest                       │
+│ Files: 44 ts · Lines: 3.5k                      │
+│ Deps: 3 prod · 8 dev                            │
+└─────────────────────────────────────────────────┘
+```
+
+For Python projects:
+```
+┌─ Project ────────────────────────────── ↻ 300s ─┐
+│ my-api · Python · MIT                           │
+│ Stack: fastapi, pytest, sqlalchemy              │
+│ Files: 28 py · Lines: 2.1k                      │
+│ Deps: 8                                         │
+└─────────────────────────────────────────────────┘
+```
+
+### Data Sources
+
+| Data | Source |
+|------|--------|
+| Name | `package.json`, `pyproject.toml`, or folder name |
+| Language | tsconfig.json, package.json, pyproject.toml, go.mod, etc. |
+| License | `package.json`, `pyproject.toml` |
+| Stack | Well-known dependencies (react, django, etc.) |
+| Files | `find` command on src/lib/app directories |
+| Lines | `wc -l` on source files |
+| Dependencies | `package.json`, `pyproject.toml` |
+
+### Language Detection
+
+First match wins:
+
+| Indicator File | Language |
+|----------------|----------|
+| `tsconfig.json` | TypeScript |
+| `package.json` | JavaScript |
+| `pyproject.toml` | Python |
+| `requirements.txt` | Python |
+| `setup.py` | Python |
+| `go.mod` | Go |
+| `Cargo.toml` | Rust |
+| `Gemfile` | Ruby |
+| `pom.xml` | Java |
+| `build.gradle` | Java |
+
+### Stack Detection
+
+Well-known frameworks and tools (max 5, frameworks prioritized):
+
+**JS/TS**: react, vue, angular, express, fastify, ink, vitest, jest, webpack, vite
+**Python**: django, flask, fastapi, pytest, pandas, numpy, tensorflow, pytorch
+
+### Configuration
+
+```yaml
+panels:
+  project:
+    enabled: true
+    interval: 5m  # doesn't change often
+```
+
+### Props
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `data` | `ProjectData` | Project information |
+| `countdown` | `number \| null` | Countdown seconds |
+| `width` | `number` | Panel width |
+| `justRefreshed` | `boolean` | Shows countdown in green |

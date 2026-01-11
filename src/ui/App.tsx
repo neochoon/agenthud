@@ -3,11 +3,13 @@ import { Box, Text, useApp, useInput } from "ink";
 import { GitPanel } from "./GitPanel.js";
 import { PlanPanel } from "./PlanPanel.js";
 import { TestPanel } from "./TestPanel.js";
+import { ProjectPanel } from "./ProjectPanel.js";
 import { GenericPanel } from "./GenericPanel.js";
 import { WelcomePanel } from "./WelcomePanel.js";
 import { getGitData, getGitDataAsync, type GitData } from "../data/git.js";
 import { getPlanDataWithConfig } from "../data/plan.js";
 import { getTestData } from "../data/tests.js";
+import { getProjectData, type ProjectData } from "../data/project.js";
 import { getCustomPanelData, getCustomPanelDataAsync, type CustomPanelResult } from "../data/custom.js";
 import { runTestCommand } from "../runner/command.js";
 import { parseConfig, type Config, type CustomPanelConfig } from "../config/parser.js";
@@ -19,6 +21,7 @@ interface AppProps {
 }
 
 interface PanelCountdowns {
+  project: number | null;
   git: number | null;
   plan: number | null;
   [key: string]: number | null; // custom panels
@@ -32,6 +35,7 @@ interface VisualFeedback {
 }
 
 interface PanelVisualStates {
+  project: VisualFeedback;
   git: VisualFeedback;
   plan: VisualFeedback;
   tests: VisualFeedback;
@@ -126,8 +130,15 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
   const { config, warnings } = useMemo(() => parseConfig(), []);
 
   // Calculate interval in seconds for display
+  const projectIntervalSeconds = config.panels.project.interval ? config.panels.project.interval / 1000 : null;
   const gitIntervalSeconds = config.panels.git.interval ? config.panels.git.interval / 1000 : null;
   const planIntervalSeconds = config.panels.plan.interval ? config.panels.plan.interval / 1000 : null;
+
+  // Project data
+  const [projectData, setProjectData] = useState<ProjectData>(() => getProjectData());
+  const refreshProject = useCallback(() => {
+    setProjectData(getProjectData());
+  }, []);
 
   // Git data - uses config commands
   const [gitData, setGitData] = useState<GitData>(() => getGitData(config.panels.git));
@@ -187,6 +198,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
   // Per-panel countdowns
   const initialCountdowns = useMemo(() => {
     const countdowns: PanelCountdowns = {
+      project: projectIntervalSeconds,
       git: gitIntervalSeconds,
       plan: planIntervalSeconds,
     };
@@ -196,13 +208,14 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
       }
     }
     return countdowns;
-  }, [gitIntervalSeconds, planIntervalSeconds, config.customPanels]);
+  }, [projectIntervalSeconds, gitIntervalSeconds, planIntervalSeconds, config.customPanels]);
 
   const [countdowns, setCountdowns] = useState<PanelCountdowns>(initialCountdowns);
 
   // Visual feedback states
   const initialVisualStates = useMemo(() => {
     const states: PanelVisualStates = {
+      project: { ...DEFAULT_VISUAL_STATE },
       git: { ...DEFAULT_VISUAL_STATE },
       plan: { ...DEFAULT_VISUAL_STATE },
       tests: { ...DEFAULT_VISUAL_STATE },
@@ -229,6 +242,13 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
       setVisualState(panel, { [key]: false });
     }, FEEDBACK_DURATION);
   }, [setVisualState]);
+
+  // Project panel refresh with visual feedback (sync, no async version needed)
+  const refreshProjectWithFeedback = useCallback(() => {
+    setProjectData(getProjectData());
+    setVisualState("project", { justRefreshed: true });
+    clearFeedback("project", "justRefreshed");
+  }, [setVisualState, clearFeedback]);
 
   // Async refresh for Git with visual feedback
   const refreshGitAsync = useCallback(async () => {
@@ -296,6 +316,10 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
   }, [customPanelNames, refreshCustomPanelAsync]);
 
   const refreshAll = useCallback(async () => {
+    if (config.panels.project.enabled) {
+      refreshProjectWithFeedback();
+      setCountdowns((prev) => ({ ...prev, project: projectIntervalSeconds }));
+    }
     if (config.panels.git.enabled) {
       void refreshGitAsync();
       setCountdowns((prev) => ({ ...prev, git: gitIntervalSeconds }));
@@ -319,11 +343,13 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
       }
     }
   }, [
+    refreshProjectWithFeedback,
     refreshGitAsync,
     refreshPlanWithFeedback,
     refreshTestAsync,
     refreshCustomPanelAsync,
     config,
+    projectIntervalSeconds,
     gitIntervalSeconds,
     planIntervalSeconds,
     customPanelNames,
@@ -343,6 +369,16 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
     if (mode !== "watch") return;
 
     const timers: NodeJS.Timeout[] = [];
+
+    // Project panel timer
+    if (config.panels.project.enabled && config.panels.project.interval !== null) {
+      timers.push(
+        setInterval(() => {
+          refreshProjectWithFeedback();
+          setCountdowns((prev) => ({ ...prev, project: projectIntervalSeconds }));
+        }, config.panels.project.interval)
+      );
+    }
 
     // Git panel timer
     if (config.panels.git.enabled && config.panels.git.interval !== null) {
@@ -388,10 +424,12 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
   }, [
     mode,
     config,
+    refreshProjectWithFeedback,
     refreshGitAsync,
     refreshPlanWithFeedback,
     refreshTestAsync,
     refreshCustomPanelAsync,
+    projectIntervalSeconds,
     gitIntervalSeconds,
     planIntervalSeconds,
   ]);
@@ -403,6 +441,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
     const tick = setInterval(() => {
       setCountdowns((prev) => {
         const next: PanelCountdowns = {
+          project: prev.project !== null && prev.project > 1 ? prev.project - 1 : prev.project,
           git: prev.git !== null && prev.git > 1 ? prev.git - 1 : prev.git,
           plan: prev.plan !== null && prev.plan > 1 ? prev.plan - 1 : prev.plan,
         };
@@ -453,6 +492,21 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
       )}
       {config.panelOrder.map((panelName, index) => {
         const isFirst = index === 0;
+
+        // Project panel
+        if (panelName === "project" && config.panels.project.enabled) {
+          const projectVisual = visualStates.project || DEFAULT_VISUAL_STATE;
+          return (
+            <Box key={`panel-project-${index}`} marginTop={isFirst ? 0 : 1}>
+              <ProjectPanel
+                data={projectData}
+                countdown={mode === "watch" ? countdowns.project : null}
+                width={config.width}
+                justRefreshed={projectVisual.justRefreshed}
+              />
+            </Box>
+          );
+        }
 
         // Git panel
         if (panelName === "git" && config.panels.git.enabled) {

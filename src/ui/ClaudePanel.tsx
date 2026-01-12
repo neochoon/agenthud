@@ -27,11 +27,11 @@ function formatCountdown(seconds: number | null | undefined): string {
 function getStatusIcon(status: ClaudeSessionStatus): string {
   switch (status) {
     case "running":
-      return "...";
+      return "🔄";
     case "completed":
-      return "done";
+      return "✅";
     case "idle":
-      return "idle";
+      return "⏳";
     case "none":
     default:
       return "";
@@ -51,10 +51,10 @@ function formatActivityLine(activity: ActivityEntry, maxWidth: number): { text: 
   const label = activity.label;
   const detail = activity.detail;
 
-  // Fixed parts: "[HH:MM:SS] " = 12 chars, icon = 1 char, " " = 1, label, ": " = 2
+  // Fixed parts: "[HH:MM:SS] " = 12 chars, icon = 2 display width, " " = 1, label, ": " = 2
   const fixedPrefix = `[${time}] `;
   const fixedPrefixWidth = fixedPrefix.length; // 12
-  const iconWidth = 1; // ASCII icons are 1-wide
+  const iconWidth = 2; // Emoji icons are 2-wide
   const labelWidth = label.length;
   const separatorWidth = detail ? 2 : 0; // ": " if there's detail
 

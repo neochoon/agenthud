@@ -178,9 +178,19 @@ export function parseSessionState(sessionFile: string): ClaudeSessionState {
       if (entry.type === "user") {
         const userEntry = entry as JsonlUserEntry;
         const content = userEntry.message?.content;
-        // Only extract string content, skip tool_result arrays
+        // Extract string content or text from array
         if (typeof content === "string") {
           lastUserMessage = content;
+        } else if (Array.isArray(content)) {
+          // Look for text block in array (e.g., when user also has tool_result)
+          const textBlock = content.find(
+            (c): c is { type: "text"; text: string } =>
+              typeof c === "object" && c !== null && c.type === "text" && typeof c.text === "string"
+          );
+          if (textBlock) {
+            lastUserMessage = textBlock.text;
+          }
+          // If no text block found, keep the previous lastUserMessage
         }
         if (userEntry.timestamp) {
           lastTimestamp = new Date(userEntry.timestamp);

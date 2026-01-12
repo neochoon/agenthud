@@ -136,6 +136,56 @@ describe("claude data module", () => {
       expect(result.lastUserMessage).toBe("Show me the project structure");
     });
 
+    it("parses user message from array content with text block", () => {
+      const jsonl = JSON.stringify({
+        type: "user",
+        message: {
+          role: "user",
+          content: [
+            { type: "tool_result", tool_use_id: "123", content: "some output" },
+            { type: "text", text: "Now fix the bug" },
+          ],
+        },
+        timestamp: new Date().toISOString(),
+      });
+
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readFileSync.mockReturnValue(jsonl);
+
+      const result = parseSessionState("/fake/session.jsonl");
+
+      expect(result.lastUserMessage).toBe("Now fix the bug");
+    });
+
+    it("skips user message when array content has only tool_result", () => {
+      const now = new Date();
+      const lines = [
+        JSON.stringify({
+          type: "user",
+          message: { role: "user", content: "Initial message" },
+          timestamp: new Date(now.getTime() - 10000).toISOString(),
+        }),
+        JSON.stringify({
+          type: "user",
+          message: {
+            role: "user",
+            content: [
+              { type: "tool_result", tool_use_id: "123", content: "output" },
+            ],
+          },
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readFileSync.mockReturnValue(lines);
+
+      const result = parseSessionState("/fake/session.jsonl");
+
+      // Should keep the previous string message since array has no text
+      expect(result.lastUserMessage).toBe("Initial message");
+    });
+
     it("detects running status for tool_use within 30 seconds", () => {
       const now = new Date();
       const lines = [

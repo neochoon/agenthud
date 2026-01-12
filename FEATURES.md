@@ -758,3 +758,108 @@ If both are set, `command` takes priority.
 2. If not found, check .agenthud/plan.json (old location)
 3. Same fallback for decisions.json
 ```
+
+## ClaudePanel Component
+
+- **Added**: 2026-01-12
+- **Issue**: #29
+- **Status**: Complete
+- **Tests**: `tests/claude.test.ts`
+- **Source**: `src/data/claude.ts`, `src/ui/ClaudePanel.tsx`
+
+### Overview
+
+ClaudePanel displays real-time status of Claude Code sessions running in the current project.
+
+### Display
+
+Active session (running):
+```
+┌─ Claude ─────────────────────────────────── 🔄 08:37 ─┐
+│ "Show me the dotfiles structure"                      │
+│ → Bash: find /Users/neochoon/dotfiles -maxdepth 3...  │
+└───────────────────────────────────────────────────────┘
+```
+
+Active session (completed):
+```
+┌─ Claude ─────────────────────────────────── ✅ 08:37 ─┐
+│ "Show me the dotfiles structure"                      │
+│ ✓ Completed · 305 tokens · 12s                        │
+└───────────────────────────────────────────────────────┘
+```
+
+No active session:
+```
+┌─ Claude ──────────────────────────────────────────────┐
+│ No active session                                     │
+└───────────────────────────────────────────────────────┘
+```
+
+### Data Source
+
+Claude Code stores session data in JSONL files:
+
+```
+~/.claude/projects/-{project-path-with-dashes}/*.jsonl
+```
+
+Example:
+- Project: `/Users/neochoon/agenthud`
+- Session files: `~/.claude/projects/-Users-neochoon-agenthud/*.jsonl`
+
+### Status Icons
+
+| Icon | Status | Description |
+|------|--------|-------------|
+| 🔄 | running | Activity within 30 seconds |
+| ✅ | completed | Activity within 30s-5min |
+| ⏳ | idle | No activity for 5+ minutes |
+| - | none | No session file found |
+
+### Configuration
+
+```yaml
+panels:
+  claude:
+    enabled: true
+    interval: 2s  # Fast refresh for real-time monitoring
+```
+
+### Functions
+
+| Function | Description | Return Type |
+|----------|-------------|-------------|
+| `getClaudeSessionPath(projectPath)` | Convert project path to session directory | `string` |
+| `findActiveSession(sessionDir)` | Find most recent active session file | `string \| null` |
+| `parseSessionState(sessionFile)` | Parse session state from JSONL | `ClaudeSessionState` |
+| `getClaudeData(projectPath)` | Get Claude session data for project | `ClaudeData` |
+
+### Types
+
+```typescript
+type ClaudeSessionStatus = "running" | "completed" | "idle" | "none";
+
+interface ClaudeSessionState {
+  status: ClaudeSessionStatus;
+  lastUserMessage: string | null;
+  currentAction: string | null;  // e.g., "Bash: npm run build"
+  lastTimestamp: Date | null;
+  tokenCount: number;
+}
+
+interface ClaudeData {
+  state: ClaudeSessionState;
+  error?: string;
+  timestamp: string;
+}
+```
+
+### Props
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `data` | `ClaudeData` | Claude session data |
+| `countdown` | `number \| null` | Countdown seconds |
+| `width` | `number` | Panel width |
+| `justRefreshed` | `boolean` | Shows countdown in green |

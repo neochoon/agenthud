@@ -9,13 +9,14 @@ import {
   type FsMock as ConfigFsMock,
 } from "../src/config/parser.js";
 import {
-  setReadFileFn as setPlanReadFileFn,
-  resetReadFileFn as resetPlanReadFileFn,
-} from "../src/data/plan.js";
-import {
   setReadFileFn as setTestsReadFileFn,
   resetReadFileFn as resetTestsReadFileFn,
 } from "../src/data/tests.js";
+import {
+  setFsMock as setClaudeFsMock,
+  resetFsMock as resetClaudeFsMock,
+  type FsMock as ClaudeFsMock,
+} from "../src/data/claude.js";
 
 describe("App", () => {
   let mockExec: ReturnType<typeof vi.fn>;
@@ -33,10 +34,6 @@ panels:
   git:
     enabled: true
     interval: 30s
-  plan:
-    enabled: true
-    interval: 10s
-    source: .agenthud/plan.json
   tests:
     enabled: true
     interval: manual
@@ -44,22 +41,26 @@ panels:
     };
     setConfigFsMock(configFsMock);
 
-    // Mock plan file
-    setPlanReadFileFn(() => {
-      throw new Error("File not found");
-    });
-
     // Mock test results file
     setTestsReadFileFn(() => {
       throw new Error("File not found");
     });
+
+    // Claude fs mock - simulate no active session
+    const claudeFsMock: ClaudeFsMock = {
+      existsSync: vi.fn().mockReturnValue(false),
+      readFileSync: vi.fn().mockReturnValue(""),
+      readdirSync: vi.fn().mockReturnValue([]),
+      statSync: vi.fn().mockReturnValue({ mtimeMs: 0 }),
+    };
+    setClaudeFsMock(claudeFsMock);
   });
 
   afterEach(() => {
     resetExecFn();
     resetConfigFsMock();
-    resetPlanReadFileFn();
     resetTestsReadFileFn();
+    resetClaudeFsMock();
   });
 
   describe("rendering", () => {

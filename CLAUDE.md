@@ -44,19 +44,19 @@ agenthud/
 │   │   ├── App.tsx       # Main Ink component
 │   │   ├── Dashboard.tsx # Dashboard layout
 │   │   ├── GitPanel.tsx  # Git info panel
-│   │   ├── PlanPanel.tsx # Plan status panel
+│   │   ├── ClaudePanel.tsx # Claude Code session panel
 │   │   └── TestPanel.tsx # Test results panel
 │   ├── data/
 │   │   ├── git.ts        # Git data collection
-│   │   ├── plan.ts       # Read .agenthud/plan.json
+│   │   ├── claude.ts     # Claude Code session data
 │   │   ├── tests.ts      # Parse test results
 │   │   └── watcher.ts    # File watcher for live updates
 │   └── types/
 │       └── index.ts      # Type definitions
 └── tests/
     ├── git.test.ts
-    ├── plan.test.ts
-    └── ui.test.ts
+    ├── claude.test.ts
+    └── App.test.tsx
 ```
 
 ## Data Sources
@@ -66,40 +66,8 @@ agenthud/
 | Branch | git | `git branch --show-current` |
 | Commits today | git | `git log --since=midnight --oneline` |
 | Lines changed | git | `git diff --stat HEAD~n` |
-| Plan | `.agenthud/plan.json` | File read + watch |
-| Decisions | `.agenthud/decisions.json` | File read |
+| Claude | `~/.claude/projects/` | JSONL file watch |
 | Tests | `test-results.json` | Jest/Vitest JSON output |
-
-## .agenthud/ Directory Schema
-
-### plan.json
-
-```json
-{
-  "goal": "Implement user authentication",
-  "updatedAt": "2025-01-09T10:30:00Z",
-  "steps": [
-    { "step": "Create auth module", "status": "done" },
-    { "step": "Write tests", "status": "done" },
-    { "step": "Implement login", "status": "in-progress" },
-    { "step": "Add session handling", "status": "pending" }
-  ]
-}
-```
-
-### decisions.json
-
-```json
-{
-  "decisions": [
-    {
-      "timestamp": "2025-01-09T09:00:00Z",
-      "decision": "Use JWT for session management",
-      "reason": "Stateless, scalable"
-    }
-  ]
-}
-```
 
 ## CLI Interface
 
@@ -151,12 +119,6 @@ agenthud --json
 - Add features without tests
 - Make big changes without confirmation
 - Leave documentation outdated
-## State Files
-
-When working on any project with agenthud, maintain `.agenthud/` directory:
-
-- Update `plan.json` when plan changes
-- Append to `decisions.json` when making important choices
 
 ## Future Extensions
 
@@ -165,9 +127,3 @@ When working on any project with agenthud, maintain `.agenthud/` directory:
 - Web dashboard mode
 - Remote agent monitoring
 - Metrics export (Prometheus)
-
-## Agent State
-
-Maintain `.agenthud/` directory:
-- Update `plan.json` when plan changes
-- Append to `decisions.json` for key decisions

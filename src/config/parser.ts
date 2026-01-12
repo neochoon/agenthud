@@ -38,16 +38,17 @@ export interface GitPanelConfig extends PanelConfig {
   };
 }
 
-export interface PlanPanelConfig extends PanelConfig {
-  source: string;
-}
-
 export interface TestsPanelConfig extends PanelConfig {
   command?: string;
+  source?: string;
 }
 
 export interface ProjectPanelConfig extends PanelConfig {
   // Project panel has no special config, just enabled and interval
+}
+
+export interface ClaudePanelConfig extends PanelConfig {
+  // Claude panel has no special config, just enabled and interval
 }
 
 export interface CustomPanelConfig extends PanelConfig {
@@ -59,8 +60,8 @@ export interface CustomPanelConfig extends PanelConfig {
 export interface PanelsConfig {
   project: ProjectPanelConfig;
   git: GitPanelConfig;
-  plan: PlanPanelConfig;
   tests: TestsPanelConfig;
+  claude: ClaudePanelConfig;
 }
 
 export interface Config {
@@ -114,22 +115,21 @@ export function getDefaultConfig(): Config {
         enabled: true,
         interval: 30000, // 30s
       },
-      plan: {
-        enabled: true,
-        interval: 10000, // 10s
-        source: ".agenthud/plan/plan.json",
-      },
       tests: {
         enabled: true,
         interval: null, // manual
       },
+      claude: {
+        enabled: true,
+        interval: 10000, // 10 seconds default
+      },
     },
-    panelOrder: ["project", "git", "plan", "tests"],
+    panelOrder: ["project", "git", "tests", "claude"],
     width: DEFAULT_WIDTH,
   };
 }
 
-const BUILTIN_PANELS = ["project", "git", "plan", "tests"];
+const BUILTIN_PANELS = ["project", "git", "tests", "claude"];
 const VALID_RENDERERS = ["list", "progress", "status"];
 
 export function parseConfig(): ParseResult {
@@ -217,24 +217,6 @@ export function parseConfig(): ParseResult {
       continue;
     }
 
-    if (panelName === "plan") {
-      if (typeof panelConfig.enabled === "boolean") {
-        config.panels.plan.enabled = panelConfig.enabled;
-      }
-      if (typeof panelConfig.interval === "string") {
-        const interval = parseInterval(panelConfig.interval);
-        if (interval === null && panelConfig.interval !== "manual") {
-          warnings.push(`Invalid interval '${panelConfig.interval}' for plan panel, using default`);
-        } else {
-          config.panels.plan.interval = interval;
-        }
-      }
-      if (typeof panelConfig.source === "string") {
-        config.panels.plan.source = panelConfig.source;
-      }
-      continue;
-    }
-
     if (panelName === "tests") {
       if (typeof panelConfig.enabled === "boolean") {
         config.panels.tests.enabled = panelConfig.enabled;
@@ -249,6 +231,21 @@ export function parseConfig(): ParseResult {
       }
       if (typeof panelConfig.command === "string") {
         config.panels.tests.command = panelConfig.command;
+      }
+      continue;
+    }
+
+    if (panelName === "claude") {
+      if (typeof panelConfig.enabled === "boolean") {
+        config.panels.claude.enabled = panelConfig.enabled;
+      }
+      if (typeof panelConfig.interval === "string") {
+        const interval = parseInterval(panelConfig.interval);
+        if (interval === null && panelConfig.interval !== "manual") {
+          warnings.push(`Invalid interval '${panelConfig.interval}' for claude panel, using default`);
+        } else {
+          config.panels.claude.interval = interval;
+        }
       }
       continue;
     }

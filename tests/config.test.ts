@@ -39,14 +39,6 @@ describe("getDefaultConfig", () => {
     expect(config.panels.git.interval).toBe(30000); // 30s
   });
 
-  it("returns default plan config", () => {
-    const config = getDefaultConfig();
-
-    expect(config.panels.plan.enabled).toBe(true);
-    expect(config.panels.plan.interval).toBe(10000); // 10s
-    expect(config.panels.plan.source).toBe(".agenthud/plan/plan.json");
-  });
-
   it("returns default tests config", () => {
     const config = getDefaultConfig();
 
@@ -108,9 +100,6 @@ panels:
   git:
     enabled: true
     interval: 60s
-  plan:
-    enabled: false
-    interval: 5s
   tests:
     enabled: true
     command: npm test -- --json
@@ -121,8 +110,6 @@ panels:
 
       expect(config.panels.git.enabled).toBe(true);
       expect(config.panels.git.interval).toBe(60000);
-      expect(config.panels.plan.enabled).toBe(false);
-      expect(config.panels.plan.interval).toBe(5000);
       expect(config.panels.tests.enabled).toBe(true);
       expect(config.panels.tests.command).toBe("npm test -- --json");
       expect(config.panels.tests.interval).toBeNull();
@@ -138,7 +125,6 @@ panels:
       const { config } = parseConfig();
 
       expect(config.panels.git.enabled).toBe(false);
-      expect(config.panels.plan.enabled).toBe(true); // default
       expect(config.panels.tests.enabled).toBe(true); // default
     });
 
@@ -218,24 +204,6 @@ panels:
       expect(warnings).not.toContain("Unknown panel 'unknown' in config");
       expect(config.customPanels).toBeDefined();
       expect(config.customPanels!.unknown).toBeDefined();
-    });
-  });
-
-  describe("custom source path", () => {
-    beforeEach(() => {
-      fsMock.existsSync.mockReturnValue(true);
-    });
-
-    it("reads custom plan source", () => {
-      fsMock.readFileSync.mockReturnValue(`
-panels:
-  plan:
-    source: custom/plan.json
-`);
-
-      const { config } = parseConfig();
-
-      expect(config.panels.plan.source).toBe("custom/plan.json");
     });
   });
 
@@ -384,8 +352,6 @@ panels:
 panels:
   git:
     enabled: true
-  plan:
-    enabled: true
   docker:
     enabled: true
     command: docker ps
@@ -395,8 +361,8 @@ panels:
 
       const { config } = parseConfig();
 
-      // Config order is preserved, missing built-in panels (project) added at end
-      expect(config.panelOrder).toEqual(["git", "plan", "docker", "tests", "project"]);
+      // Config order is preserved, missing built-in panels (project, claude) added at end
+      expect(config.panelOrder).toEqual(["git", "docker", "tests", "project", "claude"]);
     });
 
     it("returns default order when no config file", () => {
@@ -404,18 +370,16 @@ panels:
 
       const { config } = parseConfig();
 
-      expect(config.panelOrder).toEqual(["project", "git", "plan", "tests"]);
+      expect(config.panelOrder).toEqual(["project", "git", "tests", "claude"]);
     });
 
-    it("includes only enabled panels in order", () => {
+    it("includes disabled panels in order (enabled checked at render time)", () => {
       fsMock.readFileSync.mockReturnValue(`
 panels:
   git:
     enabled: true
-  plan:
-    enabled: false
   docker:
-    enabled: true
+    enabled: false
     command: docker ps
   tests:
     enabled: true
@@ -425,8 +389,8 @@ panels:
 
       // panelOrder should include all panels from config, regardless of enabled state
       // The enabled state is checked at render time
-      // Missing built-in panels (project) added at end
-      expect(config.panelOrder).toEqual(["git", "plan", "docker", "tests", "project"]);
+      // Missing built-in panels (project, claude) added at end
+      expect(config.panelOrder).toEqual(["git", "docker", "tests", "project", "claude"]);
     });
   });
 

@@ -101,7 +101,7 @@ export function ClaudePanel({
 }: ClaudePanelProps): React.ReactElement {
   const countdownSuffix = isRunning ? "running..." : formatCountdown(countdown);
   const innerWidth = getInnerWidth(width);
-  const contentWidth = innerWidth - 2; // Account for "│ " prefix
+  const contentWidth = innerWidth - 1; // Account for " " after │ (│ is counted in innerWidth)
 
   const { state } = data;
   const statusIcon = getStatusIcon(state.status);

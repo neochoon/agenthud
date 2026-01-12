@@ -70,37 +70,6 @@ agenthud/
 | Decisions | `.agenthud/decisions.json` | File read |
 | Tests | `test-results.json` | Jest/Vitest JSON output |
 
-## .agenthud/ Directory Schema
-
-### plan.json
-
-```json
-{
-  "goal": "Implement user authentication",
-  "updatedAt": "2025-01-09T10:30:00Z",
-  "steps": [
-    { "step": "Create auth module", "status": "done" },
-    { "step": "Write tests", "status": "done" },
-    { "step": "Implement login", "status": "in-progress" },
-    { "step": "Add session handling", "status": "pending" }
-  ]
-}
-```
-
-### decisions.json
-
-```json
-{
-  "decisions": [
-    {
-      "timestamp": "2025-01-09T09:00:00Z",
-      "decision": "Use JWT for session management",
-      "reason": "Stateless, scalable"
-    }
-  ]
-}
-```
-
 ## CLI Interface
 
 ```bash

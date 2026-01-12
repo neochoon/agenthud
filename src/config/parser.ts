@@ -48,7 +48,7 @@ export interface ProjectPanelConfig extends PanelConfig {
 }
 
 export interface ClaudePanelConfig extends PanelConfig {
-  // Claude panel has no special config, just enabled and interval
+  maxActivities?: number;
 }
 
 export interface CustomPanelConfig extends PanelConfig {
@@ -246,6 +246,9 @@ export function parseConfig(): ParseResult {
         } else {
           config.panels.claude.interval = interval;
         }
+      }
+      if (typeof panelConfig.max_activities === "number") {
+        config.panels.claude.maxActivities = panelConfig.max_activities;
       }
       continue;
     }

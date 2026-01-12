@@ -28,9 +28,13 @@ if (options.command === "init") {
     result.skipped.forEach((file) => console.log(`  ${file}`));
   }
 
+  if (result.warnings.length > 0) {
+    console.log("\nWarnings:");
+    result.warnings.forEach((warning) => console.log(`  ⚠ ${warning}`));
+  }
+
   console.log("\nNext steps:");
-  console.log("  1. Edit .agenthud/plan.json to add your project plan");
-  console.log("  2. Run: npx agenthud\n");
+  console.log("  Run: npx agenthud\n");
 
   process.exit(0);
 }

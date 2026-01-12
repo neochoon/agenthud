@@ -1,7 +1,7 @@
 import React from "react";
 import { describe, it, expect } from "vitest";
 import { render } from "ink-testing-library";
-import { ClaudePanel } from "../src/ui/ClaudePanel.js";
+import { ClaudePanel, getActivityStyle } from "../src/ui/ClaudePanel.js";
 import type { ClaudeData, ActivityEntry } from "../src/types/index.js";
 
 describe("ClaudePanel", () => {
@@ -43,13 +43,32 @@ describe("ClaudePanel", () => {
       activities: mockActivities,
       tokenCount: 1500,
     },
+    hasSession: true,
     timestamp: "2025-01-12T10:30:00Z",
     ...overrides,
   });
 
-  describe("no active session", () => {
-    it("shows 'No active session' when status is none", () => {
+  describe("no Claude session", () => {
+    it("shows 'No Claude session' when hasSession is false", () => {
       const data = createMockData({
+        hasSession: false,
+        state: {
+          status: "none",
+          activities: [],
+          tokenCount: 0,
+        },
+      });
+
+      const { lastFrame } = render(<ClaudePanel data={data} />);
+
+      expect(lastFrame()).toContain("No Claude session");
+    });
+  });
+
+  describe("no active session", () => {
+    it("shows 'No active session' when status is none but hasSession is true", () => {
+      const data = createMockData({
+        hasSession: true,
         state: {
           status: "none",
           activities: [],
@@ -64,6 +83,7 @@ describe("ClaudePanel", () => {
 
     it("shows 'No active session' when activities are empty", () => {
       const data = createMockData({
+        hasSession: true,
         state: {
           status: "running",
           activities: [],
@@ -248,6 +268,203 @@ describe("ClaudePanel", () => {
           expect(afterBox.trim()).toBe("");
         }
       }
+    });
+  });
+
+  describe("visual hierarchy - getActivityStyle", () => {
+    it("returns bright white for user type", () => {
+      const activity: ActivityEntry = {
+        timestamp: new Date(),
+        type: "user",
+        icon: "💬",
+        label: "User",
+        detail: "hello",
+      };
+
+      const style = getActivityStyle(activity);
+
+      expect(style.color).toBe("white");
+      expect(style.dimColor).toBe(false);
+    });
+
+    it("returns green for response type", () => {
+      const activity: ActivityEntry = {
+        timestamp: new Date(),
+        type: "response",
+        icon: "🤖",
+        label: "Response",
+        detail: "I will help you",
+      };
+
+      const style = getActivityStyle(activity);
+
+      expect(style.color).toBe("green");
+      expect(style.dimColor).toBe(false);
+    });
+
+    it("returns gray for Bash tool", () => {
+      const activity: ActivityEntry = {
+        timestamp: new Date(),
+        type: "tool",
+        icon: "🔧",
+        label: "Bash",
+        detail: "npm run test",
+      };
+
+      const style = getActivityStyle(activity);
+
+      expect(style.color).toBe("gray");
+      expect(style.dimColor).toBe(false);
+    });
+
+    it("returns dim for Edit tool", () => {
+      const activity: ActivityEntry = {
+        timestamp: new Date(),
+        type: "tool",
+        icon: "📝",
+        label: "Edit",
+        detail: "src/index.ts",
+      };
+
+      const style = getActivityStyle(activity);
+
+      expect(style.dimColor).toBe(true);
+    });
+
+    it("returns dim for Read tool", () => {
+      const activity: ActivityEntry = {
+        timestamp: new Date(),
+        type: "tool",
+        icon: "📖",
+        label: "Read",
+        detail: "package.json",
+      };
+
+      const style = getActivityStyle(activity);
+
+      expect(style.dimColor).toBe(true);
+    });
+
+    it("returns dim for Write tool", () => {
+      const activity: ActivityEntry = {
+        timestamp: new Date(),
+        type: "tool",
+        icon: "📝",
+        label: "Write",
+        detail: "config.yaml",
+      };
+
+      const style = getActivityStyle(activity);
+
+      expect(style.dimColor).toBe(true);
+    });
+
+    it("returns dim for Grep tool", () => {
+      const activity: ActivityEntry = {
+        timestamp: new Date(),
+        type: "tool",
+        icon: "🔍",
+        label: "Grep",
+        detail: "pattern",
+      };
+
+      const style = getActivityStyle(activity);
+
+      expect(style.dimColor).toBe(true);
+    });
+
+    it("returns dim for Glob tool", () => {
+      const activity: ActivityEntry = {
+        timestamp: new Date(),
+        type: "tool",
+        icon: "🔍",
+        label: "Glob",
+        detail: "**/*.ts",
+      };
+
+      const style = getActivityStyle(activity);
+
+      expect(style.dimColor).toBe(true);
+    });
+
+    it("returns dim for TodoWrite tool", () => {
+      const activity: ActivityEntry = {
+        timestamp: new Date(),
+        type: "tool",
+        icon: "📋",
+        label: "TodoWrite",
+        detail: "updating tasks",
+      };
+
+      const style = getActivityStyle(activity);
+
+      expect(style.dimColor).toBe(true);
+    });
+
+    it("returns dim for unknown tool types", () => {
+      const activity: ActivityEntry = {
+        timestamp: new Date(),
+        type: "tool",
+        icon: "❓",
+        label: "UnknownTool",
+        detail: "something",
+      };
+
+      const style = getActivityStyle(activity);
+
+      expect(style.dimColor).toBe(true);
+    });
+  });
+
+  describe("visual hierarchy - rendering", () => {
+    it("renders all activity types without error", () => {
+      const mixedActivities: ActivityEntry[] = [
+        {
+          timestamp: new Date("2025-01-12T10:30:00"),
+          type: "user",
+          icon: "💬",
+          label: "User",
+          detail: "help me",
+        },
+        {
+          timestamp: new Date("2025-01-12T10:30:05"),
+          type: "response",
+          icon: "🤖",
+          label: "Response",
+          detail: "I will help",
+        },
+        {
+          timestamp: new Date("2025-01-12T10:30:10"),
+          type: "tool",
+          icon: "🔧",
+          label: "Bash",
+          detail: "npm test",
+        },
+        {
+          timestamp: new Date("2025-01-12T10:30:15"),
+          type: "tool",
+          icon: "📝",
+          label: "Edit",
+          detail: "file.ts",
+        },
+      ];
+
+      const data = createMockData({
+        state: {
+          status: "running",
+          activities: mixedActivities,
+          tokenCount: 0,
+        },
+      });
+
+      const { lastFrame } = render(<ClaudePanel data={data} />);
+      const output = lastFrame() || "";
+
+      // All content should render
+      expect(output).toContain("help me");
+      expect(output).toContain("I will help");
+      expect(output).toContain("npm test");
+      expect(output).toContain("file.ts");
     });
   });
 });

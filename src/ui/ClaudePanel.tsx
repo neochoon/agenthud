@@ -10,6 +10,37 @@ import {
   getDisplayWidth,
 } from "./constants.js";
 
+export interface ActivityStyle {
+  color?: string;
+  dimColor: boolean;
+}
+
+export function getActivityStyle(activity: ActivityEntry): ActivityStyle {
+  // User input - bright white
+  if (activity.type === "user") {
+    return { color: "white", dimColor: false };
+  }
+
+  // Claude's response - green
+  if (activity.type === "response") {
+    return { color: "green", dimColor: false };
+  }
+
+  // Tool types
+  if (activity.type === "tool") {
+    // Bash commands - gray (secondary but visible)
+    if (activity.label === "Bash") {
+      return { color: "gray", dimColor: false };
+    }
+
+    // All other tools (Edit, Read, Write, Grep, Glob, TodoWrite, etc.) - dim
+    return { dimColor: true };
+  }
+
+  // Default fallback - dim
+  return { dimColor: true };
+}
+
 interface ClaudePanelProps {
   data: ClaudeData;
   countdown?: number | null;
@@ -45,23 +76,30 @@ function formatActivityTime(date: Date): string {
   return `${hours}:${minutes}:${seconds}`;
 }
 
-function formatActivityLine(activity: ActivityEntry, maxWidth: number): { text: string; displayWidth: number } {
+interface ActivityParts {
+  timestamp: string;  // "[HH:MM:SS] "
+  content: string;    // "icon label: detail" or "icon label"
+  displayWidth: number;
+}
+
+function formatActivityParts(activity: ActivityEntry, maxWidth: number): ActivityParts {
   const time = formatActivityTime(activity.timestamp);
   const icon = activity.icon;
   const label = activity.label;
   const detail = activity.detail;
 
   // Fixed parts: "[HH:MM:SS] " = 12 chars, icon = 2 display width, " " = 1, label, ": " = 2
-  const fixedPrefix = `[${time}] `;
-  const fixedPrefixWidth = fixedPrefix.length; // 12
+  const timestamp = `[${time}] `;
+  const timestampWidth = timestamp.length; // 12
   const iconWidth = 2; // Emoji icons are 2-wide
   const labelWidth = label.length;
   const separatorWidth = detail ? 2 : 0; // ": " if there's detail
 
-  const prefixDisplayWidth = fixedPrefixWidth + iconWidth + 1 + labelWidth + separatorWidth;
+  const contentPrefixWidth = iconWidth + 1 + labelWidth + separatorWidth;
+  const totalPrefixWidth = timestampWidth + contentPrefixWidth;
 
   if (detail) {
-    const availableWidth = maxWidth - prefixDisplayWidth;
+    const availableWidth = maxWidth - totalPrefixWidth;
     let truncatedDetail = detail;
     let detailDisplayWidth = getDisplayWidth(detail);
 
@@ -82,14 +120,14 @@ function formatActivityLine(activity: ActivityEntry, maxWidth: number): { text: 
       detailDisplayWidth = currentWidth;
     }
 
-    const text = `${fixedPrefix}${icon} ${label}: ${truncatedDetail}`;
-    const displayWidth = prefixDisplayWidth + detailDisplayWidth;
-    return { text, displayWidth };
+    const content = `${icon} ${label}: ${truncatedDetail}`;
+    const displayWidth = totalPrefixWidth + detailDisplayWidth;
+    return { timestamp, content, displayWidth };
   }
 
-  const text = `${fixedPrefix}${icon} ${label}`;
-  const displayWidth = prefixDisplayWidth;
-  return { text, displayWidth };
+  const content = `${icon} ${label}`;
+  const displayWidth = totalPrefixWidth;
+  return { timestamp, content, displayWidth };
 }
 
 export function ClaudePanel({
@@ -126,9 +164,9 @@ export function ClaudePanel({
     );
   }
 
-  // No active session
-  if (state.status === "none" || state.activities.length === 0) {
-    const noSessionText = "No active session";
+  // No Claude session (never used Claude in this project)
+  if (!data.hasSession) {
+    const noSessionText = "No Claude session";
     const noSessionPadding = Math.max(0, contentWidth - noSessionText.length);
     return (
       <Box flexDirection="column" width={width}>
@@ -144,19 +182,38 @@ export function ClaudePanel({
     );
   }
 
+  // No active session (session exists but inactive for 5+ minutes)
+  if (state.status === "none" || state.activities.length === 0) {
+    const noActiveText = "No active session";
+    const noActivePadding = Math.max(0, contentWidth - noActiveText.length);
+    return (
+      <Box flexDirection="column" width={width}>
+        <Text>{createTitleLine("Claude", countdownSuffix, width)}</Text>
+        <Text>
+          {BOX.v}{" "}
+          <Text dimColor>{noActiveText}</Text>
+          {" ".repeat(noActivePadding)}
+          {BOX.v}
+        </Text>
+        <Text>{createBottomLine(width)}</Text>
+      </Box>
+    );
+  }
+
   // Active session - build activity log lines
   const lines: React.ReactElement[] = [];
 
   for (let i = 0; i < state.activities.length; i++) {
     const activity = state.activities[i];
-    const { text: lineText, displayWidth } = formatActivityLine(activity, contentWidth);
+    const { timestamp, content, displayWidth } = formatActivityParts(activity, contentWidth);
     const padding = Math.max(0, contentWidth - displayWidth);
+    const style = getActivityStyle(activity);
 
-    // Determine color based on activity type
     lines.push(
       <Text key={`activity-${i}`}>
         {BOX.v}{" "}
-        {lineText}
+        <Text dimColor>{timestamp}</Text>
+        <Text color={style.color} dimColor={style.dimColor}>{content}</Text>
         {" ".repeat(padding)}
         {BOX.v}
       </Text>

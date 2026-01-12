@@ -447,26 +447,72 @@ describe("claude data module", () => {
 
       const result = parseSessionState("/fake/session.jsonl");
 
-      // Should only have 10 activities
+      // Should only have 10 activities (default)
       expect(result.activities.length).toBe(10);
+      // Most recent should be first
+      expect(result.activities[0].detail).toBe("file19.ts");
+    });
+
+    it("respects maxActivities parameter", () => {
+      const now = new Date();
+      const lines: string[] = [];
+
+      // Create 20 Read activities
+      for (let i = 0; i < 20; i++) {
+        lines.push(
+          JSON.stringify({
+            type: "assistant",
+            message: {
+              role: "assistant",
+              content: [
+                {
+                  type: "tool_use",
+                  name: "Read",
+                  input: { file_path: `file${i}.ts` },
+                },
+              ],
+            },
+            timestamp: new Date(now.getTime() - (20 - i) * 1000).toISOString(),
+          })
+        );
+      }
+
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readFileSync.mockReturnValue(lines.join("\n"));
+
+      const result = parseSessionState("/fake/session.jsonl", 5);
+
+      // Should only have 5 activities
+      expect(result.activities.length).toBe(5);
       // Most recent should be first
       expect(result.activities[0].detail).toBe("file19.ts");
     });
   });
 
   describe("getClaudeData", () => {
-    it("returns none status when session directory does not exist", () => {
+    it("returns none status and hasSession false when session directory does not exist", () => {
       mockFs.existsSync.mockReturnValue(false);
 
       const result = getClaudeData("/Users/test/project");
 
       expect(result.state.status).toBe("none");
+      expect(result.hasSession).toBe(false);
       expect(result.error).toBeUndefined();
+    });
+
+    it("returns hasSession true when session directory exists but no active session", () => {
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readdirSync.mockReturnValue(["old.jsonl"]);
+      mockFs.statSync.mockReturnValue({ mtimeMs: Date.now() - 10 * 60 * 1000 }); // 10 minutes ago
+
+      const result = getClaudeData("/Users/test/project");
+
+      expect(result.state.status).toBe("none");
+      expect(result.hasSession).toBe(true);
     });
 
     it("returns session state when active session exists", () => {
       const now = new Date();
-      const sessionDir = expect.stringMatching(/.claude\/projects\/-Users-test-project$/);
 
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readdirSync.mockReturnValue(["session.jsonl"]);
@@ -483,6 +529,7 @@ describe("claude data module", () => {
 
       expect(result.state.activities.length).toBe(1);
       expect(result.state.activities[0].detail).toContain("Test message");
+      expect(result.hasSession).toBe(true);
       expect(result.timestamp).toBeDefined();
     });
 
@@ -496,6 +543,7 @@ describe("claude data module", () => {
 
       expect(result.error).toBe("Permission denied");
       expect(result.state.status).toBe("none");
+      expect(result.hasSession).toBe(false);
     });
   });
 });

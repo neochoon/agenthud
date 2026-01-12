@@ -156,6 +156,34 @@ panels:
 
       expect(config).toEqual(getDefaultConfig());
     });
+
+    it("parses claude panel max_activities", () => {
+      fsMock.readFileSync.mockReturnValue(`
+panels:
+  claude:
+    enabled: true
+    interval: 10s
+    max_activities: 25
+`);
+
+      const { config } = parseConfig();
+
+      expect(config.panels.claude.enabled).toBe(true);
+      expect(config.panels.claude.interval).toBe(10000);
+      expect(config.panels.claude.maxActivities).toBe(25);
+    });
+
+    it("uses undefined for max_activities when not specified", () => {
+      fsMock.readFileSync.mockReturnValue(`
+panels:
+  claude:
+    enabled: true
+`);
+
+      const { config } = parseConfig();
+
+      expect(config.panels.claude.maxActivities).toBeUndefined();
+    });
   });
 
   describe("warnings", () => {

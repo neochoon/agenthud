@@ -5,6 +5,9 @@ import {
   readFileSync as nodeReadFileSync,
   appendFileSync as nodeAppendFileSync,
 } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+import { homedir } from "os";
 
 export interface FsMock {
   existsSync: (path: string) => boolean;
@@ -37,47 +40,35 @@ export function resetFsMock(): void {
   };
 }
 
-const AGENT_STATE_SECTION = `## Agent State
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
-Maintain \`.agenthud/\` directory:
-- Update \`plan.json\` when plan changes
-- Append to \`decisions.json\` for key decisions
-`;
-
-const DEFAULT_CONFIG = `# agenthud configuration
-panels:
-  project:
-    enabled: true
-    interval: 5m  # doesn't change often
-
-  git:
-    enabled: true
-    interval: 30s
-    command:
-      branch: git branch --show-current
-      commits: git log --since=midnight --pretty=format:"%h|%aI|%s"
-      stats: git log --since=midnight --numstat --pretty=format:""
-
-  plan:
-    enabled: true
-    interval: 10s
-    source: .agenthud/plan/plan.json
-
-  tests:
-    enabled: true
-    interval: manual
-    command: npx vitest run --reporter=json
-`;
+export function getDefaultConfig(): string {
+  // After bundling, __dirname is dist/, so templates is at dist/templates/
+  // In source, __dirname is src/commands/, so templates is at src/templates/
+  let templatePath = join(__dirname, "templates", "config.yaml");
+  if (!nodeExistsSync(templatePath)) {
+    templatePath = join(__dirname, "..", "templates", "config.yaml");
+  }
+  return nodeReadFileSync(templatePath, "utf-8");
+}
 
 export interface InitResult {
   created: string[];
   skipped: string[];
+  warnings: string[];
 }
 
-export function runInit(): InitResult {
+function getClaudeSessionPath(projectPath: string): string {
+  const encoded = projectPath.replace(/\//g, "-");
+  return join(homedir(), ".claude", "projects", encoded);
+}
+
+export function runInit(cwd: string = process.cwd()): InitResult {
   const result: InitResult = {
     created: [],
     skipped: [],
+    warnings: [],
   };
 
   // Create .agenthud/ directory
@@ -88,14 +79,6 @@ export function runInit(): InitResult {
     result.skipped.push(".agenthud/");
   }
 
-  // Create .agenthud/plan/ directory
-  if (!fs.existsSync(".agenthud/plan")) {
-    fs.mkdirSync(".agenthud/plan", { recursive: true });
-    result.created.push(".agenthud/plan/");
-  } else {
-    result.skipped.push(".agenthud/plan/");
-  }
-
   // Create .agenthud/tests/ directory
   if (!fs.existsSync(".agenthud/tests")) {
     fs.mkdirSync(".agenthud/tests", { recursive: true });
@@ -104,25 +87,9 @@ export function runInit(): InitResult {
     result.skipped.push(".agenthud/tests/");
   }
 
-  // Create plan/plan.json
-  if (!fs.existsSync(".agenthud/plan/plan.json")) {
-    fs.writeFileSync(".agenthud/plan/plan.json", "{}\n");
-    result.created.push(".agenthud/plan/plan.json");
-  } else {
-    result.skipped.push(".agenthud/plan/plan.json");
-  }
-
-  // Create plan/decisions.json
-  if (!fs.existsSync(".agenthud/plan/decisions.json")) {
-    fs.writeFileSync(".agenthud/plan/decisions.json", "[]\n");
-    result.created.push(".agenthud/plan/decisions.json");
-  } else {
-    result.skipped.push(".agenthud/plan/decisions.json");
-  }
-
   // Create config.yaml
   if (!fs.existsSync(".agenthud/config.yaml")) {
-    fs.writeFileSync(".agenthud/config.yaml", DEFAULT_CONFIG);
+    fs.writeFileSync(".agenthud/config.yaml", getDefaultConfig());
     result.created.push(".agenthud/config.yaml");
   } else {
     result.skipped.push(".agenthud/config.yaml");
@@ -142,18 +109,14 @@ export function runInit(): InitResult {
     }
   }
 
-  // Handle CLAUDE.md
-  if (!fs.existsSync("CLAUDE.md")) {
-    fs.writeFileSync("CLAUDE.md", AGENT_STATE_SECTION);
-    result.created.push("CLAUDE.md");
-  } else {
-    const content = fs.readFileSync("CLAUDE.md");
-    if (!content.includes("## Agent State")) {
-      fs.appendFileSync("CLAUDE.md", "\n" + AGENT_STATE_SECTION);
-      result.created.push("CLAUDE.md");
-    } else {
-      result.skipped.push("CLAUDE.md");
-    }
+  // Check for warnings
+  if (!fs.existsSync(".git")) {
+    result.warnings.push("Not a git repository - Git panel will show limited info");
+  }
+
+  const claudeSessionPath = getClaudeSessionPath(cwd);
+  if (!fs.existsSync(claudeSessionPath)) {
+    result.warnings.push("No Claude session found - start Claude to see activity");
   }
 
   return result;

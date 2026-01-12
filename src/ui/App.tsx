@@ -163,10 +163,10 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
   }, [getTestDataFromConfig]);
 
   // Claude data
-  const [claudeData, setClaudeData] = useState<ClaudeData>(() => getClaudeData(cwd));
+  const [claudeData, setClaudeData] = useState<ClaudeData>(() => getClaudeData(cwd, config.panels.claude.maxActivities));
   const refreshClaude = useCallback(() => {
-    setClaudeData(getClaudeData(cwd));
-  }, [cwd]);
+    setClaudeData(getClaudeData(cwd, config.panels.claude.maxActivities));
+  }, [cwd, config.panels.claude.maxActivities]);
 
   // Custom panel data
   const customPanelNames = useMemo(
@@ -304,10 +304,10 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
 
   // Claude panel refresh with visual feedback (file-based)
   const refreshClaudeWithFeedback = useCallback(() => {
-    setClaudeData(getClaudeData(cwd));
+    setClaudeData(getClaudeData(cwd, config.panels.claude.maxActivities));
     setVisualState("claude", { justRefreshed: true });
     clearFeedback("claude", "justRefreshed");
-  }, [cwd, setVisualState, clearFeedback]);
+  }, [cwd, config.panels.claude.maxActivities, setVisualState, clearFeedback]);
 
   // Build custom panel refresh actions for hotkeys (async)
   const customPanelActionsAsync = useMemo(() => {

@@ -1,0 +1,29 @@
+# agenthud configuration
+panels:
+  claude:
+    enabled: true
+    interval: 10s
+    max_activities: 20
+
+  git:
+    enabled: true
+    interval: 30s
+    command:
+      branch: git branch --show-current
+      commits: git log --since=midnight --pretty=format:"%h|%aI|%s"
+      stats: git log --since=midnight --numstat --pretty=format:""
+
+  tests:
+    enabled: true
+    interval: manual
+    command: npx vitest run --reporter=json
+
+  project:
+    enabled: true
+    interval: 5m  # doesn't change often
+
+  #docker:
+  #  enabled: true
+  #  command: docker ps --format json
+  #  renderer: list
+  #  interval: manual

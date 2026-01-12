@@ -87,7 +87,7 @@ type JsonlEntry = JsonlUserEntry | JsonlAssistantEntry | JsonlSystemEntry | { ty
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
 const THIRTY_SECONDS_MS = 30 * 1000;
 const MAX_LINES_TO_SCAN = 200;
-const MAX_ACTIVITIES = 10;
+const DEFAULT_MAX_ACTIVITIES = 10;
 const MAX_DETAIL_LENGTH = 45;
 
 // Tool icons mapping
@@ -219,7 +219,7 @@ function getToolDetail(toolName: string, input?: { command?: string; file_path?:
 /**
  * Parse session state from a JSONL session file
  */
-export function parseSessionState(sessionFile: string): ClaudeSessionState {
+export function parseSessionState(sessionFile: string, maxActivities: number = DEFAULT_MAX_ACTIVITIES): ClaudeSessionState {
   const defaultState: ClaudeSessionState = {
     status: "none",
     activities: [],
@@ -366,10 +366,10 @@ export function parseSessionState(sessionFile: string): ClaudeSessionState {
     }
   }
 
-  // Return activities in reverse order (most recent first), limited to MAX_ACTIVITIES
+  // Return activities in reverse order (most recent first), limited to maxActivities
   return {
     status,
-    activities: activities.slice(-MAX_ACTIVITIES).reverse(),
+    activities: activities.slice(-maxActivities).reverse(),
     tokenCount,
   };
 }
@@ -377,7 +377,7 @@ export function parseSessionState(sessionFile: string): ClaudeSessionState {
 /**
  * Get Claude session data for a project
  */
-export function getClaudeData(projectPath: string): ClaudeData {
+export function getClaudeData(projectPath: string, maxActivities?: number): ClaudeData {
   const defaultState: ClaudeSessionState = {
     status: "none",
     activities: [],
@@ -386,24 +386,28 @@ export function getClaudeData(projectPath: string): ClaudeData {
 
   try {
     const sessionDir = getClaudeSessionPath(projectPath);
+    const hasSession = fs.existsSync(sessionDir);
     const sessionFile = findActiveSession(sessionDir);
 
     if (!sessionFile) {
       return {
         state: defaultState,
+        hasSession,
         timestamp: new Date().toISOString(),
       };
     }
 
-    const state = parseSessionState(sessionFile);
+    const state = parseSessionState(sessionFile, maxActivities);
     return {
       state,
+      hasSession: true,
       timestamp: new Date().toISOString(),
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return {
       state: defaultState,
+      hasSession: false,
       error: message,
       timestamp: new Date().toISOString(),
     };

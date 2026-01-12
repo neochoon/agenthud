@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { runInit, setFsMock, resetFsMock, type FsMock } from "../src/commands/init.js";
+import { runInit, setFsMock, resetFsMock, getDefaultConfig, type FsMock } from "../src/commands/init.js";
 
 describe("init command", () => {
   let fsMock: FsMock;
@@ -28,14 +28,6 @@ describe("init command", () => {
       expect(fsMock.mkdirSync).toHaveBeenCalledWith(".agenthud", { recursive: true });
     });
 
-    it("creates .agenthud/plan directory", () => {
-      fsMock.existsSync.mockReturnValue(false);
-
-      runInit();
-
-      expect(fsMock.mkdirSync).toHaveBeenCalledWith(".agenthud/plan", { recursive: true });
-    });
-
     it("creates .agenthud/tests directory", () => {
       fsMock.existsSync.mockReturnValue(false);
 
@@ -50,58 +42,6 @@ describe("init command", () => {
       runInit();
 
       expect(fsMock.mkdirSync).not.toHaveBeenCalledWith(".agenthud", { recursive: true });
-    });
-  });
-
-  describe("creates plan/plan.json", () => {
-    it("creates empty plan.json in plan folder when it doesn't exist", () => {
-      fsMock.existsSync.mockReturnValue(false);
-
-      runInit();
-
-      expect(fsMock.writeFileSync).toHaveBeenCalledWith(
-        ".agenthud/plan/plan.json",
-        "{}\n"
-      );
-    });
-
-    it("skips plan.json when it exists", () => {
-      fsMock.existsSync.mockImplementation((path: string) =>
-        path === ".agenthud/plan/plan.json"
-      );
-
-      runInit();
-
-      expect(fsMock.writeFileSync).not.toHaveBeenCalledWith(
-        ".agenthud/plan/plan.json",
-        expect.any(String)
-      );
-    });
-  });
-
-  describe("creates plan/decisions.json", () => {
-    it("creates empty decisions.json in plan folder when it doesn't exist", () => {
-      fsMock.existsSync.mockReturnValue(false);
-
-      runInit();
-
-      expect(fsMock.writeFileSync).toHaveBeenCalledWith(
-        ".agenthud/plan/decisions.json",
-        "[]\n"
-      );
-    });
-
-    it("skips decisions.json when it exists", () => {
-      fsMock.existsSync.mockImplementation((path: string) =>
-        path === ".agenthud/plan/decisions.json"
-      );
-
-      runInit();
-
-      expect(fsMock.writeFileSync).not.toHaveBeenCalledWith(
-        ".agenthud/plan/decisions.json",
-        expect.any(String)
-      );
     });
   });
 
@@ -146,80 +86,7 @@ describe("init command", () => {
     });
   });
 
-  describe("updates CLAUDE.md", () => {
-    const agentStateSection = `## Agent State
-
-Maintain \`.agenthud/\` directory:
-- Update \`plan.json\` when plan changes
-- Append to \`decisions.json\` for key decisions
-`;
-
-    it("creates CLAUDE.md with agent state section when it doesn't exist", () => {
-      fsMock.existsSync.mockReturnValue(false);
-
-      runInit();
-
-      expect(fsMock.writeFileSync).toHaveBeenCalledWith(
-        "CLAUDE.md",
-        agentStateSection
-      );
-    });
-
-    it("appends agent state section to existing CLAUDE.md", () => {
-      fsMock.existsSync.mockImplementation((path: string) =>
-        path === "CLAUDE.md"
-      );
-      fsMock.readFileSync.mockReturnValue("# My Project\n\nSome content.\n");
-
-      runInit();
-
-      expect(fsMock.appendFileSync).toHaveBeenCalledWith(
-        "CLAUDE.md",
-        "\n" + agentStateSection
-      );
-    });
-
-    it("skips if CLAUDE.md already contains Agent State section", () => {
-      fsMock.existsSync.mockImplementation((path: string) =>
-        path === "CLAUDE.md"
-      );
-      fsMock.readFileSync.mockReturnValue("# Project\n\n## Agent State\n\nAlready exists.\n");
-
-      runInit();
-
-      expect(fsMock.appendFileSync).not.toHaveBeenCalledWith(
-        "CLAUDE.md",
-        expect.any(String)
-      );
-    });
-  });
-
   describe("creates config.yaml", () => {
-    const defaultConfig = `# agenthud configuration
-panels:
-  project:
-    enabled: true
-    interval: 5m  # doesn't change often
-
-  git:
-    enabled: true
-    interval: 30s
-    command:
-      branch: git branch --show-current
-      commits: git log --since=midnight --pretty=format:"%h|%aI|%s"
-      stats: git log --since=midnight --numstat --pretty=format:""
-
-  plan:
-    enabled: true
-    interval: 10s
-    source: .agenthud/plan/plan.json
-
-  tests:
-    enabled: true
-    interval: manual
-    command: npx vitest run --reporter=json
-`;
-
     it("creates config.yaml with default content when it doesn't exist", () => {
       fsMock.existsSync.mockReturnValue(false);
 
@@ -227,7 +94,7 @@ panels:
 
       expect(fsMock.writeFileSync).toHaveBeenCalledWith(
         ".agenthud/config.yaml",
-        defaultConfig
+        getDefaultConfig()
       );
     });
 
@@ -252,33 +119,76 @@ panels:
       const result = runInit();
 
       expect(result.created).toContain(".agenthud/");
-      expect(result.created).toContain(".agenthud/plan/");
       expect(result.created).toContain(".agenthud/tests/");
-      expect(result.created).toContain(".agenthud/plan/plan.json");
-      expect(result.created).toContain(".agenthud/plan/decisions.json");
       expect(result.created).toContain(".agenthud/config.yaml");
       expect(result.created).toContain(".gitignore");
-      expect(result.created).toContain("CLAUDE.md");
     });
 
     it("returns list of skipped files", () => {
       fsMock.existsSync.mockReturnValue(true);
       fsMock.readFileSync.mockImplementation((path: string) => {
         if (path === ".gitignore") return ".agenthud/\n";
-        if (path === "CLAUDE.md") return "## Agent State\n";
         return "";
       });
 
       const result = runInit();
 
       expect(result.skipped).toContain(".agenthud/");
-      expect(result.skipped).toContain(".agenthud/plan/");
       expect(result.skipped).toContain(".agenthud/tests/");
-      expect(result.skipped).toContain(".agenthud/plan/plan.json");
-      expect(result.skipped).toContain(".agenthud/plan/decisions.json");
       expect(result.skipped).toContain(".agenthud/config.yaml");
       expect(result.skipped).toContain(".gitignore");
-      expect(result.skipped).toContain("CLAUDE.md");
+    });
+  });
+
+  describe("warnings", () => {
+    it("warns when not a git repository", () => {
+      fsMock.existsSync.mockImplementation((path: string) => {
+        // .git doesn't exist, Claude session exists
+        if (path === ".git") return false;
+        if (path.includes(".claude/projects")) return true;
+        return false;
+      });
+
+      const result = runInit("/Users/test/project");
+
+      expect(result.warnings).toContain("Not a git repository - Git panel will show limited info");
+    });
+
+    it("warns when no Claude session found", () => {
+      fsMock.existsSync.mockImplementation((path: string) => {
+        // .git exists, Claude session doesn't exist
+        if (path === ".git") return true;
+        if (path.includes(".claude/projects")) return false;
+        return false;
+      });
+
+      const result = runInit("/Users/test/project");
+
+      expect(result.warnings).toContain("No Claude session found - start Claude to see activity");
+    });
+
+    it("returns both warnings when neither git nor Claude session exists", () => {
+      fsMock.existsSync.mockReturnValue(false);
+
+      const result = runInit("/Users/test/project");
+
+      expect(result.warnings).toHaveLength(2);
+      expect(result.warnings).toContain("Not a git repository - Git panel will show limited info");
+      expect(result.warnings).toContain("No Claude session found - start Claude to see activity");
+    });
+
+    it("returns no warnings when both git and Claude session exist", () => {
+      fsMock.existsSync.mockImplementation((path: string) => {
+        if (path === ".git") return true;
+        if (path.includes(".claude/projects")) return true;
+        if (path === ".gitignore") return true;
+        return false;
+      });
+      fsMock.readFileSync.mockReturnValue(".agenthud/\n");
+
+      const result = runInit("/Users/test/project");
+
+      expect(result.warnings).toHaveLength(0);
     });
   });
 });

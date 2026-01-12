@@ -89,6 +89,7 @@ export interface ClaudeSessionState {
 
 export interface ClaudeData {
   state: ClaudeSessionState;
+  hasSession: boolean;
   error?: string;
   timestamp: string;
 }

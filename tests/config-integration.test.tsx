@@ -16,6 +16,11 @@ import {
   setReadFileFn as setTestsReadFileFn,
   resetReadFileFn as resetTestsReadFileFn,
 } from "../src/data/tests.js";
+import {
+  setFsMock as setClaudeFsMock,
+  resetFsMock as resetClaudeFsMock,
+  type FsMock as ClaudeFsMock,
+} from "../src/data/claude.js";
 
 describe("App with config", () => {
   let mockExec: ReturnType<typeof vi.fn>;
@@ -50,6 +55,15 @@ describe("App with config", () => {
     setTestsReadFileFn(() => {
       throw new Error("File not found");
     });
+
+    // Claude fs mock - simulate no active session
+    const claudeFsMock: ClaudeFsMock = {
+      existsSync: vi.fn().mockReturnValue(false),
+      readFileSync: vi.fn().mockReturnValue(""),
+      readdirSync: vi.fn().mockReturnValue([]),
+      statSync: vi.fn().mockReturnValue({ mtimeMs: 0 }),
+    };
+    setClaudeFsMock(claudeFsMock);
   });
 
   afterEach(() => {
@@ -57,6 +71,7 @@ describe("App with config", () => {
     resetConfigFsMock();
     resetPlanReadFileFn();
     resetTestsReadFileFn();
+    resetClaudeFsMock();
   });
 
   describe("panel visibility", () => {

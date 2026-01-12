@@ -80,7 +80,8 @@ type JsonlEntry = JsonlUserEntry | JsonlAssistantEntry | JsonlSystemEntry | { ty
 
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
 const THIRTY_SECONDS_MS = 30 * 1000;
-const MAX_LINES_TO_PARSE = 50;
+const MAX_LINES_FOR_STATUS = 50;
+const MAX_LINES_FOR_USER_MESSAGE = 500; // Scan more lines to find user message
 const MAX_ACTION_LENGTH = 50;
 
 /**
@@ -162,36 +163,47 @@ export function parseSessionState(sessionFile: string): ClaudeSessionState {
     return defaultState;
   }
 
-  // Only parse last N lines for performance
-  const recentLines = lines.slice(-MAX_LINES_TO_PARSE);
-
   let lastUserMessage: string | null = null;
   let currentAction: string | null = null;
   let lastTimestamp: Date | null = null;
   let tokenCount = 0;
   let lastType: "user" | "tool" | "response" | "stop" | null = null;
 
+  // First pass: scan backwards to find the most recent user message (up to 500 lines)
+  const linesForUserMessage = lines.slice(-MAX_LINES_FOR_USER_MESSAGE);
+  for (let i = linesForUserMessage.length - 1; i >= 0; i--) {
+    try {
+      const entry = JSON.parse(linesForUserMessage[i]) as JsonlEntry;
+      if (entry.type === "user") {
+        const userEntry = entry as JsonlUserEntry;
+        const msgContent = userEntry.message?.content;
+        if (typeof msgContent === "string") {
+          lastUserMessage = msgContent;
+          break;
+        } else if (Array.isArray(msgContent)) {
+          const textBlock = msgContent.find(
+            (c): c is { type: "text"; text: string } =>
+              typeof c === "object" && c !== null && c.type === "text" && typeof c.text === "string"
+          );
+          if (textBlock) {
+            lastUserMessage = textBlock.text;
+            break;
+          }
+        }
+      }
+    } catch {
+      // Skip invalid JSON
+    }
+  }
+
+  // Second pass: parse recent lines for status, action, tokens (50 lines for performance)
+  const recentLines = lines.slice(-MAX_LINES_FOR_STATUS);
   for (const line of recentLines) {
     try {
       const entry = JSON.parse(line) as JsonlEntry;
 
       if (entry.type === "user") {
         const userEntry = entry as JsonlUserEntry;
-        const content = userEntry.message?.content;
-        // Extract string content or text from array
-        if (typeof content === "string") {
-          lastUserMessage = content;
-        } else if (Array.isArray(content)) {
-          // Look for text block in array (e.g., when user also has tool_result)
-          const textBlock = content.find(
-            (c): c is { type: "text"; text: string } =>
-              typeof c === "object" && c !== null && c.type === "text" && typeof c.text === "string"
-          );
-          if (textBlock) {
-            lastUserMessage = textBlock.text;
-          }
-          // If no text block found, keep the previous lastUserMessage
-        }
         if (userEntry.timestamp) {
           lastTimestamp = new Date(userEntry.timestamp);
         }

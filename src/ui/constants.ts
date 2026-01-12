@@ -1,6 +1,36 @@
 // Default panel width (can be overridden via config)
 export const DEFAULT_PANEL_WIDTH = 70;
 
+// Terminal width limits
+export const MIN_TERMINAL_WIDTH = 50;
+export const MAX_TERMINAL_WIDTH = 120;
+export const DEFAULT_FALLBACK_WIDTH = 80;
+
+// For testing - allows mocking process.stdout.columns
+let stdoutColumnsFn: () => number | undefined = () => process.stdout.columns;
+
+export function setStdoutColumnsFn(fn: () => number | undefined): void {
+  stdoutColumnsFn = fn;
+}
+
+export function resetStdoutColumnsFn(): void {
+  stdoutColumnsFn = () => process.stdout.columns;
+}
+
+/**
+ * Get terminal width with min/max limits.
+ * Returns the terminal width capped at MAX_TERMINAL_WIDTH (120),
+ * with a minimum of MIN_TERMINAL_WIDTH (50).
+ * Falls back to DEFAULT_FALLBACK_WIDTH (80) if detection fails.
+ */
+export function getTerminalWidth(): number {
+  const columns = stdoutColumnsFn();
+  if (!columns || columns <= 0) {
+    return DEFAULT_FALLBACK_WIDTH;
+  }
+  return Math.min(Math.max(columns, MIN_TERMINAL_WIDTH), MAX_TERMINAL_WIDTH);
+}
+
 // Legacy exports for backward compatibility (use functions with width param for new code)
 export const PANEL_WIDTH = DEFAULT_PANEL_WIDTH;
 export const CONTENT_WIDTH = DEFAULT_PANEL_WIDTH - 4;

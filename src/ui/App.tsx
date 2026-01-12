@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Box, Text, useApp, useInput } from "ink";
+import { Box, Text, useApp, useInput, useStdout } from "ink";
 import { GitPanel } from "./GitPanel.js";
 import { TestPanel } from "./TestPanel.js";
 import { ProjectPanel } from "./ProjectPanel.js";
 import { ClaudePanel } from "./ClaudePanel.js";
 import { GenericPanel } from "./GenericPanel.js";
 import { WelcomePanel } from "./WelcomePanel.js";
+import { MAX_TERMINAL_WIDTH, MIN_TERMINAL_WIDTH, DEFAULT_FALLBACK_WIDTH } from "./constants.js";
 import { getGitData, getGitDataAsync, type GitData } from "../data/git.js";
 import { getTestData } from "../data/tests.js";
 import { getProjectData, type ProjectData } from "../data/project.js";
@@ -123,11 +124,44 @@ function WelcomeApp(): React.ReactElement {
   return <WelcomePanel />;
 }
 
+// Calculate capped terminal width
+function getClampedWidth(columns: number | undefined): number {
+  if (!columns || columns <= 0) {
+    return DEFAULT_FALLBACK_WIDTH;
+  }
+  return Math.min(Math.max(columns, MIN_TERMINAL_WIDTH), MAX_TERMINAL_WIDTH);
+}
+
 function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   const { exit } = useApp();
+  const { stdout } = useStdout();
 
   // Parse config once at startup
   const { config, warnings } = useMemo(() => parseConfig(), []);
+
+  // Responsive terminal width using Ink's useStdout hook
+  const [width, setWidth] = useState(() => getClampedWidth(stdout?.columns));
+
+  useEffect(() => {
+    // Update width when stdout columns change
+    const newWidth = getClampedWidth(stdout?.columns);
+    if (newWidth !== width) {
+      setWidth(newWidth);
+    }
+  }, [stdout?.columns, width]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWidth(getClampedWidth(stdout?.columns));
+    };
+
+    // Listen for terminal resize events
+    stdout?.on("resize", handleResize);
+
+    return () => {
+      stdout?.off("resize", handleResize);
+    };
+  }, [stdout]);
 
   // Calculate interval in seconds for display
   const projectIntervalSeconds = config.panels.project.interval ? config.panels.project.interval / 1000 : null;
@@ -504,7 +538,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
               <ProjectPanel
                 data={projectData}
                 countdown={mode === "watch" ? countdowns.project : null}
-                width={config.width}
+                width={width}
                 justRefreshed={projectVisual.justRefreshed}
               />
             </Box>
@@ -522,7 +556,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
                 stats={gitData.stats}
                 uncommitted={gitData.uncommitted}
                 countdown={mode === "watch" ? countdowns.git : null}
-                width={config.width}
+                width={width}
                 isRunning={gitVisual.isRunning}
                 justRefreshed={gitVisual.justRefreshed}
               />
@@ -540,7 +574,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
                 isOutdated={testData.isOutdated}
                 commitsBehind={testData.commitsBehind}
                 error={testData.error}
-                width={config.width}
+                width={width}
                 isRunning={testsVisual.isRunning}
                 justCompleted={testsVisual.justCompleted}
               />
@@ -556,7 +590,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
               <ClaudePanel
                 data={claudeData}
                 countdown={mode === "watch" ? countdowns.claude : null}
-                width={config.width}
+                width={width}
                 justRefreshed={claudeVisual.justRefreshed}
               />
             </Box>
@@ -582,7 +616,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
                 countdown={countdown}
                 relativeTime={relativeTime}
                 error={result.error}
-                width={config.width}
+                width={width}
                 isRunning={customVisual.isRunning}
                 justRefreshed={customVisual.justRefreshed}
               />
@@ -593,7 +627,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
         return null;
       })}
       {mode === "watch" && (
-        <Box marginTop={1} width={config.width}>
+        <Box marginTop={1} width={width}>
           <Text dimColor>
             {statusBarItems.map((item, index) => (
               <React.Fragment key={index}>

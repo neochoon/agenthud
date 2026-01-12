@@ -156,15 +156,10 @@ export function ClaudePanel({
     const padding = Math.max(0, contentWidth - displayWidth);
 
     // Determine color based on activity type
-    const isFirst = i === 0;
-    const color = isFirst ? undefined : "gray";
-
     lines.push(
       <Text key={`activity-${i}`}>
         {BOX.v}{" "}
-        <Text color={color} dimColor={!isFirst}>
-          {lineText}
-        </Text>
+        {lineText}
         {" ".repeat(padding)}
         {BOX.v}
       </Text>

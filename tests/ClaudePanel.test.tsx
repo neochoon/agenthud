@@ -276,6 +276,25 @@ describe("ClaudePanel", () => {
       expect(lastFrame()).toContain("20s");
       expect(lastFrame()).not.toContain("·");
     });
+
+    it("shows elapsed time even when no active session", () => {
+      // 1 hour ago
+      const sessionStart = new Date(Date.now() - 60 * 60 * 1000);
+      const data = createMockData({
+        hasSession: true,
+        state: {
+          status: "none",
+          activities: [],
+          tokenCount: 0,
+          sessionStartTime: sessionStart,
+        },
+      });
+
+      const { lastFrame } = render(<ClaudePanel data={data} />);
+
+      expect(lastFrame()).toContain("No active session");
+      expect(lastFrame()).toContain("1h 0m");
+    });
   });
 
   describe("visual feedback", () => {

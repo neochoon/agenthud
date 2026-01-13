@@ -210,7 +210,7 @@ export function ClaudePanel({
     const noActivePadding = Math.max(0, contentWidth - noActiveText.length);
     return (
       <Box flexDirection="column" width={width}>
-        <Text>{createTitleLine("Claude", countdownSuffix, width)}</Text>
+        <Text>{createTitleLine("Claude", titleSuffix, width)}</Text>
         <Text>
           {BOX.v}{" "}
           <Text dimColor>{noActiveText}</Text>

@@ -68,8 +68,59 @@ function getProjectsDir(): string {
 }
 
 function decodeProjectPath(encoded: string): string {
-  // Convert "-Users-test-project" back to "/Users/test/project"
-  return encoded.replace(/-/g, "/");
+  // Claude Code encodes paths by replacing "/" with "-"
+  // e.g., "/Users/test/pain-radar" -> "-Users-test-pain-radar"
+  // Problem: we can't distinguish "-" that was "/" from original "-"
+  //
+  // Strategy: Check if naive decode exists, if not try smart decode
+  const naiveDecoded = encoded.replace(/-/g, "/");
+
+  // If naive decode exists, use it (handles simple cases)
+  if (fs.existsSync(naiveDecoded)) {
+    return naiveDecoded;
+  }
+
+  // Smart decode: try to find actual path by checking filesystem
+  const segments = encoded.split("-").filter(Boolean);
+  if (segments.length === 0) {
+    return naiveDecoded;
+  }
+
+  let currentPath = "";
+  let i = 0;
+
+  while (i < segments.length) {
+    // Try joining remaining segments with "-" to find existing directory
+    let found = false;
+
+    for (let j = segments.length; j > i; j--) {
+      const segment = segments.slice(i, j).join("-");
+      const testPath = currentPath + "/" + segment;
+
+      // Only accept if it's a directory (not just any existing file)
+      try {
+        if (fs.existsSync(testPath)) {
+          const stat = fs.statSync(testPath);
+          if (stat.isDirectory?.()) {
+            currentPath = testPath;
+            i = j;
+            found = true;
+            break;
+          }
+        }
+      } catch {
+        // Ignore stat errors
+      }
+    }
+
+    if (!found) {
+      // No existing directory found, use single segment
+      currentPath += "/" + segments[i];
+      i++;
+    }
+  }
+
+  return currentPath || naiveDecoded;
 }
 
 export function getAllProjects(): ProjectInfo[] {

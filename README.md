@@ -63,6 +63,10 @@ panels:
 - `r` refresh all
 - `t` run tests (when manual)
 
+## Feedback
+
+Issues and PRs welcome at [GitHub](https://github.com/neochoon/agenthud).
+
 ## License
 
 MIT

@@ -4,6 +4,7 @@ import { GitPanel } from "./GitPanel.js";
 import { TestPanel } from "./TestPanel.js";
 import { ProjectPanel } from "./ProjectPanel.js";
 import { ClaudePanel } from "./ClaudePanel.js";
+import { OtherSessionsPanel } from "./OtherSessionsPanel.js";
 import { GenericPanel } from "./GenericPanel.js";
 import { WelcomePanel } from "./WelcomePanel.js";
 import { MAX_TERMINAL_WIDTH, MIN_TERMINAL_WIDTH, DEFAULT_FALLBACK_WIDTH } from "./constants.js";
@@ -11,6 +12,7 @@ import { getGitData, getGitDataAsync, type GitData } from "../data/git.js";
 import { getTestData } from "../data/tests.js";
 import { getProjectData, type ProjectData } from "../data/project.js";
 import { getClaudeData } from "../data/claude.js";
+import { getOtherSessionsData, type OtherSessionsData } from "../data/otherSessions.js";
 import { getCustomPanelData, getCustomPanelDataAsync, type CustomPanelResult } from "../data/custom.js";
 import { runTestCommand } from "../runner/command.js";
 import { parseConfig, type Config, type CustomPanelConfig } from "../config/parser.js";
@@ -25,6 +27,7 @@ interface PanelCountdowns {
   project: number | null;
   git: number | null;
   claude: number | null;
+  other_sessions: number | null;
   [key: string]: number | null; // custom panels
 }
 
@@ -40,6 +43,7 @@ interface PanelVisualStates {
   git: VisualFeedback;
   tests: VisualFeedback;
   claude: VisualFeedback;
+  other_sessions: VisualFeedback;
   [key: string]: VisualFeedback; // custom panels
 }
 
@@ -175,6 +179,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
   const projectIntervalSeconds = config.panels.project.interval ? config.panels.project.interval / 1000 : null;
   const gitIntervalSeconds = config.panels.git.interval ? config.panels.git.interval / 1000 : null;
   const claudeIntervalSeconds = config.panels.claude.interval ? config.panels.claude.interval / 1000 : null;
+  const otherSessionsIntervalSeconds = config.panels.other_sessions.interval ? config.panels.other_sessions.interval / 1000 : null;
 
   // Get current working directory for Claude session lookup
   const cwd = process.cwd();
@@ -209,6 +214,14 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
   const refreshClaude = useCallback(() => {
     setClaudeData(getClaudeData(cwd, config.panels.claude.maxActivities));
   }, [cwd, config.panels.claude.maxActivities]);
+
+  // Other sessions data
+  const [otherSessionsData, setOtherSessionsData] = useState<OtherSessionsData>(() =>
+    getOtherSessionsData(cwd, { activeThresholdMs: config.panels.other_sessions.activeThreshold })
+  );
+  const refreshOtherSessions = useCallback(() => {
+    setOtherSessionsData(getOtherSessionsData(cwd, { activeThresholdMs: config.panels.other_sessions.activeThreshold }));
+  }, [cwd, config.panels.other_sessions.activeThreshold]);
 
   // Custom panel data
   const customPanelNames = useMemo(
@@ -246,6 +259,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
       project: projectIntervalSeconds,
       git: gitIntervalSeconds,
       claude: claudeIntervalSeconds,
+      other_sessions: otherSessionsIntervalSeconds,
     };
     if (config.customPanels) {
       for (const [name, panelConfig] of Object.entries(config.customPanels)) {
@@ -253,7 +267,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
       }
     }
     return countdowns;
-  }, [projectIntervalSeconds, gitIntervalSeconds, claudeIntervalSeconds, config.customPanels]);
+  }, [projectIntervalSeconds, gitIntervalSeconds, claudeIntervalSeconds, otherSessionsIntervalSeconds, config.customPanels]);
 
   const [countdowns, setCountdowns] = useState<PanelCountdowns>(initialCountdowns);
 
@@ -264,6 +278,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
       git: { ...DEFAULT_VISUAL_STATE },
       tests: { ...DEFAULT_VISUAL_STATE },
       claude: { ...DEFAULT_VISUAL_STATE },
+      other_sessions: { ...DEFAULT_VISUAL_STATE },
     };
     for (const name of customPanelNames) {
       states[name] = { ...DEFAULT_VISUAL_STATE };
@@ -351,6 +366,13 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
     clearFeedback("claude", "justRefreshed");
   }, [cwd, config.panels.claude.maxActivities, setVisualState, clearFeedback]);
 
+  // Other sessions panel refresh with visual feedback (file-based)
+  const refreshOtherSessionsWithFeedback = useCallback(() => {
+    setOtherSessionsData(getOtherSessionsData(cwd, { activeThresholdMs: config.panels.other_sessions.activeThreshold }));
+    setVisualState("other_sessions", { justRefreshed: true });
+    clearFeedback("other_sessions", "justRefreshed");
+  }, [cwd, config.panels.other_sessions.activeThreshold, setVisualState, clearFeedback]);
+
   // Build custom panel refresh actions for hotkeys (async)
   const customPanelActionsAsync = useMemo(() => {
     const actions: Record<string, () => void> = {};
@@ -376,6 +398,10 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
       refreshClaudeWithFeedback();
       setCountdowns((prev) => ({ ...prev, claude: claudeIntervalSeconds }));
     }
+    if (config.panels.other_sessions.enabled) {
+      refreshOtherSessionsWithFeedback();
+      setCountdowns((prev) => ({ ...prev, other_sessions: otherSessionsIntervalSeconds }));
+    }
     // Refresh custom panels
     for (const name of customPanelNames) {
       if (config.customPanels![name].enabled) {
@@ -392,11 +418,13 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
     refreshGitAsync,
     refreshTestAsync,
     refreshClaudeWithFeedback,
+    refreshOtherSessionsWithFeedback,
     refreshCustomPanelAsync,
     config,
     projectIntervalSeconds,
     gitIntervalSeconds,
     claudeIntervalSeconds,
+    otherSessionsIntervalSeconds,
     customPanelNames,
   ]);
 
@@ -450,6 +478,16 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
       );
     }
 
+    // Other sessions panel timer
+    if (config.panels.other_sessions.enabled && config.panels.other_sessions.interval !== null) {
+      timers.push(
+        setInterval(() => {
+          refreshOtherSessionsWithFeedback();
+          setCountdowns((prev) => ({ ...prev, other_sessions: otherSessionsIntervalSeconds }));
+        }, config.panels.other_sessions.interval)
+      );
+    }
+
     // Custom panel timers
     if (config.customPanels) {
       for (const [name, panelConfig] of Object.entries(config.customPanels)) {
@@ -473,10 +511,12 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
     refreshGitAsync,
     refreshTestAsync,
     refreshClaudeWithFeedback,
+    refreshOtherSessionsWithFeedback,
     refreshCustomPanelAsync,
     projectIntervalSeconds,
     gitIntervalSeconds,
     claudeIntervalSeconds,
+    otherSessionsIntervalSeconds,
   ]);
 
   // Countdown ticker - decrements every second
@@ -489,6 +529,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
           project: prev.project !== null && prev.project > 1 ? prev.project - 1 : prev.project,
           git: prev.git !== null && prev.git > 1 ? prev.git - 1 : prev.git,
           claude: prev.claude !== null && prev.claude > 1 ? prev.claude - 1 : prev.claude,
+          other_sessions: prev.other_sessions !== null && prev.other_sessions > 1 ? prev.other_sessions - 1 : prev.other_sessions,
         };
         // Decrement custom panel countdowns
         for (const name of customPanelNames) {
@@ -600,6 +641,22 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
                 countdown={mode === "watch" ? countdowns.claude : null}
                 width={width}
                 justRefreshed={claudeVisual.justRefreshed}
+              />
+            </Box>
+          );
+        }
+
+        // Other sessions panel
+        if (panelName === "other_sessions" && config.panels.other_sessions.enabled) {
+          const otherSessionsVisual = visualStates.other_sessions || DEFAULT_VISUAL_STATE;
+          return (
+            <Box key={`panel-other_sessions-${index}`} marginTop={isFirst ? 0 : 1}>
+              <OtherSessionsPanel
+                data={otherSessionsData}
+                countdown={mode === "watch" ? countdowns.other_sessions : null}
+                width={width}
+                isRunning={otherSessionsVisual.isRunning}
+                messageMaxLength={config.panels.other_sessions.messageMaxLength}
               />
             </Box>
           );

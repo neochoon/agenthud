@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { join } from "path";
 import {
   getClaudeSessionPath,
   findActiveSession,
@@ -37,19 +38,27 @@ describe("claude data module", () => {
     it("converts project path to Claude session directory", () => {
       const projectPath = "/Users/neochoon/agenthud";
       const result = getClaudeSessionPath(projectPath);
-      expect(result).toMatch(/.claude\/projects\/-Users-neochoon-agenthud$/);
+      // Check path contains expected components (platform-independent)
+      expect(result).toContain(".claude");
+      expect(result).toContain("projects");
+      expect(result).toContain("-Users-neochoon-agenthud");
     });
 
     it("handles paths with multiple slashes", () => {
       const projectPath = "/home/user/projects/my-app";
       const result = getClaudeSessionPath(projectPath);
-      expect(result).toMatch(/.claude\/projects\/-home-user-projects-my-app$/);
+      expect(result).toContain(".claude");
+      expect(result).toContain("projects");
+      expect(result).toContain("-home-user-projects-my-app");
     });
 
     it("handles root path", () => {
       const projectPath = "/";
       const result = getClaudeSessionPath(projectPath);
-      expect(result).toMatch(/.claude\/projects\/-$/);
+      expect(result).toContain(".claude");
+      expect(result).toContain("projects");
+      // Encoded path ends with just "-"
+      expect(result.endsWith("-")).toBe(true);
     });
   });
 
@@ -72,6 +81,7 @@ describe("claude data module", () => {
     });
 
     it("returns most recently modified jsonl file", () => {
+      const sessionDir = join("/fake", "session", "dir");
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readdirSync.mockReturnValue(["old.jsonl", "new.jsonl"]);
       mockFs.statSync.mockImplementation((path: string) => {
@@ -81,9 +91,9 @@ describe("claude data module", () => {
         return { mtimeMs: Date.now() - 1000 }; // 1 second ago
       });
 
-      const result = findActiveSession("/fake/session/dir");
+      const result = findActiveSession(sessionDir);
 
-      expect(result).toBe("/fake/session/dir/new.jsonl");
+      expect(result).toBe(join(sessionDir, "new.jsonl"));
     });
 
     it("returns null when most recent file is older than 5 minutes", () => {
@@ -99,15 +109,16 @@ describe("claude data module", () => {
     });
 
     it("returns file when modified within 5 minutes", () => {
+      const sessionDir = join("/fake", "session", "dir");
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readdirSync.mockReturnValue(["recent.jsonl"]);
       mockFs.statSync.mockReturnValue({
         mtimeMs: Date.now() - 4 * 60 * 1000, // 4 minutes ago
       });
 
-      const result = findActiveSession("/fake/session/dir");
+      const result = findActiveSession(sessionDir);
 
-      expect(result).toBe("/fake/session/dir/recent.jsonl");
+      expect(result).toBe(join(sessionDir, "recent.jsonl"));
     });
   });
 

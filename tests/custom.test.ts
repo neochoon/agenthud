@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { tmpdir } from "os";
+import { join } from "path";
 import {
   getCustomPanelData,
   getCustomPanelDataAsync,
@@ -249,16 +251,16 @@ describe("custom panel data", () => {
     it("reads from source file", async () => {
       // Create a temp file for testing
       const fs = await import("fs/promises");
-      const path = "/tmp/agenthud-test-panel.json";
+      const testPath = join(tmpdir(), "agenthud-test-panel.json");
       await fs.writeFile(
-        path,
+        testPath,
         JSON.stringify({ title: "Async File", summary: "from file" })
       );
 
       const config: CustomPanelConfig = {
         enabled: true,
         interval: 30000,
-        source: path,
+        source: testPath,
         renderer: {} as CustomPanelConfig["renderer"],
       };
 
@@ -267,14 +269,14 @@ describe("custom panel data", () => {
       expect(result.data.title).toBe("Async File");
       expect(result.data.summary).toBe("from file");
 
-      await fs.unlink(path);
+      await fs.unlink(testPath);
     });
 
     it("handles file not found", async () => {
       const config: CustomPanelConfig = {
         enabled: true,
         interval: 30000,
-        source: "/tmp/this-file-does-not-exist-12345.json",
+        source: join(tmpdir(), "this-file-does-not-exist-12345.json"),
         renderer: {} as CustomPanelConfig["renderer"],
       };
 
@@ -285,13 +287,13 @@ describe("custom panel data", () => {
 
     it("handles invalid JSON in file", async () => {
       const fs = await import("fs/promises");
-      const path = "/tmp/agenthud-test-invalid.json";
-      await fs.writeFile(path, "not json");
+      const testPath = join(tmpdir(), "agenthud-test-invalid.json");
+      await fs.writeFile(testPath, "not json");
 
       const config: CustomPanelConfig = {
         enabled: true,
         interval: 30000,
-        source: path,
+        source: testPath,
         renderer: {} as CustomPanelConfig["renderer"],
       };
 
@@ -299,7 +301,7 @@ describe("custom panel data", () => {
 
       expect(result.error).toBe("Invalid JSON");
 
-      await fs.unlink(path);
+      await fs.unlink(testPath);
     });
 
     it("returns error when no command or source configured", async () => {

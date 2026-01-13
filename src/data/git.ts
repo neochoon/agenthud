@@ -8,6 +8,15 @@ type AsyncExecFn = (command: string, options?: { encoding: string; shell?: strin
 
 const execAsync = promisify(nodeExec);
 
+// Strip BOM and surrounding quotes from output (Windows compatibility)
+function cleanOutput(str: string): string {
+  // Remove UTF-8 BOM
+  let result = str.replace(/^\uFEFF/, "");
+  // Remove surrounding double quotes (Windows cmd may include them)
+  result = result.replace(/^"|"$/g, "");
+  return result.trim();
+}
+
 // Default executor - can be overridden for testing
 let execFn: ExecFn = (command, options) =>
   nodeExecSync(command, options as Parameters<typeof nodeExecSync>[1]) as string;
@@ -196,11 +205,12 @@ export async function getGitDataAsync(config: GitPanelConfig): Promise<GitData> 
   let commits: Commit[] = [];
   try {
     const { stdout } = await execAsync(commands.commits);
-    const lines = stdout.trim().split("\n").filter(Boolean);
+    const lines = cleanOutput(stdout).split("\n").filter(Boolean);
     commits = lines.map((line) => {
-      const [hash, timestamp, ...messageParts] = line.split("|");
+      const cleanLine = cleanOutput(line);
+      const [hash, timestamp, ...messageParts] = cleanLine.split("|");
       return {
-        hash,
+        hash: cleanOutput(hash),
         message: messageParts.join("|"),
         timestamp: new Date(timestamp),
       };

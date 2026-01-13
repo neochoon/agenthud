@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { sep } from "path";
 import {
   getAllProjects,
   getOtherSessionsData,
@@ -53,7 +54,8 @@ describe("otherSessions data module", () => {
 
       expect(result).toHaveLength(3);
       expect(result[0].encodedPath).toBe("-Users-test-project1");
-      expect(result[0].decodedPath).toBe("/Users/test/project1");
+      // Decoded path uses platform-specific separator
+      expect(result[0].decodedPath).toBe(`${sep}Users${sep}test${sep}project1`);
     });
 
     it("filters out non-directory entries", () => {
@@ -81,8 +83,8 @@ describe("otherSessions data module", () => {
 
       const result = getAllProjects();
 
-      // The decode replaces all "-" with "/", so we get segments
-      expect(result[0].decodedPath).toBe("/Users/test/myproject");
+      // The decode replaces all "-" with platform separator
+      expect(result[0].decodedPath).toBe(`${sep}Users${sep}test${sep}myproject`);
     });
   });
 
@@ -249,12 +251,12 @@ describe("otherSessions data module", () => {
         })
       );
 
-      const result = getOtherSessionsData("/Users/test/current");
+      const result = getOtherSessionsData(`${sep}Users${sep}test${sep}current`);
 
       // Total should include all projects (2), but active/recent should exclude current
       expect(result.totalProjects).toBe(2);
       // Only "other" project should be considered
-      expect(result.recentSession?.projectPath).toBe("/Users/test/other");
+      expect(result.recentSession?.projectPath).toBe(`${sep}Users${sep}test${sep}other`);
     });
 
     it("counts active sessions correctly", () => {
@@ -323,10 +325,10 @@ describe("otherSessions data module", () => {
         });
       });
 
-      const result = getOtherSessionsData("/some/other/path");
+      const result = getOtherSessionsData(`${sep}some${sep}other${sep}path`);
 
       expect(result.recentSession).not.toBeNull();
-      expect(result.recentSession?.projectPath).toBe("/Users/test/newer");
+      expect(result.recentSession?.projectPath).toBe(`${sep}Users${sep}test${sep}newer`);
       expect(result.recentSession?.projectName).toBe("newer");
       expect(result.recentSession?.lastMessage).toBe("Recent message");
       expect(result.recentSession?.isActive).toBe(true);

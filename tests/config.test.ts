@@ -389,8 +389,8 @@ panels:
 
       const { config } = parseConfig();
 
-      // Config order is preserved, missing built-in panels (project, claude) added at end
-      expect(config.panelOrder).toEqual(["git", "docker", "tests", "project", "claude"]);
+      // Config order is preserved, missing built-in panels (project, claude, other_sessions) added at end
+      expect(config.panelOrder).toEqual(["git", "docker", "tests", "project", "claude", "other_sessions"]);
     });
 
     it("returns default order when no config file", () => {
@@ -398,7 +398,7 @@ panels:
 
       const { config } = parseConfig();
 
-      expect(config.panelOrder).toEqual(["project", "git", "tests", "claude"]);
+      expect(config.panelOrder).toEqual(["project", "git", "tests", "claude", "other_sessions"]);
     });
 
     it("includes disabled panels in order (enabled checked at render time)", () => {
@@ -417,8 +417,8 @@ panels:
 
       // panelOrder should include all panels from config, regardless of enabled state
       // The enabled state is checked at render time
-      // Missing built-in panels (project, claude) added at end
-      expect(config.panelOrder).toEqual(["git", "docker", "tests", "project", "claude"]);
+      // Missing built-in panels (project, claude, other_sessions) added at end
+      expect(config.panelOrder).toEqual(["git", "docker", "tests", "project", "claude", "other_sessions"]);
     });
   });
 

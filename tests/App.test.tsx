@@ -17,9 +17,15 @@ import {
   resetFsMock as resetClaudeFsMock,
   type FsMock as ClaudeFsMock,
 } from "../src/data/claude.js";
+import {
+  setFsMock as setOtherSessionsFsMock,
+  resetFsMock as resetOtherSessionsFsMock,
+  type FsMock as OtherSessionsFsMock,
+} from "../src/data/otherSessions.js";
+import { getDisplayWidth } from "../src/ui/constants.js";
 
-// Helper to strip ANSI codes
-const stripAnsi = (str: string) => str.replace(/\x1b\[[0-9;]*m/g, "");
+// Helper to strip ANSI codes (including colors and clear-to-EOL)
+const stripAnsi = (str: string) => str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
 
 describe("App", () => {
   let mockExec: ReturnType<typeof vi.fn>;
@@ -57,6 +63,15 @@ panels:
       statSync: vi.fn().mockReturnValue({ mtimeMs: 0 }),
     };
     setClaudeFsMock(claudeFsMock);
+
+    // Other sessions fs mock - simulate no projects
+    const otherSessionsFsMock: OtherSessionsFsMock = {
+      existsSync: vi.fn().mockReturnValue(false),
+      readFileSync: vi.fn().mockReturnValue(""),
+      readdirSync: vi.fn().mockReturnValue([]),
+      statSync: vi.fn().mockReturnValue({ mtimeMs: 0 }),
+    };
+    setOtherSessionsFsMock(otherSessionsFsMock);
   });
 
   afterEach(() => {
@@ -64,6 +79,7 @@ panels:
     resetConfigFsMock();
     resetTestsReadFileFn();
     resetClaudeFsMock();
+    resetOtherSessionsFsMock();
   });
 
   describe("rendering", () => {
@@ -159,8 +175,8 @@ panels:
         (line) => line.includes("┌") || line.includes("│") || line.includes("└")
       );
 
-      // All panel lines should have the same width
-      const widths = panelLines.map((line) => stripAnsi(line).length);
+      // All panel lines should have the same display width (accounting for emojis)
+      const widths = panelLines.map((line) => getDisplayWidth(stripAnsi(line)));
       const uniqueWidths = [...new Set(widths)];
 
       // There should be only one unique width (all lines same width)

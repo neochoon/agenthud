@@ -51,6 +51,11 @@ export interface ClaudePanelConfig extends PanelConfig {
   maxActivities?: number;
 }
 
+export interface OtherSessionsPanelConfig extends PanelConfig {
+  activeThreshold?: number; // in milliseconds
+  messageMaxLength?: number;
+}
+
 export interface CustomPanelConfig extends PanelConfig {
   command?: string;
   source?: string;
@@ -62,6 +67,7 @@ export interface PanelsConfig {
   git: GitPanelConfig;
   tests: TestsPanelConfig;
   claude: ClaudePanelConfig;
+  other_sessions: OtherSessionsPanelConfig;
 }
 
 export interface Config {
@@ -123,13 +129,19 @@ export function getDefaultConfig(): Config {
         enabled: true,
         interval: 10000, // 10 seconds default
       },
+      other_sessions: {
+        enabled: true,
+        interval: 10000, // 10 seconds default
+        activeThreshold: 5 * 60 * 1000, // 5 minutes
+        messageMaxLength: 50,
+      },
     },
-    panelOrder: ["project", "git", "tests", "claude"],
+    panelOrder: ["project", "git", "tests", "claude", "other_sessions"],
     width: DEFAULT_WIDTH,
   };
 }
 
-const BUILTIN_PANELS = ["project", "git", "tests", "claude"];
+const BUILTIN_PANELS = ["project", "git", "tests", "claude", "other_sessions"];
 const VALID_RENDERERS = ["list", "progress", "status"];
 
 export function parseConfig(): ParseResult {
@@ -249,6 +261,30 @@ export function parseConfig(): ParseResult {
       }
       if (typeof panelConfig.max_activities === "number") {
         config.panels.claude.maxActivities = panelConfig.max_activities;
+      }
+      continue;
+    }
+
+    if (panelName === "other_sessions") {
+      if (typeof panelConfig.enabled === "boolean") {
+        config.panels.other_sessions.enabled = panelConfig.enabled;
+      }
+      if (typeof panelConfig.interval === "string") {
+        const interval = parseInterval(panelConfig.interval);
+        if (interval === null && panelConfig.interval !== "manual") {
+          warnings.push(`Invalid interval '${panelConfig.interval}' for other_sessions panel, using default`);
+        } else {
+          config.panels.other_sessions.interval = interval;
+        }
+      }
+      if (typeof panelConfig.active_threshold === "string") {
+        const threshold = parseInterval(panelConfig.active_threshold);
+        if (threshold !== null) {
+          config.panels.other_sessions.activeThreshold = threshold;
+        }
+      }
+      if (typeof panelConfig.message_max_length === "number") {
+        config.panels.other_sessions.messageMaxLength = panelConfig.message_max_length;
       }
       continue;
     }

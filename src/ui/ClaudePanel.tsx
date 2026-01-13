@@ -210,6 +210,9 @@ export function ClaudePanel({
     const padding = Math.max(0, contentWidth - displayWidth);
     const style = getActivityStyle(activity);
 
+    // Clear to end of line to prevent ghost text from terminal width mismatch
+    const clearEOL = "\x1b[K";
+
     lines.push(
       <Text key={`activity-${i}`}>
         {BOX.v}{" "}
@@ -218,7 +221,7 @@ export function ClaudePanel({
         {" "}
         <Text color={style.color} dimColor={style.dimColor}>{labelContent}</Text>
         {" ".repeat(padding)}
-        {BOX.v}
+        {BOX.v}{clearEOL}
       </Text>
     );
   }

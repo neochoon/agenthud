@@ -89,9 +89,6 @@ const FIVE_MINUTES_MS = 5 * 60 * 1000;
 const THIRTY_SECONDS_MS = 30 * 1000;
 const MAX_LINES_TO_SCAN = 200;
 const DEFAULT_MAX_ACTIVITIES = 10;
-const MAX_DETAIL_LENGTH = 45;
-
-
 /**
  * Convert project path to Claude session directory path
  * e.g., /Users/neochoon/agenthud → ~/.claude/projects/-Users-neochoon-agenthud
@@ -138,67 +135,20 @@ export function findActiveSession(sessionDir: string): string | null {
   return null;
 }
 
-/**
- * Get display width of a string (CJK/emoji = 2, others = 1)
- */
-function getDisplayWidth(str: string): number {
-  let width = 0;
-  for (const char of str) {
-    const code = char.codePointAt(0) || 0;
-    if (
-      (code >= 0x1f300 && code <= 0x1f9ff) ||
-      (code >= 0x2600 && code <= 0x26ff) ||
-      (code >= 0x2700 && code <= 0x27bf) ||
-      (code >= 0x1f600 && code <= 0x1f64f) ||
-      (code >= 0x1f680 && code <= 0x1f6ff) ||
-      (code >= 0xac00 && code <= 0xd7af) ||
-      (code >= 0x1100 && code <= 0x11ff) ||
-      (code >= 0x3130 && code <= 0x318f) ||
-      (code >= 0x4e00 && code <= 0x9fff) ||
-      (code >= 0x3400 && code <= 0x4dbf) ||
-      (code >= 0x3000 && code <= 0x303f) ||
-      (code >= 0xff00 && code <= 0xffef)
-    ) {
-      width += 2;
-    } else if (code !== 0xfe0f) {
-      width += 1;
-    }
-  }
-  return width;
-}
-
-function truncate(str: string, maxDisplayWidth: number): string {
-  const currentWidth = getDisplayWidth(str);
-  if (currentWidth <= maxDisplayWidth) return str;
-
-  let result = "";
-  let width = 0;
-  for (const char of str) {
-    const charWidth = getDisplayWidth(char);
-    if (width + charWidth > maxDisplayWidth - 3) {
-      return result + "...";
-    }
-    result += char;
-    width += charWidth;
-  }
-  return result;
-}
-
 function getToolDetail(toolName: string, input?: { command?: string; file_path?: string; pattern?: string; query?: string }): string {
   if (!input) return "";
 
   if (input.command) {
-    return truncate(input.command, MAX_DETAIL_LENGTH);
+    return input.command.replace(/\n/g, " ");
   }
   if (input.file_path) {
-    // Show just the filename
     return basename(input.file_path);
   }
   if (input.pattern) {
-    return truncate(input.pattern, MAX_DETAIL_LENGTH);
+    return input.pattern;
   }
   if (input.query) {
-    return truncate(input.query, MAX_DETAIL_LENGTH);
+    return input.query;
   }
   return "";
 }
@@ -269,7 +219,7 @@ export function parseSessionState(sessionFile: string, maxActivities: number = D
             type: "user",
             icon: ICONS.User,
             label: "User",
-            detail: truncate(userText.replace(/\n/g, " "), MAX_DETAIL_LENGTH),
+            detail: userText.replace(/\n/g, " "),
           });
         }
         lastType = "user";
@@ -305,7 +255,7 @@ export function parseSessionState(sessionFile: string, maxActivities: number = D
                   type: "response",
                   icon: ICONS.Response,
                   label: "Response",
-                  detail: truncate(block.text.replace(/\n/g, " "), MAX_DETAIL_LENGTH),
+                  detail: block.text.replace(/\n/g, " "),
                 });
                 lastType = "response";
               }

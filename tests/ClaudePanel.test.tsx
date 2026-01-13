@@ -261,11 +261,13 @@ describe("ClaudePanel", () => {
       const output = lastFrame() || "";
       const lines = output.split("\n");
 
-      // Each line should end with box character
+      // Each line should end with box character (stripping ANSI escape sequences)
+      const stripAnsi = (str: string) => str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
       for (const line of lines) {
         if (line.includes("│")) {
-          const lastBoxChar = line.lastIndexOf("│");
-          const afterBox = line.slice(lastBoxChar + 1);
+          const cleanLine = stripAnsi(line);
+          const lastBoxChar = cleanLine.lastIndexOf("│");
+          const afterBox = cleanLine.slice(lastBoxChar + 1);
           expect(afterBox.trim()).toBe("");
         }
       }
@@ -440,7 +442,7 @@ describe("ClaudePanel", () => {
       const lines = output.split("\n");
 
       // Get actual line lengths (excluding ANSI codes)
-      const stripAnsi = (str: string) => str.replace(/\x1b\[[0-9;]*m/g, "");
+      const stripAnsi = (str: string) => str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
 
       const titleLine = stripAnsi(lines[0]); // ┌─ Claude ─...─┐
       const contentLine = stripAnsi(lines[1]); // │ [HH:MM:SS] ...│
@@ -470,7 +472,7 @@ describe("ClaudePanel", () => {
       const output = lastFrame() || "";
       const lines = output.split("\n");
 
-      const stripAnsi = (str: string) => str.replace(/\x1b\[[0-9;]*m/g, "");
+      const stripAnsi = (str: string) => str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
 
       // All content lines should have the same width
       const contentLines = lines.slice(1, -1); // Exclude title and bottom

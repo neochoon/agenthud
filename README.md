@@ -2,27 +2,7 @@
 
 Terminal dashboard for AI agent development.
 
-```
-┌─ Claude ─────────────────────────────────────────────────────┐
-│ [10:30:00] > User: Show me the project structure             │
-│ [10:30:05] * Glob: src/**/*.ts                               │
-│ [10:30:10] ○ Read: package.json                              │
-│ [10:30:15] < Response: Here's the project structure...       │
-│ [10:30:20] $ Bash: npm run test                              │
-│ [10:30:25] ~ Edit: src/index.ts                              │
-└──────────────────────────────────────────────────────────────┘
-
-┌─ Git ────────────────────────────────────────────────────────┐
-│ main · +1068 -166 · 12 commits · 23 files                    │
-│ • 1d00dc0 refactor: rename project from agent-dashboa...     │
-│ • 3529727 fix: Decisions separator line width now mat...     │
-│ • d7652c4 fix: use proper box character for Decisions...     │
-└──────────────────────────────────────────────────────────────┘
-
-┌─ Tests ──────────────────────────────────────────────────────┐
-│ ✓ 301 passed · 3fd7988                                       │
-└──────────────────────────────────────────────────────────────┘
-```
+![output](./output960.gif)
 
 ## Install
 ```bash

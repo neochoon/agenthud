@@ -1,4 +1,4 @@
-# agenthud
+# Agenthud
 
 When working with AI coding agents like Claude Code, you lose visibility into what's happening. The agent reads files, runs commands, makes changes - but you're staring at a single terminal, waiting.
 

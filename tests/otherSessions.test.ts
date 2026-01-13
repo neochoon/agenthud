@@ -467,7 +467,7 @@ describe("otherSessions data module", () => {
         })
       );
 
-      const result = getOtherSessionsData("/Users/test/current");
+      const result = getOtherSessionsData(`${sep}Users${sep}test${sep}current`);
 
       expect(result.projectNames).toEqual(["other"]);
       expect(result.projectNames).not.toContain("current");
@@ -476,7 +476,7 @@ describe("otherSessions data module", () => {
     it("returns empty array when no projects exist", () => {
       mockFs.existsSync.mockReturnValue(false);
 
-      const result = getOtherSessionsData("/current/project");
+      const result = getOtherSessionsData(`${sep}current${sep}project`);
 
       expect(result.projectNames).toEqual([]);
     });

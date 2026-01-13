@@ -180,7 +180,8 @@ describe("init command", () => {
     it("returns no warnings when both git and Claude session exist", () => {
       fsMock.existsSync.mockImplementation((path: string) => {
         if (path === ".git") return true;
-        if (path.includes(".claude/projects")) return true;
+        // Handle both / and \ path separators for cross-platform compatibility
+        if (path.includes(".claude") && path.includes("projects")) return true;
         if (path === ".gitignore") return true;
         return false;
       });

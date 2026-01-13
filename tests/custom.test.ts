@@ -212,7 +212,8 @@ describe("custom panel data", () => {
       const config: CustomPanelConfig = {
         enabled: true,
         interval: 30000,
-        command: 'echo \'{"title":"Async Panel","summary":"async test"}\'',
+        // Use node -e for cross-platform JSON output (single quotes don't work on Windows)
+        command: 'node -e "console.log(JSON.stringify({title:\\"Async Panel\\",summary:\\"async test\\"}))"',
         renderer: {} as CustomPanelConfig["renderer"],
       };
 
@@ -226,7 +227,8 @@ describe("custom panel data", () => {
       const config: CustomPanelConfig = {
         enabled: true,
         interval: 30000,
-        command: 'printf "line1\\nline2"',
+        // Use node -e for cross-platform output (printf doesn't work on Windows)
+        command: 'node -e "console.log(\\"line1\\");console.log(\\"line2\\")"',
         renderer: {} as CustomPanelConfig["renderer"],
       };
 

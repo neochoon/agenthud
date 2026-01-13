@@ -287,8 +287,8 @@ export function getOtherSessionsData(
   const allProjects = getAllProjects();
   defaultResult.totalProjects = allProjects.length;
 
-  // Normalize current project path for comparison
-  const normalizedCurrentPath = currentProjectPath.replace(/\/$/, "");
+  // Normalize current project path for comparison (handle both / and \ separators)
+  const normalizedCurrentPath = currentProjectPath.replace(/[/\\]$/, "").replace(/\\/g, "/");
 
   // Collect session info for all OTHER projects
   const otherSessions: Array<{
@@ -300,8 +300,9 @@ export function getOtherSessionsData(
   }> = [];
 
   for (const project of allProjects) {
-    // Skip current project
-    if (project.decodedPath === normalizedCurrentPath) {
+    // Skip current project (normalize separators for cross-platform comparison)
+    const normalizedDecodedPath = project.decodedPath.replace(/\\/g, "/");
+    if (normalizedDecodedPath === normalizedCurrentPath) {
       continue;
     }
 

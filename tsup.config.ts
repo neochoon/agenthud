@@ -4,7 +4,7 @@ import { cpSync } from "fs";
 export default defineConfig({
   entry: ["src/index.ts"],
   format: ["esm"],
-  target: "node18",
+  target: "node20",
   clean: true,
   shims: true,
   onSuccess: async () => {

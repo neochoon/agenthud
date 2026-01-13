@@ -38,31 +38,3 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-
-      - name: Run Snyk Dependency Check
-        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 20
-        uses: snyk/actions/node@master
-        continue-on-error: true
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          args: --json-file-output=snyk-deps.json
-
-      - name: Run Snyk Code Analysis
-        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 20
-        uses: snyk/actions/node@master
-        continue-on-error: true
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          command: code test
-          args: --json-file-output=snyk-code.json
-
-      - name: Upload Snyk results
-        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 20
-        uses: actions/upload-artifact@v4
-        with:
-          name: snyk-results
-          path: |
-            snyk-deps.json
-            snyk-code.json

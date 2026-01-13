@@ -1,6 +1,6 @@
 # agenthud configuration
 
-width: 80  # 50~120 사이
+width: 100  # between 50~120 
 
 panels:
   claude:

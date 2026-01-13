@@ -5,7 +5,7 @@ import {
   statSync as nodeStatSync,
 } from "fs";
 import { homedir } from "os";
-import { join, basename } from "path";
+import { join, basename, sep } from "path";
 
 export interface FsMock {
   existsSync: (path: string) => boolean;
@@ -68,12 +68,13 @@ function getProjectsDir(): string {
 }
 
 function decodeProjectPath(encoded: string): string {
-  // Claude Code encodes paths by replacing "/" with "-"
+  // Claude Code encodes paths by replacing "/" (or "\" on Windows) with "-"
   // e.g., "/Users/test/pain-radar" -> "-Users-test-pain-radar"
-  // Problem: we can't distinguish "-" that was "/" from original "-"
+  // e.g., "C:\Users\test\project" -> "-C--Users-test-project" (Windows)
+  // Problem: we can't distinguish "-" that was a separator from original "-"
   //
   // Strategy: Check if naive decode exists, if not try smart decode
-  const naiveDecoded = encoded.replace(/-/g, "/");
+  const naiveDecoded = encoded.replace(/-/g, sep);
 
   // If naive decode exists, use it (handles simple cases)
   if (fs.existsSync(naiveDecoded)) {
@@ -95,7 +96,7 @@ function decodeProjectPath(encoded: string): string {
 
     for (let j = segments.length; j > i; j--) {
       const segment = segments.slice(i, j).join("-");
-      const testPath = currentPath + "/" + segment;
+      const testPath = currentPath ? join(currentPath, segment) : sep + segment;
 
       // Only accept if it's a directory (not just any existing file)
       try {
@@ -115,7 +116,7 @@ function decodeProjectPath(encoded: string): string {
 
     if (!found) {
       // No existing directory found, use single segment
-      currentPath += "/" + segments[i];
+      currentPath = currentPath ? join(currentPath, segments[i]) : sep + segments[i];
       i++;
     }
   }

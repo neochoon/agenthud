@@ -93,9 +93,11 @@ const DEFAULT_MAX_ACTIVITIES = 10;
 /**
  * Convert project path to Claude session directory path
  * e.g., /Users/neochoon/agenthud → ~/.claude/projects/-Users-neochoon-agenthud
+ * e.g., C:\Users\test\project → ~/.claude/projects/-C--Users-test-project (Windows)
  */
 export function getClaudeSessionPath(projectPath: string): string {
-  const encoded = projectPath.replace(/\//g, "-");
+  // Replace both forward and backslashes for cross-platform support
+  const encoded = projectPath.replace(/[/\\]/g, "-");
   return join(homedir(), ".claude", "projects", encoded);
 }
 

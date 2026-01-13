@@ -60,7 +60,8 @@ export interface InitResult {
 }
 
 function getClaudeSessionPath(projectPath: string): string {
-  const encoded = projectPath.replace(/\//g, "-");
+  // Replace both forward and backslashes for cross-platform support
+  const encoded = projectPath.replace(/[/\\]/g, "-");
   return join(homedir(), ".claude", "projects", encoded);
 }
 

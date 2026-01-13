@@ -4,6 +4,7 @@ import {
   clearScreen,
   setClearFn,
   resetClearFn,
+  getVersion,
 } from "../src/cli.js";
 
 describe("CLI argument parsing", () => {
@@ -50,6 +51,26 @@ describe("CLI argument parsing", () => {
 
       expect(result.command).toBeUndefined();
       expect(result.mode).toBe("once");
+    });
+
+    it("returns version command with --version flag", () => {
+      const result = parseArgs(["--version"]);
+
+      expect(result.command).toBe("version");
+    });
+
+    it("returns version command with -V flag", () => {
+      const result = parseArgs(["-V"]);
+
+      expect(result.command).toBe("version");
+    });
+  });
+
+  describe("getVersion", () => {
+    it("returns version string from package.json", () => {
+      const version = getVersion();
+
+      expect(version).toMatch(/^\d+\.\d+\.\d+$/);
     });
   });
 

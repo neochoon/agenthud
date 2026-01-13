@@ -3,7 +3,7 @@ import React from "react";
 import { render } from "ink";
 import { existsSync } from "fs";
 import { App } from "./ui/App.js";
-import { parseArgs, clearScreen } from "./cli.js";
+import { parseArgs, clearScreen, getVersion } from "./cli.js";
 import { runInit } from "./commands/init.js";
 import {
   startPerformanceCleanup,
@@ -11,6 +11,12 @@ import {
 } from "./utils/performance.js";
 
 const options = parseArgs(process.argv.slice(2));
+
+// Handle version command
+if (options.command === "version") {
+  console.log(getVersion());
+  process.exit(0);
+}
 
 // Handle init command
 if (options.command === "init") {

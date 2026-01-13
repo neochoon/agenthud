@@ -29,6 +29,21 @@ Terminal dashboard for AI agent development.
 npx agenthud
 ```
 
+## CLI
+
+```
+Usage: agenthud [command] [options]
+
+Commands:
+  init              Initialize agenthud in current directory
+
+Options:
+  -w, --watch       Watch mode (default)
+  --once            Run once and exit
+  -V, --version     Show version number
+  -h, --help        Show this help message
+```
+
 ## Features
 
 - **Claude**: Real-time Claude Code session monitoring

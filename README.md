@@ -121,6 +121,17 @@ Shows test results with staleness detection:
 - **⚠ Outdated**: Warning if tests are behind commits
 - **Failures**: Shows failing test file and name
 
+**Auto-detection**: During `agenthud init`, the test framework is automatically detected:
+
+| Framework | Detection |
+|-----------|-----------|
+| vitest | package.json devDependencies |
+| jest | package.json devDependencies |
+| mocha | package.json devDependencies |
+| pytest | pytest.ini, conftest.py, pyproject.toml, requirements.txt |
+
+If the test command fails, the panel is automatically disabled.
+
 ### Project Panel
 
 Shows project overview and structure:

@@ -19,6 +19,7 @@ panels:
   tests:
     enabled: true
     interval: manual
+    # command is auto-detected from: vitest, jest, mocha, pytest
     command: npx vitest run --reporter=json
 
   project:

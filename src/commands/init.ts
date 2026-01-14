@@ -8,6 +8,7 @@ import {
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { homedir } from "os";
+import { detectTestFramework } from "../data/detectTestFramework.js";
 
 export interface FsMock {
   existsSync: (path: string) => boolean;
@@ -57,6 +58,7 @@ export interface InitResult {
   created: string[];
   skipped: string[];
   warnings: string[];
+  detectedTestFramework?: string;
 }
 
 function getClaudeSessionPath(projectPath: string): string {
@@ -88,9 +90,31 @@ export function runInit(cwd: string = process.cwd()): InitResult {
     result.skipped.push(".agenthud/tests/");
   }
 
+  // Detect test framework
+  const testFramework = detectTestFramework();
+  if (testFramework) {
+    result.detectedTestFramework = testFramework.framework;
+  }
+
   // Create config.yaml
   if (!fs.existsSync(".agenthud/config.yaml")) {
-    fs.writeFileSync(".agenthud/config.yaml", getDefaultConfig());
+    let configContent = getDefaultConfig();
+
+    // Replace test command with detected framework command
+    if (testFramework) {
+      configContent = configContent.replace(
+        /command: npx vitest run --reporter=json/,
+        `command: ${testFramework.command}`
+      );
+    } else {
+      // No test framework detected - comment out the command
+      configContent = configContent.replace(
+        /command: npx vitest run --reporter=json/,
+        "# command: (auto-detect failed - configure manually)"
+      );
+    }
+
+    fs.writeFileSync(".agenthud/config.yaml", configContent);
     result.created.push(".agenthud/config.yaml");
   } else {
     result.skipped.push(".agenthud/config.yaml");

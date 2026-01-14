@@ -212,6 +212,9 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
   }, [config.panels.git]);
 
   // Test data - uses config command or falls back to file
+  // Track if tests panel should be disabled due to command errors
+  const [testsDisabled, setTestsDisabled] = useState(false);
+
   const getTestDataFromConfig = useCallback((): TestData => {
     if (config.panels.tests.command) {
       return runTestCommand(config.panels.tests.command);
@@ -219,10 +222,23 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
     return getTestData();
   }, [config.panels.tests.command]);
 
-  const [testData, setTestData] = useState<TestData>(() => getTestDataFromConfig());
+  const [testData, setTestData] = useState<TestData>(() => {
+    const data = getTestDataFromConfig();
+    // Disable panel if command fails on first run
+    if (data.error && config.panels.tests.command) {
+      setTestsDisabled(true);
+    }
+    return data;
+  });
+
   const refreshTest = useCallback(() => {
-    setTestData(getTestDataFromConfig());
-  }, [getTestDataFromConfig]);
+    const data = getTestDataFromConfig();
+    // Disable panel if command fails
+    if (data.error && config.panels.tests.command) {
+      setTestsDisabled(true);
+    }
+    setTestData(data);
+  }, [getTestDataFromConfig, config.panels.tests.command]);
 
   // Claude data
   const [claudeData, setClaudeData] = useState<ClaudeData>(() => getClaudeData(cwd, config.panels.claude.maxActivities));
@@ -628,8 +644,8 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
           );
         }
 
-        // Tests panel
-        if (panelName === "tests" && config.panels.tests.enabled) {
+        // Tests panel (skip if disabled due to command error)
+        if (panelName === "tests" && config.panels.tests.enabled && !testsDisabled) {
           const testsVisual = visualStates.tests || DEFAULT_VISUAL_STATE;
           return (
             <Box key={`panel-tests-${index}`} marginTop={isFirst ? 0 : 1}>

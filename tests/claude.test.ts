@@ -546,6 +546,97 @@ describe("claude data module", () => {
 
       expect(result.sessionStartTime).toBeNull();
     });
+
+    it("extracts description for Task tool", () => {
+      const now = new Date();
+      const lines = [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              {
+                type: "tool_use",
+                name: "Task",
+                input: {
+                  description: "Re-check PR eligibility",
+                  prompt: "Check if PR is still open...",
+                  subagent_type: "general-purpose",
+                },
+              },
+            ],
+          },
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readFileSync.mockReturnValue(lines);
+
+      const result = parseSessionState("/fake/session.jsonl");
+
+      expect(result.activities[0].label).toBe("Task");
+      expect(result.activities[0].detail).toBe("Re-check PR eligibility");
+    });
+
+    it("returns empty detail for Task tool without description", () => {
+      const now = new Date();
+      const lines = [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              {
+                type: "tool_use",
+                name: "Task",
+                input: {
+                  prompt: "Some prompt without description",
+                  subagent_type: "general-purpose",
+                },
+              },
+            ],
+          },
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readFileSync.mockReturnValue(lines);
+
+      const result = parseSessionState("/fake/session.jsonl");
+
+      expect(result.activities[0].label).toBe("Task");
+      expect(result.activities[0].detail).toBe("");
+    });
+
+    it("prioritizes command over description for tools with both", () => {
+      const now = new Date();
+      const lines = [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              {
+                type: "tool_use",
+                name: "Bash",
+                input: {
+                  command: "npm test",
+                  description: "Run tests",
+                },
+              },
+            ],
+          },
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readFileSync.mockReturnValue(lines);
+
+      const result = parseSessionState("/fake/session.jsonl");
+
+      expect(result.activities[0].label).toBe("Bash");
+      expect(result.activities[0].detail).toBe("npm test");
+    });
   });
 
   describe("getClaudeData", () => {

@@ -138,7 +138,7 @@ export function findActiveSession(sessionDir: string): string | null {
   return null;
 }
 
-function getToolDetail(toolName: string, input?: { command?: string; file_path?: string; pattern?: string; query?: string }): string {
+function getToolDetail(toolName: string, input?: { command?: string; file_path?: string; pattern?: string; query?: string; description?: string }): string {
   if (!input) return "";
 
   if (input.command) {
@@ -152,6 +152,9 @@ function getToolDetail(toolName: string, input?: { command?: string; file_path?:
   }
   if (input.query) {
     return input.query;
+  }
+  if (input.description) {
+    return input.description;
   }
   return "";
 }

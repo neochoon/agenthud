@@ -88,8 +88,12 @@ interface JsonlAssistantEntry {
       name?: string;
       input?: { command?: string; file_path?: string; pattern?: string; query?: string };
     }>;
+    usage?: {
+      input_tokens?: number;
+      cache_read_input_tokens?: number;
+      output_tokens?: number;
+    };
   };
-  usage?: { output_tokens: number };
   timestamp: string;
 }
 
@@ -331,9 +335,13 @@ export function parseSessionState(sessionFile: string, maxActivities: number = D
           }
         }
 
-        // Accumulate token count
-        if (assistantEntry.usage?.output_tokens) {
-          tokenCount += assistantEntry.usage.output_tokens;
+        // Accumulate token count (input + cache_read + output)
+        const usage = assistantEntry.message?.usage;
+        if (usage) {
+          tokenCount +=
+            (usage.input_tokens || 0) +
+            (usage.cache_read_input_tokens || 0) +
+            (usage.output_tokens || 0);
         }
       }
 
@@ -368,6 +376,40 @@ export function parseSessionState(sessionFile: string, maxActivities: number = D
     } else {
       // More than 5 minutes
       status = "idle";
+    }
+  }
+
+  // Add subagent tokens if subagents folder exists
+  // Subagents folder path: {session-file-without-.jsonl}/subagents/
+  const subagentsDir = sessionFile.replace(/\.jsonl$/, "") + "/subagents";
+  if (fs.existsSync(subagentsDir)) {
+    try {
+      const subagentFiles = fs.readdirSync(subagentsDir).filter((f) => f.endsWith(".jsonl"));
+      for (const file of subagentFiles) {
+        const filePath = join(subagentsDir, file);
+        try {
+          const subContent = fs.readFileSync(filePath);
+          const subLines = subContent.trim().split("\n").filter(Boolean);
+          for (const line of subLines) {
+            try {
+              const entry = JSON.parse(line);
+              if (entry.type === "assistant" && entry.message?.usage) {
+                const usage = entry.message.usage;
+                tokenCount +=
+                  (usage.input_tokens || 0) +
+                  (usage.cache_read_input_tokens || 0) +
+                  (usage.output_tokens || 0);
+              }
+            } catch {
+              // Skip invalid JSON lines
+            }
+          }
+        } catch {
+          // Skip unreadable files
+        }
+      }
+    } catch {
+      // Ignore errors reading subagents directory
     }
   }
 

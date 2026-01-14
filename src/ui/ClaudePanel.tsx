@@ -56,6 +56,13 @@ function formatCountdown(seconds: number | null | undefined): string {
   return `↻ ${padded}s`;
 }
 
+function formatTokenCount(tokens: number): string {
+  if (tokens <= 0) return "";
+  if (tokens < 1000) return `${tokens} tokens`;
+  const k = Math.round(tokens / 1000);
+  return `${k}K tokens`;
+}
+
 function formatElapsedTime(startTime: Date | null): string {
   if (!startTime) return "";
   const elapsed = Date.now() - startTime.getTime();
@@ -289,13 +296,15 @@ export function ClaudePanel({
   const { state } = data;
   const statusIcon = getStatusIcon(state.status);
   const elapsedTime = formatElapsedTime(state.sessionStartTime);
+  const tokenDisplay = formatTokenCount(state.tokenCount);
 
-  // Build title suffix with elapsed time and countdown
-  const titleSuffix = elapsedTime
-    ? countdownSuffix
-      ? `${elapsedTime} · ${countdownSuffix}`
-      : elapsedTime
-    : countdownSuffix;
+  // Build title suffix with tokens, elapsed time, and countdown
+  // Order: 50K tokens · 30m · ↻ 10s
+  const titleParts: string[] = [];
+  if (tokenDisplay) titleParts.push(tokenDisplay);
+  if (elapsedTime) titleParts.push(elapsedTime);
+  if (countdownSuffix) titleParts.push(countdownSuffix);
+  const titleSuffix = titleParts.join(" · ");
 
   // Error state
   if (data.error) {
@@ -371,20 +380,6 @@ export function ClaudePanel({
         <Text color={style.color} dimColor={style.dimColor}>{labelContent}</Text>
         {" ".repeat(padding)}
         {BOX.v}{clearEOL}
-      </Text>
-    );
-  }
-
-  // Add token count if available
-  if (state.tokenCount > 0) {
-    const tokenText = `${state.tokenCount.toLocaleString()} tokens`;
-    const tokenPadding = Math.max(0, contentWidth - tokenText.length);
-    lines.push(
-      <Text key="tokens">
-        {BOX.v}{" "}
-        <Text dimColor>{tokenText}</Text>
-        {" ".repeat(tokenPadding)}
-        {BOX.v}
       </Text>
     );
   }

@@ -163,21 +163,64 @@ describe("ClaudePanel", () => {
     });
   });
 
-  describe("token count", () => {
-    it("shows token count when available", () => {
+  describe("token count in title", () => {
+    it("shows token count in title with K format for large numbers", () => {
       const data = createMockData({
         state: {
           status: "running",
           activities: mockActivities,
-          tokenCount: 12500,
+          tokenCount: 180000,
           sessionStartTime: null,
           todos: null,
         },
       });
 
       const { lastFrame } = render(<ClaudePanel data={data} />);
+      const output = lastFrame() || "";
 
-      expect(lastFrame()).toContain("12,500 tokens");
+      // Should show in title line (first line with ┌)
+      const titleLine = output.split("\n")[0];
+      expect(titleLine).toContain("180K tokens");
+    });
+
+    it("shows token count with full number for less than 1000", () => {
+      const data = createMockData({
+        state: {
+          status: "running",
+          activities: mockActivities,
+          tokenCount: 500,
+          sessionStartTime: null,
+          todos: null,
+        },
+      });
+
+      const { lastFrame } = render(<ClaudePanel data={data} />);
+      const output = lastFrame() || "";
+
+      const titleLine = output.split("\n")[0];
+      expect(titleLine).toContain("500 tokens");
+    });
+
+    it("shows token count with elapsed time and countdown", () => {
+      const sessionStart = new Date(Date.now() - 30 * 60 * 1000); // 30 minutes ago
+      const data = createMockData({
+        state: {
+          status: "running",
+          activities: mockActivities,
+          tokenCount: 50000,
+          sessionStartTime: sessionStart,
+          todos: null,
+        },
+      });
+
+      const { lastFrame } = render(<ClaudePanel data={data} countdown={10} />);
+      const output = lastFrame() || "";
+
+      const titleLine = output.split("\n")[0];
+      // Should show: 50K tokens · 30m · ↻ 10s
+      expect(titleLine).toContain("50K tokens");
+      expect(titleLine).toContain("30m");
+      expect(titleLine).toContain("10s");
     });
 
     it("does not show token count when zero", () => {
@@ -194,6 +237,36 @@ describe("ClaudePanel", () => {
       const { lastFrame } = render(<ClaudePanel data={data} />);
 
       expect(lastFrame()).not.toContain("tokens");
+    });
+
+    it("rounds K format correctly", () => {
+      // 1500 -> 2K (rounds up)
+      const data1 = createMockData({
+        state: {
+          status: "running",
+          activities: mockActivities,
+          tokenCount: 1500,
+          sessionStartTime: null,
+          todos: null,
+        },
+      });
+
+      const { lastFrame: frame1 } = render(<ClaudePanel data={data1} />);
+      expect(frame1()?.split("\n")[0]).toContain("2K tokens");
+
+      // 1400 -> 1K (rounds down)
+      const data2 = createMockData({
+        state: {
+          status: "running",
+          activities: mockActivities,
+          tokenCount: 1400,
+          sessionStartTime: null,
+          todos: null,
+        },
+      });
+
+      const { lastFrame: frame2 } = render(<ClaudePanel data={data2} />);
+      expect(frame2()?.split("\n")[0]).toContain("1K tokens");
     });
   });
 

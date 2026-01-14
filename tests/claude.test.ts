@@ -248,8 +248,8 @@ describe("claude data module", () => {
           type: "assistant",
           message: {
             content: [{ type: "text", text: "This code does something very important and interesting." }],
+            usage: { output_tokens: 150 },
           },
-          usage: { output_tokens: 150 },
           timestamp: now.toISOString(),
         }),
       ].join("\n");
@@ -314,14 +314,18 @@ describe("claude data module", () => {
       const lines = [
         JSON.stringify({
           type: "assistant",
-          message: { content: [{ type: "text", text: "First response with some content" }] },
-          usage: { output_tokens: 100 },
+          message: {
+            content: [{ type: "text", text: "First response with some content" }],
+            usage: { output_tokens: 100 },
+          },
           timestamp: new Date(now.getTime() - 3000).toISOString(),
         }),
         JSON.stringify({
           type: "assistant",
-          message: { content: [{ type: "text", text: "Second response with more content" }] },
-          usage: { output_tokens: 200 },
+          message: {
+            content: [{ type: "text", text: "Second response with more content" }],
+            usage: { output_tokens: 200 },
+          },
           timestamp: now.toISOString(),
         }),
       ].join("\n");
@@ -332,6 +336,198 @@ describe("claude data module", () => {
       const result = parseSessionState("/fake/session.jsonl");
 
       expect(result.tokenCount).toBe(300);
+    });
+
+    it("accumulates all token types: input, cache_read, and output", () => {
+      const now = new Date();
+      const lines = [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [{ type: "text", text: "First response" }],
+            usage: {
+              input_tokens: 100,
+              cache_read_input_tokens: 5000,
+              output_tokens: 200,
+            },
+          },
+          timestamp: new Date(now.getTime() - 3000).toISOString(),
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [{ type: "text", text: "Second response" }],
+            usage: {
+              input_tokens: 50,
+              cache_read_input_tokens: 5100,
+              output_tokens: 150,
+            },
+          },
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readFileSync.mockReturnValue(lines);
+
+      const result = parseSessionState("/fake/session.jsonl");
+
+      // (100 + 5000 + 200) + (50 + 5100 + 150) = 5300 + 5300 = 10600
+      expect(result.tokenCount).toBe(10600);
+    });
+
+    it("handles missing token fields gracefully", () => {
+      const now = new Date();
+      const lines = [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [{ type: "text", text: "Response" }],
+            usage: {
+              input_tokens: 100,
+              // cache_read_input_tokens is missing
+              output_tokens: 200,
+            },
+          },
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readFileSync.mockReturnValue(lines);
+
+      const result = parseSessionState("/fake/session.jsonl");
+
+      // 100 + 0 + 200 = 300
+      expect(result.tokenCount).toBe(300);
+    });
+
+    it("includes subagent tokens when subagents folder exists", () => {
+      const now = new Date();
+      const mainSessionLines = [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [{ type: "text", text: "Main response" }],
+            usage: { input_tokens: 100, cache_read_input_tokens: 1000, output_tokens: 50 },
+          },
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      const subagentLines = [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [{ type: "text", text: "Subagent response" }],
+            usage: { input_tokens: 50, cache_read_input_tokens: 500, output_tokens: 25 },
+          },
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      mockFs.existsSync.mockImplementation((path: string) => {
+        if (path === "/fake/session.jsonl") return true;
+        if (path === "/fake/session/subagents") return true;
+        return false;
+      });
+      mockFs.readFileSync.mockImplementation((path: string) => {
+        if (path === "/fake/session.jsonl") return mainSessionLines;
+        if (path === "/fake/session/subagents/agent-abc123.jsonl") return subagentLines;
+        return "";
+      });
+      mockFs.readdirSync.mockImplementation((path: string) => {
+        if (path === "/fake/session/subagents") return ["agent-abc123.jsonl"];
+        return [];
+      });
+
+      const result = parseSessionState("/fake/session.jsonl");
+
+      // Main: 100 + 1000 + 50 = 1150
+      // Subagent: 50 + 500 + 25 = 575
+      // Total: 1725
+      expect(result.tokenCount).toBe(1725);
+    });
+
+    it("handles multiple subagent files", () => {
+      const now = new Date();
+      const mainSessionLines = [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [{ type: "text", text: "Main" }],
+            usage: { output_tokens: 100 },
+          },
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      const subagent1Lines = [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [{ type: "text", text: "Sub1" }],
+            usage: { output_tokens: 200 },
+          },
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      const subagent2Lines = [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [{ type: "text", text: "Sub2" }],
+            usage: { output_tokens: 300 },
+          },
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      mockFs.existsSync.mockImplementation((path: string) => {
+        if (path === "/fake/session.jsonl") return true;
+        if (path === "/fake/session/subagents") return true;
+        return false;
+      });
+      mockFs.readFileSync.mockImplementation((path: string) => {
+        if (path === "/fake/session.jsonl") return mainSessionLines;
+        if (path === "/fake/session/subagents/agent-1.jsonl") return subagent1Lines;
+        if (path === "/fake/session/subagents/agent-2.jsonl") return subagent2Lines;
+        return "";
+      });
+      mockFs.readdirSync.mockImplementation((path: string) => {
+        if (path === "/fake/session/subagents") return ["agent-1.jsonl", "agent-2.jsonl"];
+        return [];
+      });
+
+      const result = parseSessionState("/fake/session.jsonl");
+
+      // Main: 100, Sub1: 200, Sub2: 300 = 600
+      expect(result.tokenCount).toBe(600);
+    });
+
+    it("works normally when subagents folder does not exist", () => {
+      const now = new Date();
+      const mainSessionLines = [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [{ type: "text", text: "Main" }],
+            usage: { output_tokens: 100 },
+          },
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      mockFs.existsSync.mockImplementation((path: string) => {
+        if (path === "/fake/session.jsonl") return true;
+        return false; // subagents folder doesn't exist
+      });
+      mockFs.readFileSync.mockReturnValue(mainSessionLines);
+
+      const result = parseSessionState("/fake/session.jsonl");
+
+      expect(result.tokenCount).toBe(100);
     });
 
     it("extracts tool name and input for file operations", () => {

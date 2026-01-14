@@ -1,4 +1,4 @@
-# agenthud
+# AgentHUD
 
 CLI tool to monitor agent status in real-time. Works with Claude Code, multi-agent workflows, and any AI agent system.
 
@@ -7,7 +7,7 @@ CLI tool to monitor agent status in real-time. Works with Claude Code, multi-age
 ```bash
 $ agenthud --watch
 
-┌─ agenthud ──────────────────────────┐
+┌─ AgentHUD ─────────────────────────┐
 │ Agent: Claude Code                         │
 │ Branch: feat/123-auth                      │
 │ Plan: 3/5 steps done                       │

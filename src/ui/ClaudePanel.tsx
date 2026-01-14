@@ -106,10 +106,45 @@ function formatActivityParts(activity: ActivityEntry, maxWidth: number): Activit
   const label = activity.label;
   const detail = activity.detail;
 
-  // Fixed parts: "[HH:MM:SS] " = 12 chars, icon = varies, " " = 1, label, ": " = 2
+  // Skip label for User and Response - they're already distinguished by color
+  const skipLabel = label === "User" || label === "Response";
+
+  // Fixed parts: "[HH:MM:SS] " = 12 chars, icon = varies, " " = 1
   const timestamp = `[${time}] `;
   const timestampWidth = timestamp.length; // 12
   const iconWidth = getDisplayWidth(icon); // Use actual icon width
+
+  if (skipLabel && detail) {
+    // For User/Response: just show detail without label
+    const prefixWidth = timestampWidth + iconWidth + 1; // timestamp + icon + space
+    const availableWidth = maxWidth - prefixWidth;
+    let truncatedDetail = detail;
+    let detailDisplayWidth = getDisplayWidth(detail);
+
+    if (detailDisplayWidth > availableWidth) {
+      truncatedDetail = "";
+      let currentWidth = 0;
+      for (const char of detail) {
+        const charWidth = getDisplayWidth(char);
+        if (currentWidth + charWidth > availableWidth - 3) {
+          truncatedDetail += "...";
+          currentWidth += 3;
+          break;
+        }
+        truncatedDetail += char;
+        currentWidth += charWidth;
+      }
+      detailDisplayWidth = currentWidth;
+    }
+
+    return {
+      timestamp,
+      icon,
+      labelContent: truncatedDetail,
+      displayWidth: prefixWidth + detailDisplayWidth,
+    };
+  }
+
   const labelWidth = label.length;
   const separatorWidth = detail ? 2 : 0; // ": " if there's detail
 
@@ -356,19 +391,24 @@ export function ClaudePanel({
   // If all todos completed, add summary line to activities
   if (hasTodos && allCompleted) {
     const todos = state.todos!;
-    const lastCompleted = todos[todos.length - 1];
-    const summaryText = `Todo: ${lastCompleted.content} (${todos.length}/${todos.length} done)`;
+    const summaryText = `Todo (${todos.length}/${todos.length} done)`;
     const summaryIcon = "✓";
-    const summaryPrefix = `${summaryIcon} `;
-    const maxSummaryWidth = contentWidth - getDisplayWidth(summaryPrefix);
+    const timestamp = formatActivityTime(new Date());
+    const timestampStr = `[${timestamp}] `;
+
+    // Calculate widths: timestamp + icon + space + text
+    const timestampWidth = timestampStr.length; // 12
+    const iconWidth = getDisplayWidth(summaryIcon);
+    const prefixWidth = timestampWidth + iconWidth + 1; // timestamp + icon + space
+    const maxTextWidth = contentWidth - prefixWidth;
 
     let displaySummary = summaryText;
-    if (getDisplayWidth(summaryText) > maxSummaryWidth) {
+    if (getDisplayWidth(summaryText) > maxTextWidth) {
       displaySummary = "";
       let currentWidth = 0;
       for (const char of summaryText) {
         const charWidth = getDisplayWidth(char);
-        if (currentWidth + charWidth > maxSummaryWidth - 3) {
+        if (currentWidth + charWidth > maxTextWidth - 3) {
           displaySummary += "...";
           break;
         }
@@ -377,10 +417,11 @@ export function ClaudePanel({
       }
     }
 
-    const summaryPadding = Math.max(0, contentWidth - getDisplayWidth(summaryPrefix) - getDisplayWidth(displaySummary));
+    const summaryPadding = Math.max(0, contentWidth - prefixWidth - getDisplayWidth(displaySummary));
     lines.push(
       <Text key="todo-summary">
         {BOX.v}{" "}
+        <Text dimColor>{timestampStr}</Text>
         <Text color="green">{summaryIcon}</Text>
         {" "}
         <Text color="green">{displaySummary}</Text>

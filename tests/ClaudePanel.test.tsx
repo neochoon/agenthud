@@ -129,14 +129,17 @@ describe("ClaudePanel", () => {
       expect(lastFrame()).toContain("[10:30:10]");
     });
 
-    it("shows activity labels", () => {
+    it("shows activity labels for tools but not for User/Response", () => {
       const data = createMockData();
 
       const { lastFrame } = render(<ClaudePanel data={data} />);
 
-      expect(lastFrame()).toContain("User");
+      // User and Response don't show labels (just the detail text)
+      // But Glob and Read show labels
       expect(lastFrame()).toContain("Glob");
       expect(lastFrame()).toContain("Read");
+      // User label should NOT appear (color-coded instead)
+      expect(lastFrame()).not.toMatch(/>\s+User:/);
     });
 
     it("shows activity details", () => {
@@ -834,12 +837,13 @@ describe("ClaudePanel", () => {
       const { lastFrame } = render(<ClaudePanel data={data} />);
       const output = lastFrame() || "";
 
-      // Should NOT show Todo section header
-      expect(output).not.toContain("Todo (");
-      // Should show summary line with last completed task
+      // Should NOT show Todo section header (├─ Todo)
+      expect(output).not.toContain("├─ Todo");
+      // Should show summary line with timestamp and total count
       expect(output).toContain("✓");
-      expect(output).toContain("Todo: Create PR");
-      expect(output).toContain("3/3 done");
+      expect(output).toContain("Todo (3/3 done)");
+      // Should have timestamp format [HH:MM:SS]
+      expect(output).toMatch(/\[\d{2}:\d{2}:\d{2}\].*✓.*Todo/);
     });
 
     it("hides todo section when all completed but shows summary", () => {
@@ -861,8 +865,8 @@ describe("ClaudePanel", () => {
 
       // Should NOT show separator line (├─ Todo)
       expect(output).not.toContain("├─ Todo");
-      // Should show summary
-      expect(output).toContain("2/2 done");
+      // Should show summary in new format
+      expect(output).toContain("Todo (2/2 done)");
     });
   });
 });

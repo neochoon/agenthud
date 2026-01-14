@@ -349,12 +349,56 @@ export function ClaudePanel({
     );
   }
 
+  // Check if todos exist and determine display mode
+  const hasTodos = state.todos && state.todos.length > 0;
+  const allCompleted = hasTodos && state.todos!.every((t) => t.status === "completed");
+
+  // If all todos completed, add summary line to activities
+  if (hasTodos && allCompleted) {
+    const todos = state.todos!;
+    const lastCompleted = todos[todos.length - 1];
+    const summaryText = `Todo: ${lastCompleted.content} (${todos.length}/${todos.length} done)`;
+    const summaryIcon = "✓";
+    const summaryPrefix = `${summaryIcon} `;
+    const maxSummaryWidth = contentWidth - getDisplayWidth(summaryPrefix);
+
+    let displaySummary = summaryText;
+    if (getDisplayWidth(summaryText) > maxSummaryWidth) {
+      displaySummary = "";
+      let currentWidth = 0;
+      for (const char of summaryText) {
+        const charWidth = getDisplayWidth(char);
+        if (currentWidth + charWidth > maxSummaryWidth - 3) {
+          displaySummary += "...";
+          break;
+        }
+        displaySummary += char;
+        currentWidth += charWidth;
+      }
+    }
+
+    const summaryPadding = Math.max(0, contentWidth - getDisplayWidth(summaryPrefix) - getDisplayWidth(displaySummary));
+    lines.push(
+      <Text key="todo-summary">
+        {BOX.v}{" "}
+        <Text color="green">{summaryIcon}</Text>
+        {" "}
+        <Text color="green">{displaySummary}</Text>
+        {" ".repeat(summaryPadding)}
+        {BOX.v}
+      </Text>
+    );
+  }
+
+  // Show TodoSection only if todos exist and not all completed
+  const showTodoSection = hasTodos && !allCompleted;
+
   return (
     <Box flexDirection="column" width={width}>
       <Text>{createTitleLine("Claude", titleSuffix, width)}</Text>
       {lines}
-      {state.todos && state.todos.length > 0 && (
-        <TodoSection todos={state.todos} width={width} />
+      {showTodoSection && (
+        <TodoSection todos={state.todos!} width={width} />
       )}
       <Text>{createBottomLine(width)}</Text>
     </Box>

@@ -815,5 +815,54 @@ describe("ClaudePanel", () => {
 
       expect(output).not.toContain("Todo");
     });
+
+    it("shows summary line when all todos completed", () => {
+      const data = createMockData({
+        state: {
+          status: "running",
+          activities: mockActivities,
+          tokenCount: 0,
+          sessionStartTime: null,
+          todos: [
+            { content: "Create issue", status: "completed", activeForm: "Creating issue" },
+            { content: "Write tests", status: "completed", activeForm: "Writing tests" },
+            { content: "Create PR", status: "completed", activeForm: "Creating PR" },
+          ],
+        },
+      });
+
+      const { lastFrame } = render(<ClaudePanel data={data} />);
+      const output = lastFrame() || "";
+
+      // Should NOT show Todo section header
+      expect(output).not.toContain("Todo (");
+      // Should show summary line with last completed task
+      expect(output).toContain("✓");
+      expect(output).toContain("Todo: Create PR");
+      expect(output).toContain("3/3 done");
+    });
+
+    it("hides todo section when all completed but shows summary", () => {
+      const data = createMockData({
+        state: {
+          status: "running",
+          activities: mockActivities,
+          tokenCount: 0,
+          sessionStartTime: null,
+          todos: [
+            { content: "Task A", status: "completed", activeForm: "A" },
+            { content: "Task B", status: "completed", activeForm: "B" },
+          ],
+        },
+      });
+
+      const { lastFrame } = render(<ClaudePanel data={data} />);
+      const output = lastFrame() || "";
+
+      // Should NOT show separator line (├─ Todo)
+      expect(output).not.toContain("├─ Todo");
+      // Should show summary
+      expect(output).toContain("2/2 done");
+    });
   });
 });

@@ -2,9 +2,18 @@
 
 ## [Unreleased]
 
+## [0.6.1] - 2025-01-15
+
 ### New
 - **Token Usage in Title** - See session token count (input + cache + output) in Claude panel title
 - **Subagent Tokens** - Includes token usage from subagent sessions
+- **Configurable Session Timeout** - Set `session_timeout` in config (default: 60 min)
+
+### Fixed
+- Panel countdown timers freezing at 1 second
+- Data refresh stopping after first interval
+- Wrong session selected when multiple sessions have same modification time
+- Windows path separator issue for subagent token counting
 
 ### Internal
 - **Refactored App.tsx** - Extracted reusable hooks (useCountdown, useVisualFeedback, useHotkeys, usePanelData)
@@ -54,7 +63,8 @@
 - **Test Panel** - Test results at a glance
 - Watch mode for live updates
 
-[Unreleased]: https://github.com/neochoon/agenthud/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/neochoon/agenthud/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/neochoon/agenthud/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/neochoon/agenthud/compare/v0.5.17...v0.6.0
 [0.5.17]: https://github.com/neochoon/agenthud/compare/v0.5.0...v0.5.17
 [0.5.0]: https://github.com/neochoon/agenthud/compare/v0.4.0...v0.5.0

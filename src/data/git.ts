@@ -112,6 +112,41 @@ const DEFAULT_COMMANDS = {
   stats: 'git log --since=midnight --numstat --format=""',
 };
 
+// Shared parsing functions to avoid sync/async duplication
+function parseCommitsOutput(output: string): Commit[] {
+  const lines = cleanOutput(output).split("\n").filter(Boolean);
+  return lines.map((line) => {
+    const cleanLine = cleanOutput(line);
+    const [hash, timestamp, ...messageParts] = cleanLine.split("|");
+    return {
+      hash: cleanOutput(hash),
+      message: messageParts.join("|"),
+      timestamp: new Date(timestamp),
+    };
+  });
+}
+
+function parseStatsOutput(output: string): GitStats {
+  const lines = output.trim().split("\n").filter(Boolean);
+
+  let added = 0;
+  let deleted = 0;
+  const filesSet = new Set<string>();
+
+  for (const line of lines) {
+    const [addedStr, deletedStr, filename] = line.split("\t");
+    if (addedStr === "-" || deletedStr === "-") {
+      if (filename) filesSet.add(filename);
+      continue;
+    }
+    added += parseInt(addedStr, 10) || 0;
+    deleted += parseInt(deletedStr, 10) || 0;
+    if (filename) filesSet.add(filename);
+  }
+
+  return { added, deleted, files: filesSet.size };
+}
+
 export interface GitData {
   branch: string | null;
   commits: Commit[];
@@ -139,15 +174,7 @@ export function getGitData(config: GitPanelConfig): GitData {
   let commits: Commit[] = [];
   try {
     const result = execFn(commands.commits, { encoding: "utf-8" });
-    const lines = result.trim().split("\n").filter(Boolean);
-    commits = lines.map((line) => {
-      const [hash, timestamp, ...messageParts] = line.split("|");
-      return {
-        hash,
-        message: messageParts.join("|"),
-        timestamp: new Date(timestamp),
-      };
-    });
+    commits = parseCommitsOutput(result);
   } catch {
     commits = [];
   }
@@ -156,24 +183,7 @@ export function getGitData(config: GitPanelConfig): GitData {
   let stats: GitStats = { added: 0, deleted: 0, files: 0 };
   try {
     const result = execFn(commands.stats, { encoding: "utf-8" });
-    const lines = result.trim().split("\n").filter(Boolean);
-
-    let added = 0;
-    let deleted = 0;
-    const filesSet = new Set<string>();
-
-    for (const line of lines) {
-      const [addedStr, deletedStr, filename] = line.split("\t");
-      if (addedStr === "-" || deletedStr === "-") {
-        if (filename) filesSet.add(filename);
-        continue;
-      }
-      added += parseInt(addedStr, 10) || 0;
-      deleted += parseInt(deletedStr, 10) || 0;
-      if (filename) filesSet.add(filename);
-    }
-
-    stats = { added, deleted, files: filesSet.size };
+    stats = parseStatsOutput(result);
   } catch {
     stats = { added: 0, deleted: 0, files: 0 };
   }
@@ -205,16 +215,7 @@ export async function getGitDataAsync(config: GitPanelConfig): Promise<GitData> 
   let commits: Commit[] = [];
   try {
     const { stdout } = await execAsync(commands.commits);
-    const lines = cleanOutput(stdout).split("\n").filter(Boolean);
-    commits = lines.map((line) => {
-      const cleanLine = cleanOutput(line);
-      const [hash, timestamp, ...messageParts] = cleanLine.split("|");
-      return {
-        hash: cleanOutput(hash),
-        message: messageParts.join("|"),
-        timestamp: new Date(timestamp),
-      };
-    });
+    commits = parseCommitsOutput(stdout);
   } catch {
     commits = [];
   }
@@ -223,24 +224,7 @@ export async function getGitDataAsync(config: GitPanelConfig): Promise<GitData> 
   let stats: GitStats = { added: 0, deleted: 0, files: 0 };
   try {
     const { stdout } = await execAsync(commands.stats);
-    const lines = stdout.trim().split("\n").filter(Boolean);
-
-    let added = 0;
-    let deleted = 0;
-    const filesSet = new Set<string>();
-
-    for (const line of lines) {
-      const [addedStr, deletedStr, filename] = line.split("\t");
-      if (addedStr === "-" || deletedStr === "-") {
-        if (filename) filesSet.add(filename);
-        continue;
-      }
-      added += parseInt(addedStr, 10) || 0;
-      deleted += parseInt(deletedStr, 10) || 0;
-      if (filename) filesSet.add(filename);
-    }
-
-    stats = { added, deleted, files: filesSet.size };
+    stats = parseStatsOutput(stdout);
   } catch {
     stats = { added: 0, deleted: 0, files: 0 };
   }

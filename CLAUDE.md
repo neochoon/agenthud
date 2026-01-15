@@ -119,6 +119,7 @@ agenthud --json
 - Add features without tests
 - Make big changes without confirmation
 - Leave documentation outdated
+- Push without user permission (CI runs on push, may cause errors)
 
 ## Future Extensions
 

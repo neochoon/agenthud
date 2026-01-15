@@ -144,6 +144,26 @@ export function getDefaultConfig(): Config {
 const BUILTIN_PANELS = ["project", "git", "tests", "claude", "other_sessions"];
 const VALID_RENDERERS = ["list", "progress", "status"];
 
+// Helper to parse common enabled/interval fields for all panels
+function parseBasePanelConfig(
+  panelConfig: Record<string, unknown>,
+  targetConfig: PanelConfig,
+  panelName: string,
+  warnings: string[]
+): void {
+  if (typeof panelConfig.enabled === "boolean") {
+    targetConfig.enabled = panelConfig.enabled;
+  }
+  if (typeof panelConfig.interval === "string") {
+    const interval = parseInterval(panelConfig.interval);
+    if (interval === null && panelConfig.interval !== "manual") {
+      warnings.push(`Invalid interval '${panelConfig.interval}' for ${panelName} panel, using default`);
+    } else {
+      targetConfig.interval = interval;
+    }
+  }
+}
+
 export function parseConfig(): ParseResult {
   const warnings: string[] = [];
   const defaultConfig = getDefaultConfig();
@@ -200,47 +220,17 @@ export function parseConfig(): ParseResult {
 
     // Handle built-in panels
     if (panelName === "project") {
-      if (typeof panelConfig.enabled === "boolean") {
-        config.panels.project.enabled = panelConfig.enabled;
-      }
-      if (typeof panelConfig.interval === "string") {
-        const interval = parseInterval(panelConfig.interval);
-        if (interval === null && panelConfig.interval !== "manual") {
-          warnings.push(`Invalid interval '${panelConfig.interval}' for project panel, using default`);
-        } else {
-          config.panels.project.interval = interval;
-        }
-      }
+      parseBasePanelConfig(panelConfig, config.panels.project, panelName, warnings);
       continue;
     }
 
     if (panelName === "git") {
-      if (typeof panelConfig.enabled === "boolean") {
-        config.panels.git.enabled = panelConfig.enabled;
-      }
-      if (typeof panelConfig.interval === "string") {
-        const interval = parseInterval(panelConfig.interval);
-        if (interval === null && panelConfig.interval !== "manual") {
-          warnings.push(`Invalid interval '${panelConfig.interval}' for git panel, using default`);
-        } else {
-          config.panels.git.interval = interval;
-        }
-      }
+      parseBasePanelConfig(panelConfig, config.panels.git, panelName, warnings);
       continue;
     }
 
     if (panelName === "tests") {
-      if (typeof panelConfig.enabled === "boolean") {
-        config.panels.tests.enabled = panelConfig.enabled;
-      }
-      if (typeof panelConfig.interval === "string") {
-        const interval = parseInterval(panelConfig.interval);
-        if (interval === null && panelConfig.interval !== "manual") {
-          warnings.push(`Invalid interval '${panelConfig.interval}' for tests panel, using default`);
-        } else {
-          config.panels.tests.interval = interval;
-        }
-      }
+      parseBasePanelConfig(panelConfig, config.panels.tests, panelName, warnings);
       if (typeof panelConfig.command === "string") {
         config.panels.tests.command = panelConfig.command;
       }
@@ -248,17 +238,7 @@ export function parseConfig(): ParseResult {
     }
 
     if (panelName === "claude") {
-      if (typeof panelConfig.enabled === "boolean") {
-        config.panels.claude.enabled = panelConfig.enabled;
-      }
-      if (typeof panelConfig.interval === "string") {
-        const interval = parseInterval(panelConfig.interval);
-        if (interval === null && panelConfig.interval !== "manual") {
-          warnings.push(`Invalid interval '${panelConfig.interval}' for claude panel, using default`);
-        } else {
-          config.panels.claude.interval = interval;
-        }
-      }
+      parseBasePanelConfig(panelConfig, config.panels.claude, panelName, warnings);
       if (typeof panelConfig.max_activities === "number") {
         config.panels.claude.maxActivities = panelConfig.max_activities;
       }
@@ -266,17 +246,7 @@ export function parseConfig(): ParseResult {
     }
 
     if (panelName === "other_sessions") {
-      if (typeof panelConfig.enabled === "boolean") {
-        config.panels.other_sessions.enabled = panelConfig.enabled;
-      }
-      if (typeof panelConfig.interval === "string") {
-        const interval = parseInterval(panelConfig.interval);
-        if (interval === null && panelConfig.interval !== "manual") {
-          warnings.push(`Invalid interval '${panelConfig.interval}' for other_sessions panel, using default`);
-        } else {
-          config.panels.other_sessions.interval = interval;
-        }
-      }
+      parseBasePanelConfig(panelConfig, config.panels.other_sessions, panelName, warnings);
       if (typeof panelConfig.active_threshold === "string") {
         const threshold = parseInterval(panelConfig.active_threshold);
         if (threshold !== null) {

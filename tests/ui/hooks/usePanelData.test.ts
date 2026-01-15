@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
-import { usePanelData } from "../../src/ui/hooks/usePanelData.js";
+import { usePanelData } from "../../../src/ui/hooks/usePanelData.js";
 
 describe("usePanelData", () => {
   beforeEach(() => {

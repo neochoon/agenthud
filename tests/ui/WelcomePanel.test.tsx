@@ -1,7 +1,7 @@
 import React from "react";
 import { describe, it, expect } from "vitest";
 import { render } from "ink-testing-library";
-import { WelcomePanel } from "../src/ui/WelcomePanel.js";
+import { WelcomePanel } from "../../src/ui/WelcomePanel.js";
 
 describe("WelcomePanel", () => {
   it("shows welcome title", () => {

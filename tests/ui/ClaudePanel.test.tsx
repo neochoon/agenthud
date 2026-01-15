@@ -1,9 +1,9 @@
 import React from "react";
 import { describe, it, expect } from "vitest";
 import { render } from "ink-testing-library";
-import { ClaudePanel, getActivityStyle } from "../src/ui/ClaudePanel.js";
-import { ICONS } from "../src/types/index.js";
-import type { ClaudeData, ActivityEntry } from "../src/types/index.js";
+import { ClaudePanel, getActivityStyle } from "../../src/ui/ClaudePanel.js";
+import { ICONS } from "../../src/types/index.js";
+import type { ClaudeData, ActivityEntry } from "../../src/types/index.js";
 
 describe("ClaudePanel", () => {
   const mockActivity: ActivityEntry = {

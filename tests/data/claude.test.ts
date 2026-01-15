@@ -1,37 +1,41 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { join } from "path";
+
+// Mock fs module
+vi.mock("fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("fs")>();
+  return {
+    ...actual,
+    existsSync: vi.fn(),
+    readFileSync: vi.fn(),
+    readdirSync: vi.fn(),
+    statSync: vi.fn(),
+  };
+});
+
+import { existsSync, readFileSync, readdirSync, statSync } from "fs";
 import {
   getClaudeSessionPath,
   findActiveSession,
   parseSessionState,
   getClaudeData,
-  setFsMock,
-  resetFsMock,
   type ClaudeSessionState,
   type ClaudeData,
-} from "../src/data/claude.js";
-import { ICONS } from "../src/types/index.js";
+} from "../../src/data/claude.js";
+import { ICONS } from "../../src/types/index.js";
+
+const mockExistsSync = vi.mocked(existsSync);
+const mockReadFileSync = vi.mocked(readFileSync);
+const mockReaddirSync = vi.mocked(readdirSync);
+const mockStatSync = vi.mocked(statSync);
 
 describe("claude data module", () => {
-  let mockFs: {
-    existsSync: ReturnType<typeof vi.fn>;
-    readFileSync: ReturnType<typeof vi.fn>;
-    readdirSync: ReturnType<typeof vi.fn>;
-    statSync: ReturnType<typeof vi.fn>;
-  };
-
   beforeEach(() => {
-    mockFs = {
-      existsSync: vi.fn(),
-      readFileSync: vi.fn(),
-      readdirSync: vi.fn(),
-      statSync: vi.fn(),
-    };
-    setFsMock(mockFs);
+    vi.resetAllMocks();
   });
 
   afterEach(() => {
-    resetFsMock();
+    vi.resetAllMocks();
   });
 
   describe("getClaudeSessionPath", () => {
@@ -66,7 +70,7 @@ describe("claude data module", () => {
     const ONE_HOUR_MS = 60 * 60 * 1000;
 
     it("returns null when session directory does not exist", () => {
-      mockFs.existsSync.mockReturnValue(false);
+      mockExistsSync.mockReturnValue(false);
 
       const result = findActiveSession("/fake/session/dir", ONE_HOUR_MS);
 
@@ -74,8 +78,8 @@ describe("claude data module", () => {
     });
 
     it("returns null when directory has no jsonl files", () => {
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readdirSync.mockReturnValue(["readme.txt", "config.json"]);
+      mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockReturnValue(["readme.txt", "config.json"] as any);
 
       const result = findActiveSession("/fake/session/dir", ONE_HOUR_MS);
 
@@ -84,13 +88,13 @@ describe("claude data module", () => {
 
     it("returns most recently modified jsonl file", () => {
       const sessionDir = join("/fake", "session", "dir");
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readdirSync.mockReturnValue(["old.jsonl", "new.jsonl"]);
-      mockFs.statSync.mockImplementation((path: string) => {
-        if (path.includes("old.jsonl")) {
-          return { mtimeMs: Date.now() - 60000, size: 1000 }; // 1 minute ago
+      mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockReturnValue(["old.jsonl", "new.jsonl"] as any);
+      mockStatSync.mockImplementation((path: any) => {
+        if (String(path).includes("old.jsonl")) {
+          return { mtimeMs: Date.now() - 60000, size: 1000 } as any; // 1 minute ago
         }
-        return { mtimeMs: Date.now() - 1000, size: 1000 }; // 1 second ago
+        return { mtimeMs: Date.now() - 1000, size: 1000 } as any; // 1 second ago
       });
 
       const result = findActiveSession(sessionDir, ONE_HOUR_MS);
@@ -101,13 +105,13 @@ describe("claude data module", () => {
     it("prefers larger file when mtime is equal", () => {
       const sessionDir = join("/fake", "session", "dir");
       const now = Date.now();
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readdirSync.mockReturnValue(["small.jsonl", "large.jsonl"]);
-      mockFs.statSync.mockImplementation((path: string) => {
-        if (path.includes("small.jsonl")) {
-          return { mtimeMs: now, size: 2509 }; // same time, smaller
+      mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockReturnValue(["small.jsonl", "large.jsonl"] as any);
+      mockStatSync.mockImplementation((path: any) => {
+        if (String(path).includes("small.jsonl")) {
+          return { mtimeMs: now, size: 2509 } as any; // same time, smaller
         }
-        return { mtimeMs: now, size: 2708881 }; // same time, larger
+        return { mtimeMs: now, size: 2708881 } as any; // same time, larger
       });
 
       const result = findActiveSession(sessionDir, ONE_HOUR_MS);
@@ -116,12 +120,12 @@ describe("claude data module", () => {
     });
 
     it("returns null when most recent file is older than timeout", () => {
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readdirSync.mockReturnValue(["old.jsonl"]);
-      mockFs.statSync.mockReturnValue({
+      mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockReturnValue(["old.jsonl"] as any);
+      mockStatSync.mockReturnValue({
         mtimeMs: Date.now() - 61 * 60 * 1000, // 61 minutes ago
         size: 1000,
-      });
+      } as any);
 
       const result = findActiveSession("/fake/session/dir", ONE_HOUR_MS);
 
@@ -130,12 +134,12 @@ describe("claude data module", () => {
 
     it("returns file when modified within timeout", () => {
       const sessionDir = join("/fake", "session", "dir");
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readdirSync.mockReturnValue(["recent.jsonl"]);
-      mockFs.statSync.mockReturnValue({
+      mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockReturnValue(["recent.jsonl"] as any);
+      mockStatSync.mockReturnValue({
         mtimeMs: Date.now() - 59 * 60 * 1000, // 59 minutes ago
         size: 1000,
-      });
+      } as any);
 
       const result = findActiveSession(sessionDir, ONE_HOUR_MS);
 
@@ -145,7 +149,7 @@ describe("claude data module", () => {
 
   describe("parseSessionState", () => {
     it("returns none status when file does not exist", () => {
-      mockFs.existsSync.mockReturnValue(false);
+      mockExistsSync.mockReturnValue(false);
 
       const result = parseSessionState("/fake/session.jsonl");
 
@@ -160,8 +164,8 @@ describe("claude data module", () => {
         timestamp: new Date().toISOString(),
       });
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(jsonl);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(jsonl);
 
       const result = parseSessionState("/fake/session.jsonl");
 
@@ -184,8 +188,8 @@ describe("claude data module", () => {
         timestamp: new Date().toISOString(),
       });
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(jsonl);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(jsonl);
 
       const result = parseSessionState("/fake/session.jsonl");
 
@@ -213,8 +217,8 @@ describe("claude data module", () => {
         }),
       ].join("\n");
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(lines);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
 
       const result = parseSessionState("/fake/session.jsonl");
 
@@ -246,8 +250,8 @@ describe("claude data module", () => {
         }),
       ].join("\n");
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(lines);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
 
       const result = parseSessionState("/fake/session.jsonl");
 
@@ -275,8 +279,8 @@ describe("claude data module", () => {
         }),
       ].join("\n");
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(lines);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
 
       const result = parseSessionState("/fake/session.jsonl");
 
@@ -304,8 +308,8 @@ describe("claude data module", () => {
         }),
       ].join("\n");
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(lines);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
 
       const result = parseSessionState("/fake/session.jsonl");
 
@@ -322,8 +326,8 @@ describe("claude data module", () => {
         }),
       ].join("\n");
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(lines);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
 
       const result = parseSessionState("/fake/session.jsonl");
 
@@ -351,8 +355,8 @@ describe("claude data module", () => {
         }),
       ].join("\n");
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(lines);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
 
       const result = parseSessionState("/fake/session.jsonl");
 
@@ -388,8 +392,8 @@ describe("claude data module", () => {
         }),
       ].join("\n");
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(lines);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
 
       const result = parseSessionState("/fake/session.jsonl");
 
@@ -414,8 +418,8 @@ describe("claude data module", () => {
         }),
       ].join("\n");
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(lines);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
 
       const result = parseSessionState("/fake/session.jsonl");
 
@@ -451,19 +455,19 @@ describe("claude data module", () => {
         }),
       ].join("\n");
 
-      mockFs.existsSync.mockImplementation((path: string) => {
-        if (path === sessionFile) return true;
-        if (path === subagentsDir) return true;
+      mockExistsSync.mockImplementation((path: any) => {
+        if (String(path) === sessionFile) return true;
+        if (String(path) === subagentsDir) return true;
         return false;
       });
-      mockFs.readFileSync.mockImplementation((path: string) => {
-        if (path === sessionFile) return mainSessionLines;
-        if (path === subagentFile) return subagentLines;
+      mockReadFileSync.mockImplementation((path: any) => {
+        if (String(path) === sessionFile) return mainSessionLines;
+        if (String(path) === subagentFile) return subagentLines;
         return "";
       });
-      mockFs.readdirSync.mockImplementation((path: string) => {
-        if (path === subagentsDir) return ["agent-abc123.jsonl"];
-        return [];
+      mockReaddirSync.mockImplementation((path: any) => {
+        if (String(path) === subagentsDir) return ["agent-abc123.jsonl"] as any;
+        return [] as any;
       });
 
       const result = parseSessionState(sessionFile);
@@ -514,20 +518,20 @@ describe("claude data module", () => {
         }),
       ].join("\n");
 
-      mockFs.existsSync.mockImplementation((path: string) => {
-        if (path === sessionFile) return true;
-        if (path === subagentsDir) return true;
+      mockExistsSync.mockImplementation((path: any) => {
+        if (String(path) === sessionFile) return true;
+        if (String(path) === subagentsDir) return true;
         return false;
       });
-      mockFs.readFileSync.mockImplementation((path: string) => {
-        if (path === sessionFile) return mainSessionLines;
-        if (path === subagent1File) return subagent1Lines;
-        if (path === subagent2File) return subagent2Lines;
+      mockReadFileSync.mockImplementation((path: any) => {
+        if (String(path) === sessionFile) return mainSessionLines;
+        if (String(path) === subagent1File) return subagent1Lines;
+        if (String(path) === subagent2File) return subagent2Lines;
         return "";
       });
-      mockFs.readdirSync.mockImplementation((path: string) => {
-        if (path === subagentsDir) return ["agent-1.jsonl", "agent-2.jsonl"];
-        return [];
+      mockReaddirSync.mockImplementation((path: any) => {
+        if (String(path) === subagentsDir) return ["agent-1.jsonl", "agent-2.jsonl"] as any;
+        return [] as any;
       });
 
       const result = parseSessionState(sessionFile);
@@ -551,11 +555,11 @@ describe("claude data module", () => {
         }),
       ].join("\n");
 
-      mockFs.existsSync.mockImplementation((path: string) => {
-        if (path === sessionFile) return true;
+      mockExistsSync.mockImplementation((path: any) => {
+        if (String(path) === sessionFile) return true;
         return false; // subagents folder doesn't exist
       });
-      mockFs.readFileSync.mockReturnValue(mainSessionLines);
+      mockReadFileSync.mockReturnValue(mainSessionLines);
 
       const result = parseSessionState(sessionFile);
 
@@ -580,8 +584,8 @@ describe("claude data module", () => {
         }),
       ].join("\n");
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(lines);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
 
       const result = parseSessionState("/fake/session.jsonl");
 
@@ -621,8 +625,8 @@ describe("claude data module", () => {
         }),
       ].join("\n");
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(lines);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
 
       const result = parseSessionState("/fake/session.jsonl");
 
@@ -633,8 +637,8 @@ describe("claude data module", () => {
     });
 
     it("handles empty file gracefully", () => {
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue("");
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue("");
 
       const result = parseSessionState("/fake/session.jsonl");
 
@@ -654,8 +658,8 @@ describe("claude data module", () => {
         "{ also invalid }",
       ].join("\n");
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(lines);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
 
       const result = parseSessionState("/fake/session.jsonl");
 
@@ -682,8 +686,8 @@ describe("claude data module", () => {
         );
       }
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(lines.join("\n"));
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines.join("\n"));
 
       const result = parseSessionState("/fake/session.jsonl");
 
@@ -717,8 +721,8 @@ describe("claude data module", () => {
         );
       }
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(lines.join("\n"));
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines.join("\n"));
 
       const result = parseSessionState("/fake/session.jsonl", 5);
 
@@ -744,8 +748,8 @@ describe("claude data module", () => {
         }),
       ].join("\n");
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(lines);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
 
       const result = parseSessionState("/fake/session.jsonl");
 
@@ -758,8 +762,8 @@ describe("claude data module", () => {
         JSON.stringify({ type: "system", subtype: "init" }),
       ].join("\n");
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(lines);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
 
       const result = parseSessionState("/fake/session.jsonl");
 
@@ -767,8 +771,8 @@ describe("claude data module", () => {
     });
 
     it("returns null sessionStartTime for empty file", () => {
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue("");
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue("");
 
       const result = parseSessionState("/fake/session.jsonl");
 
@@ -797,8 +801,8 @@ describe("claude data module", () => {
         }),
       ].join("\n");
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(lines);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
 
       const result = parseSessionState("/fake/session.jsonl");
 
@@ -827,8 +831,8 @@ describe("claude data module", () => {
         }),
       ].join("\n");
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(lines);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
 
       const result = parseSessionState("/fake/session.jsonl");
 
@@ -857,8 +861,8 @@ describe("claude data module", () => {
         }),
       ].join("\n");
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(lines);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
 
       const result = parseSessionState("/fake/session.jsonl");
 
@@ -888,8 +892,8 @@ describe("claude data module", () => {
         }),
       ].join("\n");
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(lines);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
 
       const result = parseSessionState("/fake/session.jsonl");
 
@@ -927,8 +931,8 @@ describe("claude data module", () => {
         }),
       ].join("\n");
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(lines);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
 
       const result = parseSessionState("/fake/session.jsonl");
 
@@ -947,8 +951,8 @@ describe("claude data module", () => {
         }),
       ].join("\n");
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(lines);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
 
       const result = parseSessionState("/fake/session.jsonl");
 
@@ -987,8 +991,8 @@ describe("claude data module", () => {
         }),
       ].join("\n");
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(lines);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
 
       const result = parseSessionState("/fake/session.jsonl");
 
@@ -1038,8 +1042,8 @@ describe("claude data module", () => {
         }),
       ].join("\n");
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(lines);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
 
       const result = parseSessionState("/fake/session.jsonl");
 
@@ -1074,8 +1078,8 @@ describe("claude data module", () => {
         }),
       ].join("\n");
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(lines);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
 
       const result = parseSessionState("/fake/session.jsonl");
 
@@ -1090,7 +1094,7 @@ describe("claude data module", () => {
 
   describe("getClaudeData", () => {
     it("returns none status and hasSession false when session directory does not exist", () => {
-      mockFs.existsSync.mockReturnValue(false);
+      mockExistsSync.mockReturnValue(false);
 
       const result = getClaudeData("/Users/test/project");
 
@@ -1100,9 +1104,9 @@ describe("claude data module", () => {
     });
 
     it("returns hasSession true when session directory exists but no active session", () => {
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readdirSync.mockReturnValue(["old.jsonl"]);
-      mockFs.statSync.mockReturnValue({ mtimeMs: Date.now() - 61 * 60 * 1000, size: 1000 }); // 61 minutes ago (beyond default 60 min timeout)
+      mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockReturnValue(["old.jsonl"] as any);
+      mockStatSync.mockReturnValue({ mtimeMs: Date.now() - 61 * 60 * 1000, size: 1000 } as any); // 61 minutes ago (beyond default 60 min timeout)
 
       const result = getClaudeData("/Users/test/project");
 
@@ -1113,10 +1117,10 @@ describe("claude data module", () => {
     it("returns session state when active session exists", () => {
       const now = new Date();
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readdirSync.mockReturnValue(["session.jsonl"]);
-      mockFs.statSync.mockReturnValue({ mtimeMs: Date.now() - 1000, size: 1000 });
-      mockFs.readFileSync.mockReturnValue(
+      mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockReturnValue(["session.jsonl"] as any);
+      mockStatSync.mockReturnValue({ mtimeMs: Date.now() - 1000, size: 1000 } as any);
+      mockReadFileSync.mockReturnValue(
         JSON.stringify({
           type: "user",
           message: { role: "user", content: "Test message" },
@@ -1133,8 +1137,8 @@ describe("claude data module", () => {
     });
 
     it("returns error when file read fails", () => {
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readdirSync.mockImplementation(() => {
+      mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockImplementation(() => {
         throw new Error("Permission denied");
       });
 

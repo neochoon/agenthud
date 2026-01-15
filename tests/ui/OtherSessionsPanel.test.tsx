@@ -1,8 +1,8 @@
 import React from "react";
 import { describe, it, expect } from "vitest";
 import { render } from "ink-testing-library";
-import { OtherSessionsPanel } from "../src/ui/OtherSessionsPanel.js";
-import type { OtherSessionsData } from "../src/data/otherSessions.js";
+import { OtherSessionsPanel } from "../../src/ui/OtherSessionsPanel.js";
+import type { OtherSessionsData } from "../../src/data/otherSessions.js";
 
 describe("OtherSessionsPanel", () => {
   const createMockData = (overrides: Partial<OtherSessionsData> = {}): OtherSessionsData => ({

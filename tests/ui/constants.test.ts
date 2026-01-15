@@ -1,21 +1,33 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   getTerminalWidth,
-  setStdoutColumnsFn,
-  resetStdoutColumnsFn,
   MIN_TERMINAL_WIDTH,
   MAX_TERMINAL_WIDTH,
   DEFAULT_FALLBACK_WIDTH,
-} from "../src/ui/constants.js";
+} from "../../src/ui/constants.js";
 
 describe("getTerminalWidth", () => {
+  const originalColumns = process.stdout.columns;
+
   afterEach(() => {
-    resetStdoutColumnsFn();
+    Object.defineProperty(process.stdout, "columns", {
+      value: originalColumns,
+      writable: true,
+      configurable: true,
+    });
   });
+
+  function setColumns(value: number | undefined) {
+    Object.defineProperty(process.stdout, "columns", {
+      value,
+      writable: true,
+      configurable: true,
+    });
+  }
 
   describe("normal terminal sizes", () => {
     it("returns terminal width for normal size (100 columns)", () => {
-      setStdoutColumnsFn(() => 100);
+      setColumns(100);
 
       const width = getTerminalWidth();
 
@@ -23,7 +35,7 @@ describe("getTerminalWidth", () => {
     });
 
     it("returns terminal width for small terminal (60 columns)", () => {
-      setStdoutColumnsFn(() => 60);
+      setColumns(60);
 
       const width = getTerminalWidth();
 
@@ -33,7 +45,7 @@ describe("getTerminalWidth", () => {
 
   describe("max width cap", () => {
     it("caps width at MAX_TERMINAL_WIDTH (120) for wide terminals", () => {
-      setStdoutColumnsFn(() => 200);
+      setColumns(200);
 
       const width = getTerminalWidth();
 
@@ -42,7 +54,7 @@ describe("getTerminalWidth", () => {
     });
 
     it("caps width at 120 for ultrawide terminals (300 columns)", () => {
-      setStdoutColumnsFn(() => 300);
+      setColumns(300);
 
       const width = getTerminalWidth();
 
@@ -50,7 +62,7 @@ describe("getTerminalWidth", () => {
     });
 
     it("returns exactly 120 when terminal is 120 columns", () => {
-      setStdoutColumnsFn(() => 120);
+      setColumns(120);
 
       const width = getTerminalWidth();
 
@@ -60,7 +72,7 @@ describe("getTerminalWidth", () => {
 
   describe("min width enforcement", () => {
     it("enforces minimum width for very small terminals", () => {
-      setStdoutColumnsFn(() => 30);
+      setColumns(30);
 
       const width = getTerminalWidth();
 
@@ -69,7 +81,7 @@ describe("getTerminalWidth", () => {
     });
 
     it("returns exactly 50 when terminal is 50 columns", () => {
-      setStdoutColumnsFn(() => 50);
+      setColumns(50);
 
       const width = getTerminalWidth();
 
@@ -79,7 +91,7 @@ describe("getTerminalWidth", () => {
 
   describe("fallback behavior", () => {
     it("returns fallback width when columns is undefined", () => {
-      setStdoutColumnsFn(() => undefined);
+      setColumns(undefined);
 
       const width = getTerminalWidth();
 
@@ -88,7 +100,7 @@ describe("getTerminalWidth", () => {
     });
 
     it("returns fallback width when columns is 0", () => {
-      setStdoutColumnsFn(() => 0);
+      setColumns(0);
 
       const width = getTerminalWidth();
 
@@ -96,7 +108,7 @@ describe("getTerminalWidth", () => {
     });
 
     it("returns fallback width when columns is negative", () => {
-      setStdoutColumnsFn(() => -1);
+      setColumns(-1);
 
       const width = getTerminalWidth();
 

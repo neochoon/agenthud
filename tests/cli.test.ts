@@ -2,8 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   parseArgs,
   clearScreen,
-  setClearFn,
-  resetClearFn,
   getVersion,
   getHelp,
 } from "../src/cli.js";
@@ -112,21 +110,20 @@ describe("CLI argument parsing", () => {
   });
 
   describe("clearScreen", () => {
-    let mockClear: ReturnType<typeof vi.fn>;
+    let consoleClearSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
-      mockClear = vi.fn();
-      setClearFn(mockClear);
+      consoleClearSpy = vi.spyOn(console, "clear").mockImplementation(() => {});
     });
 
     afterEach(() => {
-      resetClearFn();
+      consoleClearSpy.mockRestore();
     });
 
-    it("calls the clear function", () => {
+    it("calls console.clear", () => {
       clearScreen();
 
-      expect(mockClear).toHaveBeenCalledTimes(1);
+      expect(consoleClearSpy).toHaveBeenCalledTimes(1);
     });
   });
 });

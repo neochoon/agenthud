@@ -1,13 +1,25 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+// Mock fs module
+vi.mock("fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("fs")>();
+  return {
+    ...actual,
+    existsSync: vi.fn(),
+    readFileSync: vi.fn(),
+  };
+});
+
+import { existsSync, readFileSync } from "fs";
 import {
   parseConfig,
   parseInterval,
   getDefaultConfig,
-  setFsMock,
-  resetFsMock,
-  type FsMock,
   type Config,
-} from "../src/config/parser.js";
+} from "../../src/config/parser.js";
+
+const mockExistsSync = vi.mocked(existsSync);
+const mockReadFileSync = vi.mocked(readFileSync);
 
 describe("parseInterval", () => {
   it("parses seconds", () => {
@@ -55,25 +67,17 @@ describe("getDefaultConfig", () => {
 });
 
 describe("parseConfig", () => {
-  let fsMock: FsMock;
-  let warnings: string[];
-
   beforeEach(() => {
-    warnings = [];
-    fsMock = {
-      existsSync: vi.fn(),
-      readFileSync: vi.fn(),
-    };
-    setFsMock(fsMock);
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
-    resetFsMock();
+    vi.clearAllMocks();
   });
 
   describe("when config file does not exist", () => {
     it("returns default config", () => {
-      fsMock.existsSync.mockReturnValue(false);
+      mockExistsSync.mockReturnValue(false);
 
       const { config } = parseConfig();
 
@@ -81,7 +85,7 @@ describe("parseConfig", () => {
     });
 
     it("returns no warnings", () => {
-      fsMock.existsSync.mockReturnValue(false);
+      mockExistsSync.mockReturnValue(false);
 
       const { warnings } = parseConfig();
 
@@ -91,11 +95,11 @@ describe("parseConfig", () => {
 
   describe("when config file exists", () => {
     beforeEach(() => {
-      fsMock.existsSync.mockReturnValue(true);
+      mockExistsSync.mockReturnValue(true);
     });
 
     it("parses valid YAML config", () => {
-      fsMock.readFileSync.mockReturnValue(`
+      mockReadFileSync.mockReturnValue(`
 panels:
   git:
     enabled: true
@@ -116,7 +120,7 @@ panels:
     });
 
     it("uses defaults for missing panels", () => {
-      fsMock.readFileSync.mockReturnValue(`
+      mockReadFileSync.mockReturnValue(`
 panels:
   git:
     enabled: false
@@ -129,7 +133,7 @@ panels:
     });
 
     it("uses defaults for missing fields", () => {
-      fsMock.readFileSync.mockReturnValue(`
+      mockReadFileSync.mockReturnValue(`
 panels:
   git:
     enabled: false
@@ -142,7 +146,7 @@ panels:
     });
 
     it("handles empty config file", () => {
-      fsMock.readFileSync.mockReturnValue("");
+      mockReadFileSync.mockReturnValue("");
 
       const { config } = parseConfig();
 
@@ -150,7 +154,7 @@ panels:
     });
 
     it("handles config with only panels key", () => {
-      fsMock.readFileSync.mockReturnValue("panels:");
+      mockReadFileSync.mockReturnValue("panels:");
 
       const { config } = parseConfig();
 
@@ -158,7 +162,7 @@ panels:
     });
 
     it("parses claude panel max_activities", () => {
-      fsMock.readFileSync.mockReturnValue(`
+      mockReadFileSync.mockReturnValue(`
 panels:
   claude:
     enabled: true
@@ -174,7 +178,7 @@ panels:
     });
 
     it("uses undefined for max_activities when not specified", () => {
-      fsMock.readFileSync.mockReturnValue(`
+      mockReadFileSync.mockReturnValue(`
 panels:
   claude:
     enabled: true
@@ -188,11 +192,11 @@ panels:
 
   describe("warnings", () => {
     beforeEach(() => {
-      fsMock.existsSync.mockReturnValue(true);
+      mockExistsSync.mockReturnValue(true);
     });
 
     it("warns on invalid interval format", () => {
-      fsMock.readFileSync.mockReturnValue(`
+      mockReadFileSync.mockReturnValue(`
 panels:
   git:
     interval: invalid
@@ -205,7 +209,7 @@ panels:
     });
 
     it("warns on invalid YAML syntax", () => {
-      fsMock.readFileSync.mockReturnValue(`
+      mockReadFileSync.mockReturnValue(`
 panels:
   git:
     enabled: [invalid yaml
@@ -219,7 +223,7 @@ panels:
     });
 
     it("treats unknown panel as custom panel", () => {
-      fsMock.readFileSync.mockReturnValue(`
+      mockReadFileSync.mockReturnValue(`
 panels:
   unknown:
     enabled: true
@@ -237,11 +241,11 @@ panels:
 
   describe("custom panels", () => {
     beforeEach(() => {
-      fsMock.existsSync.mockReturnValue(true);
+      mockExistsSync.mockReturnValue(true);
     });
 
     it("parses custom panel with command", () => {
-      fsMock.readFileSync.mockReturnValue(`
+      mockReadFileSync.mockReturnValue(`
 panels:
   docker:
     enabled: true
@@ -262,7 +266,7 @@ panels:
     });
 
     it("parses custom panel with source", () => {
-      fsMock.readFileSync.mockReturnValue(`
+      mockReadFileSync.mockReturnValue(`
 panels:
   status:
     enabled: true
@@ -279,7 +283,7 @@ panels:
     });
 
     it("defaults renderer to list", () => {
-      fsMock.readFileSync.mockReturnValue(`
+      mockReadFileSync.mockReturnValue(`
 panels:
   custom:
     enabled: true
@@ -292,7 +296,7 @@ panels:
     });
 
     it("defaults interval to 30s for custom panels", () => {
-      fsMock.readFileSync.mockReturnValue(`
+      mockReadFileSync.mockReturnValue(`
 panels:
   custom:
     enabled: true
@@ -305,7 +309,7 @@ panels:
     });
 
     it("parses multiple custom panels", () => {
-      fsMock.readFileSync.mockReturnValue(`
+      mockReadFileSync.mockReturnValue(`
 panels:
   docker:
     enabled: true
@@ -325,7 +329,7 @@ panels:
     });
 
     it("handles mixed built-in and custom panels", () => {
-      fsMock.readFileSync.mockReturnValue(`
+      mockReadFileSync.mockReturnValue(`
 panels:
   git:
     enabled: true
@@ -342,7 +346,7 @@ panels:
     });
 
     it("warns on invalid renderer", () => {
-      fsMock.readFileSync.mockReturnValue(`
+      mockReadFileSync.mockReturnValue(`
 panels:
   custom:
     enabled: true
@@ -357,7 +361,7 @@ panels:
     });
 
     it("ignores disabled custom panels", () => {
-      fsMock.readFileSync.mockReturnValue(`
+      mockReadFileSync.mockReturnValue(`
 panels:
   docker:
     enabled: false
@@ -372,11 +376,11 @@ panels:
 
   describe("panel order", () => {
     beforeEach(() => {
-      fsMock.existsSync.mockReturnValue(true);
+      mockExistsSync.mockReturnValue(true);
     });
 
     it("preserves panel order from config.yaml", () => {
-      fsMock.readFileSync.mockReturnValue(`
+      mockReadFileSync.mockReturnValue(`
 panels:
   git:
     enabled: true
@@ -394,7 +398,7 @@ panels:
     });
 
     it("returns default order when no config file", () => {
-      fsMock.existsSync.mockReturnValue(false);
+      mockExistsSync.mockReturnValue(false);
 
       const { config } = parseConfig();
 
@@ -402,7 +406,7 @@ panels:
     });
 
     it("includes disabled panels in order (enabled checked at render time)", () => {
-      fsMock.readFileSync.mockReturnValue(`
+      mockReadFileSync.mockReturnValue(`
 panels:
   git:
     enabled: true
@@ -424,11 +428,11 @@ panels:
 
   describe("width setting", () => {
     beforeEach(() => {
-      fsMock.existsSync.mockReturnValue(true);
+      mockExistsSync.mockReturnValue(true);
     });
 
     it("uses default width when not specified", () => {
-      fsMock.readFileSync.mockReturnValue(`
+      mockReadFileSync.mockReturnValue(`
 panels:
   git:
     enabled: true
@@ -440,7 +444,7 @@ panels:
     });
 
     it("parses custom width from config", () => {
-      fsMock.readFileSync.mockReturnValue(`
+      mockReadFileSync.mockReturnValue(`
 width: 80
 
 panels:
@@ -454,7 +458,7 @@ panels:
     });
 
     it("clamps width to minimum of 50", () => {
-      fsMock.readFileSync.mockReturnValue(`
+      mockReadFileSync.mockReturnValue(`
 width: 30
 `);
 
@@ -465,7 +469,7 @@ width: 30
     });
 
     it("clamps width to maximum of 120", () => {
-      fsMock.readFileSync.mockReturnValue(`
+      mockReadFileSync.mockReturnValue(`
 width: 150
 `);
 

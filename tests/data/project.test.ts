@@ -1,4 +1,27 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+// Mock child_process module
+vi.mock("child_process", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("child_process")>();
+  return {
+    ...actual,
+    execSync: vi.fn(),
+  };
+});
+
+// Mock fs module
+vi.mock("fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("fs")>();
+  return {
+    ...actual,
+    existsSync: vi.fn(),
+    readFileSync: vi.fn(),
+    readdirSync: vi.fn(),
+  };
+});
+
+import { execSync } from "child_process";
+import { existsSync, readFileSync, readdirSync } from "fs";
 import {
   detectLanguage,
   getProjectInfo,
@@ -6,43 +29,25 @@ import {
   countFiles,
   countLines,
   getProjectData,
-  setFileExistsFn,
-  resetFileExistsFn,
-  setReadFileFn,
-  resetReadFileFn,
-  setExecFn,
-  resetExecFn,
-  setReaddirFn,
-  resetReaddirFn,
-} from "../src/data/project.js";
+} from "../../src/data/project.js";
+
+const mockExecSync = vi.mocked(execSync);
+const mockExistsSync = vi.mocked(existsSync);
+const mockReadFileSync = vi.mocked(readFileSync);
+const mockReaddirSync = vi.mocked(readdirSync);
 
 describe("project data module", () => {
-  let mockFileExists: ReturnType<typeof vi.fn>;
-  let mockReadFile: ReturnType<typeof vi.fn>;
-  let mockExec: ReturnType<typeof vi.fn>;
-  let mockReaddir: ReturnType<typeof vi.fn>;
-
   beforeEach(() => {
-    mockFileExists = vi.fn();
-    mockReadFile = vi.fn();
-    mockExec = vi.fn();
-    mockReaddir = vi.fn();
-    setFileExistsFn(mockFileExists);
-    setReadFileFn(mockReadFile);
-    setExecFn(mockExec);
-    setReaddirFn(mockReaddir);
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
-    resetFileExistsFn();
-    resetReadFileFn();
-    resetExecFn();
-    resetReaddirFn();
+    vi.clearAllMocks();
   });
 
   describe("detectLanguage", () => {
     it("detects TypeScript when tsconfig.json exists", () => {
-      mockFileExists.mockImplementation((path: string) => path === "tsconfig.json");
+      mockExistsSync.mockImplementation((path: any) => String(path) === "tsconfig.json");
 
       const result = detectLanguage();
 
@@ -50,7 +55,7 @@ describe("project data module", () => {
     });
 
     it("detects JavaScript when package.json exists but no tsconfig", () => {
-      mockFileExists.mockImplementation((path: string) => path === "package.json");
+      mockExistsSync.mockImplementation((path: any) => String(path) === "package.json");
 
       const result = detectLanguage();
 
@@ -58,7 +63,7 @@ describe("project data module", () => {
     });
 
     it("detects Python when pyproject.toml exists", () => {
-      mockFileExists.mockImplementation((path: string) => path === "pyproject.toml");
+      mockExistsSync.mockImplementation((path: any) => String(path) === "pyproject.toml");
 
       const result = detectLanguage();
 
@@ -66,7 +71,7 @@ describe("project data module", () => {
     });
 
     it("detects Python when requirements.txt exists", () => {
-      mockFileExists.mockImplementation((path: string) => path === "requirements.txt");
+      mockExistsSync.mockImplementation((path: any) => String(path) === "requirements.txt");
 
       const result = detectLanguage();
 
@@ -74,7 +79,7 @@ describe("project data module", () => {
     });
 
     it("detects Python when setup.py exists", () => {
-      mockFileExists.mockImplementation((path: string) => path === "setup.py");
+      mockExistsSync.mockImplementation((path: any) => String(path) === "setup.py");
 
       const result = detectLanguage();
 
@@ -82,7 +87,7 @@ describe("project data module", () => {
     });
 
     it("detects Go when go.mod exists", () => {
-      mockFileExists.mockImplementation((path: string) => path === "go.mod");
+      mockExistsSync.mockImplementation((path: any) => String(path) === "go.mod");
 
       const result = detectLanguage();
 
@@ -90,7 +95,7 @@ describe("project data module", () => {
     });
 
     it("detects Rust when Cargo.toml exists", () => {
-      mockFileExists.mockImplementation((path: string) => path === "Cargo.toml");
+      mockExistsSync.mockImplementation((path: any) => String(path) === "Cargo.toml");
 
       const result = detectLanguage();
 
@@ -98,7 +103,7 @@ describe("project data module", () => {
     });
 
     it("detects Ruby when Gemfile exists", () => {
-      mockFileExists.mockImplementation((path: string) => path === "Gemfile");
+      mockExistsSync.mockImplementation((path: any) => String(path) === "Gemfile");
 
       const result = detectLanguage();
 
@@ -106,7 +111,7 @@ describe("project data module", () => {
     });
 
     it("detects Java when pom.xml exists", () => {
-      mockFileExists.mockImplementation((path: string) => path === "pom.xml");
+      mockExistsSync.mockImplementation((path: any) => String(path) === "pom.xml");
 
       const result = detectLanguage();
 
@@ -114,7 +119,7 @@ describe("project data module", () => {
     });
 
     it("detects Java when build.gradle exists", () => {
-      mockFileExists.mockImplementation((path: string) => path === "build.gradle");
+      mockExistsSync.mockImplementation((path: any) => String(path) === "build.gradle");
 
       const result = detectLanguage();
 
@@ -122,7 +127,7 @@ describe("project data module", () => {
     });
 
     it("returns null when no language indicators found", () => {
-      mockFileExists.mockReturnValue(false);
+      mockExistsSync.mockReturnValue(false);
 
       const result = detectLanguage();
 
@@ -130,8 +135,8 @@ describe("project data module", () => {
     });
 
     it("TypeScript takes precedence over JavaScript", () => {
-      mockFileExists.mockImplementation(
-        (path: string) => path === "tsconfig.json" || path === "package.json"
+      mockExistsSync.mockImplementation(
+        (path: any) => String(path) === "tsconfig.json" || String(path) === "package.json"
       );
 
       const result = detectLanguage();
@@ -142,8 +147,8 @@ describe("project data module", () => {
 
   describe("getProjectInfo", () => {
     it("reads name and license from package.json", () => {
-      mockFileExists.mockImplementation((path: string) => path === "package.json");
-      mockReadFile.mockReturnValue(
+      mockExistsSync.mockImplementation((path: any) => String(path) === "package.json");
+      mockReadFileSync.mockReturnValue(
         JSON.stringify({
           name: "my-project",
           license: "MIT",
@@ -161,8 +166,8 @@ describe("project data module", () => {
     });
 
     it("reads from pyproject.toml", () => {
-      mockFileExists.mockImplementation((path: string) => path === "pyproject.toml");
-      mockReadFile.mockReturnValue(`
+      mockExistsSync.mockImplementation((path: any) => String(path) === "pyproject.toml");
+      mockReadFileSync.mockReturnValue(`
 [project]
 name = "my-python-app"
 license = {text = "Apache-2.0"}
@@ -181,8 +186,8 @@ dev = ["pytest", "black"]
     });
 
     it("reads from setup.py", () => {
-      mockFileExists.mockImplementation((path: string) => path === "setup.py");
-      mockReadFile.mockReturnValue(`
+      mockExistsSync.mockImplementation((path: any) => String(path) === "setup.py");
+      mockReadFileSync.mockReturnValue(`
 from setuptools import setup
 setup(
     name="legacy-app",
@@ -197,8 +202,8 @@ setup(
     });
 
     it("uses folder name when no project file found", () => {
-      mockFileExists.mockReturnValue(false);
-      mockExec.mockReturnValue("my-folder\n");
+      mockExistsSync.mockReturnValue(false);
+      mockExecSync.mockReturnValue("my-folder\n");
 
       const result = getProjectInfo();
 
@@ -207,8 +212,8 @@ setup(
     });
 
     it("handles missing license field", () => {
-      mockFileExists.mockImplementation((path: string) => path === "package.json");
-      mockReadFile.mockReturnValue(
+      mockExistsSync.mockImplementation((path: any) => String(path) === "package.json");
+      mockReadFileSync.mockReturnValue(
         JSON.stringify({
           name: "no-license-project",
         })
@@ -221,8 +226,8 @@ setup(
     });
 
     it("counts dependencies correctly", () => {
-      mockFileExists.mockImplementation((path: string) => path === "package.json");
-      mockReadFile.mockReturnValue(
+      mockExistsSync.mockImplementation((path: any) => String(path) === "package.json");
+      mockReadFileSync.mockReturnValue(
         JSON.stringify({
           name: "test",
           dependencies: { a: "1", b: "2", c: "3" },
@@ -298,8 +303,8 @@ setup(
 
   describe("countFiles", () => {
     it("counts files in src directory", () => {
-      mockFileExists.mockImplementation((path: string) => path === "src");
-      mockExec.mockReturnValue("42\n");
+      mockExistsSync.mockImplementation((path: any) => String(path) === "src");
+      mockExecSync.mockReturnValue("42\n");
 
       const result = countFiles("TypeScript");
 
@@ -308,21 +313,21 @@ setup(
     });
 
     it("counts tsx files for TypeScript", () => {
-      mockFileExists.mockImplementation((path: string) => path === "src");
-      mockExec.mockReturnValue("10\n");
+      mockExistsSync.mockImplementation((path: any) => String(path) === "src");
+      mockExecSync.mockReturnValue("10\n");
 
       const result = countFiles("TypeScript");
 
       // Command should include both .ts and .tsx
-      expect(mockExec).toHaveBeenCalledWith(
+      expect(mockExecSync).toHaveBeenCalledWith(
         expect.stringContaining("*.ts"),
         expect.any(Object)
       );
     });
 
     it("counts py files for Python", () => {
-      mockFileExists.mockImplementation((path: string) => path === "src");
-      mockExec.mockReturnValue("25\n");
+      mockExistsSync.mockImplementation((path: any) => String(path) === "src");
+      mockExecSync.mockReturnValue("25\n");
 
       const result = countFiles("Python");
 
@@ -331,8 +336,8 @@ setup(
     });
 
     it("tries lib directory if src not found", () => {
-      mockFileExists.mockImplementation((path: string) => path === "lib");
-      mockExec.mockReturnValue("5\n");
+      mockExistsSync.mockImplementation((path: any) => String(path) === "lib");
+      mockExecSync.mockReturnValue("5\n");
 
       const result = countFiles("JavaScript");
 
@@ -340,8 +345,8 @@ setup(
     });
 
     it("tries app directory if src and lib not found", () => {
-      mockFileExists.mockImplementation((path: string) => path === "app");
-      mockExec.mockReturnValue("8\n");
+      mockExistsSync.mockImplementation((path: any) => String(path) === "app");
+      mockExecSync.mockReturnValue("8\n");
 
       const result = countFiles("Python");
 
@@ -349,7 +354,7 @@ setup(
     });
 
     it("returns 0 when no source directory found", () => {
-      mockFileExists.mockReturnValue(false);
+      mockExistsSync.mockReturnValue(false);
 
       const result = countFiles("TypeScript");
 
@@ -359,8 +364,8 @@ setup(
 
   describe("countLines", () => {
     it("counts lines in source files", () => {
-      mockFileExists.mockImplementation((path: string) => path === "src");
-      mockExec.mockReturnValue("3500\n");
+      mockExistsSync.mockImplementation((path: any) => String(path) === "src");
+      mockExecSync.mockReturnValue("3500\n");
 
       const result = countLines("TypeScript");
 
@@ -368,8 +373,8 @@ setup(
     });
 
     it("formats large numbers with k suffix", () => {
-      mockFileExists.mockImplementation((path: string) => path === "src");
-      mockExec.mockReturnValue("15234\n");
+      mockExistsSync.mockImplementation((path: any) => String(path) === "src");
+      mockExecSync.mockReturnValue("15234\n");
 
       const result = countLines("TypeScript");
 
@@ -377,19 +382,19 @@ setup(
     });
 
     it("excludes common directories", () => {
-      mockFileExists.mockImplementation((path: string) => path === "src");
-      mockExec.mockReturnValue("100\n");
+      mockExistsSync.mockImplementation((path: any) => String(path) === "src");
+      mockExecSync.mockReturnValue("100\n");
 
       countLines("TypeScript");
 
       // Should exclude node_modules, dist, build, .git, __pycache__
-      const cmd = mockExec.mock.calls[0][0];
+      const cmd = mockExecSync.mock.calls[0][0];
       expect(cmd).toContain("node_modules");
       expect(cmd).toContain("dist");
     });
 
     it("returns 0 when no source directory found", () => {
-      mockFileExists.mockReturnValue(false);
+      mockExistsSync.mockReturnValue(false);
 
       const result = countLines("TypeScript");
 
@@ -400,10 +405,10 @@ setup(
   describe("getProjectData", () => {
     it("returns complete project data", () => {
       // Setup for TypeScript project
-      mockFileExists.mockImplementation((path: string) =>
-        ["tsconfig.json", "package.json", "src"].includes(path)
+      mockExistsSync.mockImplementation((path: any) =>
+        ["tsconfig.json", "package.json", "src"].includes(String(path))
       );
-      mockReadFile.mockReturnValue(
+      mockReadFileSync.mockReturnValue(
         JSON.stringify({
           name: "agenthud",
           license: "MIT",
@@ -413,9 +418,9 @@ setup(
       );
       // File count uses: find ... | wc -l (no xargs)
       // Line count uses: find ... | xargs ... wc -l
-      mockExec.mockImplementation((cmd: string) => {
-        if (cmd.includes("xargs")) return "3500\n"; // line count
-        if (cmd.includes("find")) return "44\n"; // file count
+      mockExecSync.mockImplementation((cmd: any) => {
+        if (String(cmd).includes("xargs")) return "3500\n"; // line count
+        if (String(cmd).includes("find")) return "44\n"; // file count
         return "\n";
       });
 
@@ -433,18 +438,18 @@ setup(
     });
 
     it("handles Python project", () => {
-      mockFileExists.mockImplementation((path: string) =>
-        ["pyproject.toml", "src"].includes(path)
+      mockExistsSync.mockImplementation((path: any) =>
+        ["pyproject.toml", "src"].includes(String(path))
       );
-      mockReadFile.mockReturnValue(`
+      mockReadFileSync.mockReturnValue(`
 [project]
 name = "my-api"
 license = {text = "MIT"}
 dependencies = ["fastapi", "uvicorn", "sqlalchemy"]
       `);
-      mockExec.mockImplementation((cmd: string) => {
-        if (cmd.includes("wc -l")) return "2100\n";
-        if (cmd.includes("find")) return "28\n";
+      mockExecSync.mockImplementation((cmd: any) => {
+        if (String(cmd).includes("wc -l")) return "2100\n";
+        if (String(cmd).includes("find")) return "28\n";
         return "\n";
       });
 
@@ -456,8 +461,8 @@ dependencies = ["fastapi", "uvicorn", "sqlalchemy"]
     });
 
     it("handles missing project info gracefully", () => {
-      mockFileExists.mockReturnValue(false);
-      mockExec.mockReturnValue("unknown-folder\n");
+      mockExistsSync.mockReturnValue(false);
+      mockExecSync.mockReturnValue("unknown-folder\n");
 
       const result = getProjectData();
 
@@ -471,11 +476,11 @@ dependencies = ["fastapi", "uvicorn", "sqlalchemy"]
 
     it("handles read errors gracefully by falling back", () => {
       // When package.json exists but can't be read, falls back to folder name
-      mockFileExists.mockImplementation((path: string) => path === "package.json");
-      mockReadFile.mockImplementation(() => {
+      mockExistsSync.mockImplementation((path: any) => String(path) === "package.json");
+      mockReadFileSync.mockImplementation(() => {
         throw new Error("EACCES: permission denied");
       });
-      mockExec.mockReturnValue("test-folder\n");
+      mockExecSync.mockReturnValue("test-folder\n");
 
       const result = getProjectData();
 

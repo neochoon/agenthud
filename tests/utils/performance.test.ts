@@ -1,29 +1,36 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+// Mock perf_hooks module
+vi.mock("perf_hooks", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("perf_hooks")>();
+  return {
+    ...actual,
+    performance: {
+      ...actual.performance,
+      clearMarks: vi.fn(),
+      clearMeasures: vi.fn(),
+    },
+  };
+});
+
+import { performance } from "perf_hooks";
 import {
   startPerformanceCleanup,
   stopPerformanceCleanup,
   clearPerformanceEntries,
-  setPerformanceFunctions,
-  resetPerformanceFunctions,
-} from "../src/utils/performance.js";
+} from "../../src/utils/performance.js";
+
+const mockClearMarks = vi.mocked(performance.clearMarks);
+const mockClearMeasures = vi.mocked(performance.clearMeasures);
 
 describe("Performance cleanup", () => {
-  let mockClearMarks: ReturnType<typeof vi.fn>;
-  let mockClearMeasures: ReturnType<typeof vi.fn>;
-
   beforeEach(() => {
-    mockClearMarks = vi.fn();
-    mockClearMeasures = vi.fn();
-    setPerformanceFunctions({
-      clearMarks: mockClearMarks,
-      clearMeasures: mockClearMeasures,
-    });
+    vi.clearAllMocks();
     vi.useFakeTimers();
   });
 
   afterEach(() => {
     stopPerformanceCleanup();
-    resetPerformanceFunctions();
     vi.useRealTimers();
   });
 

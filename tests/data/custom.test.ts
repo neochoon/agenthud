@@ -1,31 +1,69 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { tmpdir } from "os";
-import { join } from "path";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { promisify } from "util";
+
+// Mock child_process module
+vi.mock("child_process", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("child_process")>();
+  // Create a mock exec function with custom promisify
+  const mockExecFn = vi.fn((cmd: string, callback?: (error: Error | null, stdout: string, stderr: string) => void) => {
+    // Default mock implementation that calls callback with error
+    if (callback) {
+      callback(new Error("Mock exec not configured"), "", "");
+    }
+    return {} as any;
+  });
+  // Add custom promisify to return {stdout, stderr} like real exec
+  (mockExecFn as any)[promisify.custom] = vi.fn(async () => {
+    return { stdout: "", stderr: "" };
+  });
+  return {
+    ...actual,
+    execSync: vi.fn(),
+    exec: mockExecFn,
+  };
+});
+
+// Mock fs module
+vi.mock("fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("fs")>();
+  return {
+    ...actual,
+    readFileSync: vi.fn(),
+    promises: {
+      ...actual.promises,
+      readFile: vi.fn(),
+    },
+  };
+});
+
+import { execSync, exec } from "child_process";
+import { readFileSync, promises as fsPromises } from "fs";
 import {
   getCustomPanelData,
   getCustomPanelDataAsync,
-  setExecFn,
-  resetExecFn,
-  setReadFileFn,
-  resetReadFileFn,
-} from "../src/data/custom.js";
-import type { CustomPanelConfig } from "../src/config/parser.js";
+} from "../../src/data/custom.js";
+import type { CustomPanelConfig } from "../../src/config/parser.js";
+
+const mockExecSync = vi.mocked(execSync);
+const mockExec = vi.mocked(exec);
+// Get the custom promisify mock for async exec tests
+const mockExecAsync = vi.mocked((exec as any)[promisify.custom]);
+const mockReadFileSync = vi.mocked(readFileSync);
+const mockReadFile = vi.mocked(fsPromises.readFile);
 
 describe("custom panel data", () => {
   beforeEach(() => {
-    resetExecFn();
-    resetReadFileFn();
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
-    resetExecFn();
-    resetReadFileFn();
+    vi.clearAllMocks();
   });
 
   describe("getCustomPanelData", () => {
     describe("command execution", () => {
       it("parses JSON output from command", () => {
-        setExecFn(() =>
+        mockExecSync.mockReturnValue(
           JSON.stringify({
             title: "My Panel",
             summary: "Test summary",
@@ -49,7 +87,7 @@ describe("custom panel data", () => {
       });
 
       it("uses panel name as title if not in JSON", () => {
-        setExecFn(() => JSON.stringify({ summary: "No title" }));
+        mockExecSync.mockReturnValue(JSON.stringify({ summary: "No title" }));
 
         const config: CustomPanelConfig = {
           enabled: true,
@@ -64,7 +102,7 @@ describe("custom panel data", () => {
       });
 
       it("parses non-JSON output as line-separated items", () => {
-        setExecFn(() => "line1\nline2\nline3");
+        mockExecSync.mockReturnValue("line1\nline2\nline3");
 
         const config: CustomPanelConfig = {
           enabled: true,
@@ -84,7 +122,7 @@ describe("custom panel data", () => {
       });
 
       it("filters empty lines from output", () => {
-        setExecFn(() => "line1\n\nline2\n  \nline3");
+        mockExecSync.mockReturnValue("line1\n\nline2\n  \nline3");
 
         const config: CustomPanelConfig = {
           enabled: true,
@@ -99,7 +137,7 @@ describe("custom panel data", () => {
       });
 
       it("handles command failure", () => {
-        setExecFn(() => {
+        mockExecSync.mockImplementation(() => {
           throw new Error("Command not found");
         });
 
@@ -119,7 +157,7 @@ describe("custom panel data", () => {
 
     describe("source file", () => {
       it("reads and parses JSON from source file", () => {
-        setReadFileFn(() =>
+        mockReadFileSync.mockReturnValue(
           JSON.stringify({
             title: "File Panel",
             summary: "From file",
@@ -146,7 +184,7 @@ describe("custom panel data", () => {
       });
 
       it("handles file not found", () => {
-        setReadFileFn(() => {
+        mockReadFileSync.mockImplementation(() => {
           throw new Error("ENOENT: no such file");
         });
 
@@ -163,7 +201,7 @@ describe("custom panel data", () => {
       });
 
       it("handles invalid JSON in file", () => {
-        setReadFileFn(() => "not valid json");
+        mockReadFileSync.mockReturnValue("not valid json");
 
         const config: CustomPanelConfig = {
           enabled: true,
@@ -191,7 +229,7 @@ describe("custom panel data", () => {
     });
 
     it("includes timestamp in result", () => {
-      setExecFn(() => "output");
+      mockExecSync.mockReturnValue("output");
 
       const config: CustomPanelConfig = {
         enabled: true,
@@ -209,11 +247,16 @@ describe("custom panel data", () => {
 
   describe("getCustomPanelDataAsync", () => {
     it("parses JSON output from command", async () => {
+      // Mock execAsync (promisified exec) to return JSON output
+      mockExecAsync.mockResolvedValue({
+        stdout: JSON.stringify({ title: "Async Panel", summary: "async test" }),
+        stderr: "",
+      });
+
       const config: CustomPanelConfig = {
         enabled: true,
         interval: 30000,
-        // Use node -e for cross-platform JSON output (single quotes don't work on Windows)
-        command: 'node -e "console.log(JSON.stringify({title:\\"Async Panel\\",summary:\\"async test\\"}))"',
+        command: "echo test",
         renderer: {} as CustomPanelConfig["renderer"],
       };
 
@@ -224,11 +267,16 @@ describe("custom panel data", () => {
     });
 
     it("parses non-JSON output as line-separated items", async () => {
+      // Mock execAsync to return line-separated output
+      mockExecAsync.mockResolvedValue({
+        stdout: "line1\nline2",
+        stderr: "",
+      });
+
       const config: CustomPanelConfig = {
         enabled: true,
         interval: 30000,
-        // Use node -e for cross-platform output (printf doesn't work on Windows)
-        command: 'node -e "console.log(\\"line1\\");console.log(\\"line2\\")"',
+        command: "echo lines",
         renderer: {} as CustomPanelConfig["renderer"],
       };
 
@@ -238,6 +286,9 @@ describe("custom panel data", () => {
     });
 
     it("handles command failure", async () => {
+      // Mock execAsync to reject with error
+      mockExecAsync.mockRejectedValue(new Error("Command not found"));
+
       const config: CustomPanelConfig = {
         enabled: true,
         interval: 30000,
@@ -251,18 +302,13 @@ describe("custom panel data", () => {
     });
 
     it("reads from source file", async () => {
-      // Create a temp file for testing
-      const fs = await import("fs/promises");
-      const testPath = join(tmpdir(), "agenthud-test-panel.json");
-      await fs.writeFile(
-        testPath,
-        JSON.stringify({ title: "Async File", summary: "from file" })
-      );
+      // Mock fsPromises.readFile to return JSON
+      mockReadFile.mockResolvedValue(JSON.stringify({ title: "Async File", summary: "from file" }));
 
       const config: CustomPanelConfig = {
         enabled: true,
         interval: 30000,
-        source: testPath,
+        source: "/tmp/agenthud-test-panel.json",
         renderer: {} as CustomPanelConfig["renderer"],
       };
 
@@ -270,15 +316,16 @@ describe("custom panel data", () => {
 
       expect(result.data.title).toBe("Async File");
       expect(result.data.summary).toBe("from file");
-
-      await fs.unlink(testPath);
     });
 
     it("handles file not found", async () => {
+      // Mock fsPromises.readFile to reject with ENOENT error
+      mockReadFile.mockRejectedValue(new Error("ENOENT: no such file or directory"));
+
       const config: CustomPanelConfig = {
         enabled: true,
         interval: 30000,
-        source: join(tmpdir(), "this-file-does-not-exist-12345.json"),
+        source: "/tmp/this-file-does-not-exist.json",
         renderer: {} as CustomPanelConfig["renderer"],
       };
 
@@ -288,22 +335,19 @@ describe("custom panel data", () => {
     });
 
     it("handles invalid JSON in file", async () => {
-      const fs = await import("fs/promises");
-      const testPath = join(tmpdir(), "agenthud-test-invalid.json");
-      await fs.writeFile(testPath, "not json");
+      // Mock fsPromises.readFile to return invalid JSON
+      mockReadFile.mockResolvedValue("not json");
 
       const config: CustomPanelConfig = {
         enabled: true,
         interval: 30000,
-        source: testPath,
+        source: "/tmp/agenthud-test-invalid.json",
         renderer: {} as CustomPanelConfig["renderer"],
       };
 
       const result = await getCustomPanelDataAsync("test", config);
 
       expect(result.error).toBe("Invalid JSON");
-
-      await fs.unlink(testPath);
     });
 
     it("returns error when no command or source configured", async () => {

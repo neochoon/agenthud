@@ -1,8 +1,8 @@
 import React from "react";
 import { describe, it, expect } from "vitest";
 import { render } from "ink-testing-library";
-import { ProjectPanel } from "../src/ui/ProjectPanel.js";
-import type { ProjectData } from "../src/data/project.js";
+import { ProjectPanel } from "../../src/ui/ProjectPanel.js";
+import type { ProjectData } from "../../src/data/project.js";
 
 describe("ProjectPanel", () => {
   const mockProjectData: ProjectData = {

@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import { useHotkeys } from "../../src/ui/hooks/useHotkeys.js";
+import { useHotkeys } from "../../../src/ui/hooks/useHotkeys.js";
 
 describe("useHotkeys", () => {
   describe("hotkey generation", () => {

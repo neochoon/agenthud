@@ -1,8 +1,8 @@
 import React from "react";
 import { describe, it, expect } from "vitest";
 import { render } from "ink-testing-library";
-import { GitPanel } from "../src/ui/GitPanel.js";
-import type { Commit, GitStats } from "../src/types/index.js";
+import { GitPanel } from "../../src/ui/GitPanel.js";
+import type { Commit, GitStats } from "../../src/types/index.js";
 
 describe("GitPanel", () => {
   const mockCommits: Commit[] = [

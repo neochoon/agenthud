@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import { useCountdown } from "../../src/ui/hooks/useCountdown.js";
+import { useCountdown } from "../../../src/ui/hooks/useCountdown.js";
 
 describe("useCountdown", () => {
   beforeEach(() => {

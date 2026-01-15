@@ -1,40 +1,44 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { sep } from "path";
+
+// Mock fs module
+vi.mock("fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("fs")>();
+  return {
+    ...actual,
+    existsSync: vi.fn(),
+    readFileSync: vi.fn(),
+    readdirSync: vi.fn(),
+    statSync: vi.fn(),
+  };
+});
+
+import { existsSync, readFileSync, readdirSync, statSync } from "fs";
 import {
   getAllProjects,
   getOtherSessionsData,
   parseLastAssistantMessage,
   formatRelativeTime,
-  setFsMock,
-  resetFsMock,
   type OtherSessionsData,
-} from "../src/data/otherSessions.js";
+} from "../../src/data/otherSessions.js";
+
+const mockExistsSync = vi.mocked(existsSync);
+const mockReadFileSync = vi.mocked(readFileSync);
+const mockReaddirSync = vi.mocked(readdirSync);
+const mockStatSync = vi.mocked(statSync);
 
 describe("otherSessions data module", () => {
-  let mockFs: {
-    existsSync: ReturnType<typeof vi.fn>;
-    readFileSync: ReturnType<typeof vi.fn>;
-    readdirSync: ReturnType<typeof vi.fn>;
-    statSync: ReturnType<typeof vi.fn>;
-  };
-
   beforeEach(() => {
-    mockFs = {
-      existsSync: vi.fn(),
-      readFileSync: vi.fn(),
-      readdirSync: vi.fn(),
-      statSync: vi.fn(),
-    };
-    setFsMock(mockFs);
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
-    resetFsMock();
+    vi.clearAllMocks();
   });
 
   describe("getAllProjects", () => {
     it("returns empty array when projects directory does not exist", () => {
-      mockFs.existsSync.mockReturnValue(false);
+      mockExistsSync.mockReturnValue(false);
 
       const result = getAllProjects();
 
@@ -42,13 +46,13 @@ describe("otherSessions data module", () => {
     });
 
     it("returns all project directories", () => {
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readdirSync.mockReturnValue([
+      mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockReturnValue([
         "-Users-test-project1",
         "-Users-test-project2",
         "-Users-test-project3",
-      ]);
-      mockFs.statSync.mockReturnValue({ isDirectory: () => true });
+      ] as any);
+      mockStatSync.mockReturnValue({ isDirectory: () => true } as any);
 
       const result = getAllProjects();
 
@@ -59,14 +63,14 @@ describe("otherSessions data module", () => {
     });
 
     it("filters out non-directory entries", () => {
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readdirSync.mockReturnValue([
+      mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockReturnValue([
         "-Users-test-project1",
         "some-file.txt",
-      ]);
-      mockFs.statSync.mockImplementation((path: string) => ({
-        isDirectory: () => !path.includes("some-file.txt"),
-      }));
+      ] as any);
+      mockStatSync.mockImplementation((path: any) => ({
+        isDirectory: () => !String(path).includes("some-file.txt"),
+      } as any));
 
       const result = getAllProjects();
 
@@ -75,11 +79,11 @@ describe("otherSessions data module", () => {
     });
 
     it("decodes project path correctly", () => {
-      mockFs.existsSync.mockReturnValue(true);
+      mockExistsSync.mockReturnValue(true);
       // Note: path encoding is ambiguous for paths with hyphens
       // "-Users-test-myproject" could be "/Users/test/myproject" or "/Users-test-myproject"
-      mockFs.readdirSync.mockReturnValue(["-Users-test-myproject"]);
-      mockFs.statSync.mockReturnValue({ isDirectory: () => true });
+      mockReaddirSync.mockReturnValue(["-Users-test-myproject"] as any);
+      mockStatSync.mockReturnValue({ isDirectory: () => true } as any);
 
       const result = getAllProjects();
 
@@ -90,8 +94,8 @@ describe("otherSessions data module", () => {
 
   describe("parseLastAssistantMessage", () => {
     it("returns null for empty file", () => {
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue("");
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue("");
 
       const result = parseLastAssistantMessage("/fake/session.jsonl");
 
@@ -104,8 +108,8 @@ describe("otherSessions data module", () => {
         JSON.stringify({ type: "system", subtype: "init" }),
       ].join("\n");
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(lines);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
 
       const result = parseLastAssistantMessage("/fake/session.jsonl");
 
@@ -124,8 +128,8 @@ describe("otherSessions data module", () => {
         }),
       ].join("\n");
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(lines);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
 
       const result = parseLastAssistantMessage("/fake/session.jsonl");
 
@@ -146,8 +150,8 @@ describe("otherSessions data module", () => {
         }),
       ].join("\n");
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(lines);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
 
       const result = parseLastAssistantMessage("/fake/session.jsonl");
 
@@ -163,8 +167,8 @@ describe("otherSessions data module", () => {
         }),
       ].join("\n");
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(lines);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
 
       const result = parseLastAssistantMessage("/fake/session.jsonl");
 
@@ -181,8 +185,8 @@ describe("otherSessions data module", () => {
         "{ also invalid }",
       ].join("\n");
 
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readFileSync.mockReturnValue(lines);
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
 
       const result = parseLastAssistantMessage("/fake/session.jsonl");
 
@@ -219,7 +223,7 @@ describe("otherSessions data module", () => {
 
   describe("getOtherSessionsData", () => {
     it("returns empty data when projects directory does not exist", () => {
-      mockFs.existsSync.mockReturnValue(false);
+      mockExistsSync.mockReturnValue(false);
 
       const result = getOtherSessionsData("/current/project");
 
@@ -229,22 +233,22 @@ describe("otherSessions data module", () => {
     });
 
     it("excludes current project from results", () => {
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readdirSync.mockImplementation((path: string) => {
+      mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockImplementation((path: any) => {
         // Projects directory returns list of project folders
-        if (path.endsWith("projects")) {
-          return ["-Users-test-current", "-Users-test-other"];
+        if (String(path).endsWith("projects")) {
+          return ["-Users-test-current", "-Users-test-other"] as any;
         }
         // Project folders return session files
-        return ["session.jsonl"];
+        return ["session.jsonl"] as any;
       });
-      mockFs.statSync.mockImplementation((path: string) => {
-        if (path.endsWith(".jsonl")) {
-          return { mtimeMs: Date.now() - 1000, isDirectory: () => false };
+      mockStatSync.mockImplementation((path: any) => {
+        if (String(path).endsWith(".jsonl")) {
+          return { mtimeMs: Date.now() - 1000, isDirectory: () => false } as any;
         }
-        return { isDirectory: () => true };
+        return { isDirectory: () => true } as any;
       });
-      mockFs.readFileSync.mockReturnValue(
+      mockReadFileSync.mockReturnValue(
         JSON.stringify({
           type: "assistant",
           message: { content: [{ type: "text", text: "Hello" }] },
@@ -260,29 +264,29 @@ describe("otherSessions data module", () => {
     });
 
     it("counts active sessions correctly", () => {
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readdirSync.mockImplementation((path: string) => {
-        if (path.endsWith("projects")) {
-          return ["-Users-test-project1", "-Users-test-project2", "-Users-test-project3"];
+      mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockImplementation((path: any) => {
+        if (String(path).endsWith("projects")) {
+          return ["-Users-test-project1", "-Users-test-project2", "-Users-test-project3"] as any;
         }
-        return ["session.jsonl"];
+        return ["session.jsonl"] as any;
       });
-      mockFs.statSync.mockImplementation((path: string) => {
-        if (path.endsWith(".jsonl")) {
+      mockStatSync.mockImplementation((path: any) => {
+        if (String(path).endsWith(".jsonl")) {
           // project1: active (1 minute ago)
           // project2: active (3 minutes ago)
           // project3: inactive (10 minutes ago)
-          if (path.includes("project1")) {
-            return { mtimeMs: Date.now() - 1 * 60 * 1000, isDirectory: () => false };
+          if (String(path).includes("project1")) {
+            return { mtimeMs: Date.now() - 1 * 60 * 1000, isDirectory: () => false } as any;
           }
-          if (path.includes("project2")) {
-            return { mtimeMs: Date.now() - 3 * 60 * 1000, isDirectory: () => false };
+          if (String(path).includes("project2")) {
+            return { mtimeMs: Date.now() - 3 * 60 * 1000, isDirectory: () => false } as any;
           }
-          return { mtimeMs: Date.now() - 10 * 60 * 1000, isDirectory: () => false };
+          return { mtimeMs: Date.now() - 10 * 60 * 1000, isDirectory: () => false } as any;
         }
-        return { isDirectory: () => true };
+        return { isDirectory: () => true } as any;
       });
-      mockFs.readFileSync.mockReturnValue(
+      mockReadFileSync.mockReturnValue(
         JSON.stringify({
           type: "assistant",
           message: { content: [{ type: "text", text: "Hello" }] },
@@ -296,24 +300,24 @@ describe("otherSessions data module", () => {
     });
 
     it("returns most recent session info", () => {
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readdirSync.mockImplementation((path: string) => {
-        if (path.endsWith("projects")) {
-          return ["-Users-test-older", "-Users-test-newer"];
+      mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockImplementation((path: any) => {
+        if (String(path).endsWith("projects")) {
+          return ["-Users-test-older", "-Users-test-newer"] as any;
         }
-        return ["session.jsonl"];
+        return ["session.jsonl"] as any;
       });
-      mockFs.statSync.mockImplementation((path: string) => {
-        if (path.endsWith(".jsonl")) {
-          if (path.includes("newer")) {
-            return { mtimeMs: Date.now() - 30 * 1000, isDirectory: () => false }; // 30s ago
+      mockStatSync.mockImplementation((path: any) => {
+        if (String(path).endsWith(".jsonl")) {
+          if (String(path).includes("newer")) {
+            return { mtimeMs: Date.now() - 30 * 1000, isDirectory: () => false } as any; // 30s ago
           }
-          return { mtimeMs: Date.now() - 5 * 60 * 1000, isDirectory: () => false }; // 5m ago
+          return { mtimeMs: Date.now() - 5 * 60 * 1000, isDirectory: () => false } as any; // 5m ago
         }
-        return { isDirectory: () => true };
+        return { isDirectory: () => true } as any;
       });
-      mockFs.readFileSync.mockImplementation((path: string) => {
-        if (path.includes("newer")) {
+      mockReadFileSync.mockImplementation((path: any) => {
+        if (String(path).includes("newer")) {
           return JSON.stringify({
             type: "assistant",
             message: { content: [{ type: "text", text: "Recent message" }] },
@@ -335,20 +339,20 @@ describe("otherSessions data module", () => {
     });
 
     it("extracts project name from path", () => {
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readdirSync.mockImplementation((path: string) => {
-        if (path.endsWith("projects")) {
-          return ["-Users-test-myproject"];
+      mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockImplementation((path: any) => {
+        if (String(path).endsWith("projects")) {
+          return ["-Users-test-myproject"] as any;
         }
-        return ["session.jsonl"];
+        return ["session.jsonl"] as any;
       });
-      mockFs.statSync.mockImplementation((path: string) => {
-        if (path.endsWith(".jsonl")) {
-          return { mtimeMs: Date.now() - 1000, isDirectory: () => false };
+      mockStatSync.mockImplementation((path: any) => {
+        if (String(path).endsWith(".jsonl")) {
+          return { mtimeMs: Date.now() - 1000, isDirectory: () => false } as any;
         }
-        return { isDirectory: () => true };
+        return { isDirectory: () => true } as any;
       });
-      mockFs.readFileSync.mockReturnValue(
+      mockReadFileSync.mockReturnValue(
         JSON.stringify({
           type: "assistant",
           message: { content: [{ type: "text", text: "Hello" }] },
@@ -362,14 +366,14 @@ describe("otherSessions data module", () => {
     });
 
     it("handles project with no session files", () => {
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readdirSync.mockImplementation((path: string) => {
-        if (path.endsWith("projects")) {
-          return ["-Users-test-emptyproject"];
+      mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockImplementation((path: any) => {
+        if (String(path).endsWith("projects")) {
+          return ["-Users-test-emptyproject"] as any;
         }
-        return []; // No session files
+        return [] as any; // No session files
       });
-      mockFs.statSync.mockReturnValue({ isDirectory: () => true });
+      mockStatSync.mockReturnValue({ isDirectory: () => true } as any);
 
       const result = getOtherSessionsData("/other/path");
 
@@ -379,21 +383,21 @@ describe("otherSessions data module", () => {
     });
 
     it("respects activeThreshold option", () => {
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readdirSync.mockImplementation((path: string) => {
-        if (path.endsWith("projects")) {
-          return ["-Users-test-project"];
+      mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockImplementation((path: any) => {
+        if (String(path).endsWith("projects")) {
+          return ["-Users-test-project"] as any;
         }
-        return ["session.jsonl"];
+        return ["session.jsonl"] as any;
       });
-      mockFs.statSync.mockImplementation((path: string) => {
-        if (path.endsWith(".jsonl")) {
+      mockStatSync.mockImplementation((path: any) => {
+        if (String(path).endsWith(".jsonl")) {
           // 3 minutes ago - active with 5m threshold, inactive with 2m threshold
-          return { mtimeMs: Date.now() - 3 * 60 * 1000, isDirectory: () => false };
+          return { mtimeMs: Date.now() - 3 * 60 * 1000, isDirectory: () => false } as any;
         }
-        return { isDirectory: () => true };
+        return { isDirectory: () => true } as any;
       });
-      mockFs.readFileSync.mockReturnValue(
+      mockReadFileSync.mockReturnValue(
         JSON.stringify({
           type: "assistant",
           message: { content: [{ type: "text", text: "Hello" }] },
@@ -414,27 +418,27 @@ describe("otherSessions data module", () => {
 
   describe("projectNames", () => {
     it("returns project names sorted by most recent first", () => {
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readdirSync.mockImplementation((path: string) => {
-        if (path.endsWith("projects")) {
-          return ["-Users-test-alpha", "-Users-test-beta", "-Users-test-gamma"];
+      mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockImplementation((path: any) => {
+        if (String(path).endsWith("projects")) {
+          return ["-Users-test-alpha", "-Users-test-beta", "-Users-test-gamma"] as any;
         }
-        return ["session.jsonl"];
+        return ["session.jsonl"] as any;
       });
-      mockFs.statSync.mockImplementation((path: string) => {
-        if (path.endsWith(".jsonl")) {
+      mockStatSync.mockImplementation((path: any) => {
+        if (String(path).endsWith(".jsonl")) {
           // gamma: most recent, alpha: oldest, beta: middle
-          if (path.includes("gamma")) {
-            return { mtimeMs: Date.now() - 1 * 60 * 1000, isDirectory: () => false };
+          if (String(path).includes("gamma")) {
+            return { mtimeMs: Date.now() - 1 * 60 * 1000, isDirectory: () => false } as any;
           }
-          if (path.includes("beta")) {
-            return { mtimeMs: Date.now() - 5 * 60 * 1000, isDirectory: () => false };
+          if (String(path).includes("beta")) {
+            return { mtimeMs: Date.now() - 5 * 60 * 1000, isDirectory: () => false } as any;
           }
-          return { mtimeMs: Date.now() - 10 * 60 * 1000, isDirectory: () => false };
+          return { mtimeMs: Date.now() - 10 * 60 * 1000, isDirectory: () => false } as any;
         }
-        return { isDirectory: () => true };
+        return { isDirectory: () => true } as any;
       });
-      mockFs.readFileSync.mockReturnValue(
+      mockReadFileSync.mockReturnValue(
         JSON.stringify({
           type: "assistant",
           message: { content: [{ type: "text", text: "Hello" }] },
@@ -447,20 +451,20 @@ describe("otherSessions data module", () => {
     });
 
     it("excludes current project from projectNames", () => {
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readdirSync.mockImplementation((path: string) => {
-        if (path.endsWith("projects")) {
-          return ["-Users-test-current", "-Users-test-other"];
+      mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockImplementation((path: any) => {
+        if (String(path).endsWith("projects")) {
+          return ["-Users-test-current", "-Users-test-other"] as any;
         }
-        return ["session.jsonl"];
+        return ["session.jsonl"] as any;
       });
-      mockFs.statSync.mockImplementation((path: string) => {
-        if (path.endsWith(".jsonl")) {
-          return { mtimeMs: Date.now() - 1000, isDirectory: () => false };
+      mockStatSync.mockImplementation((path: any) => {
+        if (String(path).endsWith(".jsonl")) {
+          return { mtimeMs: Date.now() - 1000, isDirectory: () => false } as any;
         }
-        return { isDirectory: () => true };
+        return { isDirectory: () => true } as any;
       });
-      mockFs.readFileSync.mockReturnValue(
+      mockReadFileSync.mockReturnValue(
         JSON.stringify({
           type: "assistant",
           message: { content: [{ type: "text", text: "Hello" }] },
@@ -474,7 +478,7 @@ describe("otherSessions data module", () => {
     });
 
     it("returns empty array when no projects exist", () => {
-      mockFs.existsSync.mockReturnValue(false);
+      mockExistsSync.mockReturnValue(false);
 
       const result = getOtherSessionsData(`${sep}current${sep}project`);
 
@@ -482,14 +486,14 @@ describe("otherSessions data module", () => {
     });
 
     it("returns empty array when no other sessions have files", () => {
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readdirSync.mockImplementation((path: string) => {
-        if (path.endsWith("projects")) {
-          return ["-Users-test-emptyproject"];
+      mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockImplementation((path: any) => {
+        if (String(path).endsWith("projects")) {
+          return ["-Users-test-emptyproject"] as any;
         }
-        return []; // No session files
+        return [] as any; // No session files
       });
-      mockFs.statSync.mockReturnValue({ isDirectory: () => true });
+      mockStatSync.mockReturnValue({ isDirectory: () => true } as any);
 
       const result = getOtherSessionsData("/other/path");
 
@@ -497,27 +501,27 @@ describe("otherSessions data module", () => {
     });
 
     it("deduplicates project names with same basename", () => {
-      mockFs.existsSync.mockReturnValue(true);
-      mockFs.readdirSync.mockImplementation((path: string) => {
-        if (path.endsWith("projects")) {
+      mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockImplementation((path: any) => {
+        if (String(path).endsWith("projects")) {
           // Two different paths with same basename "dotfiles"
-          return ["-Users-alice-dotfiles", "-Users-bob-dotfiles", "-Users-test-other"];
+          return ["-Users-alice-dotfiles", "-Users-bob-dotfiles", "-Users-test-other"] as any;
         }
-        return ["session.jsonl"];
+        return ["session.jsonl"] as any;
       });
-      mockFs.statSync.mockImplementation((path: string) => {
-        if (path.endsWith(".jsonl")) {
-          if (path.includes("alice")) {
-            return { mtimeMs: Date.now() - 1 * 60 * 1000, isDirectory: () => false };
+      mockStatSync.mockImplementation((path: any) => {
+        if (String(path).endsWith(".jsonl")) {
+          if (String(path).includes("alice")) {
+            return { mtimeMs: Date.now() - 1 * 60 * 1000, isDirectory: () => false } as any;
           }
-          if (path.includes("bob")) {
-            return { mtimeMs: Date.now() - 2 * 60 * 1000, isDirectory: () => false };
+          if (String(path).includes("bob")) {
+            return { mtimeMs: Date.now() - 2 * 60 * 1000, isDirectory: () => false } as any;
           }
-          return { mtimeMs: Date.now() - 3 * 60 * 1000, isDirectory: () => false };
+          return { mtimeMs: Date.now() - 3 * 60 * 1000, isDirectory: () => false } as any;
         }
-        return { isDirectory: () => true };
+        return { isDirectory: () => true } as any;
       });
-      mockFs.readFileSync.mockReturnValue(
+      mockReadFileSync.mockReturnValue(
         JSON.stringify({
           type: "assistant",
           message: { content: [{ type: "text", text: "Hello" }] },

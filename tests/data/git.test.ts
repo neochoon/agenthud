@@ -1,4 +1,16 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { GitPanelConfig } from "../../src/config/parser.js";
+
+// Mock child_process with partial mocking
+vi.mock("child_process", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("child_process")>();
+  return {
+    ...actual,
+    execSync: vi.fn(),
+  };
+});
+
+import { execSync } from "child_process";
 import {
   getCurrentBranch,
   getTodayCommits,
@@ -6,37 +18,29 @@ import {
   getUncommittedCount,
   getGitData,
   getGitDataAsync,
-  setExecFn,
-  resetExecFn,
-} from "../src/data/git.js";
-import type { GitPanelConfig } from "../src/config/parser.js";
+} from "../../src/data/git.js";
+
+const mockExecSync = vi.mocked(execSync);
 
 describe("git data module", () => {
-  let mockExec: ReturnType<typeof vi.fn>;
-
   beforeEach(() => {
-    mockExec = vi.fn();
-    setExecFn(mockExec);
-  });
-
-  afterEach(() => {
-    resetExecFn();
+    vi.clearAllMocks();
   });
 
   describe("getCurrentBranch", () => {
     it("returns the current branch name", () => {
-      mockExec.mockReturnValue("main\n");
+      mockExecSync.mockReturnValue("main\n");
 
       const result = getCurrentBranch();
 
       expect(result).toBe("main");
-      expect(mockExec).toHaveBeenCalledWith("git branch --show-current", {
+      expect(mockExecSync).toHaveBeenCalledWith("git branch --show-current", {
         encoding: "utf-8",
       });
     });
 
     it("trims whitespace from branch name", () => {
-      mockExec.mockReturnValue("  feat/test-branch  \n");
+      mockExecSync.mockReturnValue("  feat/test-branch  \n");
 
       const result = getCurrentBranch();
 
@@ -44,7 +48,7 @@ describe("git data module", () => {
     });
 
     it("returns null when not in a git repository", () => {
-      mockExec.mockImplementation(() => {
+      mockExecSync.mockImplementation(() => {
         throw new Error("fatal: not a git repository");
       });
 
@@ -61,7 +65,7 @@ describe("git data module", () => {
         "def5678|2025-01-09T09:00:00+09:00|Initial commit",
       ].join("\n");
 
-      mockExec.mockReturnValue(gitOutput + "\n");
+      mockExecSync.mockReturnValue(gitOutput + "\n");
 
       const result = getTodayCommits();
 
@@ -82,7 +86,7 @@ describe("git data module", () => {
     });
 
     it("returns empty array when no commits today", () => {
-      mockExec.mockReturnValue("\n");
+      mockExecSync.mockReturnValue("\n");
 
       const result = getTodayCommits();
 
@@ -90,7 +94,7 @@ describe("git data module", () => {
     });
 
     it("returns empty array when not in a git repository", () => {
-      mockExec.mockImplementation(() => {
+      mockExecSync.mockImplementation(() => {
         throw new Error("fatal: not a git repository");
       });
 
@@ -102,7 +106,7 @@ describe("git data module", () => {
     it("handles commit messages with pipe characters", () => {
       const gitOutput = "abc1234|2025-01-09T10:00:00+09:00|fix: handle A | B case";
 
-      mockExec.mockReturnValue(gitOutput + "\n");
+      mockExecSync.mockReturnValue(gitOutput + "\n");
 
       const result = getTodayCommits();
 
@@ -121,7 +125,7 @@ describe("git data module", () => {
         "82\t11\ttests/app.test.ts",
       ].join("\n");
 
-      mockExec.mockReturnValue(gitOutput + "\n");
+      mockExecSync.mockReturnValue(gitOutput + "\n");
 
       const result = getTodayStats();
 
@@ -133,7 +137,7 @@ describe("git data module", () => {
     });
 
     it("returns zeros when no changes", () => {
-      mockExec.mockReturnValue("\n");
+      mockExecSync.mockReturnValue("\n");
 
       const result = getTodayStats();
 
@@ -150,7 +154,7 @@ describe("git data module", () => {
         "20\t0\tsrc/another.ts",
       ].join("\n");
 
-      mockExec.mockReturnValue(gitOutput + "\n");
+      mockExecSync.mockReturnValue(gitOutput + "\n");
 
       const result = getTodayStats();
 
@@ -167,7 +171,7 @@ describe("git data module", () => {
         "0\t5\tsrc/removed.ts",
       ].join("\n");
 
-      mockExec.mockReturnValue(gitOutput + "\n");
+      mockExecSync.mockReturnValue(gitOutput + "\n");
 
       const result = getTodayStats();
 
@@ -185,7 +189,7 @@ describe("git data module", () => {
         "20\t3\tsrc/other.ts",
       ].join("\n");
 
-      mockExec.mockReturnValue(gitOutput + "\n");
+      mockExecSync.mockReturnValue(gitOutput + "\n");
 
       const result = getTodayStats();
 
@@ -198,7 +202,7 @@ describe("git data module", () => {
     });
 
     it("returns zeros when not in a git repository", () => {
-      mockExec.mockImplementation(() => {
+      mockExecSync.mockImplementation(() => {
         throw new Error("fatal: not a git repository");
       });
 
@@ -224,18 +228,18 @@ describe("git data module", () => {
         "?? src/untracked.ts",
       ].join("\n");
 
-      mockExec.mockReturnValue(gitOutput + "\n");
+      mockExecSync.mockReturnValue(gitOutput + "\n");
 
       const result = getUncommittedCount();
 
       expect(result).toBe(4);
-      expect(mockExec).toHaveBeenCalledWith("git status --porcelain", {
+      expect(mockExecSync).toHaveBeenCalledWith("git status --porcelain", {
         encoding: "utf-8",
       });
     });
 
     it("returns 0 when working directory is clean", () => {
-      mockExec.mockReturnValue("\n");
+      mockExecSync.mockReturnValue("\n");
 
       const result = getUncommittedCount();
 
@@ -243,7 +247,7 @@ describe("git data module", () => {
     });
 
     it("returns 0 when not in a git repository", () => {
-      mockExec.mockImplementation(() => {
+      mockExecSync.mockImplementation(() => {
         throw new Error("fatal: not a git repository");
       });
 
@@ -259,7 +263,7 @@ describe("git data module", () => {
         " M src/unstaged.ts",  // only unstaged
       ].join("\n");
 
-      mockExec.mockReturnValue(gitOutput + "\n");
+      mockExecSync.mockReturnValue(gitOutput + "\n");
 
       const result = getUncommittedCount();
 
@@ -277,11 +281,11 @@ describe("git data module", () => {
         },
       };
 
-      mockExec.mockReturnValue("feature-branch\n");
+      mockExecSync.mockReturnValue("feature-branch\n");
 
       const result = getGitData(config);
 
-      expect(mockExec).toHaveBeenCalledWith(
+      expect(mockExecSync).toHaveBeenCalledWith(
         "git rev-parse --abbrev-ref HEAD",
         expect.any(Object)
       );
@@ -297,7 +301,7 @@ describe("git data module", () => {
         },
       };
 
-      mockExec.mockImplementation((cmd: string) => {
+      mockExecSync.mockImplementation((cmd: string) => {
         if (cmd.includes("log -5")) {
           return "abc1234|2026-01-10T10:00:00+00:00|Test commit\n";
         }
@@ -320,7 +324,7 @@ describe("git data module", () => {
         },
       };
 
-      mockExec.mockImplementation((cmd: string) => {
+      mockExecSync.mockImplementation((cmd: string) => {
         if (cmd.includes("diff --stat")) {
           return "10\t5\tsrc/file.ts\n";
         }
@@ -340,7 +344,7 @@ describe("git data module", () => {
         interval: 30000,
       };
 
-      mockExec.mockImplementation((cmd: string) => {
+      mockExecSync.mockImplementation((cmd: string) => {
         if (cmd.includes("branch --show-current")) return "main\n";
         if (cmd.includes("--since=midnight")) return "\n";
         if (cmd.includes("--porcelain")) return "\n";
@@ -350,7 +354,7 @@ describe("git data module", () => {
       const result = getGitData(config);
 
       expect(result.branch).toBe("main");
-      expect(mockExec).toHaveBeenCalledWith(
+      expect(mockExecSync).toHaveBeenCalledWith(
         "git branch --show-current",
         expect.any(Object)
       );
@@ -362,7 +366,7 @@ describe("git data module", () => {
         interval: 30000,
       };
 
-      mockExec.mockImplementation((cmd: string) => {
+      mockExecSync.mockImplementation((cmd: string) => {
         if (cmd.includes("branch --show-current")) return "main\n";
         if (cmd.includes('--format="%h|%aI|%s"')) {
           return "abc1234|2026-01-10T10:00:00+00:00|Commit 1\n";
@@ -392,7 +396,7 @@ describe("git data module", () => {
       };
 
       // Need to set sync mock for uncommitted count
-      mockExec.mockReturnValue("\n");
+      mockExecSync.mockReturnValue("\n");
 
       const result = await getGitDataAsync(config);
 
@@ -409,7 +413,7 @@ describe("git data module", () => {
         },
       };
 
-      mockExec.mockReturnValue("\n");
+      mockExecSync.mockReturnValue("\n");
 
       const result = await getGitDataAsync(config);
 
@@ -429,7 +433,7 @@ describe("git data module", () => {
         },
       };
 
-      mockExec.mockReturnValue("\n");
+      mockExecSync.mockReturnValue("\n");
 
       const result = await getGitDataAsync(config);
 
@@ -449,7 +453,7 @@ describe("git data module", () => {
         },
       };
 
-      mockExec.mockReturnValue("\n");
+      mockExecSync.mockReturnValue("\n");
 
       const result = await getGitDataAsync(config);
 
@@ -468,7 +472,7 @@ describe("git data module", () => {
         },
       };
 
-      mockExec.mockReturnValue("\n");
+      mockExecSync.mockReturnValue("\n");
 
       const result = await getGitDataAsync(config);
 
@@ -485,7 +489,7 @@ describe("git data module", () => {
         },
       };
 
-      mockExec.mockReturnValue("\n");
+      mockExecSync.mockReturnValue("\n");
 
       const result = await getGitDataAsync(config);
 
@@ -503,7 +507,7 @@ describe("git data module", () => {
         },
       };
 
-      mockExec.mockReturnValue("\n");
+      mockExecSync.mockReturnValue("\n");
 
       const result = await getGitDataAsync(config);
 

@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import { useVisualFeedback } from "../../src/ui/hooks/useVisualFeedback.js";
+import { useVisualFeedback } from "../../../src/ui/hooks/useVisualFeedback.js";
 
 describe("useVisualFeedback", () => {
   beforeEach(() => {

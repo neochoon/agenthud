@@ -1,34 +1,33 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  getTestData,
-  getTestDataWithConfig,
-  setReadFileFn,
-  resetReadFileFn,
-  setGetHeadHashFn,
-  resetGetHeadHashFn,
-  setGetCommitCountFn,
-  resetGetCommitCountFn,
-} from "../src/data/tests.js";
-import type { TestsPanelConfig } from "../src/config/parser.js";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { TestsPanelConfig } from "../../src/config/parser.js";
+
+// Mock fs and child_process with partial mocking
+vi.mock("fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("fs")>();
+  return {
+    ...actual,
+    readFileSync: vi.fn(),
+  };
+});
+
+vi.mock("child_process", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("child_process")>();
+  return {
+    ...actual,
+    execSync: vi.fn(),
+  };
+});
+
+import { readFileSync } from "fs";
+import { execSync } from "child_process";
+import { getTestData, getTestDataWithConfig } from "../../src/data/tests.js";
+
+const mockReadFileSync = vi.mocked(readFileSync);
+const mockExecSync = vi.mocked(execSync);
 
 describe("test data module", () => {
-  let mockReadFile: ReturnType<typeof vi.fn>;
-  let mockGetHeadHash: ReturnType<typeof vi.fn>;
-  let mockGetCommitCount: ReturnType<typeof vi.fn>;
-
   beforeEach(() => {
-    mockReadFile = vi.fn();
-    mockGetHeadHash = vi.fn();
-    mockGetCommitCount = vi.fn();
-    setReadFileFn(mockReadFile);
-    setGetHeadHashFn(mockGetHeadHash);
-    setGetCommitCountFn(mockGetCommitCount);
-  });
-
-  afterEach(() => {
-    resetReadFileFn();
-    resetGetHeadHashFn();
-    resetGetCommitCountFn();
+    vi.clearAllMocks();
   });
 
   describe("getTestData", () => {
@@ -42,9 +41,8 @@ describe("test data module", () => {
         failures: [{ file: "tests/git.test.ts", name: "returns null" }],
       };
 
-      mockReadFile.mockReturnValue(JSON.stringify(testResults));
-      mockGetHeadHash.mockReturnValue("abc1234");
-      mockGetCommitCount.mockReturnValue(0);
+      mockReadFileSync.mockReturnValue(JSON.stringify(testResults));
+      mockExecSync.mockReturnValue("abc1234\n");
 
       const result = getTestData();
 
@@ -64,9 +62,10 @@ describe("test data module", () => {
         failures: [],
       };
 
-      mockReadFile.mockReturnValue(JSON.stringify(testResults));
-      mockGetHeadHash.mockReturnValue("def5678");
-      mockGetCommitCount.mockReturnValue(3);
+      mockReadFileSync.mockReturnValue(JSON.stringify(testResults));
+      mockExecSync
+        .mockReturnValueOnce("def5678\n")  // getHeadHash
+        .mockReturnValueOnce("3\n");        // getCommitCount
 
       const result = getTestData();
 
@@ -76,7 +75,7 @@ describe("test data module", () => {
     });
 
     it("returns null results with error when file is missing", () => {
-      mockReadFile.mockImplementation(() => {
+      mockReadFileSync.mockImplementation(() => {
         throw new Error("ENOENT: no such file or directory");
       });
 
@@ -87,7 +86,7 @@ describe("test data module", () => {
     });
 
     it("returns null results with error when JSON is invalid", () => {
-      mockReadFile.mockReturnValue("{ invalid json }");
+      mockReadFileSync.mockReturnValue("{ invalid json }");
 
       const result = getTestData();
 
@@ -105,8 +104,8 @@ describe("test data module", () => {
         failures: [],
       };
 
-      mockReadFile.mockReturnValue(JSON.stringify(testResults));
-      mockGetHeadHash.mockImplementation(() => {
+      mockReadFileSync.mockReturnValue(JSON.stringify(testResults));
+      mockExecSync.mockImplementation(() => {
         throw new Error("not a git repo");
       });
 
@@ -135,13 +134,13 @@ describe("test data module", () => {
         failures: [],
       };
 
-      mockReadFile.mockReturnValue(JSON.stringify(testResults));
-      mockGetHeadHash.mockReturnValue("abc1234");
+      mockReadFileSync.mockReturnValue(JSON.stringify(testResults));
+      mockExecSync.mockReturnValue("abc1234\n");
 
       const result = getTestDataWithConfig(config);
 
       expect(result.results).toEqual(testResults);
-      expect(mockReadFile).toHaveBeenCalledWith(".agenthud/tests/results.json");
+      expect(mockReadFileSync).toHaveBeenCalledWith(".agenthud/tests/results.json", "utf-8");
     });
 
     it("falls back to default path when source not provided", () => {
@@ -160,13 +159,13 @@ describe("test data module", () => {
         failures: [],
       };
 
-      mockReadFile.mockReturnValue(JSON.stringify(testResults));
-      mockGetHeadHash.mockReturnValue("def5678");
+      mockReadFileSync.mockReturnValue(JSON.stringify(testResults));
+      mockExecSync.mockReturnValue("def5678\n");
 
       const result = getTestDataWithConfig(config);
 
       expect(result.results).toEqual(testResults);
-      expect(mockReadFile).toHaveBeenCalledWith(expect.stringContaining("test-results.json"));
+      expect(mockReadFileSync).toHaveBeenCalledWith(expect.stringContaining("test-results.json"), "utf-8");
     });
 
     it("returns error when source file does not exist", () => {
@@ -176,7 +175,7 @@ describe("test data module", () => {
         source: ".agenthud/tests/results.json",
       };
 
-      mockReadFile.mockImplementation(() => {
+      mockReadFileSync.mockImplementation(() => {
         throw new Error("ENOENT: no such file or directory");
       });
 
@@ -202,14 +201,62 @@ describe("test data module", () => {
         failures: [],
       };
 
-      mockReadFile.mockReturnValue(JSON.stringify(testResults));
-      mockGetHeadHash.mockReturnValue("new5678");
-      mockGetCommitCount.mockReturnValue(5);
+      mockReadFileSync.mockReturnValue(JSON.stringify(testResults));
+      mockExecSync
+        .mockReturnValueOnce("new5678\n")  // getHeadHash
+        .mockReturnValueOnce("5\n");        // getCommitCount
 
       const result = getTestDataWithConfig(config);
 
       expect(result.isOutdated).toBe(true);
       expect(result.commitsBehind).toBe(5);
+    });
+
+    it("parses JUnit XML format when source ends with .xml", () => {
+      const config: TestsPanelConfig = {
+        enabled: true,
+        interval: null,
+        source: ".agenthud/test-results.xml",
+      };
+
+      const junitXml = `<?xml version="1.0" encoding="utf-8"?>
+<testsuites>
+  <testsuite name="pytest" tests="10" errors="0" failures="2" skipped="1">
+    <testcase classname="test_foo" name="test_passes" time="0.001"/>
+    <testcase classname="test_foo" name="test_fails" time="0.002">
+      <failure message="AssertionError">assert 1 == 2</failure>
+    </testcase>
+    <testcase classname="test_bar" name="test_error" time="0.003">
+      <failure message="Error">error</failure>
+    </testcase>
+  </testsuite>
+</testsuites>`;
+
+      mockReadFileSync.mockReturnValue(junitXml);
+      mockExecSync.mockReturnValue("abc1234\n");
+
+      const result = getTestDataWithConfig(config);
+
+      expect(result.results).not.toBeNull();
+      expect(result.results!.passed).toBe(7);
+      expect(result.results!.failed).toBe(2);
+      expect(result.results!.skipped).toBe(1);
+      expect(result.results!.failures).toHaveLength(2);
+    });
+
+    it("returns error when JUnit XML is invalid", () => {
+      const config: TestsPanelConfig = {
+        enabled: true,
+        interval: null,
+        source: ".agenthud/test-results.xml",
+      };
+
+      mockReadFileSync.mockReturnValue("not valid xml");
+
+      const result = getTestDataWithConfig(config);
+
+      expect(result.results).toBeNull();
+      expect(result.error).toBe("Invalid test-results.xml");
     });
   });
 });

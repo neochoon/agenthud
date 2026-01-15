@@ -1,8 +1,8 @@
 import React from "react";
 import { describe, it, expect } from "vitest";
 import { render } from "ink-testing-library";
-import { TestPanel } from "../src/ui/TestPanel.js";
-import type { TestResults } from "../src/types/index.js";
+import { TestPanel } from "../../src/ui/TestPanel.js";
+import type { TestResults } from "../../src/types/index.js";
 
 describe("TestPanel", () => {
   const mockResults: TestResults = {

@@ -1,8 +1,8 @@
 import React from "react";
 import { describe, it, expect } from "vitest";
 import { render } from "ink-testing-library";
-import { GenericPanel } from "../src/ui/GenericPanel.js";
-import type { GenericPanelData } from "../src/types/index.js";
+import { GenericPanel } from "../../src/ui/GenericPanel.js";
+import type { GenericPanelData } from "../../src/types/index.js";
 
 describe("GenericPanel", () => {
   describe("list renderer (default)", () => {

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### New
+- **Token Usage in Title** - See session token count (input + cache + output) in Claude panel title
+- **Subagent Tokens** - Includes token usage from subagent sessions
+
 ## [0.6.0] - 2025-01-14
 
 ### New

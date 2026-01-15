@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.6.2] - 2025-01-15
+
 ### Internal
 - **Auto Deploy** - npm publish and GitHub Release on tag push (`v*`)
 
@@ -66,7 +68,8 @@
 - **Test Panel** - Test results at a glance
 - Watch mode for live updates
 
-[Unreleased]: https://github.com/neochoon/agenthud/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/neochoon/agenthud/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/neochoon/agenthud/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/neochoon/agenthud/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/neochoon/agenthud/compare/v0.5.17...v0.6.0
 [0.5.17]: https://github.com/neochoon/agenthud/compare/v0.5.0...v0.5.17

@@ -13,6 +13,10 @@ import {
   resetReadFileFn as resetTestsReadFileFn,
 } from "../src/data/tests.js";
 import {
+  setExecFn as setRunnerExecFn,
+  resetExecFn as resetRunnerExecFn,
+} from "../src/runner/command.js";
+import {
   setFsMock as setClaudeFsMock,
   resetFsMock as resetClaudeFsMock,
   type FsMock as ClaudeFsMock,
@@ -47,6 +51,9 @@ describe("App with config", () => {
       throw new Error("File not found");
     });
 
+    // Runner mock - prevent actual test command execution
+    setRunnerExecFn(() => "{}");
+
     // Claude fs mock - simulate no active session
     const claudeFsMock: ClaudeFsMock = {
       existsSync: vi.fn().mockReturnValue(false),
@@ -61,11 +68,19 @@ describe("App with config", () => {
     resetExecFn();
     resetConfigFsMock();
     resetTestsReadFileFn();
+    resetRunnerExecFn();
     resetClaudeFsMock();
   });
 
   describe("panel visibility", () => {
-    it("shows all panels with default config", () => {
+    it("shows all panels with default config when command is set", () => {
+      configFsMock.existsSync.mockReturnValue(true);
+      configFsMock.readFileSync.mockReturnValue(`
+panels:
+  tests:
+    command: "npm test"
+`);
+
       const { lastFrame } = render(<App mode="once" />);
 
       expect(lastFrame()).toContain("Git");
@@ -78,6 +93,8 @@ describe("App with config", () => {
 panels:
   git:
     enabled: false
+  tests:
+    command: "npm test"
 `);
 
       const { lastFrame } = render(<App mode="once" />);
@@ -146,6 +163,7 @@ panels:
     command: echo "nginx"
   tests:
     enabled: true
+    command: npm test
 `);
 
       const { lastFrame } = render(<App mode="once" />);
@@ -171,6 +189,7 @@ panels:
     command: echo "nginx"
   tests:
     enabled: true
+    command: npm test
 `);
 
       const { lastFrame } = render(<App mode="once" />);

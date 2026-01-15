@@ -3,6 +3,11 @@ import {
   readFileSync as nodeReadFileSync,
 } from "fs";
 import { parse as parseYaml } from "yaml";
+import {
+  DEFAULT_PANEL_WIDTH,
+  MIN_TERMINAL_WIDTH,
+  MAX_TERMINAL_WIDTH,
+} from "../ui/constants.js";
 
 export interface FsMock {
   existsSync: (path: string) => boolean;
@@ -77,9 +82,10 @@ export interface Config {
   width: number;
 }
 
-const DEFAULT_WIDTH = 70;
-const MIN_WIDTH = 50;
-const MAX_WIDTH = 120;
+// Use centralized constants from ui/constants.ts
+const DEFAULT_WIDTH = DEFAULT_PANEL_WIDTH;
+const MIN_WIDTH = MIN_TERMINAL_WIDTH;
+const MAX_WIDTH = MAX_TERMINAL_WIDTH;
 
 export interface ParseResult {
   config: Config;

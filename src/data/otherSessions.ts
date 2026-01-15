@@ -6,6 +6,7 @@ import {
 } from "fs";
 import { homedir } from "os";
 import { join, basename, sep } from "path";
+import { FIVE_MINUTES_MS } from "../ui/constants.js";
 
 export interface FsMock {
   existsSync: (path: string) => boolean;
@@ -34,7 +35,6 @@ export function resetFsMock(): void {
   };
 }
 
-const FIVE_MINUTES_MS = 5 * 60 * 1000;
 const MAX_LINES_TO_SCAN = 100;
 
 export interface ProjectInfo {

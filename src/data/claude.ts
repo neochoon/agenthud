@@ -14,6 +14,7 @@ import {
   type ClaudeSessionState,
   type ClaudeData,
 } from "../types/index.js";
+import { FIVE_MINUTES_MS, THIRTY_SECONDS_MS } from "../ui/constants.js";
 
 // Re-export types for backwards compatibility
 export type { ClaudeSessionStatus, ActivityEntry, TodoItem, ClaudeSessionState, ClaudeData };
@@ -84,8 +85,6 @@ interface JsonlSystemEntry {
 
 type JsonlEntry = JsonlUserEntry | JsonlAssistantEntry | JsonlSystemEntry | { type: string };
 
-const FIVE_MINUTES_MS = 5 * 60 * 1000;
-const THIRTY_SECONDS_MS = 30 * 1000;
 const MAX_LINES_TO_SCAN = 200;
 const DEFAULT_MAX_ACTIVITIES = 10;
 /**

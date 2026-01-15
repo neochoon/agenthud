@@ -88,9 +88,9 @@ describe("claude data module", () => {
       mockFs.readdirSync.mockReturnValue(["old.jsonl", "new.jsonl"]);
       mockFs.statSync.mockImplementation((path: string) => {
         if (path.includes("old.jsonl")) {
-          return { mtimeMs: Date.now() - 60000 }; // 1 minute ago
+          return { mtimeMs: Date.now() - 60000, size: 1000 }; // 1 minute ago
         }
-        return { mtimeMs: Date.now() - 1000 }; // 1 second ago
+        return { mtimeMs: Date.now() - 1000, size: 1000 }; // 1 second ago
       });
 
       const result = findActiveSession(sessionDir, ONE_HOUR_MS);
@@ -98,11 +98,29 @@ describe("claude data module", () => {
       expect(result).toBe(join(sessionDir, "new.jsonl"));
     });
 
+    it("prefers larger file when mtime is equal", () => {
+      const sessionDir = join("/fake", "session", "dir");
+      const now = Date.now();
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readdirSync.mockReturnValue(["small.jsonl", "large.jsonl"]);
+      mockFs.statSync.mockImplementation((path: string) => {
+        if (path.includes("small.jsonl")) {
+          return { mtimeMs: now, size: 2509 }; // same time, smaller
+        }
+        return { mtimeMs: now, size: 2708881 }; // same time, larger
+      });
+
+      const result = findActiveSession(sessionDir, ONE_HOUR_MS);
+
+      expect(result).toBe(join(sessionDir, "large.jsonl"));
+    });
+
     it("returns null when most recent file is older than timeout", () => {
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readdirSync.mockReturnValue(["old.jsonl"]);
       mockFs.statSync.mockReturnValue({
         mtimeMs: Date.now() - 61 * 60 * 1000, // 61 minutes ago
+        size: 1000,
       });
 
       const result = findActiveSession("/fake/session/dir", ONE_HOUR_MS);
@@ -116,6 +134,7 @@ describe("claude data module", () => {
       mockFs.readdirSync.mockReturnValue(["recent.jsonl"]);
       mockFs.statSync.mockReturnValue({
         mtimeMs: Date.now() - 59 * 60 * 1000, // 59 minutes ago
+        size: 1000,
       });
 
       const result = findActiveSession(sessionDir, ONE_HOUR_MS);
@@ -1072,7 +1091,7 @@ describe("claude data module", () => {
     it("returns hasSession true when session directory exists but no active session", () => {
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readdirSync.mockReturnValue(["old.jsonl"]);
-      mockFs.statSync.mockReturnValue({ mtimeMs: Date.now() - 61 * 60 * 1000 }); // 61 minutes ago (beyond default 60 min timeout)
+      mockFs.statSync.mockReturnValue({ mtimeMs: Date.now() - 61 * 60 * 1000, size: 1000 }); // 61 minutes ago (beyond default 60 min timeout)
 
       const result = getClaudeData("/Users/test/project");
 
@@ -1085,7 +1104,7 @@ describe("claude data module", () => {
 
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readdirSync.mockReturnValue(["session.jsonl"]);
-      mockFs.statSync.mockReturnValue({ mtimeMs: Date.now() - 1000 });
+      mockFs.statSync.mockReturnValue({ mtimeMs: Date.now() - 1000, size: 1000 });
       mockFs.readFileSync.mockReturnValue(
         JSON.stringify({
           type: "user",

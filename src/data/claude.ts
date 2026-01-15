@@ -23,7 +23,7 @@ export interface FsMock {
   existsSync: (path: string) => boolean;
   readFileSync: (path: string) => string;
   readdirSync: (path: string) => string[];
-  statSync: (path: string) => { mtimeMs: number };
+  statSync: (path: string) => { mtimeMs: number; size: number };
 }
 
 let fs: FsMock = {
@@ -101,6 +101,7 @@ export function getClaudeSessionPath(projectPath: string): string {
 /**
  * Find the most recently active session file in the session directory
  * Returns null if no active session exists within the timeout period
+ * When multiple files have the same mtime, prefer the larger file (more content = likely active)
  */
 export function findActiveSession(sessionDir: string, sessionTimeout: number): string | null {
   if (!fs.existsSync(sessionDir)) {
@@ -116,12 +117,15 @@ export function findActiveSession(sessionDir: string, sessionTimeout: number): s
 
   let latestFile: string | null = null;
   let latestMtime = 0;
+  let latestSize = 0;
 
   for (const file of jsonlFiles) {
     const filePath = join(sessionDir, file);
     const stat = fs.statSync(filePath);
-    if (stat.mtimeMs > latestMtime) {
+    // Prefer newer files, or larger files when mtime is equal
+    if (stat.mtimeMs > latestMtime || (stat.mtimeMs === latestMtime && stat.size > latestSize)) {
       latestMtime = stat.mtimeMs;
+      latestSize = stat.size;
       latestFile = file;
     }
   }

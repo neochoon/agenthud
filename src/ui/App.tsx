@@ -138,7 +138,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
   const [projectData, setProjectData] = useState<ProjectData>(() => getProjectData());
   const [gitData, setGitData] = useState<GitData>(() => getGitData(config.panels.git));
   const [claudeData, setClaudeData] = useState<ClaudeData>(() =>
-    getClaudeData(cwd, config.panels.claude.maxActivities)
+    getClaudeData(cwd, config.panels.claude.maxActivities, config.panels.claude.sessionTimeout)
   );
   const [otherSessionsData, setOtherSessionsData] = useState<OtherSessionsData>(() =>
     getOtherSessionsData(cwd, { activeThresholdMs: config.panels.other_sessions.activeThreshold })
@@ -208,10 +208,10 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
   }, [getTestDataFromConfig, config.panels.tests.command, visualFeedback]);
 
   const refreshClaude = useCallback(() => {
-    setClaudeData(getClaudeData(cwd, config.panels.claude.maxActivities));
+    setClaudeData(getClaudeData(cwd, config.panels.claude.maxActivities, config.panels.claude.sessionTimeout));
     visualFeedback.setRefreshed("claude");
     resetCountdown("claude");
-  }, [cwd, config.panels.claude.maxActivities, visualFeedback, resetCountdown]);
+  }, [cwd, config.panels.claude.maxActivities, config.panels.claude.sessionTimeout, visualFeedback, resetCountdown]);
 
   const refreshOtherSessions = useCallback(() => {
     setOtherSessionsData(

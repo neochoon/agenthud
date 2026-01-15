@@ -7,6 +7,7 @@ panels:
     enabled: true
     interval: 10s
     max_activities: 20
+    # session_timeout: 60m  # session inactive threshold (default: 60m)
 
   git:
     enabled: true

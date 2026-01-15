@@ -54,6 +54,7 @@ export interface ProjectPanelConfig extends PanelConfig {
 
 export interface ClaudePanelConfig extends PanelConfig {
   maxActivities?: number;
+  sessionTimeout?: number; // in milliseconds, default 60 minutes
 }
 
 export interface OtherSessionsPanelConfig extends PanelConfig {
@@ -134,6 +135,7 @@ export function getDefaultConfig(): Config {
       claude: {
         enabled: true,
         interval: 10000, // 10 seconds default
+        sessionTimeout: 60 * 60 * 1000, // 60 minutes default
       },
       other_sessions: {
         enabled: true,
@@ -247,6 +249,12 @@ export function parseConfig(): ParseResult {
       parseBasePanelConfig(panelConfig, config.panels.claude, panelName, warnings);
       if (typeof panelConfig.max_activities === "number") {
         config.panels.claude.maxActivities = panelConfig.max_activities;
+      }
+      if (typeof panelConfig.session_timeout === "string") {
+        const timeout = parseInterval(panelConfig.session_timeout);
+        if (timeout !== null) {
+          config.panels.claude.sessionTimeout = timeout;
+        }
       }
       continue;
     }

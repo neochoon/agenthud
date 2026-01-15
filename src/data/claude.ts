@@ -14,7 +14,7 @@ import {
   type ClaudeSessionState,
   type ClaudeData,
 } from "../types/index.js";
-import { FIVE_MINUTES_MS, THIRTY_SECONDS_MS } from "../ui/constants.js";
+import { THIRTY_SECONDS_MS } from "../ui/constants.js";
 
 // Re-export types for backwards compatibility
 export type { ClaudeSessionStatus, ActivityEntry, TodoItem, ClaudeSessionState, ClaudeData };
@@ -100,9 +100,9 @@ export function getClaudeSessionPath(projectPath: string): string {
 
 /**
  * Find the most recently active session file in the session directory
- * Returns null if no active session (modified within 5 minutes) exists
+ * Returns null if no active session exists within the timeout period
  */
-export function findActiveSession(sessionDir: string): string | null {
+export function findActiveSession(sessionDir: string, sessionTimeout: number): string | null {
   if (!fs.existsSync(sessionDir)) {
     return null;
   }
@@ -126,9 +126,9 @@ export function findActiveSession(sessionDir: string): string | null {
     }
   }
 
-  // Only return if modified within 5 minutes
-  const fiveMinutesAgo = Date.now() - FIVE_MINUTES_MS;
-  if (latestMtime > fiveMinutesAgo && latestFile) {
+  // Only return if modified within sessionTimeout
+  const cutoff = Date.now() - sessionTimeout;
+  if (latestMtime > cutoff && latestFile) {
     return join(sessionDir, latestFile);
   }
 
@@ -348,12 +348,9 @@ export function parseSessionState(sessionFile: string, maxActivities: number = D
       } else {
         status = "running";
       }
-    } else if (elapsed < FIVE_MINUTES_MS) {
-      // Between 30 seconds and 5 minutes
-      status = "completed";
     } else {
-      // More than 5 minutes
-      status = "idle";
+      // More than 30 seconds but within sessionTimeout
+      status = "completed";
     }
   }
 
@@ -401,10 +398,16 @@ export function parseSessionState(sessionFile: string, maxActivities: number = D
   };
 }
 
+const DEFAULT_SESSION_TIMEOUT = 60 * 60 * 1000; // 60 minutes
+
 /**
  * Get Claude session data for a project
  */
-export function getClaudeData(projectPath: string, maxActivities?: number): ClaudeData {
+export function getClaudeData(
+  projectPath: string,
+  maxActivities?: number,
+  sessionTimeout: number = DEFAULT_SESSION_TIMEOUT
+): ClaudeData {
   const defaultState: ClaudeSessionState = {
     status: "none",
     activities: [],
@@ -416,7 +419,7 @@ export function getClaudeData(projectPath: string, maxActivities?: number): Clau
   try {
     const sessionDir = getClaudeSessionPath(projectPath);
     const hasSession = fs.existsSync(sessionDir);
-    const sessionFile = findActiveSession(sessionDir);
+    const sessionFile = findActiveSession(sessionDir, sessionTimeout);
 
     if (!sessionFile) {
       return {

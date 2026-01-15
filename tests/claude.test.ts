@@ -63,10 +63,12 @@ describe("claude data module", () => {
   });
 
   describe("findActiveSession", () => {
+    const ONE_HOUR_MS = 60 * 60 * 1000;
+
     it("returns null when session directory does not exist", () => {
       mockFs.existsSync.mockReturnValue(false);
 
-      const result = findActiveSession("/fake/session/dir");
+      const result = findActiveSession("/fake/session/dir", ONE_HOUR_MS);
 
       expect(result).toBeNull();
     });
@@ -75,7 +77,7 @@ describe("claude data module", () => {
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readdirSync.mockReturnValue(["readme.txt", "config.json"]);
 
-      const result = findActiveSession("/fake/session/dir");
+      const result = findActiveSession("/fake/session/dir", ONE_HOUR_MS);
 
       expect(result).toBeNull();
     });
@@ -91,32 +93,32 @@ describe("claude data module", () => {
         return { mtimeMs: Date.now() - 1000 }; // 1 second ago
       });
 
-      const result = findActiveSession(sessionDir);
+      const result = findActiveSession(sessionDir, ONE_HOUR_MS);
 
       expect(result).toBe(join(sessionDir, "new.jsonl"));
     });
 
-    it("returns null when most recent file is older than 5 minutes", () => {
+    it("returns null when most recent file is older than timeout", () => {
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readdirSync.mockReturnValue(["old.jsonl"]);
       mockFs.statSync.mockReturnValue({
-        mtimeMs: Date.now() - 6 * 60 * 1000, // 6 minutes ago
+        mtimeMs: Date.now() - 61 * 60 * 1000, // 61 minutes ago
       });
 
-      const result = findActiveSession("/fake/session/dir");
+      const result = findActiveSession("/fake/session/dir", ONE_HOUR_MS);
 
       expect(result).toBeNull();
     });
 
-    it("returns file when modified within 5 minutes", () => {
+    it("returns file when modified within timeout", () => {
       const sessionDir = join("/fake", "session", "dir");
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readdirSync.mockReturnValue(["recent.jsonl"]);
       mockFs.statSync.mockReturnValue({
-        mtimeMs: Date.now() - 4 * 60 * 1000, // 4 minutes ago
+        mtimeMs: Date.now() - 59 * 60 * 1000, // 59 minutes ago
       });
 
-      const result = findActiveSession(sessionDir);
+      const result = findActiveSession(sessionDir, ONE_HOUR_MS);
 
       expect(result).toBe(join(sessionDir, "recent.jsonl"));
     });
@@ -291,13 +293,13 @@ describe("claude data module", () => {
       expect(result.status).toBe("completed");
     });
 
-    it("detects idle status when last activity is older than 5 minutes", () => {
-      const fiveMinutesAgo = new Date(Date.now() - 6 * 60 * 1000);
+    it("detects completed status when last activity is older than 30 seconds", () => {
+      const sixMinutesAgo = new Date(Date.now() - 6 * 60 * 1000);
       const lines = [
         JSON.stringify({
           type: "user",
           message: { role: "user", content: "Old message" },
-          timestamp: fiveMinutesAgo.toISOString(),
+          timestamp: sixMinutesAgo.toISOString(),
         }),
       ].join("\n");
 
@@ -306,7 +308,7 @@ describe("claude data module", () => {
 
       const result = parseSessionState("/fake/session.jsonl");
 
-      expect(result.status).toBe("idle");
+      expect(result.status).toBe("completed");
     });
 
     it("accumulates token counts from multiple assistant messages", () => {
@@ -1070,7 +1072,7 @@ describe("claude data module", () => {
     it("returns hasSession true when session directory exists but no active session", () => {
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readdirSync.mockReturnValue(["old.jsonl"]);
-      mockFs.statSync.mockReturnValue({ mtimeMs: Date.now() - 10 * 60 * 1000 }); // 10 minutes ago
+      mockFs.statSync.mockReturnValue({ mtimeMs: Date.now() - 61 * 60 * 1000 }); // 61 minutes ago (beyond default 60 min timeout)
 
       const result = getClaudeData("/Users/test/project");
 

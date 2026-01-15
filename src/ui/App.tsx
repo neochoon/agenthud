@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Box, Text, useApp, useInput, useStdout } from "ink";
 import { GitPanel } from "./GitPanel.js";
 import { TestPanel } from "./TestPanel.js";
@@ -298,46 +298,53 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
     { isActive: isWatchMode }
   );
 
-  // Per-panel refresh timers
+  // Keep refs to latest refresh functions to avoid stale closures in setInterval
+  const refreshProjectRef = useRef(refreshProject);
+  const refreshGitAsyncRef = useRef(refreshGitAsync);
+  const refreshTestAsyncRef = useRef(refreshTestAsync);
+  const refreshClaudeRef = useRef(refreshClaude);
+  const refreshOtherSessionsRef = useRef(refreshOtherSessions);
+  const refreshCustomPanelAsyncRef = useRef(refreshCustomPanelAsync);
+
+  // Update refs on each render
+  refreshProjectRef.current = refreshProject;
+  refreshGitAsyncRef.current = refreshGitAsync;
+  refreshTestAsyncRef.current = refreshTestAsync;
+  refreshClaudeRef.current = refreshClaude;
+  refreshOtherSessionsRef.current = refreshOtherSessions;
+  refreshCustomPanelAsyncRef.current = refreshCustomPanelAsync;
+
+  // Per-panel refresh timers - only recreate when config or mode changes
   useEffect(() => {
     if (!isWatchMode) return;
 
     const timers: NodeJS.Timeout[] = [];
 
     if (config.panels.project.enabled && config.panels.project.interval !== null) {
-      timers.push(setInterval(refreshProject, config.panels.project.interval));
+      timers.push(setInterval(() => refreshProjectRef.current(), config.panels.project.interval));
     }
     if (config.panels.git.enabled && config.panels.git.interval !== null) {
-      timers.push(setInterval(() => void refreshGitAsync(), config.panels.git.interval));
+      timers.push(setInterval(() => void refreshGitAsyncRef.current(), config.panels.git.interval));
     }
     if (config.panels.tests.enabled && config.panels.tests.interval !== null) {
-      timers.push(setInterval(() => void refreshTestAsync(), config.panels.tests.interval));
+      timers.push(setInterval(() => void refreshTestAsyncRef.current(), config.panels.tests.interval));
     }
     if (config.panels.claude.enabled && config.panels.claude.interval !== null) {
-      timers.push(setInterval(refreshClaude, config.panels.claude.interval));
+      timers.push(setInterval(() => refreshClaudeRef.current(), config.panels.claude.interval));
     }
     if (config.panels.other_sessions.enabled && config.panels.other_sessions.interval !== null) {
-      timers.push(setInterval(refreshOtherSessions, config.panels.other_sessions.interval));
+      timers.push(setInterval(() => refreshOtherSessionsRef.current(), config.panels.other_sessions.interval));
     }
     if (config.customPanels) {
       for (const [name, panelConfig] of Object.entries(config.customPanels)) {
         if (panelConfig.enabled && panelConfig.interval !== null) {
-          timers.push(setInterval(() => void refreshCustomPanelAsync(name), panelConfig.interval));
+          timers.push(setInterval(() => void refreshCustomPanelAsyncRef.current(name), panelConfig.interval));
         }
       }
     }
 
     return () => timers.forEach((t) => clearInterval(t));
-  }, [
-    isWatchMode,
-    config,
-    refreshProject,
-    refreshGitAsync,
-    refreshTestAsync,
-    refreshClaude,
-    refreshOtherSessions,
-    refreshCustomPanelAsync,
-  ]);
+  }, [isWatchMode, config]);
 
   // Render panels
   return (

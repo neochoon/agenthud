@@ -1,7 +1,4 @@
-import {
-  existsSync,
-  readFileSync,
-} from "fs";
+import { existsSync, readFileSync } from "node:fs";
 
 export interface TestFrameworkResult {
   framework: string;
@@ -47,7 +44,10 @@ function detectJsFramework(): TestFrameworkResult | null {
     return null;
   }
 
-  let packageJson: { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+  let packageJson: {
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+  };
   try {
     const content = readFileSync("package.json", "utf-8");
     packageJson = JSON.parse(content);
@@ -89,7 +89,10 @@ function detectPythonFramework(): TestFrameworkResult | null {
   if (existsSync("pyproject.toml")) {
     try {
       const content = readFileSync("pyproject.toml", "utf-8");
-      if (content.includes("[tool.pytest") || content.includes("[tool.pytest.ini_options]")) {
+      if (
+        content.includes("[tool.pytest") ||
+        content.includes("[tool.pytest.ini_options]")
+      ) {
         return {
           framework: "pytest",
           command: FRAMEWORK_COMMANDS.pytest,

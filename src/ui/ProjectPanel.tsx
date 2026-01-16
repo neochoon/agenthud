@@ -1,13 +1,13 @@
-import React from "react";
 import { Box, Text } from "ink";
+import type React from "react";
 import type { ProjectData } from "../data/project.js";
 import {
-  DEFAULT_PANEL_WIDTH,
   BOX,
-  createTitleLine,
   createBottomLine,
-  padLine,
+  createTitleLine,
+  DEFAULT_PANEL_WIDTH,
   getInnerWidth,
+  padLine,
 } from "./constants.js";
 
 interface ProjectPanelProps {
@@ -26,7 +26,7 @@ function formatCountdown(seconds: number | null | undefined): string {
 
 function formatLineCount(count: number): string {
   if (count >= 1000) {
-    return (count / 1000).toFixed(1) + "k";
+    return `${(count / 1000).toFixed(1)}k`;
   }
   return String(count);
 }
@@ -48,7 +48,7 @@ export function ProjectPanel({
         <Text>{createTitleLine("Project", countdownSuffix, width)}</Text>
         <Text>
           {BOX.v}
-          <Text color="red">{padLine(" " + data.error, width)}</Text>
+          <Text color="red">{padLine(` ${data.error}`, width)}</Text>
           {BOX.v}
         </Text>
         <Text>{createBottomLine(width)}</Text>
@@ -92,7 +92,7 @@ export function ProjectPanel({
   const depsPadding = Math.max(0, innerWidth - 1 - depsText.length);
 
   // Determine countdown color
-  const countdownColor = justRefreshed ? "green" : undefined;
+  const _countdownColor = justRefreshed ? "green" : undefined;
 
   return (
     <Box flexDirection="column" width={width}>
@@ -101,8 +101,7 @@ export function ProjectPanel({
 
       {/* Header: name · language · license */}
       <Text>
-        {BOX.v}{" "}
-        <Text bold>{data.name}</Text>
+        {BOX.v} <Text bold>{data.name}</Text>
         {data.language && (
           <>
             <Text dimColor> · </Text>
@@ -122,8 +121,7 @@ export function ProjectPanel({
       {/* Stack line (only if has stack) */}
       {hasStack && (
         <Text>
-          {BOX.v}{" "}
-          <Text dimColor>Stack:</Text>{" "}
+          {BOX.v} <Text dimColor>Stack:</Text>{" "}
           <Text>{data.stack.join(", ")}</Text>
           {" ".repeat(stackPadding)}
           {BOX.v}
@@ -132,8 +130,7 @@ export function ProjectPanel({
 
       {/* Files and Lines */}
       <Text>
-        {BOX.v}{" "}
-        <Text dimColor>Files:</Text>{" "}
+        {BOX.v} <Text dimColor>Files:</Text>{" "}
         <Text>
           {data.fileCount} {data.fileExtension}
         </Text>
@@ -146,8 +143,7 @@ export function ProjectPanel({
 
       {/* Dependencies */}
       <Text>
-        {BOX.v}{" "}
-        <Text dimColor>Deps:</Text>{" "}
+        {BOX.v} <Text dimColor>Deps:</Text>{" "}
         {data.prodDeps > 0 && data.devDeps > 0 ? (
           <>
             <Text>{data.prodDeps} prod</Text>

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TestsPanelConfig } from "../../src/config/parser.js";
 
 // Mock fs and child_process with partial mocking
@@ -18,8 +18,8 @@ vi.mock("child_process", async (importOriginal) => {
   };
 });
 
-import { readFileSync } from "fs";
-import { execSync } from "child_process";
+import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { getTestData, getTestDataWithConfig } from "../../src/data/tests.js";
 
 const mockReadFileSync = vi.mocked(readFileSync);
@@ -64,8 +64,8 @@ describe("test data module", () => {
 
       mockReadFileSync.mockReturnValue(JSON.stringify(testResults));
       mockExecSync
-        .mockReturnValueOnce("def5678\n")  // getHeadHash
-        .mockReturnValueOnce("3\n");        // getCommitCount
+        .mockReturnValueOnce("def5678\n") // getHeadHash
+        .mockReturnValueOnce("3\n"); // getCommitCount
 
       const result = getTestData();
 
@@ -140,7 +140,10 @@ describe("test data module", () => {
       const result = getTestDataWithConfig(config);
 
       expect(result.results).toEqual(testResults);
-      expect(mockReadFileSync).toHaveBeenCalledWith(".agenthud/tests/results.json", "utf-8");
+      expect(mockReadFileSync).toHaveBeenCalledWith(
+        ".agenthud/tests/results.json",
+        "utf-8",
+      );
     });
 
     it("falls back to default path when source not provided", () => {
@@ -165,7 +168,10 @@ describe("test data module", () => {
       const result = getTestDataWithConfig(config);
 
       expect(result.results).toEqual(testResults);
-      expect(mockReadFileSync).toHaveBeenCalledWith(expect.stringContaining("test-results.json"), "utf-8");
+      expect(mockReadFileSync).toHaveBeenCalledWith(
+        expect.stringContaining("test-results.json"),
+        "utf-8",
+      );
     });
 
     it("returns error when source file does not exist", () => {
@@ -203,8 +209,8 @@ describe("test data module", () => {
 
       mockReadFileSync.mockReturnValue(JSON.stringify(testResults));
       mockExecSync
-        .mockReturnValueOnce("new5678\n")  // getHeadHash
-        .mockReturnValueOnce("5\n");        // getCommitCount
+        .mockReturnValueOnce("new5678\n") // getHeadHash
+        .mockReturnValueOnce("5\n"); // getCommitCount
 
       const result = getTestDataWithConfig(config);
 
@@ -238,10 +244,10 @@ describe("test data module", () => {
       const result = getTestDataWithConfig(config);
 
       expect(result.results).not.toBeNull();
-      expect(result.results!.passed).toBe(7);
-      expect(result.results!.failed).toBe(2);
-      expect(result.results!.skipped).toBe(1);
-      expect(result.results!.failures).toHaveLength(2);
+      expect(result.results?.passed).toBe(7);
+      expect(result.results?.failed).toBe(2);
+      expect(result.results?.skipped).toBe(1);
+      expect(result.results?.failures).toHaveLength(2);
     });
 
     it("returns error when JUnit XML is invalid", () => {

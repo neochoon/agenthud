@@ -1,26 +1,43 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Box, Text, useApp, useInput, useStdout } from "ink";
-import { GitPanel } from "./GitPanel.js";
-import { TestPanel } from "./TestPanel.js";
-import { ProjectPanel } from "./ProjectPanel.js";
-import { ClaudePanel } from "./ClaudePanel.js";
-import { OtherSessionsPanel } from "./OtherSessionsPanel.js";
-import { GenericPanel } from "./GenericPanel.js";
-import { WelcomePanel } from "./WelcomePanel.js";
-import { MAX_TERMINAL_WIDTH, MIN_TERMINAL_WIDTH, DEFAULT_FALLBACK_WIDTH } from "./constants.js";
-import { useCountdown } from "./hooks/useCountdown.js";
-import { useVisualFeedback } from "./hooks/useVisualFeedback.js";
-import { useHotkeys } from "./hooks/useHotkeys.js";
-import { getGitData, getGitDataAsync, type GitData } from "../data/git.js";
-import { getTestData } from "../data/tests.js";
-import { getProjectData, type ProjectData } from "../data/project.js";
-import { getClaudeData } from "../data/claude.js";
-import { getOtherSessionsData, type OtherSessionsData } from "../data/otherSessions.js";
-import { getCustomPanelData, getCustomPanelDataAsync, type CustomPanelResult } from "../data/custom.js";
-import { runTestCommand } from "../runner/command.js";
-import { parseConfig } from "../config/parser.js";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { getVersion } from "../cli.js";
-import type { TestData, ClaudeData } from "../types/index.js";
+import { parseConfig } from "../config/parser.js";
+import { getClaudeData } from "../data/claude.js";
+import {
+  type CustomPanelResult,
+  getCustomPanelData,
+  getCustomPanelDataAsync,
+} from "../data/custom.js";
+import { type GitData, getGitData, getGitDataAsync } from "../data/git.js";
+import {
+  getOtherSessionsData,
+  type OtherSessionsData,
+} from "../data/otherSessions.js";
+import { getProjectData, type ProjectData } from "../data/project.js";
+import { getTestData } from "../data/tests.js";
+import { runTestCommand } from "../runner/command.js";
+import type { ClaudeData, TestData } from "../types/index.js";
+import { ClaudePanel } from "./ClaudePanel.js";
+import {
+  DEFAULT_FALLBACK_WIDTH,
+  MAX_TERMINAL_WIDTH,
+  MIN_TERMINAL_WIDTH,
+} from "./constants.js";
+import { GenericPanel } from "./GenericPanel.js";
+import { GitPanel } from "./GitPanel.js";
+import { useCountdown } from "./hooks/useCountdown.js";
+import { useHotkeys } from "./hooks/useHotkeys.js";
+import { useVisualFeedback } from "./hooks/useVisualFeedback.js";
+import { OtherSessionsPanel } from "./OtherSessionsPanel.js";
+import { ProjectPanel } from "./ProjectPanel.js";
+import { TestPanel } from "./TestPanel.js";
+import { WelcomePanel } from "./WelcomePanel.js";
 
 interface AppProps {
   mode: "watch" | "once";
@@ -60,7 +77,11 @@ function getClampedWidth(columns: number | undefined): number {
   return Math.min(Math.max(columns, MIN_TERMINAL_WIDTH), MAX_TERMINAL_WIDTH);
 }
 
-function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement {
+function DashboardApp({
+  mode,
+}: {
+  mode: "watch" | "once";
+}): React.ReactElement {
   const { exit } = useApp();
   const { stdout } = useStdout();
   const isWatchMode = mode === "watch";
@@ -74,7 +95,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
       if (config.width) return config.width;
       return getClampedWidth(terminalColumns);
     },
-    [config.width]
+    [config.width],
   );
 
   const [width, setWidth] = useState(() => getEffectiveWidth(stdout?.columns));
@@ -90,18 +111,27 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
     if (config.width) return;
     const handleResize = () => setWidth(getEffectiveWidth(stdout?.columns));
     stdout?.on("resize", handleResize);
-    return () => { stdout?.off("resize", handleResize); };
+    return () => {
+      stdout?.off("resize", handleResize);
+    };
   }, [stdout, config.width, getEffectiveWidth]);
 
   // Panel names for hooks
   const customPanelNames = useMemo(
     () => Object.keys(config.customPanels || {}),
-    [config.customPanels]
+    [config.customPanels],
   );
 
   const allPanelNames = useMemo(
-    () => ["project", "git", "tests", "claude", "other_sessions", ...customPanelNames],
-    [customPanelNames]
+    () => [
+      "project",
+      "git",
+      "tests",
+      "claude",
+      "other_sessions",
+      ...customPanelNames,
+    ],
+    [customPanelNames],
   );
 
   // Build panel intervals for useCountdown
@@ -135,16 +165,27 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
   const cwd = process.cwd();
 
   // Panel data states
-  const [projectData, setProjectData] = useState<ProjectData>(() => getProjectData());
-  const [gitData, setGitData] = useState<GitData>(() => getGitData(config.panels.git));
-  const [claudeData, setClaudeData] = useState<ClaudeData>(() =>
-    getClaudeData(cwd, config.panels.claude.maxActivities, config.panels.claude.sessionTimeout)
+  const [projectData, setProjectData] = useState<ProjectData>(() =>
+    getProjectData(),
   );
-  const [otherSessionsData, setOtherSessionsData] = useState<OtherSessionsData>(() =>
-    getOtherSessionsData(cwd, { activeThresholdMs: config.panels.other_sessions.activeThreshold })
+  const [gitData, setGitData] = useState<GitData>(() =>
+    getGitData(config.panels.git),
+  );
+  const [claudeData, setClaudeData] = useState<ClaudeData>(() =>
+    getClaudeData(
+      cwd,
+      config.panels.claude.maxActivities,
+      config.panels.claude.sessionTimeout,
+    ),
+  );
+  const [otherSessionsData, setOtherSessionsData] = useState<OtherSessionsData>(
+    () =>
+      getOtherSessionsData(cwd, {
+        activeThresholdMs: config.panels.other_sessions.activeThreshold,
+      }),
   );
 
-  // Test data with disabled state
+  // Test data with lazy loading for faster initial render
   const getTestDataFromConfig = useCallback((): TestData => {
     if (config.panels.tests.command) {
       return runTestCommand(config.panels.tests.command);
@@ -152,14 +193,35 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
     return getTestData();
   }, [config.panels.tests.command]);
 
-  const initialTestData = useMemo(() => getTestDataFromConfig(), [getTestDataFromConfig]);
-  const [testsDisabled, setTestsDisabled] = useState(
-    !!(initialTestData.error && !config.panels.tests.command)
-  );
-  const [testData, setTestData] = useState<TestData>(initialTestData);
+  const [testsDisabled, setTestsDisabled] = useState(false);
+  const [testData, setTestData] = useState<TestData>({
+    results: null,
+    isOutdated: false,
+    commitsBehind: 0,
+  });
+  const testsInitializedRef = useRef(false);
+
+  // Lazy load test data after initial render
+  useEffect(() => {
+    if (testsInitializedRef.current) return;
+    testsInitializedRef.current = true;
+
+    // Use setTimeout to defer test loading after first paint
+    const timer = setTimeout(() => {
+      const data = getTestDataFromConfig();
+      setTestData(data);
+      if (data.error && !config.panels.tests.command) {
+        setTestsDisabled(true);
+      }
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [getTestDataFromConfig, config.panels.tests.command]);
 
   // Custom panel data
-  const [customPanelData, setCustomPanelData] = useState<Record<string, CustomPanelResult>>(() => {
+  const [customPanelData, setCustomPanelData] = useState<
+    Record<string, CustomPanelResult>
+  >(() => {
     const data: Record<string, CustomPanelResult> = {};
     if (config.customPanels) {
       for (const [name, panelConfig] of Object.entries(config.customPanels)) {
@@ -208,25 +270,47 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
   }, [getTestDataFromConfig, config.panels.tests.command, visualFeedback]);
 
   const refreshClaude = useCallback(() => {
-    setClaudeData(getClaudeData(cwd, config.panels.claude.maxActivities, config.panels.claude.sessionTimeout));
+    setClaudeData(
+      getClaudeData(
+        cwd,
+        config.panels.claude.maxActivities,
+        config.panels.claude.sessionTimeout,
+      ),
+    );
     visualFeedback.setRefreshed("claude");
     resetCountdown("claude");
-  }, [cwd, config.panels.claude.maxActivities, config.panels.claude.sessionTimeout, visualFeedback, resetCountdown]);
+  }, [
+    cwd,
+    config.panels.claude.maxActivities,
+    config.panels.claude.sessionTimeout,
+    visualFeedback,
+    resetCountdown,
+  ]);
 
   const refreshOtherSessions = useCallback(() => {
     setOtherSessionsData(
-      getOtherSessionsData(cwd, { activeThresholdMs: config.panels.other_sessions.activeThreshold })
+      getOtherSessionsData(cwd, {
+        activeThresholdMs: config.panels.other_sessions.activeThreshold,
+      }),
     );
     visualFeedback.setRefreshed("other_sessions");
     resetCountdown("other_sessions");
-  }, [cwd, config.panels.other_sessions.activeThreshold, visualFeedback, resetCountdown]);
+  }, [
+    cwd,
+    config.panels.other_sessions.activeThreshold,
+    visualFeedback,
+    resetCountdown,
+  ]);
 
   const refreshCustomPanelAsync = useCallback(
     async (name: string) => {
-      if (config.customPanels && config.customPanels[name]) {
+      if (config.customPanels?.[name]) {
         visualFeedback.startAsync(name);
         try {
-          const result = await getCustomPanelDataAsync(name, config.customPanels[name]);
+          const result = await getCustomPanelDataAsync(
+            name,
+            config.customPanels[name],
+          );
           setCustomPanelData((prev) => ({ ...prev, [name]: result }));
         } finally {
           visualFeedback.endAsync(name);
@@ -234,7 +318,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
         }
       }
     },
-    [config.customPanels, visualFeedback, resetCountdown]
+    [config.customPanels, visualFeedback, resetCountdown],
   );
 
   // Refresh all panels
@@ -245,7 +329,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
     if (config.panels.claude.enabled) refreshClaude();
     if (config.panels.other_sessions.enabled) refreshOtherSessions();
     for (const name of customPanelNames) {
-      if (config.customPanels![name].enabled) {
+      if (config.customPanels?.[name].enabled) {
         void refreshCustomPanelAsync(name);
       }
     }
@@ -262,10 +346,15 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
 
   // Build manual panels for hotkeys
   const manualPanels = useMemo(() => {
-    const panels: Array<{ name: string; label: string; action: () => void }> = [];
+    const panels: Array<{ name: string; label: string; action: () => void }> =
+      [];
 
     if (config.panels.tests.enabled && config.panels.tests.interval === null) {
-      panels.push({ name: "tests", label: "run tests", action: () => void refreshTestAsync() });
+      panels.push({
+        name: "tests",
+        label: "run tests",
+        action: () => void refreshTestAsync(),
+      });
     }
 
     if (config.customPanels) {
@@ -295,7 +384,7 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
     (input) => {
       handleInput(input);
     },
-    { isActive: isWatchMode }
+    { isActive: isWatchMode },
   );
 
   // Keep refs to latest refresh functions to avoid stale closures in setInterval
@@ -320,25 +409,64 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
 
     const timers: NodeJS.Timeout[] = [];
 
-    if (config.panels.project.enabled && config.panels.project.interval !== null) {
-      timers.push(setInterval(() => refreshProjectRef.current(), config.panels.project.interval));
+    if (
+      config.panels.project.enabled &&
+      config.panels.project.interval !== null
+    ) {
+      timers.push(
+        setInterval(
+          () => refreshProjectRef.current(),
+          config.panels.project.interval,
+        ),
+      );
     }
     if (config.panels.git.enabled && config.panels.git.interval !== null) {
-      timers.push(setInterval(() => void refreshGitAsyncRef.current(), config.panels.git.interval));
+      timers.push(
+        setInterval(
+          () => void refreshGitAsyncRef.current(),
+          config.panels.git.interval,
+        ),
+      );
     }
     if (config.panels.tests.enabled && config.panels.tests.interval !== null) {
-      timers.push(setInterval(() => void refreshTestAsyncRef.current(), config.panels.tests.interval));
+      timers.push(
+        setInterval(
+          () => void refreshTestAsyncRef.current(),
+          config.panels.tests.interval,
+        ),
+      );
     }
-    if (config.panels.claude.enabled && config.panels.claude.interval !== null) {
-      timers.push(setInterval(() => refreshClaudeRef.current(), config.panels.claude.interval));
+    if (
+      config.panels.claude.enabled &&
+      config.panels.claude.interval !== null
+    ) {
+      timers.push(
+        setInterval(
+          () => refreshClaudeRef.current(),
+          config.panels.claude.interval,
+        ),
+      );
     }
-    if (config.panels.other_sessions.enabled && config.panels.other_sessions.interval !== null) {
-      timers.push(setInterval(() => refreshOtherSessionsRef.current(), config.panels.other_sessions.interval));
+    if (
+      config.panels.other_sessions.enabled &&
+      config.panels.other_sessions.interval !== null
+    ) {
+      timers.push(
+        setInterval(
+          () => refreshOtherSessionsRef.current(),
+          config.panels.other_sessions.interval,
+        ),
+      );
     }
     if (config.customPanels) {
       for (const [name, panelConfig] of Object.entries(config.customPanels)) {
         if (panelConfig.enabled && panelConfig.interval !== null) {
-          timers.push(setInterval(() => void refreshCustomPanelAsyncRef.current(name), panelConfig.interval));
+          timers.push(
+            setInterval(
+              () => void refreshCustomPanelAsyncRef.current(name),
+              panelConfig.interval,
+            ),
+          );
         }
       }
     }
@@ -391,7 +519,11 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
           );
         }
 
-        if (panelName === "tests" && config.panels.tests.enabled && !testsDisabled) {
+        if (
+          panelName === "tests" &&
+          config.panels.tests.enabled &&
+          !testsDisabled
+        ) {
           const vs = visualFeedback.getState("tests");
           return (
             <Box key={`panel-${panelName}-${index}`} marginTop={marginTop}>
@@ -422,7 +554,10 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
           );
         }
 
-        if (panelName === "other_sessions" && config.panels.other_sessions.enabled) {
+        if (
+          panelName === "other_sessions" &&
+          config.panels.other_sessions.enabled
+        ) {
           const vs = visualFeedback.getState("other_sessions");
           return (
             <Box key={`panel-${panelName}-${index}`} marginTop={marginTop}>
@@ -439,14 +574,17 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
 
         // Custom panel
         const customConfig = config.customPanels?.[panelName];
-        if (customConfig && customConfig.enabled) {
+        if (customConfig?.enabled) {
           const result = customPanelData[panelName];
           if (!result) return null;
 
           const vs = visualFeedback.getState(panelName);
           const isManual = customConfig.interval === null;
-          const relativeTime = isManual ? formatRelativeTime(result.timestamp) : undefined;
-          const countdown = !isManual && isWatchMode ? countdowns[panelName] : null;
+          const relativeTime = isManual
+            ? formatRelativeTime(result.timestamp)
+            : undefined;
+          const countdown =
+            !isManual && isWatchMode ? countdowns[panelName] : null;
 
           return (
             <Box key={`panel-${panelName}-${index}`} marginTop={marginTop}>
@@ -485,7 +623,10 @@ function DashboardApp({ mode }: { mode: "watch" | "once" }): React.ReactElement 
   );
 }
 
-export function App({ mode, agentDirExists = true }: AppProps): React.ReactElement {
+export function App({
+  mode,
+  agentDirExists = true,
+}: AppProps): React.ReactElement {
   if (!agentDirExists) {
     return <WelcomeApp />;
   }

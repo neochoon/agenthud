@@ -1,6 +1,6 @@
-import React from "react";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render } from "ink-testing-library";
+import { act } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock child_process module
 vi.mock("child_process", async (importOriginal) => {
@@ -25,8 +25,14 @@ vi.mock("fs", async (importOriginal) => {
   };
 });
 
-import { execSync, exec } from "child_process";
-import { existsSync, readFileSync, readdirSync, statSync, unlinkSync } from "fs";
+import { execSync } from "node:child_process";
+import {
+  existsSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  unlinkSync,
+} from "node:fs";
 import { App } from "../../src/ui/App.js";
 import { getDisplayWidth } from "../../src/ui/constants.js";
 
@@ -35,7 +41,7 @@ const mockExistsSync = vi.mocked(existsSync);
 const mockReadFileSync = vi.mocked(readFileSync);
 const mockReaddirSync = vi.mocked(readdirSync);
 const mockStatSync = vi.mocked(statSync);
-const mockUnlinkSync = vi.mocked(unlinkSync);
+const _mockUnlinkSync = vi.mocked(unlinkSync);
 
 // Helper to strip ANSI codes (including colors and clear-to-EOL)
 const stripAnsi = (str: string) => str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
@@ -67,7 +73,10 @@ describe("App", () => {
 
     // Default: no projects directory for other sessions
     mockReaddirSync.mockReturnValue([]);
-    mockStatSync.mockReturnValue({ mtimeMs: 0, isDirectory: () => true } as any);
+    mockStatSync.mockReturnValue({
+      mtimeMs: 0,
+      isDirectory: () => true,
+    } as any);
   });
 
   afterEach(() => {
@@ -164,7 +173,8 @@ describe("App", () => {
 
       // Find panel border lines (contain box drawing characters)
       const panelLines = lines.filter(
-        (line) => line.includes("┌") || line.includes("│") || line.includes("└")
+        (line) =>
+          line.includes("┌") || line.includes("│") || line.includes("└"),
       );
 
       // All panel lines should have the same display width (accounting for emojis)
@@ -219,7 +229,9 @@ panels:
       expect(lastFrame()).toContain("Tests");
     });
 
-    it("shows Tests panel when test command succeeds", () => {
+    it("shows Tests panel when test command succeeds", async () => {
+      vi.useFakeTimers();
+
       // Mock config file exists with test command
       mockExistsSync.mockImplementation((path: any) => {
         if (String(path).includes("config.yaml")) return true;
@@ -262,12 +274,21 @@ panels:
 
       const { lastFrame } = render(<App mode="once" />);
 
+      // Wait for lazy test loading
+      await act(async () => {
+        vi.advanceTimersByTime(10);
+      });
+
       // Tests panel should be rendered when command succeeds
       expect(lastFrame()).toContain("Tests");
       expect(lastFrame()).toContain("10 passed");
+
+      vi.useRealTimers();
     });
 
-    it("shows Tests panel when no command is configured (file-based)", () => {
+    it("shows Tests panel when no command is configured (file-based)", async () => {
+      vi.useFakeTimers();
+
       // Mock config file exists WITHOUT test command (file-based mode)
       mockExistsSync.mockImplementation((path: any) => {
         if (String(path).includes("config.yaml")) return true;
@@ -311,10 +332,17 @@ panels:
 
       const { lastFrame } = render(<App mode="once" />);
 
+      // Wait for lazy test loading
+      await act(async () => {
+        vi.advanceTimersByTime(10);
+      });
+
       // Tests panel should be rendered when file-based data is available
       // (testsDisabled only applies to command-based tests)
       expect(lastFrame()).toContain("Tests");
       expect(lastFrame()).toContain("5 passed");
+
+      vi.useRealTimers();
     });
   });
 });

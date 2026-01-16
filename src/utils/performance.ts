@@ -1,4 +1,4 @@
-import { performance } from "perf_hooks";
+import { performance } from "node:perf_hooks";
 
 const DEFAULT_CLEANUP_INTERVAL = 60000; // 60 seconds
 
@@ -19,7 +19,7 @@ export function clearPerformanceEntries(): void {
  * @param intervalMs - Cleanup interval in milliseconds (default: 60000)
  */
 export function startPerformanceCleanup(
-  intervalMs: number = DEFAULT_CLEANUP_INTERVAL
+  intervalMs: number = DEFAULT_CLEANUP_INTERVAL,
 ): void {
   if (cleanupInterval !== null) {
     clearInterval(cleanupInterval);

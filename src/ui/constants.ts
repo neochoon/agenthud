@@ -52,26 +52,35 @@ export const BOX = {
 
 // Create a title line with label on left and suffix on right
 // Example: "┌─ Git ───────────────────────────────── ↻ 25s ─┐"
-export function createTitleLine(label: string, suffix: string = "", panelWidth: number = DEFAULT_PANEL_WIDTH): string {
-  const leftPart = BOX.h + " " + label + " ";
-  const rightPart = suffix ? " " + suffix + " " + BOX.h : "";
-  // Use display width for suffix since it may contain emojis
-  const leftWidth = leftPart.length;
-  const rightWidth = suffix ? 1 + getDisplayWidth(suffix) + 1 + 1 : 0; // space + suffix + space + dash
+export function createTitleLine(
+  label: string,
+  suffix: string = "",
+  panelWidth: number = DEFAULT_PANEL_WIDTH,
+): string {
+  const leftPart = `${BOX.h} ${label} `;
+  const rightPart = suffix ? ` ${suffix} ${BOX.h}` : "";
+  // Use display width for both parts to handle special characters correctly
+  const leftWidth = getDisplayWidth(leftPart);
+  const rightWidth = suffix ? getDisplayWidth(rightPart) : 0;
   const dashCount = panelWidth - 1 - leftWidth - rightWidth - 1;
   const dashes = BOX.h.repeat(Math.max(0, dashCount));
   return BOX.tl + leftPart + dashes + rightPart + BOX.tr;
 }
 
 // Create bottom line
-export function createBottomLine(panelWidth: number = DEFAULT_PANEL_WIDTH): string {
+export function createBottomLine(
+  panelWidth: number = DEFAULT_PANEL_WIDTH,
+): string {
   return BOX.bl + BOX.h.repeat(getInnerWidth(panelWidth)) + BOX.br;
 }
 
 // Create separator line with title (for sub-sections)
 // Example: "├─ Todo (3/6) ──────────────────────────────────────┤"
-export function createSeparatorLine(title: string, panelWidth: number = DEFAULT_PANEL_WIDTH): string {
-  const leftPart = BOX.h + " " + title + " ";
+export function createSeparatorLine(
+  title: string,
+  panelWidth: number = DEFAULT_PANEL_WIDTH,
+): string {
+  const leftPart = `${BOX.h} ${title} `;
   const leftWidth = leftPart.length;
   const dashCount = panelWidth - 1 - leftWidth - 1; // ml + leftPart + dashes + mr
   const dashes = BOX.h.repeat(Math.max(0, dashCount));
@@ -79,14 +88,19 @@ export function createSeparatorLine(title: string, panelWidth: number = DEFAULT_
 }
 
 // Pad content to fit inner width (content goes between │ and │)
-export function padLine(content: string, panelWidth: number = DEFAULT_PANEL_WIDTH): string {
+export function padLine(
+  content: string,
+  panelWidth: number = DEFAULT_PANEL_WIDTH,
+): string {
   const innerWidth = getInnerWidth(panelWidth);
   const padding = innerWidth - content.length;
   return content + " ".repeat(Math.max(0, padding));
 }
 
 // Separator line for content area
-export function createSeparator(panelWidth: number = DEFAULT_PANEL_WIDTH): string {
+export function createSeparator(
+  panelWidth: number = DEFAULT_PANEL_WIDTH,
+): string {
   return "─".repeat(getContentWidth(panelWidth));
 }
 
@@ -96,7 +110,7 @@ export const SEPARATOR = "─".repeat(CONTENT_WIDTH);
 // Truncate text to fit within max length, adding "..." if needed
 export function truncate(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
-  return text.slice(0, maxLength - 3) + "...";
+  return `${text.slice(0, maxLength - 3)}...`;
 }
 
 // Use string-width for accurate terminal width calculation

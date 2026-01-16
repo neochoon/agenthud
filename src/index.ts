@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-import React from "react";
+import { existsSync } from "node:fs";
 import { render } from "ink";
-import { existsSync } from "fs";
-import { App } from "./ui/App.js";
-import { parseArgs, clearScreen, getVersion, getHelp } from "./cli.js";
+import React from "react";
+import { clearScreen, getHelp, getVersion, parseArgs } from "./cli.js";
 import { runInit } from "./commands/init.js";
+import { App } from "./ui/App.js";
 import {
   startPerformanceCleanup,
   stopPerformanceCleanup,
@@ -60,7 +60,7 @@ if (options.mode === "watch") {
 }
 
 const { waitUntilExit } = render(
-  React.createElement(App, { mode: options.mode, agentDirExists })
+  React.createElement(App, { mode: options.mode, agentDirExists }),
 );
 
 if (options.mode === "once") {

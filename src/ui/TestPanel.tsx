@@ -1,7 +1,16 @@
-import React from "react";
 import { Box, Text } from "ink";
+import type React from "react";
 import type { TestResults } from "../types/index.js";
-import { DEFAULT_PANEL_WIDTH, BOX, createTitleLine, createBottomLine, padLine, truncate, getInnerWidth, getContentWidth } from "./constants.js";
+import {
+  BOX,
+  createBottomLine,
+  createTitleLine,
+  DEFAULT_PANEL_WIDTH,
+  getContentWidth,
+  getInnerWidth,
+  padLine,
+  truncate,
+} from "./constants.js";
 
 interface TestPanelProps {
   results: TestResults | null;
@@ -53,12 +62,17 @@ export function TestPanel({
   };
   const titleSuffix = getTitleSuffix();
 
-  // Error state
+  // Error or loading state
   if (error || !results) {
+    const message = error || (isRunning ? "Running..." : "Loading...");
     return (
       <Box flexDirection="column" width={width}>
         <Text>{createTitleLine("Tests", titleSuffix, width)}</Text>
-        <Text>{BOX.v}<Text dimColor>{padLine(" " + (error || "No test results"), width)}</Text>{BOX.v}</Text>
+        <Text>
+          {BOX.v}
+          <Text dimColor>{padLine(` ${message}`, width)}</Text>
+          {BOX.v}
+        </Text>
         <Text>{createBottomLine(width)}</Text>
       </Box>
     );
@@ -87,15 +101,19 @@ export function TestPanel({
       {isOutdated && (
         <Text>
           {BOX.v}
-          <Text color="yellow">{padLine(` ⚠ Outdated (${commitsBehind} ${commitsBehind === 1 ? "commit" : "commits"} behind)`, width)}</Text>
+          <Text color="yellow">
+            {padLine(
+              ` ⚠ Outdated (${commitsBehind} ${commitsBehind === 1 ? "commit" : "commits"} behind)`,
+              width,
+            )}
+          </Text>
           {BOX.v}
         </Text>
       )}
 
       {/* Summary line with colors */}
       <Text>
-        {BOX.v}{" "}
-        <Text color="green">✓ {results.passed} passed</Text>
+        {BOX.v} <Text color="green">✓ {results.passed} passed</Text>
         {results.failed > 0 && (
           <>
             {"  "}
@@ -109,7 +127,8 @@ export function TestPanel({
           </>
         )}
         <Text dimColor> · {results.hash}</Text>
-        {" ".repeat(summaryPadding)}{BOX.v}
+        {" ".repeat(summaryPadding)}
+        {BOX.v}
       </Text>
 
       {/* Failures section */}
@@ -124,13 +143,15 @@ export function TestPanel({
             return (
               <Box key={`failure-${index}`} flexDirection="column">
                 <Text>
-                  {BOX.v}{" "}
-                  <Text color="red">✗ {fileName}</Text>
-                  {" ".repeat(filePadding)}{BOX.v}
+                  {BOX.v} <Text color="red">✗ {fileName}</Text>
+                  {" ".repeat(filePadding)}
+                  {BOX.v}
                 </Text>
                 <Text>
-                  {BOX.v}{"   "}• {testName}
-                  {" ".repeat(testPadding)}{BOX.v}
+                  {BOX.v}
+                  {"   "}• {testName}
+                  {" ".repeat(testPadding)}
+                  {BOX.v}
                 </Text>
               </Box>
             );

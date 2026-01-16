@@ -1,12 +1,11 @@
-import React from "react";
-import { describe, it, expect } from "vitest";
 import { render } from "ink-testing-library";
-import { ClaudePanel, getActivityStyle } from "../../src/ui/ClaudePanel.js";
+import { describe, expect, it } from "vitest";
+import type { ActivityEntry, ClaudeData } from "../../src/types/index.js";
 import { ICONS } from "../../src/types/index.js";
-import type { ClaudeData, ActivityEntry } from "../../src/types/index.js";
+import { ClaudePanel, getActivityStyle } from "../../src/ui/ClaudePanel.js";
 
 describe("ClaudePanel", () => {
-  const mockActivity: ActivityEntry = {
+  const _mockActivity: ActivityEntry = {
     timestamp: new Date("2025-01-12T10:30:00"),
     type: "tool",
     icon: ICONS.Grep,
@@ -268,12 +267,66 @@ describe("ClaudePanel", () => {
       const { lastFrame: frame2 } = render(<ClaudePanel data={data2} />);
       expect(frame2()?.split("\n")[0]).toContain("1K tokens");
     });
+
+    it("shows token count with M format for >= 1 million", () => {
+      const data = createMockData({
+        state: {
+          status: "running",
+          activities: mockActivities,
+          tokenCount: 24774000,
+          sessionStartTime: null,
+          todos: null,
+        },
+      });
+
+      const { lastFrame } = render(<ClaudePanel data={data} />);
+      const titleLine = lastFrame()?.split("\n")[0] || "";
+      expect(titleLine).toContain("24.8M tokens");
+    });
+
+    it("shows 1.5M for 1500000 tokens", () => {
+      const data = createMockData({
+        state: {
+          status: "running",
+          activities: mockActivities,
+          tokenCount: 1500000,
+          sessionStartTime: null,
+          todos: null,
+        },
+      });
+
+      const { lastFrame } = render(<ClaudePanel data={data} />);
+      const titleLine = lastFrame()?.split("\n")[0] || "";
+      expect(titleLine).toContain("1.5M tokens");
+    });
   });
 
-  describe("elapsed time", () => {
-    it("shows elapsed time in hours and minutes in title", () => {
+  describe("session time", () => {
+    it("shows session start time and elapsed time with icon", () => {
+      const sessionStart = new Date(Date.now() - 30 * 60 * 1000); // 30 minutes ago
+      const startHours = String(sessionStart.getHours()).padStart(2, "0");
+      const startMinutes = String(sessionStart.getMinutes()).padStart(2, "0");
+      const data = createMockData({
+        state: {
+          status: "running",
+          activities: mockActivities,
+          tokenCount: 0,
+          sessionStartTime: sessionStart,
+          todos: null,
+        },
+      });
+
+      const { lastFrame } = render(<ClaudePanel data={data} />);
+
+      expect(lastFrame()).toContain(`${startHours}:${startMinutes}`);
+      expect(lastFrame()).toContain("(30m)");
+    });
+
+    it("shows elapsed time in hours and minutes format", () => {
       // 2 hours 30 minutes ago
-      const sessionStart = new Date(Date.now() - 2 * 60 * 60 * 1000 - 30 * 60 * 1000);
+      const sessionStart = new Date(
+        Date.now() - 2 * 60 * 60 * 1000 - 30 * 60 * 1000,
+      );
       const data = createMockData({
         state: {
           status: "running",
@@ -285,7 +338,7 @@ describe("ClaudePanel", () => {
 
       const { lastFrame } = render(<ClaudePanel data={data} />);
 
-      expect(lastFrame()).toContain("2h 30m");
+      expect(lastFrame()).toContain("(2h 30m)");
     });
 
     it("shows elapsed time in minutes only when less than 1 hour", () => {
@@ -302,8 +355,7 @@ describe("ClaudePanel", () => {
 
       const { lastFrame } = render(<ClaudePanel data={data} />);
 
-      expect(lastFrame()).toContain("45m");
-      expect(lastFrame()).not.toContain("h ");
+      expect(lastFrame()).toContain("(45m)");
     });
 
     it("shows '<1m' when less than 1 minute", () => {
@@ -320,10 +372,10 @@ describe("ClaudePanel", () => {
 
       const { lastFrame } = render(<ClaudePanel data={data} />);
 
-      expect(lastFrame()).toContain("<1m");
+      expect(lastFrame()).toContain("(<1m)");
     });
 
-    it("shows elapsed time with countdown separated by dot", () => {
+    it("shows session time with countdown separated by dot", () => {
       // 10 minutes ago
       const sessionStart = new Date(Date.now() - 10 * 60 * 1000);
       const data = createMockData({
@@ -337,8 +389,8 @@ describe("ClaudePanel", () => {
 
       const { lastFrame } = render(<ClaudePanel data={data} countdown={15} />);
 
-      // Should show both elapsed time and countdown with separator
-      expect(lastFrame()).toContain("10m");
+      // Should show session time and countdown with separator
+      expect(lastFrame()).toContain("(10m)");
       expect(lastFrame()).toContain("·");
       expect(lastFrame()).toContain("15s");
     });
@@ -360,7 +412,7 @@ describe("ClaudePanel", () => {
       expect(lastFrame()).not.toContain("·");
     });
 
-    it("shows elapsed time even when no active session", () => {
+    it("shows session time even when no active session", () => {
       // 1 hour ago
       const sessionStart = new Date(Date.now() - 60 * 60 * 1000);
       const data = createMockData({
@@ -376,7 +428,7 @@ describe("ClaudePanel", () => {
       const { lastFrame } = render(<ClaudePanel data={data} />);
 
       expect(lastFrame()).toContain("No active session");
-      expect(lastFrame()).toContain("1h 0m");
+      expect(lastFrame()).toContain("(1h 0m)");
     });
   });
 
@@ -384,7 +436,9 @@ describe("ClaudePanel", () => {
     it("shows 'running...' when isRunning is true", () => {
       const data = createMockData();
 
-      const { lastFrame } = render(<ClaudePanel data={data} isRunning={true} />);
+      const { lastFrame } = render(
+        <ClaudePanel data={data} isRunning={true} />,
+      );
 
       expect(lastFrame()).toContain("running...");
     });
@@ -393,7 +447,7 @@ describe("ClaudePanel", () => {
       const data = createMockData();
 
       const { lastFrame } = render(
-        <ClaudePanel data={data} isRunning={false} countdown={25} />
+        <ClaudePanel data={data} isRunning={false} countdown={25} />,
       );
 
       expect(lastFrame()).toContain("25s");
@@ -404,7 +458,7 @@ describe("ClaudePanel", () => {
       const data = createMockData();
 
       const { lastFrame } = render(
-        <ClaudePanel data={data} isRunning={false} countdown={null} />
+        <ClaudePanel data={data} isRunning={false} countdown={null} />,
       );
 
       // Should not contain countdown format (↻ followed by number and s)
@@ -462,7 +516,8 @@ describe("ClaudePanel", () => {
       const lines = output.split("\n");
 
       // Each line should end with box character (stripping ANSI escape sequences)
-      const stripAnsi = (str: string) => str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
+      const stripAnsi = (str: string) =>
+        str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
       for (const line of lines) {
         if (line.includes("│")) {
           const cleanLine = stripAnsi(line);
@@ -644,7 +699,8 @@ describe("ClaudePanel", () => {
       const lines = output.split("\n");
 
       // Get actual line lengths (excluding ANSI codes)
-      const stripAnsi = (str: string) => str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
+      const stripAnsi = (str: string) =>
+        str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
 
       const titleLine = stripAnsi(lines[0]); // ┌─ Claude ─...─┐
       const contentLine = stripAnsi(lines[1]); // │ [HH:MM:SS] ...│
@@ -659,22 +715,58 @@ describe("ClaudePanel", () => {
     it("handles different emoji icons correctly", () => {
       // Test with different emoji icons to ensure width calculation is correct
       const activities: ActivityEntry[] = [
-        { timestamp: new Date("2025-01-12T10:30:00"), type: "user", icon: ICONS.User, label: "User", detail: "hello world" },
-        { timestamp: new Date("2025-01-12T10:30:01"), type: "response", icon: ICONS.Response, label: "Response", detail: "hi there" },
-        { timestamp: new Date("2025-01-12T10:30:02"), type: "tool", icon: ICONS.Bash, label: "Bash", detail: "npm test" },
-        { timestamp: new Date("2025-01-12T10:30:03"), type: "tool", icon: ICONS.Edit, label: "Edit", detail: "file.ts" },
-        { timestamp: new Date("2025-01-12T10:30:04"), type: "tool", icon: ICONS.Grep, label: "Grep", detail: "pattern" },
+        {
+          timestamp: new Date("2025-01-12T10:30:00"),
+          type: "user",
+          icon: ICONS.User,
+          label: "User",
+          detail: "hello world",
+        },
+        {
+          timestamp: new Date("2025-01-12T10:30:01"),
+          type: "response",
+          icon: ICONS.Response,
+          label: "Response",
+          detail: "hi there",
+        },
+        {
+          timestamp: new Date("2025-01-12T10:30:02"),
+          type: "tool",
+          icon: ICONS.Bash,
+          label: "Bash",
+          detail: "npm test",
+        },
+        {
+          timestamp: new Date("2025-01-12T10:30:03"),
+          type: "tool",
+          icon: ICONS.Edit,
+          label: "Edit",
+          detail: "file.ts",
+        },
+        {
+          timestamp: new Date("2025-01-12T10:30:04"),
+          type: "tool",
+          icon: ICONS.Grep,
+          label: "Grep",
+          detail: "pattern",
+        },
       ];
 
       const data = createMockData({
-        state: { status: "running", activities, tokenCount: 0, sessionStartTime: null },
+        state: {
+          status: "running",
+          activities,
+          tokenCount: 0,
+          sessionStartTime: null,
+        },
       });
 
       const { lastFrame } = render(<ClaudePanel data={data} width={100} />);
       const output = lastFrame() || "";
       const lines = output.split("\n");
 
-      const stripAnsi = (str: string) => str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
+      const stripAnsi = (str: string) =>
+        str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
 
       // All content lines should have the same width
       const contentLines = lines.slice(1, -1); // Exclude title and bottom
@@ -687,7 +779,8 @@ describe("ClaudePanel", () => {
     it("uses full width for long details when width is large", () => {
       // At width 120: contentWidth=117, prefix=21, available=96 chars for detail
       // This detail is 90 chars - should fit without truncation at width 120
-      const detail90chars = "npm run build && npm run test && npm run lint && npm run format && npm run typecheck";
+      const detail90chars =
+        "npm run build && npm run test && npm run lint && npm run format && npm run typecheck";
       const data = createMockData({
         state: {
           status: "running",
@@ -717,7 +810,8 @@ describe("ClaudePanel", () => {
 
     it("truncates at narrow width but not at wide width", () => {
       // This detail is 60 chars - should truncate at width 60, but fit at width 120
-      const detail60chars = "npm run build && npm run test && npm run lint && npm run";
+      const detail60chars =
+        "npm run build && npm run test && npm run lint && npm run";
       const data = createMockData({
         state: {
           status: "running",
@@ -812,9 +906,21 @@ describe("ClaudePanel", () => {
           tokenCount: 0,
           sessionStartTime: null,
           todos: [
-            { content: "Create issue", status: "completed", activeForm: "Creating issue" },
-            { content: "Write tests", status: "in_progress", activeForm: "Writing tests" },
-            { content: "Implement", status: "pending", activeForm: "Implementing" },
+            {
+              content: "Create issue",
+              status: "completed",
+              activeForm: "Creating issue",
+            },
+            {
+              content: "Write tests",
+              status: "in_progress",
+              activeForm: "Writing tests",
+            },
+            {
+              content: "Implement",
+              status: "pending",
+              activeForm: "Implementing",
+            },
           ],
         },
       });
@@ -841,7 +947,11 @@ describe("ClaudePanel", () => {
           sessionStartTime: null,
           todos: [
             { content: "Done task", status: "completed", activeForm: "Done" },
-            { content: "Current task", status: "in_progress", activeForm: "Working" },
+            {
+              content: "Current task",
+              status: "in_progress",
+              activeForm: "Working",
+            },
             { content: "Future task", status: "pending", activeForm: "Future" },
           ],
         },
@@ -900,9 +1010,21 @@ describe("ClaudePanel", () => {
           tokenCount: 0,
           sessionStartTime: null,
           todos: [
-            { content: "Create issue", status: "completed", activeForm: "Creating issue" },
-            { content: "Write tests", status: "completed", activeForm: "Writing tests" },
-            { content: "Create PR", status: "completed", activeForm: "Creating PR" },
+            {
+              content: "Create issue",
+              status: "completed",
+              activeForm: "Creating issue",
+            },
+            {
+              content: "Write tests",
+              status: "completed",
+              activeForm: "Writing tests",
+            },
+            {
+              content: "Create PR",
+              status: "completed",
+              activeForm: "Creating PR",
+            },
           ],
         },
       });

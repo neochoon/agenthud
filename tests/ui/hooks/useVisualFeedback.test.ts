@@ -1,8 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+
+import { act, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useVisualFeedback } from "../../../src/ui/hooks/useVisualFeedback.js";
 
 describe("useVisualFeedback", () => {
@@ -19,7 +20,7 @@ describe("useVisualFeedback", () => {
       const { result } = renderHook(() =>
         useVisualFeedback({
           panels: ["project", "git", "tests", "claude"],
-        })
+        }),
       );
 
       expect(result.current.states.project).toEqual({
@@ -48,7 +49,7 @@ describe("useVisualFeedback", () => {
       const { result } = renderHook(() =>
         useVisualFeedback({
           panels: [],
-        })
+        }),
       );
 
       expect(result.current.states).toEqual({});
@@ -58,7 +59,7 @@ describe("useVisualFeedback", () => {
       const { result } = renderHook(() =>
         useVisualFeedback({
           panels: ["git", "deploy", "build"],
-        })
+        }),
       );
 
       expect(result.current.states.deploy).toEqual({
@@ -79,7 +80,7 @@ describe("useVisualFeedback", () => {
       const { result } = renderHook(() =>
         useVisualFeedback({
           panels: ["git"],
-        })
+        }),
       );
 
       act(() => {
@@ -93,7 +94,7 @@ describe("useVisualFeedback", () => {
       const { result } = renderHook(() =>
         useVisualFeedback({
           panels: ["git"],
-        })
+        }),
       );
 
       act(() => {
@@ -111,7 +112,7 @@ describe("useVisualFeedback", () => {
       const { result } = renderHook(() =>
         useVisualFeedback({
           panels: ["git", "tests"],
-        })
+        }),
       );
 
       act(() => {
@@ -128,7 +129,7 @@ describe("useVisualFeedback", () => {
       const { result } = renderHook(() =>
         useVisualFeedback({
           panels: ["git"],
-        })
+        }),
       );
 
       act(() => {
@@ -142,7 +143,7 @@ describe("useVisualFeedback", () => {
       const { result } = renderHook(() =>
         useVisualFeedback({
           panels: ["git"],
-        })
+        }),
       );
 
       act(() => {
@@ -167,7 +168,7 @@ describe("useVisualFeedback", () => {
       const { result } = renderHook(() =>
         useVisualFeedback({
           panels: ["git"],
-        })
+        }),
       );
 
       act(() => {
@@ -205,7 +206,7 @@ describe("useVisualFeedback", () => {
       const { result } = renderHook(() =>
         useVisualFeedback({
           panels: ["tests"],
-        })
+        }),
       );
 
       act(() => {
@@ -219,7 +220,7 @@ describe("useVisualFeedback", () => {
       const { result } = renderHook(() =>
         useVisualFeedback({
           panels: ["tests"],
-        })
+        }),
       );
 
       act(() => {
@@ -239,7 +240,7 @@ describe("useVisualFeedback", () => {
       const { result } = renderHook(() =>
         useVisualFeedback({
           panels: ["git"],
-        })
+        }),
       );
 
       act(() => {
@@ -253,7 +254,7 @@ describe("useVisualFeedback", () => {
       const { result } = renderHook(() =>
         useVisualFeedback({
           panels: ["git"],
-        })
+        }),
       );
 
       act(() => {
@@ -273,7 +274,7 @@ describe("useVisualFeedback", () => {
       const { result } = renderHook(() =>
         useVisualFeedback({
           panels: ["tests"],
-        })
+        }),
       );
 
       act(() => {
@@ -295,7 +296,7 @@ describe("useVisualFeedback", () => {
       const { result } = renderHook(() =>
         useVisualFeedback({
           panels: ["git"],
-        })
+        }),
       );
 
       const state = result.current.getState("git");
@@ -310,7 +311,7 @@ describe("useVisualFeedback", () => {
       const { result } = renderHook(() =>
         useVisualFeedback({
           panels: ["git"],
-        })
+        }),
       );
 
       const state = result.current.getState("unknown");
@@ -327,7 +328,7 @@ describe("useVisualFeedback", () => {
       const { result, unmount } = renderHook(() =>
         useVisualFeedback({
           panels: ["git"],
-        })
+        }),
       );
 
       act(() => {

@@ -1,14 +1,20 @@
-import React, { useState, useEffect } from "react";
 import { Box, Text } from "ink";
-import type { ClaudeData, ClaudeSessionStatus, ActivityEntry, TodoItem } from "../types/index.js";
+import type React from "react";
+import { useEffect, useState } from "react";
+import type {
+  ActivityEntry,
+  ClaudeData,
+  ClaudeSessionStatus,
+  TodoItem,
+} from "../types/index.js";
 import {
-  DEFAULT_PANEL_WIDTH,
   BOX,
-  createTitleLine,
   createBottomLine,
   createSeparatorLine,
-  getInnerWidth,
+  createTitleLine,
+  DEFAULT_PANEL_WIDTH,
   getDisplayWidth,
+  getInnerWidth,
 } from "./constants.js";
 
 export interface ActivityStyle {
@@ -59,24 +65,36 @@ function formatCountdown(seconds: number | null | undefined): string {
 function formatTokenCount(tokens: number): string {
   if (tokens <= 0) return "";
   if (tokens < 1000) return `${tokens} tokens`;
-  const k = Math.round(tokens / 1000);
-  return `${k}K tokens`;
+  if (tokens < 1000000) return `${Math.round(tokens / 1000)}K tokens`;
+  return `${(tokens / 1000000).toFixed(1)}M tokens`;
 }
 
-function formatElapsedTime(startTime: Date | null): string {
+function formatSessionTime(startTime: Date | null): string {
   if (!startTime) return "";
-  const elapsed = Date.now() - startTime.getTime();
-  const minutes = Math.floor(elapsed / 60000);
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
 
-  if (hours > 0) {
-    return `${hours}h ${remainingMinutes}m`;
+  // Start time (HH:MM)
+  const startHours = String(startTime.getHours()).padStart(2, "0");
+  const startMinutes = String(startTime.getMinutes()).padStart(2, "0");
+  const startStr = `${startHours}:${startMinutes}`;
+
+  // Elapsed time
+  const elapsed = Date.now() - startTime.getTime();
+  const elapsedMinutes = Math.floor(elapsed / 60000);
+  const hours = Math.floor(elapsedMinutes / 60);
+  const remainingMinutes = elapsedMinutes % 60;
+
+  let elapsedStr: string;
+  if (hours >= 10) {
+    elapsedStr = `${hours}h`;
+  } else if (hours > 0) {
+    elapsedStr = `${hours}h ${remainingMinutes}m`;
+  } else if (elapsedMinutes > 0) {
+    elapsedStr = `${elapsedMinutes}m`;
+  } else {
+    elapsedStr = "<1m";
   }
-  if (minutes > 0) {
-    return `${minutes}m`;
-  }
-  return "<1m";
+
+  return `${startStr} (${elapsedStr})`;
 }
 
 function getStatusIcon(status: ClaudeSessionStatus): string {
@@ -87,7 +105,6 @@ function getStatusIcon(status: ClaudeSessionStatus): string {
       return "✅";
     case "idle":
       return "⏳";
-    case "none":
     default:
       return "";
   }
@@ -101,13 +118,16 @@ function formatActivityTime(date: Date): string {
 }
 
 interface ActivityParts {
-  timestamp: string;  // "[HH:MM:SS] "
-  icon: string;       // ">" or "$" etc.
+  timestamp: string; // "[HH:MM:SS] "
+  icon: string; // ">" or "$" etc.
   labelContent: string; // "label: detail" or "label"
   displayWidth: number;
 }
 
-function formatActivityParts(activity: ActivityEntry, maxWidth: number): ActivityParts {
+function formatActivityParts(
+  activity: ActivityEntry,
+  maxWidth: number,
+): ActivityParts {
   const time = formatActivityTime(activity.timestamp);
   const icon = activity.icon;
   const label = activity.label;
@@ -186,7 +206,8 @@ function formatActivityParts(activity: ActivityEntry, maxWidth: number): Activit
     }
 
     const labelContent = `${label}: ${truncatedDetail}${countSuffix}`;
-    const displayWidth = totalPrefixWidth + detailDisplayWidth + countSuffixWidth;
+    const displayWidth =
+      totalPrefixWidth + detailDisplayWidth + countSuffixWidth;
     return { timestamp, icon, labelContent, displayWidth };
   }
 
@@ -223,7 +244,9 @@ function TodoSection({ todos, width }: TodoSectionProps): React.ReactElement {
   const totalCount = todos.length;
   const headerTitle = `Todo (${completedCount}/${totalCount})`;
 
-  const inProgressIcon = tick ? TODO_ICONS.in_progress_left : TODO_ICONS.in_progress_right;
+  const inProgressIcon = tick
+    ? TODO_ICONS.in_progress_left
+    : TODO_ICONS.in_progress_right;
 
   return (
     <>
@@ -247,7 +270,8 @@ function TodoSection({ todos, width }: TodoSectionProps): React.ReactElement {
         }
 
         // Use activeForm for in_progress, content for others
-        const text = todo.status === "in_progress" ? todo.activeForm : todo.content;
+        const text =
+          todo.status === "in_progress" ? todo.activeForm : todo.content;
         const maxTextWidth = contentWidth - 3; // icon + space + border
         let displayText = text;
         if (getDisplayWidth(text) > maxTextWidth) {
@@ -265,13 +289,17 @@ function TodoSection({ todos, width }: TodoSectionProps): React.ReactElement {
           }
         }
 
-        const padding = Math.max(0, contentWidth - getDisplayWidth(icon) - 1 - getDisplayWidth(displayText));
+        const padding = Math.max(
+          0,
+          contentWidth -
+            getDisplayWidth(icon) -
+            1 -
+            getDisplayWidth(displayText),
+        );
 
         return (
           <Text key={`todo-${i}`}>
-            {BOX.v}{" "}
-            <Text color={iconColor}>{icon}</Text>
-            {" "}
+            {BOX.v} <Text color={iconColor}>{icon}</Text>{" "}
             <Text dimColor={todo.status === "completed"}>{displayText}</Text>
             {" ".repeat(padding)}
             {BOX.v}
@@ -294,15 +322,15 @@ export function ClaudePanel({
   const contentWidth = innerWidth - 1; // Account for " " after │ (│ is counted in innerWidth)
 
   const { state } = data;
-  const statusIcon = getStatusIcon(state.status);
-  const elapsedTime = formatElapsedTime(state.sessionStartTime);
+  const _statusIcon = getStatusIcon(state.status);
+  const sessionTime = formatSessionTime(state.sessionStartTime);
   const tokenDisplay = formatTokenCount(state.tokenCount);
 
   // Build title suffix with tokens, elapsed time, and countdown
   // Order: 50K tokens · 30m · ↻ 10s
   const titleParts: string[] = [];
   if (tokenDisplay) titleParts.push(tokenDisplay);
-  if (elapsedTime) titleParts.push(elapsedTime);
+  if (sessionTime) titleParts.push(sessionTime);
   if (countdownSuffix) titleParts.push(countdownSuffix);
   const titleSuffix = titleParts.join(" · ");
 
@@ -313,8 +341,7 @@ export function ClaudePanel({
       <Box flexDirection="column" width={width}>
         <Text>{createTitleLine("Claude", titleSuffix, width)}</Text>
         <Text>
-          {BOX.v}{" "}
-          <Text color="red">{data.error}</Text>
+          {BOX.v} <Text color="red">{data.error}</Text>
           {" ".repeat(errorPadding)}
           {BOX.v}
         </Text>
@@ -331,8 +358,7 @@ export function ClaudePanel({
       <Box flexDirection="column" width={width}>
         <Text>{createTitleLine("Claude", countdownSuffix, width)}</Text>
         <Text>
-          {BOX.v}{" "}
-          <Text dimColor>{noSessionText}</Text>
+          {BOX.v} <Text dimColor>{noSessionText}</Text>
           {" ".repeat(noSessionPadding)}
           {BOX.v}
         </Text>
@@ -349,8 +375,7 @@ export function ClaudePanel({
       <Box flexDirection="column" width={width}>
         <Text>{createTitleLine("Claude", titleSuffix, width)}</Text>
         <Text>
-          {BOX.v}{" "}
-          <Text dimColor>{noActiveText}</Text>
+          {BOX.v} <Text dimColor>{noActiveText}</Text>
           {" ".repeat(noActivePadding)}
           {BOX.v}
         </Text>
@@ -364,7 +389,10 @@ export function ClaudePanel({
 
   for (let i = 0; i < state.activities.length; i++) {
     const activity = state.activities[i];
-    const { timestamp, icon, labelContent, displayWidth } = formatActivityParts(activity, contentWidth);
+    const { timestamp, icon, labelContent, displayWidth } = formatActivityParts(
+      activity,
+      contentWidth,
+    );
     const padding = Math.max(0, contentWidth - displayWidth);
     const style = getActivityStyle(activity);
 
@@ -373,20 +401,22 @@ export function ClaudePanel({
 
     lines.push(
       <Text key={`activity-${i}`}>
-        {BOX.v}{" "}
-        <Text dimColor>{timestamp}</Text>
-        <Text color="cyan">{icon}</Text>
-        {" "}
-        <Text color={style.color} dimColor={style.dimColor}>{labelContent}</Text>
+        {BOX.v} <Text dimColor>{timestamp}</Text>
+        <Text color="cyan">{icon}</Text>{" "}
+        <Text color={style.color} dimColor={style.dimColor}>
+          {labelContent}
+        </Text>
         {" ".repeat(padding)}
-        {BOX.v}{clearEOL}
-      </Text>
+        {BOX.v}
+        {clearEOL}
+      </Text>,
     );
   }
 
   // Check if todos exist and determine display mode
   const hasTodos = state.todos && state.todos.length > 0;
-  const allCompleted = hasTodos && state.todos!.every((t) => t.status === "completed");
+  const allCompleted =
+    hasTodos && state.todos?.every((t) => t.status === "completed");
 
   // If all todos completed, add summary line to activities
   if (hasTodos && allCompleted) {
@@ -417,17 +447,18 @@ export function ClaudePanel({
       }
     }
 
-    const summaryPadding = Math.max(0, contentWidth - prefixWidth - getDisplayWidth(displaySummary));
+    const summaryPadding = Math.max(
+      0,
+      contentWidth - prefixWidth - getDisplayWidth(displaySummary),
+    );
     lines.push(
       <Text key="todo-summary">
-        {BOX.v}{" "}
-        <Text dimColor>{timestampStr}</Text>
-        <Text color="green">{summaryIcon}</Text>
-        {" "}
+        {BOX.v} <Text dimColor>{timestampStr}</Text>
+        <Text color="green">{summaryIcon}</Text>{" "}
         <Text color="green">{displaySummary}</Text>
         {" ".repeat(summaryPadding)}
         {BOX.v}
-      </Text>
+      </Text>,
     );
   }
 
@@ -438,9 +469,7 @@ export function ClaudePanel({
     <Box flexDirection="column" width={width}>
       <Text>{createTitleLine("Claude", titleSuffix, width)}</Text>
       {lines}
-      {showTodoSection && (
-        <TodoSection todos={state.todos!} width={width} />
-      )}
+      {showTodoSection && <TodoSection todos={state.todos!} width={width} />}
       <Text>{createBottomLine(width)}</Text>
     </Box>
   );

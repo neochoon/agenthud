@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface VisualFeedback {
   isRunning: boolean;
@@ -61,7 +61,7 @@ export function useVisualFeedback({
         [panel]: { ...(prev[panel] || DEFAULT_VISUAL_STATE), ...update },
       }));
     },
-    []
+    [],
   );
 
   // Helper to schedule auto-clear of a feedback flag
@@ -82,7 +82,7 @@ export function useVisualFeedback({
 
       timeoutsRef.current.set(timeoutKey, timeout);
     },
-    [updateState]
+    [updateState],
   );
 
   // Set isRunning state
@@ -90,7 +90,7 @@ export function useVisualFeedback({
     (panel: string, running: boolean) => {
       updateState(panel, { isRunning: running });
     },
-    [updateState]
+    [updateState],
   );
 
   // Set justRefreshed with auto-clear
@@ -99,7 +99,7 @@ export function useVisualFeedback({
       updateState(panel, { justRefreshed: true });
       scheduleAutoClear(panel, "justRefreshed");
     },
-    [updateState, scheduleAutoClear]
+    [updateState, scheduleAutoClear],
   );
 
   // Set justCompleted with auto-clear
@@ -108,7 +108,7 @@ export function useVisualFeedback({
       updateState(panel, { justCompleted: true });
       scheduleAutoClear(panel, "justCompleted");
     },
-    [updateState, scheduleAutoClear]
+    [updateState, scheduleAutoClear],
   );
 
   // Start async operation
@@ -116,7 +116,7 @@ export function useVisualFeedback({
     (panel: string) => {
       setRunning(panel, true);
     },
-    [setRunning]
+    [setRunning],
   );
 
   // End async operation
@@ -129,7 +129,7 @@ export function useVisualFeedback({
         setRefreshed(panel);
       }
     },
-    [setRunning, setRefreshed, setCompleted]
+    [setRunning, setRefreshed, setCompleted],
   );
 
   // Get state for a panel (returns default if unknown)
@@ -137,7 +137,7 @@ export function useVisualFeedback({
     (panel: string): VisualFeedback => {
       return states[panel] || { ...DEFAULT_VISUAL_STATE };
     },
-    [states]
+    [states],
   );
 
   return {

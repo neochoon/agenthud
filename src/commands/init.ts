@@ -1,13 +1,13 @@
 import {
+  appendFileSync,
   existsSync,
   mkdirSync,
-  writeFileSync,
   readFileSync,
-  appendFileSync,
-} from "fs";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-import { homedir } from "os";
+  writeFileSync,
+} from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { detectTestFramework } from "../data/detectTestFramework.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -73,13 +73,13 @@ export function runInit(cwd: string = process.cwd()): InitResult {
     if (testFramework) {
       configContent = configContent.replace(
         /command: npx vitest run --reporter=json/,
-        `command: ${testFramework.command}`
+        `command: ${testFramework.command}`,
       );
     } else {
       // No test framework detected - comment out the command
       configContent = configContent.replace(
         /command: npx vitest run --reporter=json/,
-        "# command: (auto-detect failed - configure manually)"
+        "# command: (auto-detect failed - configure manually)",
       );
     }
 
@@ -105,12 +105,16 @@ export function runInit(cwd: string = process.cwd()): InitResult {
 
   // Check for warnings
   if (!existsSync(".git")) {
-    result.warnings.push("Not a git repository - Git panel will show limited info");
+    result.warnings.push(
+      "Not a git repository - Git panel will show limited info",
+    );
   }
 
   const claudeSessionPath = getClaudeSessionPath(cwd);
   if (!existsSync(claudeSessionPath)) {
-    result.warnings.push("No Claude session found - start Claude to see activity");
+    result.warnings.push(
+      "No Claude session found - start Claude to see activity",
+    );
   }
 
   return result;

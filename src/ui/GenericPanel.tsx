@@ -1,7 +1,16 @@
-import React from "react";
 import { Box, Text } from "ink";
+import type React from "react";
 import type { GenericPanelData, GenericPanelRenderer } from "../types/index.js";
-import { DEFAULT_PANEL_WIDTH, BOX, createTitleLine, createBottomLine, padLine, truncate, getContentWidth, getInnerWidth } from "./constants.js";
+import {
+  BOX,
+  createBottomLine,
+  createTitleLine,
+  DEFAULT_PANEL_WIDTH,
+  getContentWidth,
+  getInnerWidth,
+  padLine,
+  truncate,
+} from "./constants.js";
 
 interface GenericPanelProps {
   data: GenericPanelData;
@@ -23,7 +32,10 @@ function createProgressBar(done: number, total: number): string {
   return "█".repeat(filled) + "░".repeat(empty);
 }
 
-function formatTitleSuffix(countdown?: number | null, relativeTime?: string): string {
+function formatTitleSuffix(
+  countdown?: number | null,
+  relativeTime?: string,
+): string {
   if (countdown != null) {
     const padded = String(countdown).padStart(2, " ");
     return `↻ ${padded}s`;
@@ -39,66 +51,117 @@ function createProgressTitleLine(
   total: number,
   panelWidth: number,
   countdown?: number | null,
-  relativeTime?: string
+  relativeTime?: string,
 ): string {
   const label = ` ${title} `;
   const count = ` ${done}/${total} `;
   const bar = createProgressBar(done, total);
   const suffix = formatTitleSuffix(countdown, relativeTime);
-  const suffixPart = suffix ? ` · ${suffix} ` + BOX.h : "";
+  const suffixPart = suffix ? ` · ${suffix} ${BOX.h}` : "";
 
-  const dashCount = panelWidth - 3 - label.length - count.length - bar.length - suffixPart.length;
+  const dashCount =
+    panelWidth -
+    3 -
+    label.length -
+    count.length -
+    bar.length -
+    suffixPart.length;
   const dashes = BOX.h.repeat(Math.max(0, dashCount));
   return BOX.tl + BOX.h + label + dashes + count + bar + suffixPart + BOX.tr;
 }
 
-function ListRenderer({ data, width }: { data: GenericPanelData; width: number }): React.ReactElement {
+function ListRenderer({
+  data,
+  width,
+}: {
+  data: GenericPanelData;
+  width: number;
+}): React.ReactElement {
   const items = data.items || [];
   const contentWidth = getContentWidth(width);
 
   if (items.length === 0 && !data.summary) {
-    return <Text>{BOX.v}<Text dimColor>{padLine(" No data", width)}</Text>{BOX.v}</Text>;
+    return (
+      <Text>
+        {BOX.v}
+        <Text dimColor>{padLine(" No data", width)}</Text>
+        {BOX.v}
+      </Text>
+    );
   }
 
   return (
     <>
       {data.summary && (
-        <Text>{BOX.v}{padLine(" " + truncate(data.summary, contentWidth), width)}{BOX.v}</Text>
+        <Text>
+          {BOX.v}
+          {padLine(` ${truncate(data.summary, contentWidth)}`, width)}
+          {BOX.v}
+        </Text>
       )}
       {items.map((item, index) => (
-        <Text key={`list-item-${index}`}>{BOX.v}{padLine(" • " + truncate(item.text, contentWidth - 3), width)}{BOX.v}</Text>
+        <Text key={`list-item-${index}`}>
+          {BOX.v}
+          {padLine(` • ${truncate(item.text, contentWidth - 3)}`, width)}
+          {BOX.v}
+        </Text>
       ))}
       {items.length === 0 && data.summary && null}
     </>
   );
 }
 
-function ProgressRenderer({ data, width }: { data: GenericPanelData; width: number }): React.ReactElement {
+function ProgressRenderer({
+  data,
+  width,
+}: {
+  data: GenericPanelData;
+  width: number;
+}): React.ReactElement {
   const items = data.items || [];
   const contentWidth = getContentWidth(width);
 
   return (
     <>
       {data.summary && (
-        <Text>{BOX.v}{padLine(" " + truncate(data.summary, contentWidth), width)}{BOX.v}</Text>
+        <Text>
+          {BOX.v}
+          {padLine(` ${truncate(data.summary, contentWidth)}`, width)}
+          {BOX.v}
+        </Text>
       )}
       {items.map((item, index) => {
-        const icon = item.status === "done" ? "✓" : item.status === "failed" ? "✗" : "○";
+        const icon =
+          item.status === "done" ? "✓" : item.status === "failed" ? "✗" : "○";
         const line = ` ${icon} ${truncate(item.text, contentWidth - 3)}`;
         return (
-          <Text key={`progress-item-${index}`}>{BOX.v}{padLine(line, width)}{BOX.v}</Text>
+          <Text key={`progress-item-${index}`}>
+            {BOX.v}
+            {padLine(line, width)}
+            {BOX.v}
+          </Text>
         );
       })}
       {items.length === 0 && !data.summary && (
-        <Text>{BOX.v}<Text dimColor>{padLine(" No data", width)}</Text>{BOX.v}</Text>
+        <Text>
+          {BOX.v}
+          <Text dimColor>{padLine(" No data", width)}</Text>
+          {BOX.v}
+        </Text>
       )}
     </>
   );
 }
 
-function StatusRenderer({ data, width }: { data: GenericPanelData; width: number }): React.ReactElement {
+function StatusRenderer({
+  data,
+  width,
+}: {
+  data: GenericPanelData;
+  width: number;
+}): React.ReactElement {
   const stats = data.stats || { passed: 0, failed: 0 };
-  const items = data.items?.filter(i => i.status === "failed") || [];
+  const items = data.items?.filter((i) => i.status === "failed") || [];
   const innerWidth = getInnerWidth(width);
   const contentWidth = getContentWidth(width);
 
@@ -115,11 +178,14 @@ function StatusRenderer({ data, width }: { data: GenericPanelData; width: number
   return (
     <>
       {data.summary && (
-        <Text>{BOX.v}{padLine(" " + truncate(data.summary, contentWidth), width)}{BOX.v}</Text>
+        <Text>
+          {BOX.v}
+          {padLine(` ${truncate(data.summary, contentWidth)}`, width)}
+          {BOX.v}
+        </Text>
       )}
       <Text>
-        {BOX.v}{" "}
-        <Text color="green">✓ {stats.passed} passed</Text>
+        {BOX.v} <Text color="green">✓ {stats.passed} passed</Text>
         {stats.failed > 0 && (
           <>
             {"  "}
@@ -132,11 +198,17 @@ function StatusRenderer({ data, width }: { data: GenericPanelData; width: number
             <Text dimColor>○ {stats.skipped} skipped</Text>
           </>
         )}
-        {" ".repeat(summaryPadding)}{BOX.v}
+        {" ".repeat(summaryPadding)}
+        {BOX.v}
       </Text>
-      {items.length > 0 && items.map((item, index) => (
-        <Text key={`status-item-${index}`}>{BOX.v}{padLine(" • " + truncate(item.text, contentWidth - 3), width)}{BOX.v}</Text>
-      ))}
+      {items.length > 0 &&
+        items.map((item, index) => (
+          <Text key={`status-item-${index}`}>
+            {BOX.v}
+            {padLine(` • ${truncate(item.text, contentWidth - 3)}`, width)}
+            {BOX.v}
+          </Text>
+        ))}
     </>
   );
 }
@@ -152,8 +224,14 @@ export function GenericPanel({
   justRefreshed = false,
 }: GenericPanelProps): React.ReactElement {
   // Determine suffix based on running state
-  const suffix = isRunning ? "running..." : formatTitleSuffix(countdown, relativeTime);
-  const suffixColor = isRunning ? "yellow" : justRefreshed ? "green" : undefined;
+  const suffix = isRunning
+    ? "running..."
+    : formatTitleSuffix(countdown, relativeTime);
+  const _suffixColor = isRunning
+    ? "yellow"
+    : justRefreshed
+      ? "green"
+      : undefined;
   const progress = data.progress || { done: 0, total: 0 };
 
   // Error state
@@ -161,7 +239,11 @@ export function GenericPanel({
     return (
       <Box flexDirection="column" width={width}>
         <Text>{createTitleLine(data.title, suffix, width)}</Text>
-        <Text>{BOX.v}<Text dimColor>{padLine(" " + error, width)}</Text>{BOX.v}</Text>
+        <Text>
+          {BOX.v}
+          <Text dimColor>{padLine(` ${error}`, width)}</Text>
+          {BOX.v}
+        </Text>
         <Text>{createBottomLine(width)}</Text>
       </Box>
     );
@@ -171,7 +253,16 @@ export function GenericPanel({
   if (renderer === "progress") {
     return (
       <Box flexDirection="column" width={width}>
-        <Text>{createProgressTitleLine(data.title, progress.done, progress.total, width, countdown, relativeTime)}</Text>
+        <Text>
+          {createProgressTitleLine(
+            data.title,
+            progress.done,
+            progress.total,
+            width,
+            countdown,
+            relativeTime,
+          )}
+        </Text>
         <ProgressRenderer data={data} width={width} />
         <Text>{createBottomLine(width)}</Text>
       </Box>
@@ -182,7 +273,11 @@ export function GenericPanel({
   return (
     <Box flexDirection="column" width={width}>
       <Text>{createTitleLine(data.title, suffix, width)}</Text>
-      {renderer === "status" ? <StatusRenderer data={data} width={width} /> : <ListRenderer data={data} width={width} />}
+      {renderer === "status" ? (
+        <StatusRenderer data={data} width={width} />
+      ) : (
+        <ListRenderer data={data} width={width} />
+      )}
       <Text>{createBottomLine(width)}</Text>
     </Box>
   );

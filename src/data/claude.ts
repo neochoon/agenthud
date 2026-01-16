@@ -1,23 +1,24 @@
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { homedir } from "node:os";
+import { basename, join } from "node:path";
 import {
-  existsSync,
-  readFileSync,
-  readdirSync,
-  statSync,
-} from "fs";
-import { homedir } from "os";
-import { join, basename } from "path";
-import {
-  ICONS,
-  type ClaudeSessionStatus,
   type ActivityEntry,
-  type TodoItem,
-  type ClaudeSessionState,
   type ClaudeData,
+  type ClaudeSessionState,
+  type ClaudeSessionStatus,
+  ICONS,
+  type TodoItem,
 } from "../types/index.js";
 import { THIRTY_SECONDS_MS } from "../ui/constants.js";
 
 // Re-export types for backwards compatibility
-export type { ClaudeSessionStatus, ActivityEntry, TodoItem, ClaudeSessionState, ClaudeData };
+export type {
+  ClaudeSessionStatus,
+  ActivityEntry,
+  TodoItem,
+  ClaudeSessionState,
+  ClaudeData,
+};
 
 interface JsonlUserEntry {
   type: "user";
@@ -39,7 +40,12 @@ interface JsonlAssistantEntry {
       type: string;
       text?: string;
       name?: string;
-      input?: { command?: string; file_path?: string; pattern?: string; query?: string };
+      input?: {
+        command?: string;
+        file_path?: string;
+        pattern?: string;
+        query?: string;
+      };
     }>;
     usage?: {
       input_tokens?: number;
@@ -56,7 +62,11 @@ interface JsonlSystemEntry {
   timestamp: string;
 }
 
-type JsonlEntry = JsonlUserEntry | JsonlAssistantEntry | JsonlSystemEntry | { type: string };
+type JsonlEntry =
+  | JsonlUserEntry
+  | JsonlAssistantEntry
+  | JsonlSystemEntry
+  | { type: string };
 
 const MAX_LINES_TO_SCAN = 200;
 const DEFAULT_MAX_ACTIVITIES = 10;
@@ -76,7 +86,10 @@ export function getClaudeSessionPath(projectPath: string): string {
  * Returns null if no active session exists within the timeout period
  * When multiple files have the same mtime, prefer the larger file (more content = likely active)
  */
-export function findActiveSession(sessionDir: string, sessionTimeout: number): string | null {
+export function findActiveSession(
+  sessionDir: string,
+  sessionTimeout: number,
+): string | null {
   if (!existsSync(sessionDir)) {
     return null;
   }
@@ -96,7 +109,10 @@ export function findActiveSession(sessionDir: string, sessionTimeout: number): s
     const filePath = join(sessionDir, file);
     const stat = statSync(filePath);
     // Prefer newer files, or larger files when mtime is equal
-    if (stat.mtimeMs > latestMtime || (stat.mtimeMs === latestMtime && stat.size > latestSize)) {
+    if (
+      stat.mtimeMs > latestMtime ||
+      (stat.mtimeMs === latestMtime && stat.size > latestSize)
+    ) {
       latestMtime = stat.mtimeMs;
       latestSize = stat.size;
       latestFile = file;
@@ -112,7 +128,16 @@ export function findActiveSession(sessionDir: string, sessionTimeout: number): s
   return null;
 }
 
-function getToolDetail(toolName: string, input?: { command?: string; file_path?: string; pattern?: string; query?: string; description?: string }): string {
+function getToolDetail(
+  _toolName: string,
+  input?: {
+    command?: string;
+    file_path?: string;
+    pattern?: string;
+    query?: string;
+    description?: string;
+  },
+): string {
   if (!input) return "";
 
   if (input.command) {
@@ -136,7 +161,10 @@ function getToolDetail(toolName: string, input?: { command?: string; file_path?:
 /**
  * Parse session state from a JSONL session file
  */
-export function parseSessionState(sessionFile: string, maxActivities: number = DEFAULT_MAX_ACTIVITIES): ClaudeSessionState {
+export function parseSessionState(
+  sessionFile: string,
+  maxActivities: number = DEFAULT_MAX_ACTIVITIES,
+): ClaudeSessionState {
   const defaultState: ClaudeSessionState = {
     status: "none",
     activities: [],
@@ -161,12 +189,13 @@ export function parseSessionState(sessionFile: string, maxActivities: number = D
     return defaultState;
   }
 
-  // Extract session start time from first few lines
+  // Extract session start time from first entry with a valid timestamp
+  // Skip summary/file-history-snapshot entries at the beginning
   let sessionStartTime: Date | null = null;
-  for (let i = 0; i < Math.min(10, lines.length); i++) {
+  for (let i = 0; i < Math.min(50, lines.length); i++) {
     try {
       const entry = JSON.parse(lines[i]);
-      if (entry.timestamp) {
+      if (entry.timestamp && typeof entry.timestamp === "string") {
         sessionStartTime = new Date(entry.timestamp);
         break;
       }
@@ -202,7 +231,10 @@ export function parseSessionState(sessionFile: string, maxActivities: number = D
         } else if (Array.isArray(msgContent)) {
           const textBlock = msgContent.find(
             (c): c is { type: "text"; text: string } =>
-              typeof c === "object" && c !== null && c.type === "text" && typeof c.text === "string"
+              typeof c === "object" &&
+              c !== null &&
+              c.type === "text" &&
+              typeof c.text === "string",
           );
           if (textBlock) {
             userText = textBlock.text;
@@ -250,7 +282,8 @@ export function parseSessionState(sessionFile: string, maxActivities: number = D
                 continue;
               }
 
-              const icon = (ICONS as Record<string, string>)[toolName] || ICONS.Default;
+              const icon =
+                (ICONS as Record<string, string>)[toolName] || ICONS.Default;
               const detail = getToolDetail(toolName, block.input);
 
               // Check if this is the same as the last activity (aggregate consecutive same operations)
@@ -336,7 +369,9 @@ export function parseSessionState(sessionFile: string, maxActivities: number = D
   const subagentsDir = join(sessionFile.replace(/\.jsonl$/, ""), "subagents");
   if (existsSync(subagentsDir)) {
     try {
-      const subagentFiles = (readdirSync(subagentsDir) as string[]).filter((f) => f.endsWith(".jsonl"));
+      const subagentFiles = (readdirSync(subagentsDir) as string[]).filter(
+        (f) => f.endsWith(".jsonl"),
+      );
       for (const file of subagentFiles) {
         const filePath = join(subagentsDir, file);
         try {
@@ -383,7 +418,7 @@ const DEFAULT_SESSION_TIMEOUT = 60 * 60 * 1000; // 60 minutes
 export function getClaudeData(
   projectPath: string,
   maxActivities?: number,
-  sessionTimeout: number = DEFAULT_SESSION_TIMEOUT
+  sessionTimeout: number = DEFAULT_SESSION_TIMEOUT,
 ): ClaudeData {
   const defaultState: ClaudeSessionState = {
     status: "none",

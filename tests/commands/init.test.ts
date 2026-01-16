@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock fs module
 vi.mock("fs", async (importOriginal) => {
@@ -18,8 +18,14 @@ vi.mock("../../src/data/detectTestFramework.js", () => ({
   detectTestFramework: vi.fn(),
 }));
 
-import { existsSync, mkdirSync, writeFileSync, readFileSync, appendFileSync } from "fs";
-import { runInit, getDefaultConfig } from "../../src/commands/init.js";
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
+import { runInit } from "../../src/commands/init.js";
 import { detectTestFramework } from "../../src/data/detectTestFramework.js";
 
 const mockExistsSync = vi.mocked(existsSync);
@@ -34,7 +40,10 @@ describe("init command", () => {
     vi.clearAllMocks();
     // Default mock for getDefaultConfig - return a template-like content
     mockReadFileSync.mockImplementation((path: any) => {
-      if (String(path).includes("config.yaml") || String(path).includes("templates")) {
+      if (
+        String(path).includes("config.yaml") ||
+        String(path).includes("templates")
+      ) {
         return `
 panels:
   tests:
@@ -58,7 +67,9 @@ panels:
 
       runInit();
 
-      expect(mockMkdirSync).toHaveBeenCalledWith(".agenthud", { recursive: true });
+      expect(mockMkdirSync).toHaveBeenCalledWith(".agenthud", {
+        recursive: true,
+      });
     });
 
     it("creates .agenthud/tests directory", () => {
@@ -66,15 +77,21 @@ panels:
 
       runInit();
 
-      expect(mockMkdirSync).toHaveBeenCalledWith(".agenthud/tests", { recursive: true });
+      expect(mockMkdirSync).toHaveBeenCalledWith(".agenthud/tests", {
+        recursive: true,
+      });
     });
 
     it("skips directory creation when .agenthud exists", () => {
-      mockExistsSync.mockImplementation((path: any) => String(path) === ".agenthud");
+      mockExistsSync.mockImplementation(
+        (path: any) => String(path) === ".agenthud",
+      );
 
       runInit();
 
-      expect(mockMkdirSync).not.toHaveBeenCalledWith(".agenthud", { recursive: true });
+      expect(mockMkdirSync).not.toHaveBeenCalledWith(".agenthud", {
+        recursive: true,
+      });
     });
   });
 
@@ -86,17 +103,20 @@ panels:
 
       expect(mockWriteFileSync).toHaveBeenCalledWith(
         ".gitignore",
-        ".agenthud/\n"
+        ".agenthud/\n",
       );
     });
 
     it("appends .agenthud/ to existing .gitignore", () => {
-      mockExistsSync.mockImplementation((path: any) =>
-        String(path) === ".gitignore"
+      mockExistsSync.mockImplementation(
+        (path: any) => String(path) === ".gitignore",
       );
       mockReadFileSync.mockImplementation((path: any) => {
         if (String(path) === ".gitignore") return "node_modules/\n";
-        if (String(path).includes("config.yaml") || String(path).includes("templates")) {
+        if (
+          String(path).includes("config.yaml") ||
+          String(path).includes("templates")
+        ) {
           return "panels:\n  tests:\n    command: npx vitest run --reporter=json\n";
         }
         return "";
@@ -106,17 +126,20 @@ panels:
 
       expect(mockAppendFileSync).toHaveBeenCalledWith(
         ".gitignore",
-        "\n.agenthud/\n"
+        "\n.agenthud/\n",
       );
     });
 
     it("skips if .gitignore already contains .agenthud/", () => {
-      mockExistsSync.mockImplementation((path: any) =>
-        String(path) === ".gitignore"
+      mockExistsSync.mockImplementation(
+        (path: any) => String(path) === ".gitignore",
       );
       mockReadFileSync.mockImplementation((path: any) => {
         if (String(path) === ".gitignore") return "node_modules/\n.agenthud/\n";
-        if (String(path).includes("config.yaml") || String(path).includes("templates")) {
+        if (
+          String(path).includes("config.yaml") ||
+          String(path).includes("templates")
+        ) {
           return "panels:\n  tests:\n    command: npx vitest run --reporter=json\n";
         }
         return "";
@@ -126,7 +149,7 @@ panels:
 
       expect(mockAppendFileSync).not.toHaveBeenCalledWith(
         ".gitignore",
-        expect.any(String)
+        expect.any(String),
       );
     });
   });
@@ -139,20 +162,20 @@ panels:
 
       expect(mockWriteFileSync).toHaveBeenCalledWith(
         ".agenthud/config.yaml",
-        expect.any(String)
+        expect.any(String),
       );
     });
 
     it("skips config.yaml when it exists", () => {
-      mockExistsSync.mockImplementation((path: any) =>
-        String(path) === ".agenthud/config.yaml"
+      mockExistsSync.mockImplementation(
+        (path: any) => String(path) === ".agenthud/config.yaml",
       );
 
       runInit();
 
       expect(mockWriteFileSync).not.toHaveBeenCalledWith(
         ".agenthud/config.yaml",
-        expect.any(String)
+        expect.any(String),
       );
     });
   });
@@ -173,7 +196,10 @@ panels:
       mockExistsSync.mockReturnValue(true);
       mockReadFileSync.mockImplementation((path: any) => {
         if (String(path) === ".gitignore") return ".agenthud/\n";
-        if (String(path).includes("config.yaml") || String(path).includes("templates")) {
+        if (
+          String(path).includes("config.yaml") ||
+          String(path).includes("templates")
+        ) {
           return "panels:\n  tests:\n    command: npx vitest run --reporter=json\n";
         }
         return "";
@@ -193,26 +219,38 @@ panels:
       mockExistsSync.mockImplementation((path: any) => {
         // .git doesn't exist, Claude session exists
         if (String(path) === ".git") return false;
-        if (String(path).includes(".claude") && String(path).includes("projects")) return true;
+        if (
+          String(path).includes(".claude") &&
+          String(path).includes("projects")
+        )
+          return true;
         return false;
       });
 
       const result = runInit("/Users/test/project");
 
-      expect(result.warnings).toContain("Not a git repository - Git panel will show limited info");
+      expect(result.warnings).toContain(
+        "Not a git repository - Git panel will show limited info",
+      );
     });
 
     it("warns when no Claude session found", () => {
       mockExistsSync.mockImplementation((path: any) => {
         // .git exists, Claude session doesn't exist
         if (String(path) === ".git") return true;
-        if (String(path).includes(".claude") && String(path).includes("projects")) return false;
+        if (
+          String(path).includes(".claude") &&
+          String(path).includes("projects")
+        )
+          return false;
         return false;
       });
 
       const result = runInit("/Users/test/project");
 
-      expect(result.warnings).toContain("No Claude session found - start Claude to see activity");
+      expect(result.warnings).toContain(
+        "No Claude session found - start Claude to see activity",
+      );
     });
 
     it("returns both warnings when neither git nor Claude session exists", () => {
@@ -221,21 +259,32 @@ panels:
       const result = runInit("/Users/test/project");
 
       expect(result.warnings).toHaveLength(2);
-      expect(result.warnings).toContain("Not a git repository - Git panel will show limited info");
-      expect(result.warnings).toContain("No Claude session found - start Claude to see activity");
+      expect(result.warnings).toContain(
+        "Not a git repository - Git panel will show limited info",
+      );
+      expect(result.warnings).toContain(
+        "No Claude session found - start Claude to see activity",
+      );
     });
 
     it("returns no warnings when both git and Claude session exist", () => {
       mockExistsSync.mockImplementation((path: any) => {
         if (String(path) === ".git") return true;
         // Handle both / and \ path separators for cross-platform compatibility
-        if (String(path).includes(".claude") && String(path).includes("projects")) return true;
+        if (
+          String(path).includes(".claude") &&
+          String(path).includes("projects")
+        )
+          return true;
         if (String(path) === ".gitignore") return true;
         return false;
       });
       mockReadFileSync.mockImplementation((path: any) => {
         if (String(path) === ".gitignore") return ".agenthud/\n";
-        if (String(path).includes("config.yaml") || String(path).includes("templates")) {
+        if (
+          String(path).includes("config.yaml") ||
+          String(path).includes("templates")
+        ) {
           return "panels:\n  tests:\n    command: npx vitest run --reporter=json\n";
         }
         return "";

@@ -1,8 +1,8 @@
-import { execSync, exec } from "child_process";
-import { readFileSync, promises as fsPromises } from "fs";
-import { promisify } from "util";
-import type { GenericPanelData, GenericPanelRenderer } from "../types/index.js";
+import { exec, execSync } from "node:child_process";
+import { promises as fsPromises, readFileSync } from "node:fs";
+import { promisify } from "node:util";
 import type { CustomPanelConfig } from "../config/parser.js";
+import type { GenericPanelData } from "../types/index.js";
 
 const execAsync = promisify(exec);
 
@@ -18,7 +18,7 @@ function capitalizeFirst(str: string): string {
 
 export function getCustomPanelData(
   name: string,
-  panelConfig: CustomPanelConfig
+  panelConfig: CustomPanelConfig,
 ): CustomPanelResult {
   const timestamp = new Date().toISOString();
   const defaultData: GenericPanelData = {
@@ -28,7 +28,9 @@ export function getCustomPanelData(
   // Try command first
   if (panelConfig.command) {
     try {
-      const output = (execSync(panelConfig.command, { encoding: "utf-8" }) as string).trim();
+      const output = (
+        execSync(panelConfig.command, { encoding: "utf-8" }) as string
+      ).trim();
 
       // Try to parse as JSON
       try {
@@ -106,7 +108,7 @@ export function getCustomPanelData(
 // Async version for non-blocking UI updates
 export async function getCustomPanelDataAsync(
   name: string,
-  panelConfig: CustomPanelConfig
+  panelConfig: CustomPanelConfig,
 ): Promise<CustomPanelResult> {
   const timestamp = new Date().toISOString();
   const defaultData: GenericPanelData = {

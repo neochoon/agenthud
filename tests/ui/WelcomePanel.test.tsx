@@ -1,6 +1,5 @@
-import React from "react";
-import { describe, it, expect } from "vitest";
 import { render } from "ink-testing-library";
+import { describe, expect, it } from "vitest";
 import { WelcomePanel } from "../../src/ui/WelcomePanel.js";
 
 describe("WelcomePanel", () => {

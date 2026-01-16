@@ -1,8 +1,7 @@
-import React from "react";
-import { describe, it, expect } from "vitest";
 import { render } from "ink-testing-library";
-import { TestPanel } from "../../src/ui/TestPanel.js";
+import { describe, expect, it } from "vitest";
 import type { TestResults } from "../../src/types/index.js";
+import { TestPanel } from "../../src/ui/TestPanel.js";
 
 describe("TestPanel", () => {
   const mockResults: TestResults = {
@@ -20,7 +19,11 @@ describe("TestPanel", () => {
   describe("summary display", () => {
     it("shows passed count with checkmark", () => {
       const { lastFrame } = render(
-        <TestPanel results={mockResults} isOutdated={false} commitsBehind={0} />
+        <TestPanel
+          results={mockResults}
+          isOutdated={false}
+          commitsBehind={0}
+        />,
       );
 
       expect(lastFrame()).toContain("✓");
@@ -30,7 +33,11 @@ describe("TestPanel", () => {
 
     it("shows failed count with x", () => {
       const { lastFrame } = render(
-        <TestPanel results={mockResults} isOutdated={false} commitsBehind={0} />
+        <TestPanel
+          results={mockResults}
+          isOutdated={false}
+          commitsBehind={0}
+        />,
       );
 
       expect(lastFrame()).toContain("✗");
@@ -40,7 +47,11 @@ describe("TestPanel", () => {
 
     it("shows git hash", () => {
       const { lastFrame } = render(
-        <TestPanel results={mockResults} isOutdated={false} commitsBehind={0} />
+        <TestPanel
+          results={mockResults}
+          isOutdated={false}
+          commitsBehind={0}
+        />,
       );
 
       expect(lastFrame()).toContain("abc1234");
@@ -48,7 +59,11 @@ describe("TestPanel", () => {
 
     it("shows relative time", () => {
       const { lastFrame } = render(
-        <TestPanel results={mockResults} isOutdated={false} commitsBehind={0} />
+        <TestPanel
+          results={mockResults}
+          isOutdated={false}
+          commitsBehind={0}
+        />,
       );
 
       // Should show some time indicator (ago)
@@ -59,7 +74,7 @@ describe("TestPanel", () => {
   describe("outdated state", () => {
     it("shows warning when outdated", () => {
       const { lastFrame } = render(
-        <TestPanel results={mockResults} isOutdated={true} commitsBehind={3} />
+        <TestPanel results={mockResults} isOutdated={true} commitsBehind={3} />,
       );
 
       expect(lastFrame()).toContain("⚠");
@@ -68,7 +83,7 @@ describe("TestPanel", () => {
 
     it("shows commits behind count", () => {
       const { lastFrame } = render(
-        <TestPanel results={mockResults} isOutdated={true} commitsBehind={3} />
+        <TestPanel results={mockResults} isOutdated={true} commitsBehind={3} />,
       );
 
       expect(lastFrame()).toContain("3");
@@ -79,7 +94,11 @@ describe("TestPanel", () => {
   describe("failures display", () => {
     it("shows failed test files", () => {
       const { lastFrame } = render(
-        <TestPanel results={mockResults} isOutdated={false} commitsBehind={0} />
+        <TestPanel
+          results={mockResults}
+          isOutdated={false}
+          commitsBehind={0}
+        />,
       );
 
       expect(lastFrame()).toContain("tests/git.test.ts");
@@ -88,7 +107,11 @@ describe("TestPanel", () => {
 
     it("shows failed test names", () => {
       const { lastFrame } = render(
-        <TestPanel results={mockResults} isOutdated={false} commitsBehind={0} />
+        <TestPanel
+          results={mockResults}
+          isOutdated={false}
+          commitsBehind={0}
+        />,
       );
 
       expect(lastFrame()).toContain("returns null");
@@ -103,7 +126,11 @@ describe("TestPanel", () => {
       };
 
       const { lastFrame } = render(
-        <TestPanel results={passingResults} isOutdated={false} commitsBehind={0} />
+        <TestPanel
+          results={passingResults}
+          isOutdated={false}
+          commitsBehind={0}
+        />,
       );
 
       expect(lastFrame()).not.toContain("tests/git.test.ts");
@@ -113,7 +140,12 @@ describe("TestPanel", () => {
   describe("error states", () => {
     it("shows 'No test results' when results is null", () => {
       const { lastFrame } = render(
-        <TestPanel results={null} isOutdated={false} commitsBehind={0} error="No test results" />
+        <TestPanel
+          results={null}
+          isOutdated={false}
+          commitsBehind={0}
+          error="No test results"
+        />,
       );
 
       expect(lastFrame()).toContain("No test results");
@@ -121,7 +153,12 @@ describe("TestPanel", () => {
 
     it("shows error message for invalid file", () => {
       const { lastFrame } = render(
-        <TestPanel results={null} isOutdated={false} commitsBehind={0} error="Invalid test-results.json" />
+        <TestPanel
+          results={null}
+          isOutdated={false}
+          commitsBehind={0}
+          error="Invalid test-results.json"
+        />,
       );
 
       expect(lastFrame()).toContain("Invalid test-results.json");
@@ -137,7 +174,11 @@ describe("TestPanel", () => {
       };
 
       const { lastFrame } = render(
-        <TestPanel results={zeroResults} isOutdated={false} commitsBehind={0} />
+        <TestPanel
+          results={zeroResults}
+          isOutdated={false}
+          commitsBehind={0}
+        />,
       );
 
       expect(lastFrame()).toContain("0");
@@ -145,7 +186,11 @@ describe("TestPanel", () => {
 
     it("handles skipped tests", () => {
       const { lastFrame } = render(
-        <TestPanel results={mockResults} isOutdated={false} commitsBehind={0} />
+        <TestPanel
+          results={mockResults}
+          isOutdated={false}
+          commitsBehind={0}
+        />,
       );
 
       // Should show skipped if > 0
@@ -157,7 +202,12 @@ describe("TestPanel", () => {
   describe("visual feedback", () => {
     it("shows 'running...' when isRunning is true", () => {
       const { lastFrame } = render(
-        <TestPanel results={null} isOutdated={false} commitsBehind={0} isRunning={true} />
+        <TestPanel
+          results={null}
+          isOutdated={false}
+          commitsBehind={0}
+          isRunning={true}
+        />,
       );
 
       expect(lastFrame()).toContain("running...");
@@ -165,7 +215,12 @@ describe("TestPanel", () => {
 
     it("shows relative time when isRunning is false", () => {
       const { lastFrame } = render(
-        <TestPanel results={mockResults} isOutdated={false} commitsBehind={0} isRunning={false} />
+        <TestPanel
+          results={mockResults}
+          isOutdated={false}
+          commitsBehind={0}
+          isRunning={false}
+        />,
       );
 
       expect(lastFrame()).not.toContain("running...");
@@ -173,7 +228,12 @@ describe("TestPanel", () => {
 
     it("shows 'just now' when justCompleted is true", () => {
       const { lastFrame } = render(
-        <TestPanel results={mockResults} isOutdated={false} commitsBehind={0} justCompleted={true} />
+        <TestPanel
+          results={mockResults}
+          isOutdated={false}
+          commitsBehind={0}
+          justCompleted={true}
+        />,
       );
 
       expect(lastFrame()).toContain("just now");

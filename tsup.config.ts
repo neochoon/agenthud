@@ -1,5 +1,5 @@
+import { cpSync } from "node:fs";
 import { defineConfig } from "tsup";
-import { cpSync } from "fs";
 
 export default defineConfig({
   entry: ["src/index.ts"],

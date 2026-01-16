@@ -1,11 +1,12 @@
-import React from "react";
-import { describe, it, expect } from "vitest";
 import { render } from "ink-testing-library";
-import { OtherSessionsPanel } from "../../src/ui/OtherSessionsPanel.js";
+import { describe, expect, it } from "vitest";
 import type { OtherSessionsData } from "../../src/data/otherSessions.js";
+import { OtherSessionsPanel } from "../../src/ui/OtherSessionsPanel.js";
 
 describe("OtherSessionsPanel", () => {
-  const createMockData = (overrides: Partial<OtherSessionsData> = {}): OtherSessionsData => ({
+  const createMockData = (
+    overrides: Partial<OtherSessionsData> = {},
+  ): OtherSessionsData => ({
     totalProjects: 3,
     activeCount: 2,
     projectNames: ["radar", "backend", "frontend"],
@@ -83,7 +84,9 @@ describe("OtherSessionsPanel", () => {
         ],
       });
 
-      const { lastFrame } = render(<OtherSessionsPanel data={data} width={50} />);
+      const { lastFrame } = render(
+        <OtherSessionsPanel data={data} width={50} />,
+      );
 
       // With narrow width, should show fewer names and +N for remaining
       // Format: 📁 very-long-project-name-here +4 | ⚡ 2 active
@@ -169,7 +172,9 @@ describe("OtherSessionsPanel", () => {
         },
       });
 
-      const { lastFrame } = render(<OtherSessionsPanel data={data} width={50} />);
+      const { lastFrame } = render(
+        <OtherSessionsPanel data={data} width={50} />,
+      );
       const output = lastFrame() || "";
 
       // Should contain truncation indicator
@@ -221,7 +226,9 @@ describe("OtherSessionsPanel", () => {
     it("shows countdown when provided", () => {
       const data = createMockData();
 
-      const { lastFrame } = render(<OtherSessionsPanel data={data} countdown={10} />);
+      const { lastFrame } = render(
+        <OtherSessionsPanel data={data} countdown={10} />,
+      );
 
       expect(lastFrame()).toContain("10s");
     });
@@ -229,7 +236,9 @@ describe("OtherSessionsPanel", () => {
     it("shows 'running...' when isRunning is true", () => {
       const data = createMockData();
 
-      const { lastFrame } = render(<OtherSessionsPanel data={data} isRunning={true} />);
+      const { lastFrame } = render(
+        <OtherSessionsPanel data={data} isRunning={true} />,
+      );
 
       expect(lastFrame()).toContain("running...");
     });
@@ -239,12 +248,15 @@ describe("OtherSessionsPanel", () => {
     it("panel border width matches content line width", () => {
       const data = createMockData();
 
-      const { lastFrame } = render(<OtherSessionsPanel data={data} width={80} />);
+      const { lastFrame } = render(
+        <OtherSessionsPanel data={data} width={80} />,
+      );
       const output = lastFrame() || "";
       const lines = output.split("\n");
 
       // Strip ANSI codes
-      const stripAnsi = (str: string) => str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
+      const stripAnsi = (str: string) =>
+        str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
 
       const titleLine = stripAnsi(lines[0]);
       const bottomLine = stripAnsi(lines[lines.length - 1]);

@@ -1,8 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, vi } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+
+import { act, renderHook } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { useHotkeys } from "../../../src/ui/hooks/useHotkeys.js";
 
 describe("useHotkeys", () => {
@@ -13,13 +14,17 @@ describe("useHotkeys", () => {
 
       const { result } = renderHook(() =>
         useHotkeys({
-          manualPanels: [{ name: "tests", label: "run tests", action: vi.fn() }],
+          manualPanels: [
+            { name: "tests", label: "run tests", action: vi.fn() },
+          ],
           onRefreshAll,
           onQuit,
-        })
+        }),
       );
 
-      const testsHotkey = result.current.hotkeys.find((h) => h.label === "run tests");
+      const testsHotkey = result.current.hotkeys.find(
+        (h) => h.label === "run tests",
+      );
       expect(testsHotkey).toBeDefined();
       expect(testsHotkey?.key).toBe("t");
     });
@@ -33,15 +38,19 @@ describe("useHotkeys", () => {
           ],
           onRefreshAll: vi.fn(),
           onQuit: vi.fn(),
-        })
+        }),
       );
 
       // 'r' is reserved, should use 'e' from "refresh"
-      const refreshHotkey = result.current.hotkeys.find((h) => h.label === "refresh panel");
+      const refreshHotkey = result.current.hotkeys.find(
+        (h) => h.label === "refresh panel",
+      );
       expect(refreshHotkey?.key).toBe("e");
 
       // 'q' is reserved, should use 'u' from "query"
-      const queryHotkey = result.current.hotkeys.find((h) => h.label === "run query");
+      const queryHotkey = result.current.hotkeys.find(
+        (h) => h.label === "run query",
+      );
       expect(queryHotkey?.key).toBe("u");
     });
 
@@ -54,11 +63,15 @@ describe("useHotkeys", () => {
           ],
           onRefreshAll: vi.fn(),
           onQuit: vi.fn(),
-        })
+        }),
       );
 
-      const testsHotkey = result.current.hotkeys.find((h) => h.label === "run tests");
-      const typesHotkey = result.current.hotkeys.find((h) => h.label === "check types");
+      const testsHotkey = result.current.hotkeys.find(
+        (h) => h.label === "run tests",
+      );
+      const typesHotkey = result.current.hotkeys.find(
+        (h) => h.label === "check types",
+      );
 
       expect(testsHotkey?.key).toBe("t");
       // 't' already used, should use 'y' from "types"
@@ -73,11 +86,13 @@ describe("useHotkeys", () => {
           ],
           onRefreshAll: vi.fn(),
           onQuit: vi.fn(),
-        })
+        }),
       );
 
       // No valid key available, should not create hotkey
-      const hotkey = result.current.hotkeys.find((h) => h.label === "reserved only");
+      const hotkey = result.current.hotkeys.find(
+        (h) => h.label === "reserved only",
+      );
       expect(hotkey).toBeUndefined();
     });
 
@@ -87,7 +102,7 @@ describe("useHotkeys", () => {
           manualPanels: [],
           onRefreshAll: vi.fn(),
           onQuit: vi.fn(),
-        })
+        }),
       );
 
       const refreshHotkey = result.current.hotkeys.find((h) => h.key === "r");
@@ -101,7 +116,7 @@ describe("useHotkeys", () => {
           manualPanels: [],
           onRefreshAll: vi.fn(),
           onQuit: vi.fn(),
-        })
+        }),
       );
 
       const quitHotkey = result.current.hotkeys.find((h) => h.key === "q");
@@ -118,7 +133,7 @@ describe("useHotkeys", () => {
           ],
           onRefreshAll: vi.fn(),
           onQuit: vi.fn(),
-        })
+        }),
       );
 
       const keys = result.current.hotkeys.map((h) => h.key);
@@ -132,10 +147,12 @@ describe("useHotkeys", () => {
 
       const { result } = renderHook(() =>
         useHotkeys({
-          manualPanels: [{ name: "tests", label: "run tests", action: testsAction }],
+          manualPanels: [
+            { name: "tests", label: "run tests", action: testsAction },
+          ],
           onRefreshAll: vi.fn(),
           onQuit: vi.fn(),
-        })
+        }),
       );
 
       act(() => {
@@ -153,7 +170,7 @@ describe("useHotkeys", () => {
           manualPanels: [],
           onRefreshAll,
           onQuit: vi.fn(),
-        })
+        }),
       );
 
       act(() => {
@@ -171,7 +188,7 @@ describe("useHotkeys", () => {
           manualPanels: [],
           onRefreshAll: vi.fn(),
           onQuit,
-        })
+        }),
       );
 
       act(() => {
@@ -188,10 +205,12 @@ describe("useHotkeys", () => {
 
       const { result } = renderHook(() =>
         useHotkeys({
-          manualPanels: [{ name: "tests", label: "run tests", action: testsAction }],
+          manualPanels: [
+            { name: "tests", label: "run tests", action: testsAction },
+          ],
           onRefreshAll,
           onQuit,
-        })
+        }),
       );
 
       act(() => {
@@ -215,7 +234,7 @@ describe("useHotkeys", () => {
           ],
           onRefreshAll: vi.fn(),
           onQuit: vi.fn(),
-        })
+        }),
       );
 
       act(() => {
@@ -231,10 +250,12 @@ describe("useHotkeys", () => {
     it("returns formatted status bar items", () => {
       const { result } = renderHook(() =>
         useHotkeys({
-          manualPanels: [{ name: "tests", label: "run tests", action: vi.fn() }],
+          manualPanels: [
+            { name: "tests", label: "run tests", action: vi.fn() },
+          ],
           onRefreshAll: vi.fn(),
           onQuit: vi.fn(),
-        })
+        }),
       );
 
       expect(result.current.statusBarItems).toEqual([
@@ -250,10 +271,13 @@ describe("useHotkeys", () => {
           manualPanels: [],
           onRefreshAll: vi.fn(),
           onQuit: vi.fn(),
-        })
+        }),
       );
 
-      expect(result.current.statusBarItems).toEqual(["r: refresh all", "q: quit"]);
+      expect(result.current.statusBarItems).toEqual([
+        "r: refresh all",
+        "q: quit",
+      ]);
     });
   });
 
@@ -273,7 +297,7 @@ describe("useHotkeys", () => {
           initialProps: {
             panels: [{ name: "tests", label: "run tests", action: action1 }],
           },
-        }
+        },
       );
 
       expect(result.current.hotkeys.find((h) => h.key === "t")).toBeDefined();

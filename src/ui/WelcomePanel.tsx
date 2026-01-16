@@ -1,24 +1,29 @@
-import React from "react";
 import { Box, Text } from "ink";
+import type React from "react";
 import { DEFAULT_PANEL_WIDTH } from "./constants.js";
 
 export function WelcomePanel(): React.ReactElement {
   return (
-    <Box flexDirection="column" borderStyle="single" paddingX={1} width={DEFAULT_PANEL_WIDTH}>
+    <Box
+      flexDirection="column"
+      borderStyle="single"
+      paddingX={1}
+      width={DEFAULT_PANEL_WIDTH}
+    >
       {/* Header */}
       <Box marginTop={-1}>
         <Text> Welcome to agenthud </Text>
       </Box>
 
       <Text> </Text>
-      <Text>  No .agenthud/ directory found.</Text>
+      <Text> No .agenthud/ directory found.</Text>
       <Text> </Text>
-      <Text>  Quick setup:</Text>
-      <Text color="cyan">     npx agenthud init</Text>
+      <Text> Quick setup:</Text>
+      <Text color="cyan"> npx agenthud init</Text>
       <Text> </Text>
-      <Text dimColor>  Or visit: github.com/neochoon/agenthud</Text>
+      <Text dimColor> Or visit: github.com/neochoon/agenthud</Text>
       <Text> </Text>
-      <Text dimColor>  Press q to quit</Text>
+      <Text dimColor> Press q to quit</Text>
     </Box>
   );
 }

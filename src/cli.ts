@@ -1,6 +1,6 @@
-import { readFileSync } from "fs";
-import { dirname, join } from "path";
-import { fileURLToPath } from "url";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export interface CliOptions {
   mode: "watch" | "once";
@@ -24,7 +24,7 @@ Options:
 export function getVersion(): string {
   const __dirname = dirname(fileURLToPath(import.meta.url));
   const packageJson = JSON.parse(
-    readFileSync(join(__dirname, "..", "package.json"), "utf-8")
+    readFileSync(join(__dirname, "..", "package.json"), "utf-8"),
   );
   return packageJson.version;
 }

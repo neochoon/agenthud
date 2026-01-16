@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [0.6.3] - 2025-01-16
+
+### New
+- **JUnit XML Support** - All test frameworks (vitest, jest, mocha, pytest) now output JUnit XML format for consistent parsing
+
+### Internal
+- Test folder structure reorganized to match `src/` layout
+- Removed test mock patterns from production code, using `vi.mock()` instead
+
 ## [0.6.2] - 2025-01-15
 
 ### Internal
@@ -68,7 +77,8 @@
 - **Test Panel** - Test results at a glance
 - Watch mode for live updates
 
-[Unreleased]: https://github.com/neochoon/agenthud/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/neochoon/agenthud/compare/v0.6.3...HEAD
+[0.6.3]: https://github.com/neochoon/agenthud/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/neochoon/agenthud/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/neochoon/agenthud/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/neochoon/agenthud/compare/v0.5.17...v0.6.0

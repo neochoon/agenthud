@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2025-01-17
+
+### New
+- **Responsive 2-Column Layout** - Automatically switches to 2-column layout when terminal width >= 102 columns
+  - Left column: Claude + Other Sessions panels
+  - Right column: Project, Git, Tests, and custom panels
+  - 50:50 width ratio with 2-character gap
+- **Dynamic Height Calculation** - Claude panel activities adjust based on terminal height and todo count
+- **Auto Layout Detection** - No configuration needed; layout adapts to terminal size
+
+### Fixed
+- Tests panel now always shows (removed `testsDisabled` logic that hid it on error)
+- ANSI escape codes stripped from activity descriptions (fixed `2m` display bug)
+- Column gap alignment in wide layout mode
+- Single column mode now uses full terminal width instead of fixed 70
+
+### Changed
+- `wideLayoutThreshold` config is now optional (auto-calculated as MIN_WIDTH * 2 + gap)
+- `width` config is now optional (uses terminal width by default)
+
 ## [0.6.5] - 2025-01-16
 
 ### New

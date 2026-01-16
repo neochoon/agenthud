@@ -62,16 +62,15 @@ export function TestPanel({
   };
   const titleSuffix = getTitleSuffix();
 
-  // Error state
+  // Error or loading state
   if (error || !results) {
+    const message = error || (isRunning ? "Running..." : "Loading...");
     return (
       <Box flexDirection="column" width={width}>
         <Text>{createTitleLine("Tests", titleSuffix, width)}</Text>
         <Text>
           {BOX.v}
-          <Text dimColor>
-            {padLine(` ${error || "No test results"}`, width)}
-          </Text>
+          <Text dimColor>{padLine(` ${message}`, width)}</Text>
           {BOX.v}
         </Text>
         <Text>{createBottomLine(width)}</Text>

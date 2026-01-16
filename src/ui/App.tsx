@@ -185,7 +185,7 @@ function DashboardApp({
       }),
   );
 
-  // Test data with disabled state
+  // Test data with lazy loading for faster initial render
   const getTestDataFromConfig = useCallback((): TestData => {
     if (config.panels.tests.command) {
       return runTestCommand(config.panels.tests.command);
@@ -193,14 +193,30 @@ function DashboardApp({
     return getTestData();
   }, [config.panels.tests.command]);
 
-  const initialTestData = useMemo(
-    () => getTestDataFromConfig(),
-    [getTestDataFromConfig],
-  );
-  const [testsDisabled, setTestsDisabled] = useState(
-    !!(initialTestData.error && !config.panels.tests.command),
-  );
-  const [testData, setTestData] = useState<TestData>(initialTestData);
+  const [testsDisabled, setTestsDisabled] = useState(false);
+  const [testData, setTestData] = useState<TestData>({
+    results: null,
+    isOutdated: false,
+    commitsBehind: 0,
+  });
+  const testsInitializedRef = useRef(false);
+
+  // Lazy load test data after initial render
+  useEffect(() => {
+    if (testsInitializedRef.current) return;
+    testsInitializedRef.current = true;
+
+    // Use setTimeout to defer test loading after first paint
+    const timer = setTimeout(() => {
+      const data = getTestDataFromConfig();
+      setTestData(data);
+      if (data.error && !config.panels.tests.command) {
+        setTestsDisabled(true);
+      }
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [getTestDataFromConfig, config.panels.tests.command]);
 
   // Custom panel data
   const [customPanelData, setCustomPanelData] = useState<

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GitPanelConfig } from "../../src/config/parser.js";
 
 // Mock child_process with partial mocking
@@ -10,14 +10,14 @@ vi.mock("child_process", async (importOriginal) => {
   };
 });
 
-import { execSync } from "child_process";
+import { execSync } from "node:child_process";
 import {
   getCurrentBranch,
+  getGitData,
+  getGitDataAsync,
   getTodayCommits,
   getTodayStats,
   getUncommittedCount,
-  getGitData,
-  getGitDataAsync,
 } from "../../src/data/git.js";
 
 const mockExecSync = vi.mocked(execSync);
@@ -65,7 +65,7 @@ describe("git data module", () => {
         "def5678|2025-01-09T09:00:00+09:00|Initial commit",
       ].join("\n");
 
-      mockExecSync.mockReturnValue(gitOutput + "\n");
+      mockExecSync.mockReturnValue(`${gitOutput}\n`);
 
       const result = getTodayCommits();
 
@@ -104,9 +104,10 @@ describe("git data module", () => {
     });
 
     it("handles commit messages with pipe characters", () => {
-      const gitOutput = "abc1234|2025-01-09T10:00:00+09:00|fix: handle A | B case";
+      const gitOutput =
+        "abc1234|2025-01-09T10:00:00+09:00|fix: handle A | B case";
 
-      mockExecSync.mockReturnValue(gitOutput + "\n");
+      mockExecSync.mockReturnValue(`${gitOutput}\n`);
 
       const result = getTodayCommits();
 
@@ -125,13 +126,13 @@ describe("git data module", () => {
         "82\t11\ttests/app.test.ts",
       ].join("\n");
 
-      mockExecSync.mockReturnValue(gitOutput + "\n");
+      mockExecSync.mockReturnValue(`${gitOutput}\n`);
 
       const result = getTodayStats();
 
       expect(result).toEqual({
-        added: 142,   // 10 + 50 + 82
-        deleted: 23,  // 2 + 10 + 11
+        added: 142, // 10 + 50 + 82
+        deleted: 23, // 2 + 10 + 11
         files: 3,
       });
     });
@@ -154,7 +155,7 @@ describe("git data module", () => {
         "20\t0\tsrc/another.ts",
       ].join("\n");
 
-      mockExecSync.mockReturnValue(gitOutput + "\n");
+      mockExecSync.mockReturnValue(`${gitOutput}\n`);
 
       const result = getTodayStats();
 
@@ -166,12 +167,11 @@ describe("git data module", () => {
     });
 
     it("handles only deletions", () => {
-      const gitOutput = [
-        "0\t5\tsrc/old-file.ts",
-        "0\t5\tsrc/removed.ts",
-      ].join("\n");
+      const gitOutput = ["0\t5\tsrc/old-file.ts", "0\t5\tsrc/removed.ts"].join(
+        "\n",
+      );
 
-      mockExecSync.mockReturnValue(gitOutput + "\n");
+      mockExecSync.mockReturnValue(`${gitOutput}\n`);
 
       const result = getTodayStats();
 
@@ -189,7 +189,7 @@ describe("git data module", () => {
         "20\t3\tsrc/other.ts",
       ].join("\n");
 
-      mockExecSync.mockReturnValue(gitOutput + "\n");
+      mockExecSync.mockReturnValue(`${gitOutput}\n`);
 
       const result = getTodayStats();
 
@@ -228,7 +228,7 @@ describe("git data module", () => {
         "?? src/untracked.ts",
       ].join("\n");
 
-      mockExecSync.mockReturnValue(gitOutput + "\n");
+      mockExecSync.mockReturnValue(`${gitOutput}\n`);
 
       const result = getUncommittedCount();
 
@@ -258,12 +258,12 @@ describe("git data module", () => {
 
     it("handles staged and unstaged changes", () => {
       const gitOutput = [
-        "MM src/both.ts",      // staged and unstaged
-        "M  src/staged.ts",    // only staged
-        " M src/unstaged.ts",  // only unstaged
+        "MM src/both.ts", // staged and unstaged
+        "M  src/staged.ts", // only staged
+        " M src/unstaged.ts", // only unstaged
       ].join("\n");
 
-      mockExecSync.mockReturnValue(gitOutput + "\n");
+      mockExecSync.mockReturnValue(`${gitOutput}\n`);
 
       const result = getUncommittedCount();
 
@@ -287,7 +287,7 @@ describe("git data module", () => {
 
       expect(mockExecSync).toHaveBeenCalledWith(
         "git rev-parse --abbrev-ref HEAD",
-        expect.any(Object)
+        expect.any(Object),
       );
       expect(result.branch).toBe("feature-branch");
     });
@@ -320,7 +320,7 @@ describe("git data module", () => {
         enabled: true,
         interval: 30000,
         command: {
-          stats: 'git diff --stat HEAD~1',
+          stats: "git diff --stat HEAD~1",
         },
       };
 
@@ -356,7 +356,7 @@ describe("git data module", () => {
       expect(result.branch).toBe("main");
       expect(mockExecSync).toHaveBeenCalledWith(
         "git branch --show-current",
-        expect.any(Object)
+        expect.any(Object),
       );
     });
 

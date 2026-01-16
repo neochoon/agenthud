@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from "react";
+import { useCallback, useMemo } from "react";
 
 interface ManualPanel {
   name: string;
@@ -85,7 +85,7 @@ export function useHotkeys({
         hotkey.action();
       }
     },
-    [hotkeys]
+    [hotkeys],
   );
 
   // Generate status bar items

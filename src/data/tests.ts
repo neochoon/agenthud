@@ -1,9 +1,9 @@
-import { readFileSync } from "fs";
-import { execSync } from "child_process";
-import { join } from "path";
-import type { TestResults, TestData } from "../types/index.js";
+import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { TestsPanelConfig } from "../config/parser.js";
 import { parseJUnitXml } from "../runner/command.js";
+import type { TestData, TestResults } from "../types/index.js";
 
 const AGENT_DIR = ".agenthud";
 const TEST_RESULTS_FILE = "test-results.json";
@@ -58,7 +58,8 @@ export function getTestData(dir: string = process.cwd()): TestData {
 
 export function getTestDataWithConfig(config: TestsPanelConfig): TestData {
   // Use source from config if provided, otherwise use default path
-  const testResultsPath = config.source || join(process.cwd(), AGENT_DIR, TEST_RESULTS_FILE);
+  const testResultsPath =
+    config.source || join(process.cwd(), AGENT_DIR, TEST_RESULTS_FILE);
   const isXmlFormat = testResultsPath.endsWith(".xml");
 
   let results: TestResults | null = null;
@@ -92,7 +93,9 @@ export function getTestDataWithConfig(config: TestsPanelConfig): TestData {
     }
   } catch (e) {
     if (e instanceof SyntaxError) {
-      error = isXmlFormat ? "Invalid test-results.xml" : "Invalid test-results.json";
+      error = isXmlFormat
+        ? "Invalid test-results.xml"
+        : "Invalid test-results.json";
     } else {
       error = "No test results";
     }

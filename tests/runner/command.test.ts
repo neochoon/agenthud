@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock child_process module
 vi.mock("child_process", async (importOriginal) => {
@@ -20,14 +20,13 @@ vi.mock("fs", async (importOriginal) => {
   };
 });
 
-import { execSync } from "child_process";
-import { existsSync, unlinkSync, readFileSync } from "fs";
+import { execSync } from "node:child_process";
+import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import {
-  runTestCommand,
-  parseVitestOutput,
   parseJUnitXml,
+  parseVitestOutput,
+  runTestCommand,
 } from "../../src/runner/command.js";
-import type { TestResults } from "../../src/types/index.js";
 
 const mockExecSync = vi.mocked(execSync);
 const mockExistsSync = vi.mocked(existsSync);
@@ -66,9 +65,7 @@ describe("parseVitestOutput", () => {
         },
         {
           name: "tests/bar.test.ts",
-          assertionResults: [
-            { title: "another failure", status: "failed" },
-          ],
+          assertionResults: [{ title: "another failure", status: "failed" }],
         },
       ],
     });
@@ -114,10 +111,10 @@ describe("parseJUnitXml", () => {
     const result = parseJUnitXml(xml);
 
     expect(result).not.toBeNull();
-    expect(result!.passed).toBe(8);
-    expect(result!.failed).toBe(0);
-    expect(result!.skipped).toBe(2);
-    expect(result!.failures).toEqual([]);
+    expect(result?.passed).toBe(8);
+    expect(result?.failed).toBe(0);
+    expect(result?.skipped).toBe(2);
+    expect(result?.failures).toEqual([]);
   });
 
   it("parses JUnit XML with failures", () => {
@@ -137,14 +134,14 @@ describe("parseJUnitXml", () => {
     const result = parseJUnitXml(xml);
 
     expect(result).not.toBeNull();
-    expect(result!.passed).toBe(3);
-    expect(result!.failed).toBe(2);
-    expect(result!.failures).toHaveLength(2);
-    expect(result!.failures[0]).toEqual({
+    expect(result?.passed).toBe(3);
+    expect(result?.failed).toBe(2);
+    expect(result?.failures).toHaveLength(2);
+    expect(result?.failures[0]).toEqual({
       file: "test_foo",
       name: "test_fails",
     });
-    expect(result!.failures[1]).toEqual({
+    expect(result?.failures[1]).toEqual({
       file: "test_bar",
       name: "test_error",
     });
@@ -166,9 +163,9 @@ describe("parseJUnitXml", () => {
     const result = parseJUnitXml(xml);
 
     expect(result).not.toBeNull();
-    expect(result!.passed).toBe(3);
-    expect(result!.failed).toBe(1);
-    expect(result!.skipped).toBe(1);
+    expect(result?.passed).toBe(3);
+    expect(result?.failed).toBe(1);
+    expect(result?.skipped).toBe(1);
   });
 
   it("returns null for invalid XML", () => {
@@ -192,8 +189,8 @@ describe("parseJUnitXml", () => {
     const result = parseJUnitXml(xml);
 
     expect(result).not.toBeNull();
-    expect(result!.passed).toBe(3);
-    expect(result!.failed).toBe(0);
+    expect(result?.passed).toBe(3);
+    expect(result?.failed).toBe(0);
   });
 });
 
@@ -215,8 +212,9 @@ describe("runTestCommand", () => {
 
   it("deletes existing file, runs command, and parses XML output", () => {
     // File exists initially, command runs, file is recreated
-    mockExistsSync.mockReturnValueOnce(true)   // check before delete
-      .mockReturnValueOnce(true);  // check after command
+    mockExistsSync
+      .mockReturnValueOnce(true) // check before delete
+      .mockReturnValueOnce(true); // check after command
     mockReadFileSync.mockReturnValue(sampleXml);
     mockExecSync.mockReturnValue("");
 
@@ -235,7 +233,8 @@ describe("runTestCommand", () => {
     mockExecSync.mockImplementation(() => {
       throw new Error("Command failed");
     });
-    mockExistsSync.mockReturnValueOnce(false)  // no file before
+    mockExistsSync
+      .mockReturnValueOnce(false) // no file before
       .mockReturnValueOnce(false); // no file after (command failed)
 
     const result = runTestCommand("npm test");
@@ -249,8 +248,9 @@ describe("runTestCommand", () => {
     mockExecSync.mockImplementation(() => {
       throw new Error("Tests failed");
     });
-    mockExistsSync.mockReturnValueOnce(false)  // no file before
-      .mockReturnValueOnce(true);  // file created despite exit code
+    mockExistsSync
+      .mockReturnValueOnce(false) // no file before
+      .mockReturnValueOnce(true); // file created despite exit code
     mockReadFileSync.mockReturnValue(sampleXml);
 
     const result = runTestCommand("npm test");
@@ -260,8 +260,9 @@ describe("runTestCommand", () => {
   });
 
   it("returns error when output file is not valid XML", () => {
-    mockExistsSync.mockReturnValueOnce(false)  // no file before
-      .mockReturnValueOnce(true);  // file created after command
+    mockExistsSync
+      .mockReturnValueOnce(false) // no file before
+      .mockReturnValueOnce(true); // file created after command
     mockReadFileSync.mockReturnValue("not valid xml at all");
     mockExecSync.mockReturnValue("");
 
@@ -278,8 +279,9 @@ describe("runTestCommand", () => {
       }
       return "";
     });
-    mockExistsSync.mockReturnValueOnce(false)  // no file before
-      .mockReturnValueOnce(true);  // file created after command
+    mockExistsSync
+      .mockReturnValueOnce(false) // no file before
+      .mockReturnValueOnce(true); // file created after command
     mockReadFileSync.mockReturnValue(sampleXml);
 
     const result = runTestCommand("npm test");
@@ -288,8 +290,9 @@ describe("runTestCommand", () => {
   });
 
   it("includes timestamp in results", () => {
-    mockExistsSync.mockReturnValueOnce(false)  // no file before
-      .mockReturnValueOnce(true);  // file created after command
+    mockExistsSync
+      .mockReturnValueOnce(false) // no file before
+      .mockReturnValueOnce(true); // file created after command
     mockReadFileSync.mockReturnValue(sampleXml);
     mockExecSync.mockReturnValue("");
 
@@ -298,7 +301,7 @@ describe("runTestCommand", () => {
     const after = new Date().toISOString();
 
     expect(result.results?.timestamp).toBeDefined();
-    expect(result.results!.timestamp >= before).toBe(true);
-    expect(result.results!.timestamp <= after).toBe(true);
+    expect(result.results?.timestamp >= before).toBe(true);
+    expect(result.results?.timestamp <= after).toBe(true);
   });
 });

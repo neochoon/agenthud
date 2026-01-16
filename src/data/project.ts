@@ -1,10 +1,6 @@
-import { execSync } from "child_process";
-import {
-  existsSync,
-  readFileSync,
-  readdirSync,
-} from "fs";
-import { basename } from "path";
+import { execSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { basename } from "node:path";
 
 // Language detection order (first match wins)
 const LANGUAGE_INDICATORS: Array<{ file: string; language: string }> = [
@@ -81,7 +77,16 @@ const FILE_EXTENSIONS: Record<string, { ext: string; patterns: string[] }> = {
 const SOURCE_DIRS = ["src", "lib", "app"];
 
 // Directories to exclude from counting
-const EXCLUDE_DIRS = ["node_modules", "dist", "build", ".git", "__pycache__", "venv", ".venv", "target"];
+const EXCLUDE_DIRS = [
+  "node_modules",
+  "dist",
+  "build",
+  ".git",
+  "__pycache__",
+  "venv",
+  ".venv",
+  "target",
+];
 
 export interface ProjectInfo {
   name: string;
@@ -174,7 +179,9 @@ function parsePyprojectToml(content: string): ProjectInfo {
       }
 
       // Parse license
-      const licenseMatch = trimmed.match(/^license\s*=\s*\{text\s*=\s*"([^"]+)"/);
+      const licenseMatch = trimmed.match(
+        /^license\s*=\s*\{text\s*=\s*"([^"]+)"/,
+      );
       if (licenseMatch) {
         license = licenseMatch[1];
       }
@@ -191,7 +198,9 @@ function parsePyprojectToml(content: string): ProjectInfo {
         if (inlineMatch) {
           const items = inlineMatch[1].match(/"([^"]+)"/g);
           if (items) {
-            deps.push(...items.map((s) => s.replace(/"/g, "").split(/[<>=\[]/)[0]));
+            deps.push(
+              ...items.map((s) => s.replace(/"/g, "").split(/[<>=[]/)[0]),
+            );
           }
           inDeps = false;
         }
@@ -203,7 +212,7 @@ function parsePyprojectToml(content: string): ProjectInfo {
     if (inDeps && trimmed.startsWith('"')) {
       const depMatch = trimmed.match(/"([^"]+)"/);
       if (depMatch) {
-        deps.push(depMatch[1].split(/[<>=\[]/)[0]);
+        deps.push(depMatch[1].split(/[<>=[]/)[0]);
       }
       if (trimmed.endsWith("]")) {
         inDeps = false;
@@ -214,7 +223,7 @@ function parsePyprojectToml(content: string): ProjectInfo {
     if (inDevDeps && trimmed.startsWith('"')) {
       const depMatch = trimmed.match(/"([^"]+)"/);
       if (depMatch) {
-        devDeps.push(depMatch[1].split(/[<>=\[]/)[0]);
+        devDeps.push(depMatch[1].split(/[<>=[]/)[0]);
       }
     }
     if (inDevDeps && trimmed.match(/^dev\s*=\s*\[/)) {
@@ -222,7 +231,9 @@ function parsePyprojectToml(content: string): ProjectInfo {
       if (inlineMatch) {
         const items = inlineMatch[1].match(/"([^"]+)"/g);
         if (items) {
-          devDeps.push(...items.map((s) => s.replace(/"/g, "").split(/[<>=\[]/)[0]));
+          devDeps.push(
+            ...items.map((s) => s.replace(/"/g, "").split(/[<>=[]/)[0]),
+          );
         }
       }
     }
@@ -252,7 +263,7 @@ function parseSetupPy(content: string): ProjectInfo {
   if (reqMatch) {
     const items = reqMatch[1].match(/["']([^"']+)["']/g);
     if (items) {
-      deps.push(...items.map((s) => s.replace(/["']/g, "").split(/[<>=\[]/)[0]));
+      deps.push(...items.map((s) => s.replace(/["']/g, "").split(/[<>=[]/)[0]));
     }
   }
 
@@ -267,7 +278,7 @@ function parseSetupPy(content: string): ProjectInfo {
 
 function getFolderName(): string {
   try {
-    return execSync("basename \"$PWD\"", { encoding: "utf-8" }).trim();
+    return execSync('basename "$PWD"', { encoding: "utf-8" }).trim();
   } catch {
     return basename(process.cwd());
   }
@@ -358,7 +369,9 @@ export function countFiles(language: string | null): FileCount {
   try {
     // Build find command with exclusions
     const excludes = EXCLUDE_DIRS.map((d) => `-path "*/${d}/*"`).join(" -o ");
-    const namePatterns = config.patterns.map((p) => `-name "${p}"`).join(" -o ");
+    const namePatterns = config.patterns
+      .map((p) => `-name "${p}"`)
+      .join(" -o ");
 
     const cmd = `find ${sourceDir} \\( ${excludes} \\) -prune -o -type f \\( ${namePatterns} \\) -print | wc -l`;
     const result = execSync(cmd, { encoding: "utf-8" });
@@ -384,7 +397,9 @@ export function countLines(language: string | null): number {
   try {
     // Build find command with exclusions, then count lines
     const excludes = EXCLUDE_DIRS.map((d) => `-path "*/${d}/*"`).join(" -o ");
-    const namePatterns = config.patterns.map((p) => `-name "${p}"`).join(" -o ");
+    const namePatterns = config.patterns
+      .map((p) => `-name "${p}"`)
+      .join(" -o ");
 
     const cmd = `find ${sourceDir} \\( ${excludes} \\) -prune -o -type f \\( ${namePatterns} \\) -print0 | xargs -0 wc -l 2>/dev/null | tail -1 | awk '{print $1}'`;
     const result = execSync(cmd, { encoding: "utf-8" });

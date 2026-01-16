@@ -1,14 +1,25 @@
-import React from "react";
-import { describe, it, expect } from "vitest";
 import { render } from "ink-testing-library";
-import { GitPanel } from "../../src/ui/GitPanel.js";
+import { describe, expect, it } from "vitest";
 import type { Commit, GitStats } from "../../src/types/index.js";
+import { GitPanel } from "../../src/ui/GitPanel.js";
 
 describe("GitPanel", () => {
   const mockCommits: Commit[] = [
-    { hash: "abc1234", message: "Add login feature", timestamp: new Date("2025-01-09T10:30:00") },
-    { hash: "def5678", message: "Fix bug", timestamp: new Date("2025-01-09T09:00:00") },
-    { hash: "890abcd", message: "Update docs", timestamp: new Date("2025-01-09T08:00:00") },
+    {
+      hash: "abc1234",
+      message: "Add login feature",
+      timestamp: new Date("2025-01-09T10:30:00"),
+    },
+    {
+      hash: "def5678",
+      message: "Fix bug",
+      timestamp: new Date("2025-01-09T09:00:00"),
+    },
+    {
+      hash: "890abcd",
+      message: "Update docs",
+      timestamp: new Date("2025-01-09T08:00:00"),
+    },
   ];
 
   const mockStats: GitStats = { added: 142, deleted: 23, files: 5 };
@@ -20,7 +31,7 @@ describe("GitPanel", () => {
           branch="feat/1-git-data"
           commits={mockCommits}
           stats={mockStats}
-        />
+        />,
       );
 
       expect(lastFrame()).toContain("feat/1-git-data");
@@ -28,11 +39,7 @@ describe("GitPanel", () => {
 
     it("shows stats with additions and deletions", () => {
       const { lastFrame } = render(
-        <GitPanel
-          branch="main"
-          commits={mockCommits}
-          stats={mockStats}
-        />
+        <GitPanel branch="main" commits={mockCommits} stats={mockStats} />,
       );
 
       expect(lastFrame()).toContain("+142");
@@ -42,11 +49,7 @@ describe("GitPanel", () => {
 
     it("shows commit list with hash and message", () => {
       const { lastFrame } = render(
-        <GitPanel
-          branch="main"
-          commits={mockCommits}
-          stats={mockStats}
-        />
+        <GitPanel branch="main" commits={mockCommits} stats={mockStats} />,
       );
 
       expect(lastFrame()).toContain("abc1234");
@@ -57,11 +60,7 @@ describe("GitPanel", () => {
 
     it("shows commits with bullet points", () => {
       const { lastFrame } = render(
-        <GitPanel
-          branch="main"
-          commits={mockCommits}
-          stats={mockStats}
-        />
+        <GitPanel branch="main" commits={mockCommits} stats={mockStats} />,
       );
 
       // Check for bullet point format
@@ -82,11 +81,7 @@ describe("GitPanel", () => {
       ];
 
       const { lastFrame } = render(
-        <GitPanel
-          branch="main"
-          commits={manyCommits}
-          stats={mockStats}
-        />
+        <GitPanel branch="main" commits={manyCommits} stats={mockStats} />,
       );
 
       expect(lastFrame()).toContain("commit1");
@@ -104,7 +99,7 @@ describe("GitPanel", () => {
           commits={[]}
           stats={{ added: 0, deleted: 0, files: 0 }}
           uncommitted={0}
-        />
+        />,
       );
 
       expect(lastFrame()).toContain("main");
@@ -118,7 +113,7 @@ describe("GitPanel", () => {
           commits={[]}
           stats={{ added: 0, deleted: 0, files: 0 }}
           uncommitted={0}
-        />
+        />,
       );
 
       expect(lastFrame()).toContain("Not a git repository");
@@ -133,7 +128,7 @@ describe("GitPanel", () => {
           commits={[mockCommits[0]]}
           stats={{ added: 10, deleted: 5, files: 1 }}
           uncommitted={0}
-        />
+        />,
       );
 
       expect(lastFrame()).toContain("1 commit");
@@ -149,7 +144,7 @@ describe("GitPanel", () => {
           commits={mockCommits}
           stats={mockStats}
           uncommitted={3}
-        />
+        />,
       );
 
       expect(lastFrame()).toContain("3 dirty");
@@ -162,7 +157,7 @@ describe("GitPanel", () => {
           commits={mockCommits}
           stats={mockStats}
           uncommitted={0}
-        />
+        />,
       );
 
       expect(lastFrame()).not.toContain("dirty");
@@ -175,7 +170,7 @@ describe("GitPanel", () => {
           commits={mockCommits}
           stats={mockStats}
           uncommitted={1}
-        />
+        />,
       );
 
       expect(lastFrame()).toContain("1 dirty");
@@ -188,7 +183,7 @@ describe("GitPanel", () => {
           commits={[]}
           stats={{ added: 0, deleted: 0, files: 0 }}
           uncommitted={5}
-        />
+        />,
       );
 
       expect(lastFrame()).toContain("5 dirty");
@@ -202,7 +197,7 @@ describe("GitPanel", () => {
           branch="feat/21-generic-panel-with-very-long-name"
           commits={mockCommits}
           stats={{ added: 4993, deleted: 586, files: 44 }}
-        />
+        />,
       );
 
       const output = lastFrame() || "";
@@ -223,20 +218,24 @@ describe("GitPanel", () => {
       const { lastFrame } = render(
         <GitPanel
           branch="feat/21-generic-panel"
-          commits={Array(30).fill(null).map((_, i) => ({
-            hash: `abc${i.toString().padStart(4, "0")}`,
-            message: `Commit ${i}`,
-            timestamp: new Date(),
-          }))}
+          commits={Array(30)
+            .fill(null)
+            .map((_, i) => ({
+              hash: `abc${i.toString().padStart(4, "0")}`,
+              message: `Commit ${i}`,
+              timestamp: new Date(),
+            }))}
           stats={{ added: 4993, deleted: 586, files: 44 }}
-        />
+        />,
       );
 
       const output = lastFrame() || "";
       const lines = output.split("\n");
 
       // Find the branch line (contains stats with files)
-      const branchLine = lines.find(l => l.includes("files") && l.includes("+4993"));
+      const branchLine = lines.find(
+        (l) => l.includes("files") && l.includes("+4993"),
+      );
       expect(branchLine).toBeDefined();
 
       // Should contain both branch (possibly truncated) and files on same line
@@ -253,7 +252,7 @@ describe("GitPanel", () => {
           commits={mockCommits}
           stats={mockStats}
           isRunning={true}
-        />
+        />,
       );
 
       expect(lastFrame()).toContain("running...");
@@ -267,7 +266,7 @@ describe("GitPanel", () => {
           stats={mockStats}
           isRunning={false}
           countdown={25}
-        />
+        />,
       );
 
       expect(lastFrame()).toContain("25s");
@@ -282,7 +281,7 @@ describe("GitPanel", () => {
           stats={mockStats}
           countdown={30}
           justRefreshed={true}
-        />
+        />,
       );
 
       // Should contain countdown (the green color is tested by checking it renders)

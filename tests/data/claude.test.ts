@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { join } from "path";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock fs module
 vi.mock("fs", async (importOriginal) => {
@@ -13,14 +13,12 @@ vi.mock("fs", async (importOriginal) => {
   };
 });
 
-import { existsSync, readFileSync, readdirSync, statSync } from "fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import {
-  getClaudeSessionPath,
   findActiveSession,
-  parseSessionState,
   getClaudeData,
-  type ClaudeSessionState,
-  type ClaudeData,
+  getClaudeSessionPath,
+  parseSessionState,
 } from "../../src/data/claude.js";
 import { ICONS } from "../../src/types/index.js";
 
@@ -272,7 +270,12 @@ describe("claude data module", () => {
         JSON.stringify({
           type: "assistant",
           message: {
-            content: [{ type: "text", text: "This code does something very important and interesting." }],
+            content: [
+              {
+                type: "text",
+                text: "This code does something very important and interesting.",
+              },
+            ],
             usage: { output_tokens: 150 },
           },
           timestamp: now.toISOString(),
@@ -298,7 +301,11 @@ describe("claude data module", () => {
         }),
         JSON.stringify({
           type: "assistant",
-          message: { content: [{ type: "text", text: "Done with the task successfully" }] },
+          message: {
+            content: [
+              { type: "text", text: "Done with the task successfully" },
+            ],
+          },
           timestamp: new Date(now.getTime() - 2000).toISOString(),
         }),
         JSON.stringify({
@@ -340,7 +347,9 @@ describe("claude data module", () => {
         JSON.stringify({
           type: "assistant",
           message: {
-            content: [{ type: "text", text: "First response with some content" }],
+            content: [
+              { type: "text", text: "First response with some content" },
+            ],
             usage: { output_tokens: 100 },
           },
           timestamp: new Date(now.getTime() - 3000).toISOString(),
@@ -348,7 +357,9 @@ describe("claude data module", () => {
         JSON.stringify({
           type: "assistant",
           message: {
-            content: [{ type: "text", text: "Second response with more content" }],
+            content: [
+              { type: "text", text: "Second response with more content" },
+            ],
             usage: { output_tokens: 200 },
           },
           timestamp: now.toISOString(),
@@ -438,7 +449,11 @@ describe("claude data module", () => {
           type: "assistant",
           message: {
             content: [{ type: "text", text: "Main response" }],
-            usage: { input_tokens: 100, cache_read_input_tokens: 1000, output_tokens: 50 },
+            usage: {
+              input_tokens: 100,
+              cache_read_input_tokens: 1000,
+              output_tokens: 50,
+            },
           },
           timestamp: now.toISOString(),
         }),
@@ -449,7 +464,11 @@ describe("claude data module", () => {
           type: "assistant",
           message: {
             content: [{ type: "text", text: "Subagent response" }],
-            usage: { input_tokens: 50, cache_read_input_tokens: 500, output_tokens: 25 },
+            usage: {
+              input_tokens: 50,
+              cache_read_input_tokens: 500,
+              output_tokens: 25,
+            },
           },
           timestamp: now.toISOString(),
         }),
@@ -530,7 +549,8 @@ describe("claude data module", () => {
         return "";
       });
       mockReaddirSync.mockImplementation((path: any) => {
-        if (String(path) === subagentsDir) return ["agent-1.jsonl", "agent-2.jsonl"] as any;
+        if (String(path) === subagentsDir)
+          return ["agent-1.jsonl", "agent-2.jsonl"] as any;
         return [] as any;
       });
 
@@ -600,7 +620,11 @@ describe("claude data module", () => {
           type: "assistant",
           message: {
             content: [
-              { type: "tool_use", name: "Edit", input: { file_path: "/test.ts" } },
+              {
+                type: "tool_use",
+                name: "Edit",
+                input: { file_path: "/test.ts" },
+              },
             ],
           },
           timestamp: new Date(now.getTime() - 3000).toISOString(),
@@ -609,7 +633,11 @@ describe("claude data module", () => {
           type: "assistant",
           message: {
             content: [
-              { type: "tool_use", name: "Bash", input: { command: "npm test" } },
+              {
+                type: "tool_use",
+                name: "Bash",
+                input: { command: "npm test" },
+              },
             ],
           },
           timestamp: new Date(now.getTime() - 2000).toISOString(),
@@ -618,7 +646,11 @@ describe("claude data module", () => {
           type: "assistant",
           message: {
             content: [
-              { type: "tool_use", name: "Grep", input: { pattern: "function" } },
+              {
+                type: "tool_use",
+                name: "Grep",
+                input: { pattern: "function" },
+              },
             ],
           },
           timestamp: now.toISOString(),
@@ -678,11 +710,15 @@ describe("claude data module", () => {
             type: "assistant",
             message: {
               content: [
-                { type: "tool_use", name: "Read", input: { file_path: `/file${i}.ts` } },
+                {
+                  type: "tool_use",
+                  name: "Read",
+                  input: { file_path: `/file${i}.ts` },
+                },
               ],
             },
             timestamp: new Date(now.getTime() - (20 - i) * 1000).toISOString(),
-          })
+          }),
         );
       }
 
@@ -717,7 +753,7 @@ describe("claude data module", () => {
               ],
             },
             timestamp: new Date(now.getTime() - (20 - i) * 1000).toISOString(),
-          })
+          }),
         );
       }
 
@@ -743,7 +779,9 @@ describe("claude data module", () => {
         }),
         JSON.stringify({
           type: "assistant",
-          message: { content: [{ type: "text", text: "Response to the first message" }] },
+          message: {
+            content: [{ type: "text", text: "Response to the first message" }],
+          },
           timestamp: now.toISOString(),
         }),
       ].join("\n");
@@ -754,13 +792,15 @@ describe("claude data module", () => {
       const result = parseSessionState("/fake/session.jsonl");
 
       expect(result.sessionStartTime).not.toBeNull();
-      expect(result.sessionStartTime?.toISOString()).toBe(sessionStart.toISOString());
+      expect(result.sessionStartTime?.toISOString()).toBe(
+        sessionStart.toISOString(),
+      );
     });
 
     it("returns null sessionStartTime when no entries have timestamps", () => {
-      const lines = [
-        JSON.stringify({ type: "system", subtype: "init" }),
-      ].join("\n");
+      const lines = [JSON.stringify({ type: "system", subtype: "init" })].join(
+        "\n",
+      );
 
       mockExistsSync.mockReturnValue(true);
       mockReadFileSync.mockReturnValue(lines);
@@ -878,14 +918,30 @@ describe("claude data module", () => {
           message: {
             role: "user",
             content: [
-              { type: "tool_result", tool_use_id: "123", content: "Todos modified" },
+              {
+                type: "tool_result",
+                tool_use_id: "123",
+                content: "Todos modified",
+              },
             ],
           },
           toolUseResult: {
             newTodos: [
-              { content: "Create issue", status: "completed", activeForm: "Creating issue" },
-              { content: "Write tests", status: "in_progress", activeForm: "Writing tests" },
-              { content: "Implement feature", status: "pending", activeForm: "Implementing" },
+              {
+                content: "Create issue",
+                status: "completed",
+                activeForm: "Creating issue",
+              },
+              {
+                content: "Write tests",
+                status: "in_progress",
+                activeForm: "Writing tests",
+              },
+              {
+                content: "Implement feature",
+                status: "pending",
+                activeForm: "Implementing",
+              },
             ],
           },
           timestamp: now.toISOString(),
@@ -899,10 +955,10 @@ describe("claude data module", () => {
 
       expect(result.todos).toBeDefined();
       expect(result.todos).toHaveLength(3);
-      expect(result.todos![0].content).toBe("Create issue");
-      expect(result.todos![0].status).toBe("completed");
-      expect(result.todos![1].status).toBe("in_progress");
-      expect(result.todos![2].status).toBe("pending");
+      expect(result.todos?.[0].content).toBe("Create issue");
+      expect(result.todos?.[0].status).toBe("completed");
+      expect(result.todos?.[1].status).toBe("in_progress");
+      expect(result.todos?.[2].status).toBe("pending");
     });
 
     it("uses latest todos when multiple toolUseResult entries exist", () => {
@@ -910,7 +966,10 @@ describe("claude data module", () => {
       const lines = [
         JSON.stringify({
           type: "user",
-          message: { role: "user", content: [{ type: "tool_result", tool_use_id: "1", content: "" }] },
+          message: {
+            role: "user",
+            content: [{ type: "tool_result", tool_use_id: "1", content: "" }],
+          },
           toolUseResult: {
             newTodos: [
               { content: "Task A", status: "in_progress", activeForm: "A" },
@@ -920,7 +979,10 @@ describe("claude data module", () => {
         }),
         JSON.stringify({
           type: "user",
-          message: { role: "user", content: [{ type: "tool_result", tool_use_id: "2", content: "" }] },
+          message: {
+            role: "user",
+            content: [{ type: "tool_result", tool_use_id: "2", content: "" }],
+          },
           toolUseResult: {
             newTodos: [
               { content: "Task A", status: "completed", activeForm: "A" },
@@ -937,8 +999,8 @@ describe("claude data module", () => {
       const result = parseSessionState("/fake/session.jsonl");
 
       expect(result.todos).toHaveLength(2);
-      expect(result.todos![0].status).toBe("completed");
-      expect(result.todos![1].status).toBe("in_progress");
+      expect(result.todos?.[0].status).toBe("completed");
+      expect(result.todos?.[1].status).toBe("in_progress");
     });
 
     it("returns null todos when no toolUseResult exists", () => {
@@ -966,7 +1028,11 @@ describe("claude data module", () => {
           type: "assistant",
           message: {
             content: [
-              { type: "tool_use", name: "Edit", input: { file_path: "/test.ts" } },
+              {
+                type: "tool_use",
+                name: "Edit",
+                input: { file_path: "/test.ts" },
+              },
             ],
           },
           timestamp: new Date(now.getTime() - 2000).toISOString(),
@@ -974,9 +1040,7 @@ describe("claude data module", () => {
         JSON.stringify({
           type: "assistant",
           message: {
-            content: [
-              { type: "tool_use", name: "TodoWrite", input: {} },
-            ],
+            content: [{ type: "tool_use", name: "TodoWrite", input: {} }],
           },
           timestamp: new Date(now.getTime() - 1000).toISOString(),
         }),
@@ -984,7 +1048,11 @@ describe("claude data module", () => {
           type: "assistant",
           message: {
             content: [
-              { type: "tool_use", name: "Bash", input: { command: "npm test" } },
+              {
+                type: "tool_use",
+                name: "Bash",
+                input: { command: "npm test" },
+              },
             ],
           },
           timestamp: now.toISOString(),
@@ -1008,7 +1076,11 @@ describe("claude data module", () => {
           type: "assistant",
           message: {
             content: [
-              { type: "tool_use", name: "Edit", input: { file_path: "/test.ts" } },
+              {
+                type: "tool_use",
+                name: "Edit",
+                input: { file_path: "/test.ts" },
+              },
             ],
           },
           timestamp: new Date(now.getTime() - 4000).toISOString(),
@@ -1017,7 +1089,11 @@ describe("claude data module", () => {
           type: "assistant",
           message: {
             content: [
-              { type: "tool_use", name: "Edit", input: { file_path: "/test.ts" } },
+              {
+                type: "tool_use",
+                name: "Edit",
+                input: { file_path: "/test.ts" },
+              },
             ],
           },
           timestamp: new Date(now.getTime() - 3000).toISOString(),
@@ -1026,7 +1102,11 @@ describe("claude data module", () => {
           type: "assistant",
           message: {
             content: [
-              { type: "tool_use", name: "Edit", input: { file_path: "/test.ts" } },
+              {
+                type: "tool_use",
+                name: "Edit",
+                input: { file_path: "/test.ts" },
+              },
             ],
           },
           timestamp: new Date(now.getTime() - 2000).toISOString(),
@@ -1035,7 +1115,11 @@ describe("claude data module", () => {
           type: "assistant",
           message: {
             content: [
-              { type: "tool_use", name: "Bash", input: { command: "npm test" } },
+              {
+                type: "tool_use",
+                name: "Bash",
+                input: { command: "npm test" },
+              },
             ],
           },
           timestamp: now.toISOString(),
@@ -1062,7 +1146,11 @@ describe("claude data module", () => {
           type: "assistant",
           message: {
             content: [
-              { type: "tool_use", name: "Edit", input: { file_path: "/file1.ts" } },
+              {
+                type: "tool_use",
+                name: "Edit",
+                input: { file_path: "/file1.ts" },
+              },
             ],
           },
           timestamp: new Date(now.getTime() - 2000).toISOString(),
@@ -1071,7 +1159,11 @@ describe("claude data module", () => {
           type: "assistant",
           message: {
             content: [
-              { type: "tool_use", name: "Edit", input: { file_path: "/file2.ts" } },
+              {
+                type: "tool_use",
+                name: "Edit",
+                input: { file_path: "/file2.ts" },
+              },
             ],
           },
           timestamp: now.toISOString(),
@@ -1106,7 +1198,10 @@ describe("claude data module", () => {
     it("returns hasSession true when session directory exists but no active session", () => {
       mockExistsSync.mockReturnValue(true);
       mockReaddirSync.mockReturnValue(["old.jsonl"] as any);
-      mockStatSync.mockReturnValue({ mtimeMs: Date.now() - 61 * 60 * 1000, size: 1000 } as any); // 61 minutes ago (beyond default 60 min timeout)
+      mockStatSync.mockReturnValue({
+        mtimeMs: Date.now() - 61 * 60 * 1000,
+        size: 1000,
+      } as any); // 61 minutes ago (beyond default 60 min timeout)
 
       const result = getClaudeData("/Users/test/project");
 
@@ -1119,13 +1214,16 @@ describe("claude data module", () => {
 
       mockExistsSync.mockReturnValue(true);
       mockReaddirSync.mockReturnValue(["session.jsonl"] as any);
-      mockStatSync.mockReturnValue({ mtimeMs: Date.now() - 1000, size: 1000 } as any);
+      mockStatSync.mockReturnValue({
+        mtimeMs: Date.now() - 1000,
+        size: 1000,
+      } as any);
       mockReadFileSync.mockReturnValue(
         JSON.stringify({
           type: "user",
           message: { role: "user", content: "Test message" },
           timestamp: now.toISOString(),
-        })
+        }),
       );
 
       const result = getClaudeData("/Users/test/project");

@@ -1,10 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  parseArgs,
-  clearScreen,
-  getVersion,
-  getHelp,
-} from "../src/cli.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { clearScreen, getHelp, getVersion, parseArgs } from "../src/cli.js";
 
 describe("CLI argument parsing", () => {
   describe("parseArgs", () => {

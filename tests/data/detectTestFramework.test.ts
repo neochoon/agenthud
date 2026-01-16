@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock fs module
 vi.mock("fs", async (importOriginal) => {
@@ -10,11 +10,8 @@ vi.mock("fs", async (importOriginal) => {
   };
 });
 
-import { existsSync, readFileSync } from "fs";
-import {
-  detectTestFramework,
-  type TestFrameworkResult,
-} from "../../src/data/detectTestFramework.js";
+import { existsSync, readFileSync } from "node:fs";
+import { detectTestFramework } from "../../src/data/detectTestFramework.js";
 
 const mockExistsSync = vi.mocked(existsSync);
 const mockReadFileSync = vi.mocked(readFileSync);
@@ -38,14 +35,15 @@ describe("detectTestFramework", () => {
           devDependencies: {
             vitest: "^1.0.0",
           },
-        })
+        }),
       );
 
       const result = detectTestFramework();
 
       expect(result).toEqual({
         framework: "vitest",
-        command: "npx vitest run --reporter=junit --outputFile=.agenthud/test-results.xml",
+        command:
+          "npx vitest run --reporter=junit --outputFile=.agenthud/test-results.xml",
       });
     });
 
@@ -58,14 +56,15 @@ describe("detectTestFramework", () => {
           devDependencies: {
             jest: "^29.0.0",
           },
-        })
+        }),
       );
 
       const result = detectTestFramework();
 
       expect(result).toEqual({
         framework: "jest",
-        command: "JEST_JUNIT_OUTPUT_FILE=.agenthud/test-results.xml npx jest --reporters=jest-junit",
+        command:
+          "JEST_JUNIT_OUTPUT_FILE=.agenthud/test-results.xml npx jest --reporters=jest-junit",
       });
     });
 
@@ -78,14 +77,15 @@ describe("detectTestFramework", () => {
           devDependencies: {
             mocha: "^10.0.0",
           },
-        })
+        }),
       );
 
       const result = detectTestFramework();
 
       expect(result).toEqual({
         framework: "mocha",
-        command: "npx mocha --reporter mocha-junit-reporter --reporter-options mochaFile=.agenthud/test-results.xml",
+        command:
+          "npx mocha --reporter mocha-junit-reporter --reporter-options mochaFile=.agenthud/test-results.xml",
       });
     });
 
@@ -98,14 +98,15 @@ describe("detectTestFramework", () => {
           dependencies: {
             vitest: "^1.0.0",
           },
-        })
+        }),
       );
 
       const result = detectTestFramework();
 
       expect(result).toEqual({
         framework: "vitest",
-        command: "npx vitest run --reporter=junit --outputFile=.agenthud/test-results.xml",
+        command:
+          "npx vitest run --reporter=junit --outputFile=.agenthud/test-results.xml",
       });
     });
 
@@ -119,7 +120,7 @@ describe("detectTestFramework", () => {
             vitest: "^1.0.0",
             jest: "^29.0.0",
           },
-        })
+        }),
       );
 
       const result = detectTestFramework();
@@ -137,7 +138,7 @@ describe("detectTestFramework", () => {
             jest: "^29.0.0",
             mocha: "^10.0.0",
           },
-        })
+        }),
       );
 
       const result = detectTestFramework();
@@ -264,7 +265,7 @@ pytest-cov==4.0.0
           devDependencies: {
             typescript: "^5.0.0",
           },
-        })
+        }),
       );
 
       const result = detectTestFramework();

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface UsePanelDataOptions<T, D extends unknown[]> {
   fetcher: (...deps: D) => T;
@@ -22,14 +22,19 @@ export function usePanelData<T, D extends unknown[] = []>({
   enabled = true,
 }: UsePanelDataOptions<T, D>): UsePanelDataResult<T> {
   // Initialize data and error together to avoid double fetcher call
-  const [state, setState] = useState<{ data: T | null; error: string | null }>(() => {
-    if (!enabled) return { data: null, error: null };
-    try {
-      return { data: fetcher(...deps), error: null };
-    } catch (err) {
-      return { data: null, error: err instanceof Error ? err.message : String(err) };
-    }
-  });
+  const [state, setState] = useState<{ data: T | null; error: string | null }>(
+    () => {
+      if (!enabled) return { data: null, error: null };
+      try {
+        return { data: fetcher(...deps), error: null };
+      } catch (err) {
+        return {
+          data: null,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+    },
+  );
 
   const [isLoading, setIsLoading] = useState(false);
 
@@ -97,7 +102,7 @@ export function usePanelData<T, D extends unknown[] = []>({
         }
       }
     }
-  }, [enabled, fetcher, ...deps]);
+  }, [enabled, fetcher, ...deps, deps]);
 
   return {
     data: state.data,

@@ -1,8 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { renderHook, act, waitFor } from "@testing-library/react";
+
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { usePanelData } from "../../../src/ui/hooks/usePanelData.js";
 
 describe("usePanelData", () => {
@@ -21,7 +22,7 @@ describe("usePanelData", () => {
       const { result } = renderHook(() =>
         usePanelData({
           fetcher,
-        })
+        }),
       );
 
       expect(fetcher).toHaveBeenCalledTimes(1);
@@ -35,7 +36,7 @@ describe("usePanelData", () => {
         usePanelData({
           fetcher,
           deps: ["arg1", 123],
-        })
+        }),
       );
 
       expect(fetcher).toHaveBeenCalledWith("arg1", 123);
@@ -47,7 +48,7 @@ describe("usePanelData", () => {
       const { result } = renderHook(() =>
         usePanelData({
           fetcher,
-        })
+        }),
       );
 
       expect(result.current.data).toBeNull();
@@ -62,7 +63,7 @@ describe("usePanelData", () => {
       const { result } = renderHook(() =>
         usePanelData({
           fetcher,
-        })
+        }),
       );
 
       expect(result.current.data).toEqual({ count: 0 });
@@ -82,7 +83,7 @@ describe("usePanelData", () => {
         usePanelData({
           fetcher,
           deps: ["dep1", "dep2"],
-        })
+        }),
       );
 
       act(() => {
@@ -107,7 +108,7 @@ describe("usePanelData", () => {
         usePanelData({
           fetcher: () => ({ count: -1 }), // sync initial
           asyncFetcher,
-        })
+        }),
       );
 
       expect(result.current.data).toEqual({ count: -1 });
@@ -130,7 +131,7 @@ describe("usePanelData", () => {
           fetcher: () => null,
           asyncFetcher,
           deps: ["async1", "async2"],
-        })
+        }),
       );
 
       await act(async () => {
@@ -149,7 +150,7 @@ describe("usePanelData", () => {
       const { result } = renderHook(() =>
         usePanelData({
           fetcher,
-        })
+        }),
       );
 
       expect(result.current.data).toEqual({ count: 0 });
@@ -170,7 +171,7 @@ describe("usePanelData", () => {
         usePanelData({
           fetcher,
           enabled: false,
-        })
+        }),
       );
 
       expect(fetcher).not.toHaveBeenCalled();
@@ -186,7 +187,7 @@ describe("usePanelData", () => {
             fetcher,
             enabled,
           }),
-        { initialProps: { enabled: false } }
+        { initialProps: { enabled: false } },
       );
 
       expect(fetcher).not.toHaveBeenCalled();
@@ -209,7 +210,7 @@ describe("usePanelData", () => {
             fetcher,
             deps: [id],
           }),
-        { initialProps: { id: "first" } }
+        { initialProps: { id: "first" } },
       );
 
       expect(result.current.data).toEqual({ id: "first" });
@@ -231,7 +232,7 @@ describe("usePanelData", () => {
       const { result } = renderHook(() =>
         usePanelData({
           fetcher,
-        })
+        }),
       );
 
       expect(result.current.data).toBeNull();
@@ -247,7 +248,7 @@ describe("usePanelData", () => {
         usePanelData({
           fetcher: () => null,
           asyncFetcher,
-        })
+        }),
       );
 
       await act(async () => {
@@ -272,7 +273,7 @@ describe("usePanelData", () => {
         usePanelData({
           fetcher: () => null,
           asyncFetcher,
-        })
+        }),
       );
 
       await act(async () => {
@@ -301,14 +302,14 @@ describe("usePanelData", () => {
         () =>
           new Promise((resolve) => {
             resolvePromise = resolve;
-          })
+          }),
       );
 
       const { result } = renderHook(() =>
         usePanelData({
           fetcher: () => null,
           asyncFetcher,
-        })
+        }),
       );
 
       expect(result.current.isLoading).toBe(false);
@@ -323,7 +324,7 @@ describe("usePanelData", () => {
       });
 
       await act(async () => {
-        resolvePromise!({ done: true });
+        resolvePromise?.({ done: true });
         await refreshPromise;
       });
 

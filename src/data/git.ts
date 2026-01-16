@@ -1,7 +1,7 @@
-import { execSync, exec } from "child_process";
-import { promisify } from "util";
-import type { Commit, GitStats } from "../types/index.js";
+import { exec, execSync } from "node:child_process";
+import { promisify } from "node:util";
 import type { GitPanelConfig } from "../config/parser.js";
+import type { Commit, GitStats } from "../types/index.js";
 
 const execAsync = promisify(exec);
 
@@ -179,7 +179,9 @@ export function getGitData(config: GitPanelConfig): GitData {
 }
 
 // Async version for non-blocking UI updates
-export async function getGitDataAsync(config: GitPanelConfig): Promise<GitData> {
+export async function getGitDataAsync(
+  config: GitPanelConfig,
+): Promise<GitData> {
   const commands = {
     branch: config.command?.branch || DEFAULT_COMMANDS.branch,
     commits: config.command?.commits || DEFAULT_COMMANDS.commits,

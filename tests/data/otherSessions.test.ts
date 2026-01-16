@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { sep } from "path";
+import { sep } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock fs module
 vi.mock("fs", async (importOriginal) => {
@@ -13,13 +13,12 @@ vi.mock("fs", async (importOriginal) => {
   };
 });
 
-import { existsSync, readFileSync, readdirSync, statSync } from "fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import {
+  formatRelativeTime,
   getAllProjects,
   getOtherSessionsData,
   parseLastAssistantMessage,
-  formatRelativeTime,
-  type OtherSessionsData,
 } from "../../src/data/otherSessions.js";
 
 const mockExistsSync = vi.mocked(existsSync);
@@ -68,9 +67,12 @@ describe("otherSessions data module", () => {
         "-Users-test-project1",
         "some-file.txt",
       ] as any);
-      mockStatSync.mockImplementation((path: any) => ({
-        isDirectory: () => !String(path).includes("some-file.txt"),
-      } as any));
+      mockStatSync.mockImplementation(
+        (path: any) =>
+          ({
+            isDirectory: () => !String(path).includes("some-file.txt"),
+          }) as any,
+      );
 
       const result = getAllProjects();
 
@@ -88,7 +90,9 @@ describe("otherSessions data module", () => {
       const result = getAllProjects();
 
       // The decode replaces all "-" with platform separator
-      expect(result[0].decodedPath).toBe(`${sep}Users${sep}test${sep}myproject`);
+      expect(result[0].decodedPath).toBe(
+        `${sep}Users${sep}test${sep}myproject`,
+      );
     });
   });
 
@@ -145,7 +149,13 @@ describe("otherSessions data module", () => {
         JSON.stringify({
           type: "assistant",
           message: {
-            content: [{ type: "tool_use", name: "Bash", input: { command: "npm test" } }],
+            content: [
+              {
+                type: "tool_use",
+                name: "Bash",
+                input: { command: "npm test" },
+              },
+            ],
           },
         }),
       ].join("\n");
@@ -163,7 +173,9 @@ describe("otherSessions data module", () => {
       const lines = [
         JSON.stringify({
           type: "assistant",
-          message: { content: [{ type: "text", text: "Line one\nLine two\nLine three" }] },
+          message: {
+            content: [{ type: "text", text: "Line one\nLine two\nLine three" }],
+          },
         }),
       ].join("\n");
 
@@ -244,7 +256,10 @@ describe("otherSessions data module", () => {
       });
       mockStatSync.mockImplementation((path: any) => {
         if (String(path).endsWith(".jsonl")) {
-          return { mtimeMs: Date.now() - 1000, isDirectory: () => false } as any;
+          return {
+            mtimeMs: Date.now() - 1000,
+            isDirectory: () => false,
+          } as any;
         }
         return { isDirectory: () => true } as any;
       });
@@ -252,7 +267,7 @@ describe("otherSessions data module", () => {
         JSON.stringify({
           type: "assistant",
           message: { content: [{ type: "text", text: "Hello" }] },
-        })
+        }),
       );
 
       const result = getOtherSessionsData(`${sep}Users${sep}test${sep}current`);
@@ -260,14 +275,20 @@ describe("otherSessions data module", () => {
       // Total should include all projects (2), but active/recent should exclude current
       expect(result.totalProjects).toBe(2);
       // Only "other" project should be considered
-      expect(result.recentSession?.projectPath).toBe(`${sep}Users${sep}test${sep}other`);
+      expect(result.recentSession?.projectPath).toBe(
+        `${sep}Users${sep}test${sep}other`,
+      );
     });
 
     it("counts active sessions correctly", () => {
       mockExistsSync.mockReturnValue(true);
       mockReaddirSync.mockImplementation((path: any) => {
         if (String(path).endsWith("projects")) {
-          return ["-Users-test-project1", "-Users-test-project2", "-Users-test-project3"] as any;
+          return [
+            "-Users-test-project1",
+            "-Users-test-project2",
+            "-Users-test-project3",
+          ] as any;
         }
         return ["session.jsonl"] as any;
       });
@@ -277,12 +298,21 @@ describe("otherSessions data module", () => {
           // project2: active (3 minutes ago)
           // project3: inactive (10 minutes ago)
           if (String(path).includes("project1")) {
-            return { mtimeMs: Date.now() - 1 * 60 * 1000, isDirectory: () => false } as any;
+            return {
+              mtimeMs: Date.now() - 1 * 60 * 1000,
+              isDirectory: () => false,
+            } as any;
           }
           if (String(path).includes("project2")) {
-            return { mtimeMs: Date.now() - 3 * 60 * 1000, isDirectory: () => false } as any;
+            return {
+              mtimeMs: Date.now() - 3 * 60 * 1000,
+              isDirectory: () => false,
+            } as any;
           }
-          return { mtimeMs: Date.now() - 10 * 60 * 1000, isDirectory: () => false } as any;
+          return {
+            mtimeMs: Date.now() - 10 * 60 * 1000,
+            isDirectory: () => false,
+          } as any;
         }
         return { isDirectory: () => true } as any;
       });
@@ -290,7 +320,7 @@ describe("otherSessions data module", () => {
         JSON.stringify({
           type: "assistant",
           message: { content: [{ type: "text", text: "Hello" }] },
-        })
+        }),
       );
 
       const result = getOtherSessionsData("/some/other/path");
@@ -310,9 +340,15 @@ describe("otherSessions data module", () => {
       mockStatSync.mockImplementation((path: any) => {
         if (String(path).endsWith(".jsonl")) {
           if (String(path).includes("newer")) {
-            return { mtimeMs: Date.now() - 30 * 1000, isDirectory: () => false } as any; // 30s ago
+            return {
+              mtimeMs: Date.now() - 30 * 1000,
+              isDirectory: () => false,
+            } as any; // 30s ago
           }
-          return { mtimeMs: Date.now() - 5 * 60 * 1000, isDirectory: () => false } as any; // 5m ago
+          return {
+            mtimeMs: Date.now() - 5 * 60 * 1000,
+            isDirectory: () => false,
+          } as any; // 5m ago
         }
         return { isDirectory: () => true } as any;
       });
@@ -332,7 +368,9 @@ describe("otherSessions data module", () => {
       const result = getOtherSessionsData(`${sep}some${sep}other${sep}path`);
 
       expect(result.recentSession).not.toBeNull();
-      expect(result.recentSession?.projectPath).toBe(`${sep}Users${sep}test${sep}newer`);
+      expect(result.recentSession?.projectPath).toBe(
+        `${sep}Users${sep}test${sep}newer`,
+      );
       expect(result.recentSession?.projectName).toBe("newer");
       expect(result.recentSession?.lastMessage).toBe("Recent message");
       expect(result.recentSession?.isActive).toBe(true);
@@ -348,7 +386,10 @@ describe("otherSessions data module", () => {
       });
       mockStatSync.mockImplementation((path: any) => {
         if (String(path).endsWith(".jsonl")) {
-          return { mtimeMs: Date.now() - 1000, isDirectory: () => false } as any;
+          return {
+            mtimeMs: Date.now() - 1000,
+            isDirectory: () => false,
+          } as any;
         }
         return { isDirectory: () => true } as any;
       });
@@ -356,7 +397,7 @@ describe("otherSessions data module", () => {
         JSON.stringify({
           type: "assistant",
           message: { content: [{ type: "text", text: "Hello" }] },
-        })
+        }),
       );
 
       const result = getOtherSessionsData("/other/path");
@@ -393,7 +434,10 @@ describe("otherSessions data module", () => {
       mockStatSync.mockImplementation((path: any) => {
         if (String(path).endsWith(".jsonl")) {
           // 3 minutes ago - active with 5m threshold, inactive with 2m threshold
-          return { mtimeMs: Date.now() - 3 * 60 * 1000, isDirectory: () => false } as any;
+          return {
+            mtimeMs: Date.now() - 3 * 60 * 1000,
+            isDirectory: () => false,
+          } as any;
         }
         return { isDirectory: () => true } as any;
       });
@@ -401,7 +445,7 @@ describe("otherSessions data module", () => {
         JSON.stringify({
           type: "assistant",
           message: { content: [{ type: "text", text: "Hello" }] },
-        })
+        }),
       );
 
       // With 5 minute threshold (default)
@@ -410,7 +454,9 @@ describe("otherSessions data module", () => {
       expect(result1.recentSession?.isActive).toBe(true);
 
       // With 2 minute threshold
-      const result2 = getOtherSessionsData("/other/path", { activeThresholdMs: 2 * 60 * 1000 });
+      const result2 = getOtherSessionsData("/other/path", {
+        activeThresholdMs: 2 * 60 * 1000,
+      });
       expect(result2.activeCount).toBe(0);
       expect(result2.recentSession?.isActive).toBe(false);
     });
@@ -421,7 +467,11 @@ describe("otherSessions data module", () => {
       mockExistsSync.mockReturnValue(true);
       mockReaddirSync.mockImplementation((path: any) => {
         if (String(path).endsWith("projects")) {
-          return ["-Users-test-alpha", "-Users-test-beta", "-Users-test-gamma"] as any;
+          return [
+            "-Users-test-alpha",
+            "-Users-test-beta",
+            "-Users-test-gamma",
+          ] as any;
         }
         return ["session.jsonl"] as any;
       });
@@ -429,12 +479,21 @@ describe("otherSessions data module", () => {
         if (String(path).endsWith(".jsonl")) {
           // gamma: most recent, alpha: oldest, beta: middle
           if (String(path).includes("gamma")) {
-            return { mtimeMs: Date.now() - 1 * 60 * 1000, isDirectory: () => false } as any;
+            return {
+              mtimeMs: Date.now() - 1 * 60 * 1000,
+              isDirectory: () => false,
+            } as any;
           }
           if (String(path).includes("beta")) {
-            return { mtimeMs: Date.now() - 5 * 60 * 1000, isDirectory: () => false } as any;
+            return {
+              mtimeMs: Date.now() - 5 * 60 * 1000,
+              isDirectory: () => false,
+            } as any;
           }
-          return { mtimeMs: Date.now() - 10 * 60 * 1000, isDirectory: () => false } as any;
+          return {
+            mtimeMs: Date.now() - 10 * 60 * 1000,
+            isDirectory: () => false,
+          } as any;
         }
         return { isDirectory: () => true } as any;
       });
@@ -442,7 +501,7 @@ describe("otherSessions data module", () => {
         JSON.stringify({
           type: "assistant",
           message: { content: [{ type: "text", text: "Hello" }] },
-        })
+        }),
       );
 
       const result = getOtherSessionsData("/other/path");
@@ -460,7 +519,10 @@ describe("otherSessions data module", () => {
       });
       mockStatSync.mockImplementation((path: any) => {
         if (String(path).endsWith(".jsonl")) {
-          return { mtimeMs: Date.now() - 1000, isDirectory: () => false } as any;
+          return {
+            mtimeMs: Date.now() - 1000,
+            isDirectory: () => false,
+          } as any;
         }
         return { isDirectory: () => true } as any;
       });
@@ -468,7 +530,7 @@ describe("otherSessions data module", () => {
         JSON.stringify({
           type: "assistant",
           message: { content: [{ type: "text", text: "Hello" }] },
-        })
+        }),
       );
 
       const result = getOtherSessionsData(`${sep}Users${sep}test${sep}current`);
@@ -505,19 +567,32 @@ describe("otherSessions data module", () => {
       mockReaddirSync.mockImplementation((path: any) => {
         if (String(path).endsWith("projects")) {
           // Two different paths with same basename "dotfiles"
-          return ["-Users-alice-dotfiles", "-Users-bob-dotfiles", "-Users-test-other"] as any;
+          return [
+            "-Users-alice-dotfiles",
+            "-Users-bob-dotfiles",
+            "-Users-test-other",
+          ] as any;
         }
         return ["session.jsonl"] as any;
       });
       mockStatSync.mockImplementation((path: any) => {
         if (String(path).endsWith(".jsonl")) {
           if (String(path).includes("alice")) {
-            return { mtimeMs: Date.now() - 1 * 60 * 1000, isDirectory: () => false } as any;
+            return {
+              mtimeMs: Date.now() - 1 * 60 * 1000,
+              isDirectory: () => false,
+            } as any;
           }
           if (String(path).includes("bob")) {
-            return { mtimeMs: Date.now() - 2 * 60 * 1000, isDirectory: () => false } as any;
+            return {
+              mtimeMs: Date.now() - 2 * 60 * 1000,
+              isDirectory: () => false,
+            } as any;
           }
-          return { mtimeMs: Date.now() - 3 * 60 * 1000, isDirectory: () => false } as any;
+          return {
+            mtimeMs: Date.now() - 3 * 60 * 1000,
+            isDirectory: () => false,
+          } as any;
         }
         return { isDirectory: () => true } as any;
       });
@@ -525,7 +600,7 @@ describe("otherSessions data module", () => {
         JSON.stringify({
           type: "assistant",
           message: { content: [{ type: "text", text: "Hello" }] },
-        })
+        }),
       );
 
       const result = getOtherSessionsData("/other/path");

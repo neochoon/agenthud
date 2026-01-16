@@ -1,13 +1,13 @@
-import React from "react";
 import { Box, Text } from "ink";
+import type React from "react";
 import type { OtherSessionsData } from "../data/otherSessions.js";
 import {
-  DEFAULT_PANEL_WIDTH,
   BOX,
-  createTitleLine,
   createBottomLine,
-  getInnerWidth,
+  createTitleLine,
+  DEFAULT_PANEL_WIDTH,
   getDisplayWidth,
+  getInnerWidth,
 } from "./constants.js";
 
 interface OtherSessionsPanelProps {
@@ -45,10 +45,7 @@ function truncateMessage(message: string, maxLength: number): string {
   return truncated;
 }
 
-function formatProjectNames(
-  projectNames: string[],
-  maxWidth: number
-): string {
+function formatProjectNames(projectNames: string[], maxWidth: number): string {
   if (projectNames.length === 0) {
     return "No projects";
   }
@@ -93,7 +90,7 @@ function formatProjectNames(
   const maxNameLen = availableWidth - suffixLen - 3; // -3 for "..."
 
   if (maxNameLen > 0) {
-    return firstProject.slice(0, maxNameLen) + "..." + suffix;
+    return `${firstProject.slice(0, maxNameLen)}...${suffix}`;
   }
 
   return "...";
@@ -128,35 +125,38 @@ export function OtherSessionsPanel({
   // Header line with counts
   lines.push(
     <Text key="header">
-      {BOX.v}{" "}
-      <Text>{headerText}</Text>
+      {BOX.v} <Text>{headerText}</Text>
       {" ".repeat(headerPadding)}
-      {BOX.v}{clearEOL}
-    </Text>
+      {BOX.v}
+      {clearEOL}
+    </Text>,
   );
 
   // Empty line
   lines.push(
     <Text key="empty">
-      {BOX.v}{" "}
-      {" ".repeat(contentWidth)}
-      {BOX.v}{clearEOL}
-    </Text>
+      {BOX.v} {" ".repeat(contentWidth)}
+      {BOX.v}
+      {clearEOL}
+    </Text>,
   );
 
   // Recent session or empty state
   if (recentSession) {
     const statusIcon = recentSession.isActive ? "🔵" : "⚪";
     const sessionLine = `${statusIcon} ${recentSession.projectName} (${recentSession.relativeTime})`;
-    const sessionLinePadding = Math.max(0, contentWidth - getDisplayWidth(sessionLine));
+    const sessionLinePadding = Math.max(
+      0,
+      contentWidth - getDisplayWidth(sessionLine),
+    );
 
     lines.push(
       <Text key="session">
-        {BOX.v}{" "}
-        <Text>{sessionLine}</Text>
+        {BOX.v} <Text>{sessionLine}</Text>
         {" ".repeat(sessionLinePadding)}
-        {BOX.v}{clearEOL}
-      </Text>
+        {BOX.v}
+        {clearEOL}
+      </Text>,
     );
 
     // Last message (if available)
@@ -169,18 +169,21 @@ export function OtherSessionsPanel({
 
       const truncatedMessage = truncateMessage(
         recentSession.lastMessage,
-        Math.min(availableWidth, messageMaxLength)
+        Math.min(availableWidth, messageMaxLength),
       );
       const messageText = `${indent}${quotePrefix}${truncatedMessage}${quoteSuffix}`;
-      const messagePadding = Math.max(0, contentWidth - getDisplayWidth(messageText));
+      const messagePadding = Math.max(
+        0,
+        contentWidth - getDisplayWidth(messageText),
+      );
 
       lines.push(
         <Text key="message">
-          {BOX.v}{" "}
-          <Text dimColor>{messageText}</Text>
+          {BOX.v} <Text dimColor>{messageText}</Text>
           {" ".repeat(messagePadding)}
-          {BOX.v}{clearEOL}
-        </Text>
+          {BOX.v}
+          {clearEOL}
+        </Text>,
       );
     }
   } else {
@@ -190,11 +193,11 @@ export function OtherSessionsPanel({
 
     lines.push(
       <Text key="no-session">
-        {BOX.v}{" "}
-        <Text dimColor>{noSessionText}</Text>
+        {BOX.v} <Text dimColor>{noSessionText}</Text>
         {" ".repeat(noSessionPadding)}
-        {BOX.v}{clearEOL}
-      </Text>
+        {BOX.v}
+        {clearEOL}
+      </Text>,
     );
   }
 

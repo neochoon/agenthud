@@ -1,17 +1,22 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { promisify } from "util";
+import { promisify } from "node:util";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock child_process module
 vi.mock("child_process", async (importOriginal) => {
   const actual = await importOriginal<typeof import("child_process")>();
   // Create a mock exec function with custom promisify
-  const mockExecFn = vi.fn((cmd: string, callback?: (error: Error | null, stdout: string, stderr: string) => void) => {
-    // Default mock implementation that calls callback with error
-    if (callback) {
-      callback(new Error("Mock exec not configured"), "", "");
-    }
-    return {} as any;
-  });
+  const mockExecFn = vi.fn(
+    (
+      _cmd: string,
+      callback?: (error: Error | null, stdout: string, stderr: string) => void,
+    ) => {
+      // Default mock implementation that calls callback with error
+      if (callback) {
+        callback(new Error("Mock exec not configured"), "", "");
+      }
+      return {} as any;
+    },
+  );
   // Add custom promisify to return {stdout, stderr} like real exec
   (mockExecFn as any)[promisify.custom] = vi.fn(async () => {
     return { stdout: "", stderr: "" };
@@ -36,16 +41,16 @@ vi.mock("fs", async (importOriginal) => {
   };
 });
 
-import { execSync, exec } from "child_process";
-import { readFileSync, promises as fsPromises } from "fs";
+import { exec, execSync } from "node:child_process";
+import { promises as fsPromises, readFileSync } from "node:fs";
+import type { CustomPanelConfig } from "../../src/config/parser.js";
 import {
   getCustomPanelData,
   getCustomPanelDataAsync,
 } from "../../src/data/custom.js";
-import type { CustomPanelConfig } from "../../src/config/parser.js";
 
 const mockExecSync = vi.mocked(execSync);
-const mockExec = vi.mocked(exec);
+const _mockExec = vi.mocked(exec);
 // Get the custom promisify mock for async exec tests
 const mockExecAsync = vi.mocked((exec as any)[promisify.custom]);
 const mockReadFileSync = vi.mocked(readFileSync);
@@ -68,7 +73,7 @@ describe("custom panel data", () => {
             title: "My Panel",
             summary: "Test summary",
             items: [{ text: "item1" }],
-          })
+          }),
         );
 
         const config: CustomPanelConfig = {
@@ -164,7 +169,7 @@ describe("custom panel data", () => {
             items: [{ text: "file item" }],
             progress: { current: 5, total: 10 },
             stats: [{ label: "Count", value: "42" }],
-          })
+          }),
         );
 
         const config: CustomPanelConfig = {
@@ -241,7 +246,9 @@ describe("custom panel data", () => {
       const result = getCustomPanelData("test", config);
 
       expect(result.timestamp).toBeDefined();
-      expect(new Date(result.timestamp).getTime()).toBeLessThanOrEqual(Date.now());
+      expect(new Date(result.timestamp).getTime()).toBeLessThanOrEqual(
+        Date.now(),
+      );
     });
   });
 
@@ -303,7 +310,9 @@ describe("custom panel data", () => {
 
     it("reads from source file", async () => {
       // Mock fsPromises.readFile to return JSON
-      mockReadFile.mockResolvedValue(JSON.stringify({ title: "Async File", summary: "from file" }));
+      mockReadFile.mockResolvedValue(
+        JSON.stringify({ title: "Async File", summary: "from file" }),
+      );
 
       const config: CustomPanelConfig = {
         enabled: true,
@@ -320,7 +329,9 @@ describe("custom panel data", () => {
 
     it("handles file not found", async () => {
       // Mock fsPromises.readFile to reject with ENOENT error
-      mockReadFile.mockRejectedValue(new Error("ENOENT: no such file or directory"));
+      mockReadFile.mockRejectedValue(
+        new Error("ENOENT: no such file or directory"),
+      );
 
       const config: CustomPanelConfig = {
         enabled: true,

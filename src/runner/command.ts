@@ -1,11 +1,7 @@
-import { execSync } from "child_process";
-import {
-  existsSync,
-  unlinkSync,
-  readFileSync,
-} from "fs";
-import type { TestResults, TestFailure, TestData } from "../types/index.js";
+import { execSync } from "node:child_process";
+import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { TEST_RESULTS_FILE } from "../data/detectTestFramework.js";
+import type { TestData, TestFailure, TestResults } from "../types/index.js";
 
 interface VitestOutput {
   numPassedTests: number;
@@ -48,8 +44,7 @@ export function parseJUnitXml(xml: string): ParsedResults | null {
 
     // If inside <testsuites>, we should have matches
     // If no matches but we have <testsuite, treat the whole XML as the suite
-    const testsuites =
-      testsuiteMatches.length > 0 ? testsuiteMatches : [xml];
+    const testsuites = testsuiteMatches.length > 0 ? testsuiteMatches : [xml];
 
     for (const suite of testsuites) {
       // Extract attributes from testsuite tag
@@ -70,9 +65,9 @@ export function parseJUnitXml(xml: string): ParsedResults | null {
       // Use [^/>]* before (?:\/>) to avoid consuming the / in self-closing tags
       const testcaseRegex =
         /<testcase[^>]*classname="([^"]*)"[^>]*name="([^"]*)"[^/>]*(?:\/>|>[\s\S]*?<\/testcase>)/g;
-      let testcaseMatch;
+      const testcaseMatches = suite.matchAll(testcaseRegex);
 
-      while ((testcaseMatch = testcaseRegex.exec(suite)) !== null) {
+      for (const testcaseMatch of testcaseMatches) {
         const testcaseContent = testcaseMatch[0];
         const classname = testcaseMatch[1];
         const name = testcaseMatch[2];
@@ -146,16 +141,21 @@ export function parseVitestOutput(output: string): ParsedResults | null {
 
 function getHeadHash(): string {
   try {
-    return (execSync("git rev-parse --short HEAD", {
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    }) as string).trim();
+    return (
+      execSync("git rev-parse --short HEAD", {
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
+      }) as string
+    ).trim();
   } catch {
     return "unknown";
   }
 }
 
-export function runTestCommand(command: string, source: string = TEST_RESULTS_FILE): TestData {
+export function runTestCommand(
+  command: string,
+  source: string = TEST_RESULTS_FILE,
+): TestData {
   // 1. Delete existing result file (if exists)
   try {
     if (existsSync(source)) {

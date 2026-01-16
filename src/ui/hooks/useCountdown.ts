@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface PanelInterval {
   interval: number | null; // ms, null = manual
@@ -61,7 +61,8 @@ export function useCountdown({
     return result;
   }, [panels, customPanels]);
 
-  const [countdowns, setCountdowns] = useState<Record<string, number | null>>(initialCountdowns);
+  const [countdowns, setCountdowns] =
+    useState<Record<string, number | null>>(initialCountdowns);
 
   // Keep ref to latest intervalSeconds to avoid stale closures
   const intervalSecondsRef = useRef(intervalSeconds);

@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
-  getTerminalWidth,
-  MIN_TERMINAL_WIDTH,
-  MAX_TERMINAL_WIDTH,
   DEFAULT_FALLBACK_WIDTH,
+  getTerminalWidth,
+  MAX_TERMINAL_WIDTH,
+  MIN_TERMINAL_WIDTH,
 } from "../../src/ui/constants.js";
 
 describe("getTerminalWidth", () => {

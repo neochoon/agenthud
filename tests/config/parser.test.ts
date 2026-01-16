@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock fs module
 vi.mock("fs", async (importOriginal) => {
@@ -10,12 +10,11 @@ vi.mock("fs", async (importOriginal) => {
   };
 });
 
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync } from "node:fs";
 import {
+  getDefaultConfig,
   parseConfig,
   parseInterval,
-  getDefaultConfig,
-  type Config,
 } from "../../src/config/parser.js";
 
 const mockExistsSync = vi.mocked(existsSync);
@@ -204,7 +203,9 @@ panels:
 
       const { warnings, config } = parseConfig();
 
-      expect(warnings).toContain("Invalid interval 'invalid' for git panel, using default");
+      expect(warnings).toContain(
+        "Invalid interval 'invalid' for git panel, using default",
+      );
       expect(config.panels.git.interval).toBe(30000); // default
     });
 
@@ -235,7 +236,7 @@ panels:
       // Unknown panels are now treated as custom panels, not warnings
       expect(warnings).not.toContain("Unknown panel 'unknown' in config");
       expect(config.customPanels).toBeDefined();
-      expect(config.customPanels!.unknown).toBeDefined();
+      expect(config.customPanels?.unknown).toBeDefined();
     });
   });
 
@@ -257,11 +258,13 @@ panels:
       const { config, warnings } = parseConfig();
 
       expect(config.customPanels).toBeDefined();
-      expect(config.customPanels!.docker).toBeDefined();
-      expect(config.customPanels!.docker.enabled).toBe(true);
-      expect(config.customPanels!.docker.command).toBe("docker ps --format json");
-      expect(config.customPanels!.docker.renderer).toBe("list");
-      expect(config.customPanels!.docker.interval).toBe(30000);
+      expect(config.customPanels?.docker).toBeDefined();
+      expect(config.customPanels?.docker.enabled).toBe(true);
+      expect(config.customPanels?.docker.command).toBe(
+        "docker ps --format json",
+      );
+      expect(config.customPanels?.docker.renderer).toBe("list");
+      expect(config.customPanels?.docker.interval).toBe(30000);
       expect(warnings).not.toContain("Unknown panel 'docker' in config");
     });
 
@@ -277,9 +280,9 @@ panels:
 
       const { config } = parseConfig();
 
-      expect(config.customPanels!.status.source).toBe(".agenthud/status.json");
-      expect(config.customPanels!.status.renderer).toBe("status");
-      expect(config.customPanels!.status.interval).toBeNull();
+      expect(config.customPanels?.status.source).toBe(".agenthud/status.json");
+      expect(config.customPanels?.status.renderer).toBe("status");
+      expect(config.customPanels?.status.interval).toBeNull();
     });
 
     it("defaults renderer to list", () => {
@@ -292,7 +295,7 @@ panels:
 
       const { config } = parseConfig();
 
-      expect(config.customPanels!.custom.renderer).toBe("list");
+      expect(config.customPanels?.custom.renderer).toBe("list");
     });
 
     it("defaults interval to 30s for custom panels", () => {
@@ -305,7 +308,7 @@ panels:
 
       const { config } = parseConfig();
 
-      expect(config.customPanels!.custom.interval).toBe(30000);
+      expect(config.customPanels?.custom.interval).toBe(30000);
     });
 
     it("parses multiple custom panels", () => {
@@ -323,9 +326,9 @@ panels:
       const { config } = parseConfig();
 
       expect(Object.keys(config.customPanels!)).toHaveLength(2);
-      expect(config.customPanels!.docker).toBeDefined();
-      expect(config.customPanels!.k8s).toBeDefined();
-      expect(config.customPanels!.k8s.renderer).toBe("progress");
+      expect(config.customPanels?.docker).toBeDefined();
+      expect(config.customPanels?.k8s).toBeDefined();
+      expect(config.customPanels?.k8s.renderer).toBe("progress");
     });
 
     it("handles mixed built-in and custom panels", () => {
@@ -342,7 +345,7 @@ panels:
       const { config } = parseConfig();
 
       expect(config.panels.git.interval).toBe(60000);
-      expect(config.customPanels!.docker).toBeDefined();
+      expect(config.customPanels?.docker).toBeDefined();
     });
 
     it("warns on invalid renderer", () => {
@@ -356,8 +359,10 @@ panels:
 
       const { config, warnings } = parseConfig();
 
-      expect(warnings).toContain("Invalid renderer 'invalid' for custom panel, using 'list'");
-      expect(config.customPanels!.custom.renderer).toBe("list");
+      expect(warnings).toContain(
+        "Invalid renderer 'invalid' for custom panel, using 'list'",
+      );
+      expect(config.customPanels?.custom.renderer).toBe("list");
     });
 
     it("ignores disabled custom panels", () => {
@@ -370,7 +375,7 @@ panels:
 
       const { config } = parseConfig();
 
-      expect(config.customPanels!.docker.enabled).toBe(false);
+      expect(config.customPanels?.docker.enabled).toBe(false);
     });
   });
 
@@ -394,7 +399,14 @@ panels:
       const { config } = parseConfig();
 
       // Config order is preserved, missing built-in panels (project, claude, other_sessions) added at end
-      expect(config.panelOrder).toEqual(["git", "docker", "tests", "project", "claude", "other_sessions"]);
+      expect(config.panelOrder).toEqual([
+        "git",
+        "docker",
+        "tests",
+        "project",
+        "claude",
+        "other_sessions",
+      ]);
     });
 
     it("returns default order when no config file", () => {
@@ -402,7 +414,13 @@ panels:
 
       const { config } = parseConfig();
 
-      expect(config.panelOrder).toEqual(["project", "git", "tests", "claude", "other_sessions"]);
+      expect(config.panelOrder).toEqual([
+        "project",
+        "git",
+        "tests",
+        "claude",
+        "other_sessions",
+      ]);
     });
 
     it("includes disabled panels in order (enabled checked at render time)", () => {
@@ -422,7 +440,14 @@ panels:
       // panelOrder should include all panels from config, regardless of enabled state
       // The enabled state is checked at render time
       // Missing built-in panels (project, claude, other_sessions) added at end
-      expect(config.panelOrder).toEqual(["git", "docker", "tests", "project", "claude", "other_sessions"]);
+      expect(config.panelOrder).toEqual([
+        "git",
+        "docker",
+        "tests",
+        "project",
+        "claude",
+        "other_sessions",
+      ]);
     });
   });
 
@@ -476,7 +501,9 @@ width: 150
       const { config, warnings } = parseConfig();
 
       expect(config.width).toBe(120);
-      expect(warnings).toContain("Width 150 is too large, using maximum of 120");
+      expect(warnings).toContain(
+        "Width 150 is too large, using maximum of 120",
+      );
     });
   });
 });

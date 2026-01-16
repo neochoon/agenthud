@@ -1,8 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+
+import { act, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useCountdown } from "../../../src/ui/hooks/useCountdown.js";
 
 describe("useCountdown", () => {
@@ -23,7 +24,7 @@ describe("useCountdown", () => {
             git: { interval: 60000 }, // 60s in ms
           },
           enabled: true,
-        })
+        }),
       );
 
       expect(result.current.countdowns.project).toBe(30);
@@ -37,7 +38,7 @@ describe("useCountdown", () => {
             tests: { interval: null }, // manual
           },
           enabled: true,
-        })
+        }),
       );
 
       expect(result.current.countdowns.tests).toBeNull();
@@ -54,7 +55,7 @@ describe("useCountdown", () => {
             build: { interval: null }, // manual
           },
           enabled: true,
-        })
+        }),
       );
 
       expect(result.current.countdowns.deploy).toBe(120);
@@ -70,7 +71,7 @@ describe("useCountdown", () => {
             git: { interval: 5000 }, // 5s
           },
           enabled: true,
-        })
+        }),
       );
 
       expect(result.current.countdowns.git).toBe(5);
@@ -93,7 +94,7 @@ describe("useCountdown", () => {
             git: { interval: 3000 }, // 3s
           },
           enabled: true,
-        })
+        }),
       );
 
       expect(result.current.countdowns.git).toBe(3);
@@ -113,7 +114,7 @@ describe("useCountdown", () => {
             tests: { interval: null },
           },
           enabled: true,
-        })
+        }),
       );
 
       expect(result.current.countdowns.tests).toBeNull();
@@ -132,7 +133,7 @@ describe("useCountdown", () => {
             git: { interval: 5000 },
           },
           enabled: false, // disabled (once mode)
-        })
+        }),
       );
 
       expect(result.current.countdowns.git).toBe(5);
@@ -154,7 +155,7 @@ describe("useCountdown", () => {
             git: { interval: 30000 },
           },
           enabled: true,
-        })
+        }),
       );
 
       // Tick down
@@ -178,7 +179,7 @@ describe("useCountdown", () => {
             deploy: { interval: 60000 },
           },
           enabled: true,
-        })
+        }),
       );
 
       act(() => {
@@ -199,7 +200,7 @@ describe("useCountdown", () => {
             tests: { interval: null },
           },
           enabled: true,
-        })
+        }),
       );
 
       act(() => {
@@ -223,7 +224,7 @@ describe("useCountdown", () => {
             deploy: { interval: 120000 },
           },
           enabled: true,
-        })
+        }),
       );
 
       // Tick down
@@ -255,7 +256,7 @@ describe("useCountdown", () => {
             git: { interval: 30000 },
           },
           enabled: true,
-        })
+        }),
       );
 
       const clearIntervalSpy = vi.spyOn(global, "clearInterval");

@@ -1,6 +1,5 @@
-import React from "react";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render } from "ink-testing-library";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock child_process module
 vi.mock("child_process", async (importOriginal) => {
@@ -25,8 +24,8 @@ vi.mock("fs", async (importOriginal) => {
   };
 });
 
-import { execSync, exec } from "child_process";
-import { existsSync, readFileSync, readdirSync, statSync, unlinkSync } from "fs";
+import { execSync } from "node:child_process";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { App } from "../../src/ui/App.js";
 
 const mockExecSync = vi.mocked(execSync);
@@ -53,7 +52,10 @@ describe("App with config", () => {
 
     // Default: no projects directory for other sessions
     mockReaddirSync.mockReturnValue([]);
-    mockStatSync.mockReturnValue({ mtimeMs: 0, isDirectory: () => true } as any);
+    mockStatSync.mockReturnValue({
+      mtimeMs: 0,
+      isDirectory: () => true,
+    } as any);
   });
 
   afterEach(() => {

@@ -1,6 +1,5 @@
-import React from "react";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render } from "ink-testing-library";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock child_process module
 vi.mock("child_process", async (importOriginal) => {
@@ -25,8 +24,14 @@ vi.mock("fs", async (importOriginal) => {
   };
 });
 
-import { execSync, exec } from "child_process";
-import { existsSync, readFileSync, readdirSync, statSync, unlinkSync } from "fs";
+import { execSync } from "node:child_process";
+import {
+  existsSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  unlinkSync,
+} from "node:fs";
 import { App } from "../../src/ui/App.js";
 import { getDisplayWidth } from "../../src/ui/constants.js";
 
@@ -35,7 +40,7 @@ const mockExistsSync = vi.mocked(existsSync);
 const mockReadFileSync = vi.mocked(readFileSync);
 const mockReaddirSync = vi.mocked(readdirSync);
 const mockStatSync = vi.mocked(statSync);
-const mockUnlinkSync = vi.mocked(unlinkSync);
+const _mockUnlinkSync = vi.mocked(unlinkSync);
 
 // Helper to strip ANSI codes (including colors and clear-to-EOL)
 const stripAnsi = (str: string) => str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
@@ -67,7 +72,10 @@ describe("App", () => {
 
     // Default: no projects directory for other sessions
     mockReaddirSync.mockReturnValue([]);
-    mockStatSync.mockReturnValue({ mtimeMs: 0, isDirectory: () => true } as any);
+    mockStatSync.mockReturnValue({
+      mtimeMs: 0,
+      isDirectory: () => true,
+    } as any);
   });
 
   afterEach(() => {
@@ -164,7 +172,8 @@ describe("App", () => {
 
       // Find panel border lines (contain box drawing characters)
       const panelLines = lines.filter(
-        (line) => line.includes("┌") || line.includes("│") || line.includes("└")
+        (line) =>
+          line.includes("┌") || line.includes("│") || line.includes("└"),
       );
 
       // All panel lines should have the same display width (accounting for emojis)

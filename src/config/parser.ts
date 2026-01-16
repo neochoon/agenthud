@@ -1,12 +1,9 @@
-import {
-  existsSync,
-  readFileSync,
-} from "fs";
+import { existsSync, readFileSync } from "node:fs";
 import { parse as parseYaml } from "yaml";
 import {
   DEFAULT_PANEL_WIDTH,
-  MIN_TERMINAL_WIDTH,
   MAX_TERMINAL_WIDTH,
+  MIN_TERMINAL_WIDTH,
 } from "../ui/constants.js";
 
 export interface PanelConfig {
@@ -136,7 +133,7 @@ function parseBasePanelConfig(
   panelConfig: Record<string, unknown>,
   targetConfig: PanelConfig,
   panelName: string,
-  warnings: string[]
+  warnings: string[],
 ): void {
   if (typeof panelConfig.enabled === "boolean") {
     targetConfig.enabled = panelConfig.enabled;
@@ -144,7 +141,9 @@ function parseBasePanelConfig(
   if (typeof panelConfig.interval === "string") {
     const interval = parseInterval(panelConfig.interval);
     if (interval === null && panelConfig.interval !== "manual") {
-      warnings.push(`Invalid interval '${panelConfig.interval}' for ${panelName} panel, using default`);
+      warnings.push(
+        `Invalid interval '${panelConfig.interval}' for ${panelName} panel, using default`,
+      );
     } else {
       targetConfig.interval = interval;
     }
@@ -179,10 +178,14 @@ export function parseConfig(): ParseResult {
   // Parse width
   if (typeof parsed.width === "number") {
     if (parsed.width < MIN_WIDTH) {
-      warnings.push(`Width ${parsed.width} is too small, using minimum of ${MIN_WIDTH}`);
+      warnings.push(
+        `Width ${parsed.width} is too small, using minimum of ${MIN_WIDTH}`,
+      );
       config.width = MIN_WIDTH;
     } else if (parsed.width > MAX_WIDTH) {
-      warnings.push(`Width ${parsed.width} is too large, using maximum of ${MAX_WIDTH}`);
+      warnings.push(
+        `Width ${parsed.width} is too large, using maximum of ${MAX_WIDTH}`,
+      );
       config.width = MAX_WIDTH;
     } else {
       config.width = parsed.width;
@@ -200,14 +203,21 @@ export function parseConfig(): ParseResult {
 
   for (const panelName of Object.keys(panels)) {
     panelOrder.push(panelName);
-    const panelConfig = panels[panelName] as Record<string, unknown> | undefined;
+    const panelConfig = panels[panelName] as
+      | Record<string, unknown>
+      | undefined;
     if (!panelConfig || typeof panelConfig !== "object") {
       continue;
     }
 
     // Handle built-in panels
     if (panelName === "project") {
-      parseBasePanelConfig(panelConfig, config.panels.project, panelName, warnings);
+      parseBasePanelConfig(
+        panelConfig,
+        config.panels.project,
+        panelName,
+        warnings,
+      );
       continue;
     }
 
@@ -217,7 +227,12 @@ export function parseConfig(): ParseResult {
     }
 
     if (panelName === "tests") {
-      parseBasePanelConfig(panelConfig, config.panels.tests, panelName, warnings);
+      parseBasePanelConfig(
+        panelConfig,
+        config.panels.tests,
+        panelName,
+        warnings,
+      );
       if (typeof panelConfig.command === "string") {
         config.panels.tests.command = panelConfig.command;
       }
@@ -225,7 +240,12 @@ export function parseConfig(): ParseResult {
     }
 
     if (panelName === "claude") {
-      parseBasePanelConfig(panelConfig, config.panels.claude, panelName, warnings);
+      parseBasePanelConfig(
+        panelConfig,
+        config.panels.claude,
+        panelName,
+        warnings,
+      );
       if (typeof panelConfig.max_activities === "number") {
         config.panels.claude.maxActivities = panelConfig.max_activities;
       }
@@ -239,7 +259,12 @@ export function parseConfig(): ParseResult {
     }
 
     if (panelName === "other_sessions") {
-      parseBasePanelConfig(panelConfig, config.panels.other_sessions, panelName, warnings);
+      parseBasePanelConfig(
+        panelConfig,
+        config.panels.other_sessions,
+        panelName,
+        warnings,
+      );
       if (typeof panelConfig.active_threshold === "string") {
         const threshold = parseInterval(panelConfig.active_threshold);
         if (threshold !== null) {
@@ -247,14 +272,16 @@ export function parseConfig(): ParseResult {
         }
       }
       if (typeof panelConfig.message_max_length === "number") {
-        config.panels.other_sessions.messageMaxLength = panelConfig.message_max_length;
+        config.panels.other_sessions.messageMaxLength =
+          panelConfig.message_max_length;
       }
       continue;
     }
 
     // Handle custom panels (not a built-in panel)
     const customPanel: CustomPanelConfig = {
-      enabled: typeof panelConfig.enabled === "boolean" ? panelConfig.enabled : true,
+      enabled:
+        typeof panelConfig.enabled === "boolean" ? panelConfig.enabled : true,
       interval: 30000, // default 30s
       renderer: "list", // default
     };
@@ -278,9 +305,14 @@ export function parseConfig(): ParseResult {
     // Parse renderer
     if (typeof panelConfig.renderer === "string") {
       if (VALID_RENDERERS.includes(panelConfig.renderer)) {
-        customPanel.renderer = panelConfig.renderer as "list" | "progress" | "status";
+        customPanel.renderer = panelConfig.renderer as
+          | "list"
+          | "progress"
+          | "status";
       } else {
-        warnings.push(`Invalid renderer '${panelConfig.renderer}' for custom panel, using 'list'`);
+        warnings.push(
+          `Invalid renderer '${panelConfig.renderer}' for custom panel, using 'list'`,
+        );
       }
     }
 

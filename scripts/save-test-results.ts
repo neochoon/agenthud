@@ -10,9 +10,9 @@
  *   .agenthud/test-results.json
  */
 
-import { execSync } from "child_process";
-import { writeFileSync, mkdirSync, existsSync } from "fs";
-import { join } from "path";
+import { execSync } from "node:child_process";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 interface VitestResult {
   numPassedTests: number;
@@ -77,7 +77,7 @@ function extractFailures(vitestResult: VitestResult): TestFailure[] {
     for (const assertion of testFile.assertionResults) {
       if (assertion.status === "failed") {
         failures.push({
-          file: testFile.name.replace(process.cwd() + "/", ""),
+          file: testFile.name.replace(`${process.cwd()}/`, ""),
           name: assertion.title,
         });
       }

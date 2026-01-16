@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock perf_hooks module
 vi.mock("perf_hooks", async (importOriginal) => {
@@ -13,11 +13,11 @@ vi.mock("perf_hooks", async (importOriginal) => {
   };
 });
 
-import { performance } from "perf_hooks";
+import { performance } from "node:perf_hooks";
 import {
+  clearPerformanceEntries,
   startPerformanceCleanup,
   stopPerformanceCleanup,
-  clearPerformanceEntries,
 } from "../../src/utils/performance.js";
 
 const mockClearMarks = vi.mocked(performance.clearMarks);

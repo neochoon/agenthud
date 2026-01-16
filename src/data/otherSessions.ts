@@ -1,11 +1,6 @@
-import {
-  existsSync,
-  readFileSync,
-  readdirSync,
-  statSync,
-} from "fs";
-import { homedir } from "os";
-import { join, basename, sep } from "path";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { homedir } from "node:os";
+import { basename, join, sep } from "node:path";
 import { FIVE_MINUTES_MS } from "../ui/constants.js";
 
 const MAX_LINES_TO_SCAN = 100;
@@ -89,7 +84,9 @@ function decodeProjectPath(encoded: string): string {
 
     if (!found) {
       // No existing directory found, use single segment
-      currentPath = currentPath ? join(currentPath, segments[i]) : sep + segments[i];
+      currentPath = currentPath
+        ? join(currentPath, segments[i])
+        : sep + segments[i];
       i++;
     }
   }
@@ -198,7 +195,9 @@ export function formatRelativeTime(date: Date): string {
   return `${days}d ago`;
 }
 
-function findMostRecentSession(projectDir: string): { file: string; mtimeMs: number } | null {
+function findMostRecentSession(
+  projectDir: string,
+): { file: string; mtimeMs: number } | null {
   if (!existsSync(projectDir)) {
     return null;
   }
@@ -240,7 +239,7 @@ function findMostRecentSession(projectDir: string): { file: string; mtimeMs: num
 
 export function getOtherSessionsData(
   currentProjectPath: string,
-  options: OtherSessionsOptions = {}
+  options: OtherSessionsOptions = {},
 ): OtherSessionsData {
   const activeThresholdMs = options.activeThresholdMs ?? FIVE_MINUTES_MS;
   const projectsDir = getProjectsDir();
@@ -261,7 +260,9 @@ export function getOtherSessionsData(
   defaultResult.totalProjects = allProjects.length;
 
   // Normalize current project path for comparison (handle both / and \ separators)
-  const normalizedCurrentPath = currentProjectPath.replace(/[/\\]$/, "").replace(/\\/g, "/");
+  const normalizedCurrentPath = currentProjectPath
+    .replace(/[/\\]$/, "")
+    .replace(/\\/g, "/");
 
   // Collect session info for all OTHER projects
   const otherSessions: Array<{

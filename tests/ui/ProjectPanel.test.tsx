@@ -1,8 +1,7 @@
-import React from "react";
-import { describe, it, expect } from "vitest";
 import { render } from "ink-testing-library";
-import { ProjectPanel } from "../../src/ui/ProjectPanel.js";
+import { describe, expect, it } from "vitest";
 import type { ProjectData } from "../../src/data/project.js";
+import { ProjectPanel } from "../../src/ui/ProjectPanel.js";
 
 describe("ProjectPanel", () => {
   const mockProjectData: ProjectData = {
@@ -235,7 +234,7 @@ describe("ProjectPanel", () => {
   describe("countdown display", () => {
     it("shows countdown when provided", () => {
       const { lastFrame } = render(
-        <ProjectPanel data={mockProjectData} countdown={300} />
+        <ProjectPanel data={mockProjectData} countdown={300} />,
       );
 
       expect(lastFrame()).toContain("300s");
@@ -243,7 +242,7 @@ describe("ProjectPanel", () => {
 
     it("does not show countdown when null", () => {
       const { lastFrame } = render(
-        <ProjectPanel data={mockProjectData} countdown={null} />
+        <ProjectPanel data={mockProjectData} countdown={null} />,
       );
 
       // Should not show countdown indicator (↻)
@@ -254,7 +253,7 @@ describe("ProjectPanel", () => {
   describe("width prop", () => {
     it("respects custom width", () => {
       const { lastFrame } = render(
-        <ProjectPanel data={mockProjectData} width={80} />
+        <ProjectPanel data={mockProjectData} width={80} />,
       );
 
       const output = lastFrame() || "";

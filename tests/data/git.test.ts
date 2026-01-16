@@ -36,6 +36,7 @@ describe("git data module", () => {
       expect(result).toBe("main");
       expect(mockExecSync).toHaveBeenCalledWith("git branch --show-current", {
         encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
       });
     });
 
@@ -235,6 +236,7 @@ describe("git data module", () => {
       expect(result).toBe(4);
       expect(mockExecSync).toHaveBeenCalledWith("git status --porcelain", {
         encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
       });
     });
 

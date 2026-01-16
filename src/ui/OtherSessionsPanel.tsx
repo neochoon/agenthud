@@ -58,9 +58,7 @@ function formatProjectNames(projectNames: string[], maxWidth: number): string {
   let suffix = remaining > 0 ? ` +${remaining}` : "";
 
   // Try to fit names within available width
-  // Available width = maxWidth - emoji(2) - space(1)
-  const emojiWidth = getDisplayWidth("📁");
-  const availableWidth = maxWidth - emojiWidth - 1;
+  const availableWidth = maxWidth;
 
   // Build the text and truncate if needed
   let text = namesToShow.join(", ") + suffix;
@@ -110,26 +108,32 @@ export function OtherSessionsPanel({
   const { activeCount, projectNames, recentSession } = data;
 
   // Build header line content
-  // Format: 📁 radar, backend, frontend +3 | ⚡ 2 active
-  const activeSuffix = ` | ⚡ ${activeCount} active`;
+  // Format: radar, backend, frontend +3 | * 2 active
+  const activeSuffix = ` | * ${activeCount} active`;
   const projectsAvailableWidth = contentWidth - getDisplayWidth(activeSuffix);
   const projectsText = formatProjectNames(projectNames, projectsAvailableWidth);
-  const headerText = `📁 ${projectsText}${activeSuffix}`;
+  const headerText = `${projectsText}${activeSuffix}`;
   const headerPadding = Math.max(0, contentWidth - getDisplayWidth(headerText));
 
-  // Clear to end of line to prevent ghost text
-  const clearEOL = "\x1b[K";
+  // Determine colors based on counts
+  const hasProjects = projectNames.length > 0;
+  const hasActive = activeCount > 0;
 
   const lines: React.ReactElement[] = [];
 
-  // Header line with counts
+  // Header line with counts (colored based on values)
   lines.push(
     <Text key="header">
-      {BOX.v} <Text>{headerText}</Text>
+      {BOX.v}{" "}
+      <Text dimColor={!hasProjects} color={hasProjects ? "cyan" : undefined}>
+        {projectsText}
+      </Text>
+      <Text dimColor={!hasActive} color={hasActive ? "yellow" : undefined}>
+        {" "}| * {activeCount} active
+      </Text>
       {" ".repeat(headerPadding)}
       {BOX.v}
-      {clearEOL}
-    </Text>,
+          </Text>,
   );
 
   // Empty line
@@ -137,13 +141,12 @@ export function OtherSessionsPanel({
     <Text key="empty">
       {BOX.v} {" ".repeat(contentWidth)}
       {BOX.v}
-      {clearEOL}
-    </Text>,
+          </Text>,
   );
 
   // Recent session or empty state
   if (recentSession) {
-    const statusIcon = recentSession.isActive ? "🔵" : "⚪";
+    const statusIcon = recentSession.isActive ? "*" : "o";
     const sessionLine = `${statusIcon} ${recentSession.projectName} (${recentSession.relativeTime})`;
     const sessionLinePadding = Math.max(
       0,
@@ -155,8 +158,7 @@ export function OtherSessionsPanel({
         {BOX.v} <Text>{sessionLine}</Text>
         {" ".repeat(sessionLinePadding)}
         {BOX.v}
-        {clearEOL}
-      </Text>,
+              </Text>,
     );
 
     // Last message (if available)
@@ -182,8 +184,7 @@ export function OtherSessionsPanel({
           {BOX.v} <Text dimColor>{messageText}</Text>
           {" ".repeat(messagePadding)}
           {BOX.v}
-          {clearEOL}
-        </Text>,
+                  </Text>,
       );
     }
   } else {
@@ -196,8 +197,7 @@ export function OtherSessionsPanel({
         {BOX.v} <Text dimColor>{noSessionText}</Text>
         {" ".repeat(noSessionPadding)}
         {BOX.v}
-        {clearEOL}
-      </Text>,
+              </Text>,
     );
   }
 

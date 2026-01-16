@@ -121,7 +121,7 @@ describe("OtherSessionsPanel", () => {
 
       const { lastFrame } = render(<OtherSessionsPanel data={data} />);
 
-      expect(lastFrame()).toContain("🔵");
+      expect(lastFrame()).toContain("* project (1m ago)");
     });
 
     it("shows inactive icon for inactive session", () => {
@@ -138,7 +138,7 @@ describe("OtherSessionsPanel", () => {
 
       const { lastFrame } = render(<OtherSessionsPanel data={data} />);
 
-      expect(lastFrame()).toContain("⚪");
+      expect(lastFrame()).toContain("o project (10m ago)");
     });
 
     it("shows last assistant message", () => {

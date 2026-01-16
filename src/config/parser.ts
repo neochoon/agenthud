@@ -57,6 +57,7 @@ export interface Config {
   customPanels?: Record<string, CustomPanelConfig>;
   panelOrder: string[];
   width: number;
+  wideLayoutThreshold: number | null; // null = disabled, number = min terminal width for 2-column layout
 }
 
 // Use centralized constants from ui/constants.ts
@@ -122,6 +123,7 @@ export function getDefaultConfig(): Config {
     },
     panelOrder: ["project", "git", "tests", "claude", "other_sessions"],
     width: DEFAULT_WIDTH,
+    wideLayoutThreshold: null, // disabled by default
   };
 }
 
@@ -189,6 +191,21 @@ export function parseConfig(): ParseResult {
       config.width = MAX_WIDTH;
     } else {
       config.width = parsed.width;
+    }
+  }
+
+  // Parse wideLayoutThreshold (supports both camelCase and snake_case)
+  const MIN_WIDE_THRESHOLD = 140;
+  const wideThresholdValue =
+    parsed.wideLayoutThreshold ?? parsed.wide_layout_threshold;
+  if (typeof wideThresholdValue === "number") {
+    if (wideThresholdValue < MIN_WIDE_THRESHOLD) {
+      warnings.push(
+        `wideLayoutThreshold ${wideThresholdValue} is too small, using minimum of ${MIN_WIDE_THRESHOLD}`,
+      );
+      config.wideLayoutThreshold = MIN_WIDE_THRESHOLD;
+    } else {
+      config.wideLayoutThreshold = wideThresholdValue;
     }
   }
 

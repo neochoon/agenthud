@@ -54,6 +54,7 @@ interface ClaudePanelProps {
   width?: number;
   isRunning?: boolean;
   justRefreshed?: boolean;
+  maxActivities?: number; // Dynamic limit for activities display
 }
 
 function formatCountdown(seconds: number | null | undefined): string {
@@ -316,6 +317,7 @@ export function ClaudePanel({
   width = DEFAULT_PANEL_WIDTH,
   isRunning = false,
   justRefreshed = false,
+  maxActivities,
 }: ClaudePanelProps): React.ReactElement {
   const countdownSuffix = isRunning ? "running..." : formatCountdown(countdown);
   const innerWidth = getInnerWidth(width);
@@ -387,8 +389,14 @@ export function ClaudePanel({
   // Active session - build activity log lines
   const lines: React.ReactElement[] = [];
 
-  for (let i = 0; i < state.activities.length; i++) {
-    const activity = state.activities[i];
+  // Slice activities if maxActivities is specified
+  const displayActivities =
+    maxActivities !== undefined
+      ? state.activities.slice(0, maxActivities)
+      : state.activities;
+
+  for (let i = 0; i < displayActivities.length; i++) {
+    const activity = displayActivities[i];
 
     // For Task with subActivities, append count to label
     let modifiedActivity = activity;
@@ -413,9 +421,6 @@ export function ClaudePanel({
     const padding = Math.max(0, contentWidth - displayWidth);
     const style = getActivityStyle(activity);
 
-    // Clear to end of line to prevent ghost text from terminal width mismatch
-    const clearEOL = "\x1b[K";
-
     lines.push(
       <Text key={`activity-${i}`}>
         {BOX.v} <Text dimColor>{timestamp}</Text>
@@ -425,7 +430,6 @@ export function ClaudePanel({
         </Text>
         {" ".repeat(padding)}
         {BOX.v}
-        {clearEOL}
       </Text>,
     );
 
@@ -491,7 +495,6 @@ export function ClaudePanel({
             </Text>
             {" ".repeat(subPadding)}
             {BOX.v}
-            {clearEOL}
           </Text>,
         );
       }

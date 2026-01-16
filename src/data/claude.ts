@@ -11,6 +11,12 @@ import {
 } from "../types/index.js";
 import { THIRTY_SECONDS_MS } from "../ui/constants.js";
 
+// Strip ANSI escape codes from text
+function stripAnsi(text: string): string {
+  // eslint-disable-next-line no-control-regex
+  return text.replace(/\x1b\[[0-9;]*m/g, "");
+}
+
 // Re-export types for backwards compatibility
 export type {
   ClaudeSessionStatus,
@@ -141,19 +147,19 @@ function getToolDetail(
   if (!input) return "";
 
   if (input.command) {
-    return input.command.replace(/\n/g, " ");
+    return stripAnsi(input.command.replace(/\n/g, " "));
   }
   if (input.file_path) {
     return basename(input.file_path);
   }
   if (input.pattern) {
-    return input.pattern;
+    return stripAnsi(input.pattern);
   }
   if (input.query) {
-    return input.query;
+    return stripAnsi(input.query);
   }
   if (input.description) {
-    return input.description;
+    return stripAnsi(input.description);
   }
   return "";
 }

@@ -506,4 +506,59 @@ width: 150
       );
     });
   });
+
+  describe("wideLayoutThreshold setting", () => {
+    beforeEach(() => {
+      mockExistsSync.mockReturnValue(true);
+    });
+
+    it("uses default wideLayoutThreshold of null (disabled) when not specified", () => {
+      mockReadFileSync.mockReturnValue(`
+panels:
+  git:
+    enabled: true
+`);
+
+      const { config } = parseConfig();
+
+      expect(config.wideLayoutThreshold).toBeNull();
+    });
+
+    it("parses wideLayoutThreshold from config", () => {
+      mockReadFileSync.mockReturnValue(`
+wideLayoutThreshold: 180
+
+panels:
+  git:
+    enabled: true
+`);
+
+      const { config } = parseConfig();
+
+      expect(config.wideLayoutThreshold).toBe(180);
+    });
+
+    it("accepts wideLayoutThreshold with snake_case", () => {
+      mockReadFileSync.mockReturnValue(`
+wide_layout_threshold: 200
+`);
+
+      const { config } = parseConfig();
+
+      expect(config.wideLayoutThreshold).toBe(200);
+    });
+
+    it("warns when wideLayoutThreshold is too small", () => {
+      mockReadFileSync.mockReturnValue(`
+wideLayoutThreshold: 100
+`);
+
+      const { config, warnings } = parseConfig();
+
+      expect(config.wideLayoutThreshold).toBe(140);
+      expect(warnings).toContain(
+        "wideLayoutThreshold 100 is too small, using minimum of 140",
+      );
+    });
+  });
 });

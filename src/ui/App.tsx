@@ -98,6 +98,34 @@ function DashboardApp({
     [config.width],
   );
 
+  // Calculate dynamic maxActivities based on terminal height for wide layout
+  // todoCount: number of active todos (not all completed) to account for TodoSection height
+  // isWideLayout: whether we're in 2-column mode
+  const getEffectiveMaxActivities = useCallback(
+    (
+      terminalRows: number | undefined,
+      todoCount = 0,
+      isWideLayout = false,
+    ): number => {
+      const configMax = config.panels.claude.maxActivities ?? 10;
+      if (!terminalRows || !isWideLayout) {
+        return configMax;
+      }
+      // In wide layout: Claude shares left column with Other Sessions panel
+      // Claude: title(1) + bottom(1) = 2
+      // OtherSessions: ~6 lines (title, header, empty, session, message, bottom)
+      // Margins: 2 (between panels + before status bar)
+      // StatusBar: 1
+      // Buffer: 2 (for subActivities or variations)
+      // Total fixed = 2 + 6 + 2 + 1 + 2 = 13
+      // TodoSection adds: separator (1) + todo items (todoCount)
+      const todoHeight = todoCount > 0 ? 1 + todoCount : 0;
+      const heightBasedMax = Math.max(5, terminalRows - 13 - todoHeight);
+      return Math.max(configMax, heightBasedMax);
+    },
+    [config.panels.claude.maxActivities],
+  );
+
   const [width, setWidth] = useState(() => getEffectiveWidth(stdout?.columns));
 
   useEffect(() => {
@@ -171,12 +199,13 @@ function DashboardApp({
   const [gitData, setGitData] = useState<GitData>(() =>
     getGitData(config.panels.git),
   );
+  // Fetch more activities than needed; display will be limited by claudeMaxActivities
+  const fetchMaxActivities = Math.max(
+    config.panels.claude.maxActivities ?? 10,
+    stdout?.rows ?? 50,
+  );
   const [claudeData, setClaudeData] = useState<ClaudeData>(() =>
-    getClaudeData(
-      cwd,
-      config.panels.claude.maxActivities,
-      config.panels.claude.sessionTimeout,
-    ),
+    getClaudeData(cwd, fetchMaxActivities, config.panels.claude.sessionTimeout),
   );
   const [otherSessionsData, setOtherSessionsData] = useState<OtherSessionsData>(
     () =>
@@ -193,7 +222,6 @@ function DashboardApp({
     return getTestData();
   }, [config.panels.tests.command]);
 
-  const [testsDisabled, setTestsDisabled] = useState(false);
   const [testData, setTestData] = useState<TestData>({
     results: null,
     isOutdated: false,
@@ -208,15 +236,11 @@ function DashboardApp({
 
     // Use setTimeout to defer test loading after first paint
     const timer = setTimeout(() => {
-      const data = getTestDataFromConfig();
-      setTestData(data);
-      if (data.error && !config.panels.tests.command) {
-        setTestsDisabled(true);
-      }
+      setTestData(getTestDataFromConfig());
     }, 0);
 
     return () => clearTimeout(timer);
-  }, [getTestDataFromConfig, config.panels.tests.command]);
+  }, [getTestDataFromConfig]);
 
   // Custom panel data
   const [customPanelData, setCustomPanelData] = useState<
@@ -256,31 +280,28 @@ function DashboardApp({
     try {
       await new Promise<void>((resolve) => {
         setTimeout(() => {
-          const data = getTestDataFromConfig();
-          if (config.panels.tests.command) {
-            setTestsDisabled(!!data.error);
-          }
-          setTestData(data);
+          setTestData(getTestDataFromConfig());
           resolve();
         }, 0);
       });
     } finally {
       visualFeedback.endAsync("tests", { completed: true });
     }
-  }, [getTestDataFromConfig, config.panels.tests.command, visualFeedback]);
+  }, [getTestDataFromConfig, visualFeedback]);
 
   const refreshClaude = useCallback(() => {
+    const maxFetch = Math.max(
+      config.panels.claude.maxActivities ?? 10,
+      stdout?.rows ?? 50,
+    );
     setClaudeData(
-      getClaudeData(
-        cwd,
-        config.panels.claude.maxActivities,
-        config.panels.claude.sessionTimeout,
-      ),
+      getClaudeData(cwd, maxFetch, config.panels.claude.sessionTimeout),
     );
     visualFeedback.setRefreshed("claude");
     resetCountdown("claude");
   }, [
     cwd,
+    stdout?.rows,
     config.panels.claude.maxActivities,
     config.panels.claude.sessionTimeout,
     visualFeedback,
@@ -474,7 +495,223 @@ function DashboardApp({
     return () => timers.forEach((t) => clearInterval(t));
   }, [isWatchMode, config]);
 
+  // Check for wide layout mode
+  const terminalWidth = stdout?.columns ?? 0;
+  const terminalHeight = stdout?.rows ?? 0;
+  const columnGap = 2;
+
+  // Calculate effective threshold for wide layout
+  // If config has threshold, use it; otherwise auto-calculate from MIN_TERMINAL_WIDTH
+  const effectiveThreshold =
+    config.wideLayoutThreshold ?? MIN_TERMINAL_WIDTH * 2 + columnGap;
+  const useWideLayout = terminalWidth >= effectiveThreshold;
+
+  // Calculate widths for 2-column layout (50:50 ratio)
+  // In single column mode, use full terminal width (clamped)
+  const singleColumnWidth = getClampedWidth(terminalWidth);
+  const leftColumnWidth = useWideLayout
+    ? Math.floor((terminalWidth - columnGap) / 2)
+    : singleColumnWidth;
+  const rightColumnWidth = useWideLayout
+    ? terminalWidth - leftColumnWidth - columnGap
+    : singleColumnWidth;
+
+  // Calculate dynamic maxActivities for Claude panel in wide layout
+  // Account for TodoSection height when todos exist and not all completed
+  const claudeMaxActivities = useMemo(() => {
+    if (!useWideLayout) return undefined; // No limit in normal layout
+    const todos = claudeData.state.todos;
+    const hasTodos = todos && todos.length > 0;
+    const allCompleted =
+      hasTodos && todos.every((t) => t.status === "completed");
+    // Only count todos if TodoSection will be shown (has todos and not all completed)
+    const activeTodoCount = hasTodos && !allCompleted ? todos.length : 0;
+    return getEffectiveMaxActivities(terminalHeight, activeTodoCount, true);
+  }, [
+    useWideLayout,
+    claudeData.state.todos,
+    terminalHeight,
+    getEffectiveMaxActivities,
+  ]);
+
+  // Helper to render a panel by name
+  const renderPanel = (
+    panelName: string,
+    panelWidth: number,
+    marginTop: number,
+  ): React.ReactElement | null => {
+    if (panelName === "project" && config.panels.project.enabled) {
+      const vs = visualFeedback.getState("project");
+      return (
+        <Box key={`panel-${panelName}`} marginTop={marginTop}>
+          <ProjectPanel
+            data={projectData}
+            countdown={isWatchMode ? countdowns.project : null}
+            width={panelWidth}
+            justRefreshed={vs.justRefreshed}
+          />
+        </Box>
+      );
+    }
+
+    if (panelName === "git" && config.panels.git.enabled) {
+      const vs = visualFeedback.getState("git");
+      return (
+        <Box key={`panel-${panelName}`} marginTop={marginTop}>
+          <GitPanel
+            branch={gitData.branch}
+            commits={gitData.commits}
+            stats={gitData.stats}
+            uncommitted={gitData.uncommitted}
+            countdown={isWatchMode ? countdowns.git : null}
+            width={panelWidth}
+            isRunning={vs.isRunning}
+            justRefreshed={vs.justRefreshed}
+          />
+        </Box>
+      );
+    }
+
+    if (panelName === "tests" && config.panels.tests.enabled) {
+      const vs = visualFeedback.getState("tests");
+      return (
+        <Box key={`panel-${panelName}`} marginTop={marginTop}>
+          <TestPanel
+            results={testData.results}
+            isOutdated={testData.isOutdated}
+            commitsBehind={testData.commitsBehind}
+            error={testData.error}
+            width={panelWidth}
+            isRunning={vs.isRunning}
+            justCompleted={vs.justCompleted}
+          />
+        </Box>
+      );
+    }
+
+    if (panelName === "claude" && config.panels.claude.enabled) {
+      const vs = visualFeedback.getState("claude");
+      return (
+        <Box key={`panel-${panelName}`} marginTop={marginTop}>
+          <ClaudePanel
+            data={claudeData}
+            countdown={isWatchMode ? countdowns.claude : null}
+            width={panelWidth}
+            justRefreshed={vs.justRefreshed}
+            maxActivities={claudeMaxActivities}
+          />
+        </Box>
+      );
+    }
+
+    if (
+      panelName === "other_sessions" &&
+      config.panels.other_sessions.enabled
+    ) {
+      const vs = visualFeedback.getState("other_sessions");
+      return (
+        <Box key={`panel-${panelName}`} marginTop={marginTop}>
+          <OtherSessionsPanel
+            data={otherSessionsData}
+            countdown={isWatchMode ? countdowns.other_sessions : null}
+            width={panelWidth}
+            isRunning={vs.isRunning}
+            messageMaxLength={config.panels.other_sessions.messageMaxLength}
+          />
+        </Box>
+      );
+    }
+
+    // Custom panel
+    const customConfig = config.customPanels?.[panelName];
+    if (customConfig?.enabled) {
+      const result = customPanelData[panelName];
+      if (!result) return null;
+
+      const vs = visualFeedback.getState(panelName);
+      const isManual = customConfig.interval === null;
+      const relativeTime = isManual
+        ? formatRelativeTime(result.timestamp)
+        : undefined;
+      const countdown = !isManual && isWatchMode ? countdowns[panelName] : null;
+
+      return (
+        <Box key={`panel-${panelName}`} marginTop={marginTop}>
+          <GenericPanel
+            data={result.data}
+            renderer={customConfig.renderer}
+            countdown={countdown}
+            relativeTime={relativeTime}
+            error={result.error}
+            width={panelWidth}
+            isRunning={vs.isRunning}
+            justRefreshed={vs.justRefreshed}
+          />
+        </Box>
+      );
+    }
+
+    return null;
+  };
+
   // Render panels
+  if (useWideLayout) {
+    // 2-column layout: Claude + Other Sessions on left, others on right
+    const leftPanels = ["claude", "other_sessions"];
+    const rightPanels = config.panelOrder.filter(
+      (name) => !leftPanels.includes(name),
+    );
+
+    return (
+      <Box flexDirection="column">
+        {warnings.length > 0 && (
+          <Box marginBottom={1}>
+            <Text color="yellow">⚠ {warnings.join(", ")}</Text>
+          </Box>
+        )}
+
+        <Box flexDirection="row">
+          {/* Left column: Claude + Other Sessions */}
+          <Box flexDirection="column" width={leftColumnWidth}>
+            {renderPanel("claude", leftColumnWidth, 0)}
+            {renderPanel("other_sessions", leftColumnWidth, 1)}
+          </Box>
+
+          {/* Right column: Other panels */}
+          <Box
+            flexDirection="column"
+            width={rightColumnWidth}
+            marginLeft={columnGap}
+          >
+            {rightPanels.map((panelName, index) =>
+              renderPanel(panelName, rightColumnWidth, index === 0 ? 0 : 1),
+            )}
+          </Box>
+        </Box>
+
+        {isWatchMode && (
+          <Box
+            marginTop={1}
+            width={terminalWidth}
+            justifyContent="space-between"
+          >
+            <Text dimColor>
+              {statusBarItems.map((item, index) => (
+                <React.Fragment key={index}>
+                  {index > 0 && " · "}
+                  <Text color="cyan">{item.split(":")[0]}:</Text>
+                  {item.split(":").slice(1).join(":")}
+                </React.Fragment>
+              ))}
+            </Text>
+            <Text dimColor>AgentHUD v{getVersion()}</Text>
+          </Box>
+        )}
+      </Box>
+    );
+  }
+
+  // Standard vertical layout
   return (
     <Box flexDirection="column">
       {warnings.length > 0 && (
@@ -483,127 +720,9 @@ function DashboardApp({
         </Box>
       )}
 
-      {config.panelOrder.map((panelName, index) => {
-        const isFirst = index === 0;
-        const marginTop = isFirst ? 0 : 1;
-
-        if (panelName === "project" && config.panels.project.enabled) {
-          const vs = visualFeedback.getState("project");
-          return (
-            <Box key={`panel-${panelName}-${index}`} marginTop={marginTop}>
-              <ProjectPanel
-                data={projectData}
-                countdown={isWatchMode ? countdowns.project : null}
-                width={width}
-                justRefreshed={vs.justRefreshed}
-              />
-            </Box>
-          );
-        }
-
-        if (panelName === "git" && config.panels.git.enabled) {
-          const vs = visualFeedback.getState("git");
-          return (
-            <Box key={`panel-${panelName}-${index}`} marginTop={marginTop}>
-              <GitPanel
-                branch={gitData.branch}
-                commits={gitData.commits}
-                stats={gitData.stats}
-                uncommitted={gitData.uncommitted}
-                countdown={isWatchMode ? countdowns.git : null}
-                width={width}
-                isRunning={vs.isRunning}
-                justRefreshed={vs.justRefreshed}
-              />
-            </Box>
-          );
-        }
-
-        if (
-          panelName === "tests" &&
-          config.panels.tests.enabled &&
-          !testsDisabled
-        ) {
-          const vs = visualFeedback.getState("tests");
-          return (
-            <Box key={`panel-${panelName}-${index}`} marginTop={marginTop}>
-              <TestPanel
-                results={testData.results}
-                isOutdated={testData.isOutdated}
-                commitsBehind={testData.commitsBehind}
-                error={testData.error}
-                width={width}
-                isRunning={vs.isRunning}
-                justCompleted={vs.justCompleted}
-              />
-            </Box>
-          );
-        }
-
-        if (panelName === "claude" && config.panels.claude.enabled) {
-          const vs = visualFeedback.getState("claude");
-          return (
-            <Box key={`panel-${panelName}-${index}`} marginTop={marginTop}>
-              <ClaudePanel
-                data={claudeData}
-                countdown={isWatchMode ? countdowns.claude : null}
-                width={width}
-                justRefreshed={vs.justRefreshed}
-              />
-            </Box>
-          );
-        }
-
-        if (
-          panelName === "other_sessions" &&
-          config.panels.other_sessions.enabled
-        ) {
-          const vs = visualFeedback.getState("other_sessions");
-          return (
-            <Box key={`panel-${panelName}-${index}`} marginTop={marginTop}>
-              <OtherSessionsPanel
-                data={otherSessionsData}
-                countdown={isWatchMode ? countdowns.other_sessions : null}
-                width={width}
-                isRunning={vs.isRunning}
-                messageMaxLength={config.panels.other_sessions.messageMaxLength}
-              />
-            </Box>
-          );
-        }
-
-        // Custom panel
-        const customConfig = config.customPanels?.[panelName];
-        if (customConfig?.enabled) {
-          const result = customPanelData[panelName];
-          if (!result) return null;
-
-          const vs = visualFeedback.getState(panelName);
-          const isManual = customConfig.interval === null;
-          const relativeTime = isManual
-            ? formatRelativeTime(result.timestamp)
-            : undefined;
-          const countdown =
-            !isManual && isWatchMode ? countdowns[panelName] : null;
-
-          return (
-            <Box key={`panel-${panelName}-${index}`} marginTop={marginTop}>
-              <GenericPanel
-                data={result.data}
-                renderer={customConfig.renderer}
-                countdown={countdown}
-                relativeTime={relativeTime}
-                error={result.error}
-                width={width}
-                isRunning={vs.isRunning}
-                justRefreshed={vs.justRefreshed}
-              />
-            </Box>
-          );
-        }
-
-        return null;
-      })}
+      {config.panelOrder.map((panelName, index) =>
+        renderPanel(panelName, width, index === 0 ? 0 : 1),
+      )}
 
       {isWatchMode && (
         <Box marginTop={1} width={width} justifyContent="space-between">

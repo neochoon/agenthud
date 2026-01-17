@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock fs module
@@ -42,9 +43,14 @@ describe("sessionAvailability", () => {
       const result = hasCurrentProjectSession("/Users/test/my-project");
 
       expect(result).toBe(true);
-      expect(mockExistsSync).toHaveBeenCalledWith(
-        "/home/user/.claude/projects/-Users-test-my-project",
+      // Use join() for platform-independent path
+      const expectedPath = join(
+        "/home/user",
+        ".claude",
+        "projects",
+        "-Users-test-my-project",
       );
+      expect(mockExistsSync).toHaveBeenCalledWith(expectedPath);
     });
 
     it("returns false when session directory does not exist", () => {

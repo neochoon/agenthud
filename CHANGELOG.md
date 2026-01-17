@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [0.7.1] - 2025-01-17
+
+### Fixed
+- **Graceful Node.js Version Check** - Shows helpful message when Node.js < 20 instead of cryptic library errors
+- **Git Errors Suppressed** - No more "fatal: not a git repository" errors in non-git directories
+- **Other Sessions Panel Layout** - Replaced ambiguous-width emojis with ASCII characters to fix layout breaking in 2-column mode
+- **Windows Path Compatibility** - Fixed path separator issue in session availability tests
+
+### Improved
+- **Session Availability Check** - Shows list of projects with Claude sessions when no session exists in current directory
+- **Conditional Colors** - Other Sessions panel uses cyan/yellow for non-zero counts, dim for zero
+
 ## [0.7.0] - 2025-01-17
 
 ### New
@@ -120,7 +132,11 @@
 - **Test Panel** - Test results at a glance
 - Watch mode for live updates
 
-[Unreleased]: https://github.com/neochoon/agenthud/compare/v0.6.3...HEAD
+[Unreleased]: https://github.com/neochoon/agenthud/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/neochoon/agenthud/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/neochoon/agenthud/compare/v0.6.5...v0.7.0
+[0.6.5]: https://github.com/neochoon/agenthud/compare/v0.6.4...v0.6.5
+[0.6.4]: https://github.com/neochoon/agenthud/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/neochoon/agenthud/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/neochoon/agenthud/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/neochoon/agenthud/compare/v0.6.0...v0.6.1

@@ -1,6 +1,6 @@
 {
   "name": "agenthud",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "CLI tool to monitor agent status in real-time. Works with Claude Code, multi-agent workflows, and any AI agent system.",
   "type": "module",
   "main": "dist/index.js",

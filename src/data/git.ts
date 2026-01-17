@@ -18,6 +18,7 @@ export function getCurrentBranch(): string | null {
   try {
     const result = execSync("git branch --show-current", {
       encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
     });
     return result.trim();
   } catch {
@@ -29,6 +30,7 @@ export function getTodayCommits(): Commit[] {
   try {
     const result = execSync('git log --since=midnight --format="%h|%aI|%s"', {
       encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
     });
 
     const lines = result.trim().split("\n").filter(Boolean);
@@ -50,6 +52,7 @@ export function getTodayStats(): GitStats {
   try {
     const result = execSync('git log --since=midnight --numstat --format=""', {
       encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
     });
 
     const lines = result.trim().split("\n").filter(Boolean);
@@ -80,6 +83,7 @@ export function getUncommittedCount(): number {
   try {
     const result = execSync("git status --porcelain", {
       encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
     });
 
     const lines = result.trim().split("\n").filter(Boolean);
@@ -148,7 +152,10 @@ export function getGitData(config: GitPanelConfig): GitData {
   // Get branch
   let branch: string | null = null;
   try {
-    const result = execSync(commands.branch, { encoding: "utf-8" });
+    const result = execSync(commands.branch, {
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
     branch = result.trim();
   } catch {
     branch = null;
@@ -157,7 +164,10 @@ export function getGitData(config: GitPanelConfig): GitData {
   // Get commits
   let commits: Commit[] = [];
   try {
-    const result = execSync(commands.commits, { encoding: "utf-8" });
+    const result = execSync(commands.commits, {
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
     commits = parseCommitsOutput(result);
   } catch {
     commits = [];
@@ -166,7 +176,10 @@ export function getGitData(config: GitPanelConfig): GitData {
   // Get stats
   let stats: GitStats = { added: 0, deleted: 0, files: 0 };
   try {
-    const result = execSync(commands.stats, { encoding: "utf-8" });
+    const result = execSync(commands.stats, {
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
     stats = parseStatsOutput(result);
   } catch {
     stats = { added: 0, deleted: 0, files: 0 };

@@ -863,3 +863,92 @@ interface ClaudeData {
 | `countdown` | `number \| null` | Countdown seconds |
 | `width` | `number` | Panel width |
 | `justRefreshed` | `boolean` | Shows countdown in green |
+
+## Startup Experience and UI Improvements
+
+- **Added**: 2026-01-17
+- **Issue**: #71
+- **Status**: Complete
+- **Tests**: `tests/utils/nodeVersion.test.ts`, `tests/data/sessionAvailability.test.ts`
+- **Source**: `src/utils/nodeVersion.ts`, `src/data/sessionAvailability.ts`, `src/main.ts`, `src/index.ts`
+
+### Overview
+
+Improved the startup experience for new users and fixed various UI layout issues that occur in edge cases.
+
+### Node.js Version Check
+
+Shows a friendly error message and exits gracefully when Node.js version is below 20:
+
+```
+Error: Node.js 20+ is required (current: v18.17.0)
+
+Please upgrade Node.js:
+  https://nodejs.org/
+```
+
+### Session Availability Check
+
+When no Claude session exists in the current directory:
+
+**Other projects have sessions:**
+```
+No Claude Code session found in current directory.
+
+Projects with Claude Code sessions:
+  - agenthud
+  - pain-radar
+  - my-api
+
+Run agenthud from one of these project directories.
+```
+
+**No sessions exist anywhere:**
+```
+Could not find any projects with Claude Code sessions.
+
+Start a Claude Code session in a project directory first:
+  $ claude
+```
+
+### Startup Flow
+
+```
+1. Check Node.js version >= 20
+   → No: Show error, exit
+
+2. Check Claude session in current directory
+   → No: Check other projects
+      → Has sessions: Show project list, exit
+      → No sessions: Show "not found" message, exit
+
+3. Check .agenthud/ directory
+   → No: Show Welcome screen (init suggestion)
+   → Yes: Show dashboard
+```
+
+### Git Error Suppression
+
+Suppressed "fatal: not a git repository" error messages in non-git directories by adding `stdio: 'pipe'` to all `execSync` calls in git.ts.
+
+### Other Sessions Panel Fixes
+
+- Replaced ambiguous-width emojis with ASCII characters:
+  - `📁` → removed
+  - `⚡` → `*`
+  - `🔵` → `*` (active)
+  - `⚪` → `o` (inactive)
+- Removed `clearEOL` escape sequence that broke 2-column layout
+- Added conditional coloring:
+  - Cyan for project names (when count > 0)
+  - Yellow for active count (when count > 0)
+  - Dim when counts are 0
+
+### Functions
+
+| Function | Description | Return Type |
+|----------|-------------|-------------|
+| `checkNodeVersion()` | Check Node.js version and exit if < 20 | `void` |
+| `hasCurrentProjectSession(cwd)` | Check if current project has Claude session | `boolean` |
+| `getProjectsWithSessions(cwd)` | Get list of other projects with sessions | `string[]` |
+| `checkSessionAvailability(cwd)` | Combined session availability check | `SessionAvailabilityResult`

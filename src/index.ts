@@ -1,78 +1,19 @@
 #!/usr/bin/env node
-import { existsSync } from "node:fs";
-import { render } from "ink";
-import React from "react";
-import { clearScreen, getHelp, getVersion, parseArgs } from "./cli.js";
-import { runInit } from "./commands/init.js";
-import { App } from "./ui/App.js";
-import {
-  startPerformanceCleanup,
-  stopPerformanceCleanup,
-} from "./utils/performance.js";
 
-const options = parseArgs(process.argv.slice(2));
+// Check Node.js version before importing any dependencies
+// This prevents ugly crashes from libraries that require Node 20+
+const MIN_NODE_VERSION = 20;
+const match = process.version.match(/^v?(\d+)/);
+const majorVersion = match ? Number.parseInt(match[1], 10) : 0;
 
-// Handle help command
-if (options.command === "help") {
-  console.log(getHelp());
-  process.exit(0);
+if (majorVersion < MIN_NODE_VERSION) {
+  console.error(
+    `\nError: Node.js ${MIN_NODE_VERSION}+ is required (current: ${process.version})\n`,
+  );
+  console.error("Please upgrade Node.js:");
+  console.error("  https://nodejs.org/\n");
+  process.exit(1);
 }
 
-// Handle version command
-if (options.command === "version") {
-  console.log(getVersion());
-  process.exit(0);
-}
-
-// Handle init command
-if (options.command === "init") {
-  const result = runInit();
-
-  console.log("\n✓ agenthud initialized\n");
-
-  if (result.created.length > 0) {
-    console.log("Created:");
-    result.created.forEach((file) => console.log(`  ${file}`));
-  }
-
-  if (result.skipped.length > 0) {
-    console.log("\nSkipped (already exists):");
-    result.skipped.forEach((file) => console.log(`  ${file}`));
-  }
-
-  if (result.warnings.length > 0) {
-    console.log("\nWarnings:");
-    result.warnings.forEach((warning) => console.log(`  ⚠ ${warning}`));
-  }
-
-  console.log("\nNext steps:");
-  console.log("  Run: npx agenthud\n");
-
-  process.exit(0);
-}
-
-// Check if .agenthud/ directory exists
-const agentDirExists = existsSync(".agenthud");
-
-// Clear screen in watch mode for clean display
-if (options.mode === "watch") {
-  clearScreen();
-}
-
-const { waitUntilExit } = render(
-  React.createElement(App, { mode: options.mode, agentDirExists }),
-);
-
-if (options.mode === "once") {
-  // In once mode, exit after first render
-  setTimeout(() => process.exit(0), 100);
-} else {
-  // In watch mode, start performance cleanup to prevent memory leak warnings
-  startPerformanceCleanup();
-
-  // Wait until user quits, then cleanup
-  waitUntilExit().then(() => {
-    stopPerformanceCleanup();
-    process.exit(0);
-  });
-}
+// Version is OK, dynamically import the main application
+import("./main.js").then(({ main }) => main());

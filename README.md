@@ -156,15 +156,15 @@ Shows activity from your other Claude Code projects:
 
 ```
 ┌─ Other Sessions ─────────────────────────────────────┐
-│ 📁 dotfiles, pain-radar, myapp +4 | ⚡ 1 active      │
+│ dotfiles, pain-radar, myapp +4 | * 1 active          │
 │                                                      │
-│ 🔵 dotfiles (2m ago)                                 │
+│ * dotfiles (2m ago)                                  │
 │    "Updated the config file as requested..."         │
 └──────────────────────────────────────────────────────┘
 ```
 
 - **Project names**: Shows up to 3 recent projects, +N for more
-- **Active indicator**: 🔵 active (within 5 min), ⚪ inactive
+- **Active indicator**: `*` active (within 5 min), `o` inactive
 - **Last message**: Most recent assistant response from that session
 
 ## Keyboard

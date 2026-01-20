@@ -3,9 +3,29 @@ import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import { getAllProjects } from "./otherSessions.js";
 
+export interface ProjectInfo {
+  name: string;
+  path: string;
+}
+
 export interface SessionAvailabilityResult {
   hasCurrentSession: boolean;
-  otherProjects: string[];
+  otherProjects: ProjectInfo[];
+}
+
+/**
+ * Shorten path by replacing home directory with ~
+ * e.g., /Users/test/project → ~/project
+ */
+export function shortenPath(path: string): string {
+  const home = homedir();
+  if (path === home) {
+    return "~";
+  }
+  if (path.startsWith(home + "/") || path.startsWith(home + "\\")) {
+    return "~" + path.slice(home.length);
+  }
+  return path;
 }
 
 /**
@@ -26,15 +46,18 @@ export function hasCurrentProjectSession(cwd: string): boolean {
 }
 
 /**
- * Get list of project names that have Claude sessions, excluding current project
+ * Get list of projects that have Claude sessions, excluding current project
  */
-export function getProjectsWithSessions(currentPath: string): string[] {
+export function getProjectsWithSessions(currentPath: string): ProjectInfo[] {
   const allProjects = getAllProjects();
   const currentEncoded = currentPath.replace(/[/\\]/g, "-");
 
   return allProjects
     .filter((p) => p.encodedPath !== currentEncoded)
-    .map((p) => basename(p.decodedPath));
+    .map((p) => ({
+      name: basename(p.decodedPath),
+      path: p.decodedPath,
+    }));
 }
 
 /**

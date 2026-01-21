@@ -3,7 +3,10 @@ import { render } from "ink";
 import React from "react";
 import { clearScreen, getHelp, getVersion, parseArgs } from "./cli.js";
 import { runInit } from "./commands/init.js";
-import { checkSessionAvailability } from "./data/sessionAvailability.js";
+import {
+  checkSessionAvailability,
+  shortenPath,
+} from "./data/sessionAvailability.js";
 import { App } from "./ui/App.js";
 import {
   startPerformanceCleanup,
@@ -60,12 +63,14 @@ export function main(): void {
   if (!sessionAvailability.hasCurrentSession) {
     if (sessionAvailability.otherProjects.length > 0) {
       // Show other projects with sessions
-      console.log("\nNo Claude Code session found in current directory.\n");
-      console.log("Projects with Claude Code sessions:");
-      sessionAvailability.otherProjects.forEach((name) =>
-        console.log(`  - ${name}`),
-      );
-      console.log("\nRun agenthud from one of these project directories.\n");
+      console.log("\nProjects with Claude Code sessions:");
+      sessionAvailability.otherProjects.forEach((project, index) => {
+        const shortPath = shortenPath(project.path);
+        console.log(`  ${index + 1}. ${project.name} (${shortPath})`);
+      });
+      const firstProject = sessionAvailability.otherProjects[0];
+      const firstShortPath = shortenPath(firstProject.path);
+      console.log(`\nRun: cd ${firstShortPath} && agenthud\n`);
     } else {
       // No sessions anywhere
       console.log("\nCould not find any projects with Claude Code sessions.\n");

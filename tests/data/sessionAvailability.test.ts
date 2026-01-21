@@ -26,6 +26,7 @@ import {
   checkSessionAvailability,
   getProjectsWithSessions,
   hasCurrentProjectSession,
+  shortenPath,
 } from "../../src/data/sessionAvailability.js";
 
 const mockExistsSync = vi.mocked(existsSync);
@@ -63,7 +64,7 @@ describe("sessionAvailability", () => {
   });
 
   describe("getProjectsWithSessions", () => {
-    it("returns list of project names that have sessions", () => {
+    it("returns list of projects with name and path", () => {
       mockGetAllProjects.mockReturnValue([
         { encodedPath: "-Users-test-project-a", decodedPath: "/Users/test/project-a" },
         { encodedPath: "-Users-test-project-b", decodedPath: "/Users/test/project-b" },
@@ -72,7 +73,11 @@ describe("sessionAvailability", () => {
 
       const result = getProjectsWithSessions("/Users/test/current");
 
-      expect(result).toEqual(["project-a", "project-b", "project-c"]);
+      expect(result).toEqual([
+        { name: "project-a", path: "/Users/test/project-a" },
+        { name: "project-b", path: "/Users/test/project-b" },
+        { name: "project-c", path: "/Users/test/project-c" },
+      ]);
     });
 
     it("excludes current project from the list", () => {
@@ -84,8 +89,11 @@ describe("sessionAvailability", () => {
 
       const result = getProjectsWithSessions("/Users/test/current");
 
-      expect(result).toEqual(["project-a", "project-b"]);
-      expect(result).not.toContain("current");
+      expect(result).toEqual([
+        { name: "project-a", path: "/Users/test/project-a" },
+        { name: "project-b", path: "/Users/test/project-b" },
+      ]);
+      expect(result.map((p) => p.name)).not.toContain("current");
     });
 
     it("returns empty array when no projects exist", () => {
@@ -94,6 +102,17 @@ describe("sessionAvailability", () => {
       const result = getProjectsWithSessions("/Users/test/current");
 
       expect(result).toEqual([]);
+    });
+  });
+
+  describe("shortenPath", () => {
+    it("replaces home directory with ~", () => {
+      expect(shortenPath("/home/user/projects/myapp")).toBe("~/projects/myapp");
+      expect(shortenPath("/home/user")).toBe("~");
+    });
+
+    it("returns path unchanged if not under home directory", () => {
+      expect(shortenPath("/var/www/project")).toBe("/var/www/project");
     });
   });
 
@@ -118,7 +137,10 @@ describe("sessionAvailability", () => {
       const result = checkSessionAvailability("/Users/test/current");
 
       expect(result.hasCurrentSession).toBe(false);
-      expect(result.otherProjects).toEqual(["project-a", "project-b"]);
+      expect(result.otherProjects).toEqual([
+        { name: "project-a", path: "/Users/test/project-a" },
+        { name: "project-b", path: "/Users/test/project-b" },
+      ]);
     });
 
     it("returns empty otherProjects when no sessions exist anywhere", () => {

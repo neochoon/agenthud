@@ -89,17 +89,19 @@ export function runInit(cwd: string = process.cwd()): InitResult {
     result.skipped.push(".agenthud/config.yaml");
   }
 
-  // Handle .gitignore
-  if (!existsSync(".gitignore")) {
-    writeFileSync(".gitignore", ".agenthud/\n");
-    result.created.push(".gitignore");
-  } else {
-    const content = readFileSync(".gitignore", "utf-8");
-    if (!content.includes(".agenthud/")) {
-      appendFileSync(".gitignore", "\n.agenthud/\n");
+  // Handle .gitignore (only if this is a git repository)
+  if (existsSync(".git")) {
+    if (!existsSync(".gitignore")) {
+      writeFileSync(".gitignore", ".agenthud/\n");
       result.created.push(".gitignore");
     } else {
-      result.skipped.push(".gitignore");
+      const content = readFileSync(".gitignore", "utf-8");
+      if (!content.includes(".agenthud/")) {
+        appendFileSync(".gitignore", "\n.agenthud/\n");
+        result.created.push(".gitignore");
+      } else {
+        result.skipped.push(".gitignore");
+      }
     }
   }
 

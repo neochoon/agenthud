@@ -98,6 +98,19 @@ function formatSessionTime(startTime: Date | null): string {
   return `${startStr} (${elapsedStr})`;
 }
 
+function formatTurnDuration(durationMs: number | null): string {
+  if (durationMs == null || durationMs <= 0) return "";
+  const seconds = Math.round(durationMs / 1000);
+  if (seconds >= 60) {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSecs = seconds % 60;
+    const duration =
+      remainingSecs > 0 ? `${minutes}m${remainingSecs}s` : `${minutes}m`;
+    return `Last: ${duration}`;
+  }
+  return `Last: ${seconds}s`;
+}
+
 function getStatusIcon(status: ClaudeSessionStatus): string {
   switch (status) {
     case "running":
@@ -327,12 +340,17 @@ export function ClaudePanel({
   const _statusIcon = getStatusIcon(state.status);
   const sessionTime = formatSessionTime(state.sessionStartTime);
   const tokenDisplay = formatTokenCount(state.tokenCount);
+  const turnDuration = formatTurnDuration(state.lastTurnDuration);
 
-  // Build title suffix with tokens, elapsed time, and countdown
-  // Order: 50K tokens · 30m · ↻ 10s
+  // Build title with model name: "Claude [opus-4.5]" or just "Claude"
+  const panelTitle = state.modelName ? `Claude [${state.modelName}]` : "Claude";
+
+  // Build title suffix with tokens, elapsed time, turn duration, and countdown
+  // Order: 50K tokens · 30m · 45s · ↻ 10s
   const titleParts: string[] = [];
   if (tokenDisplay) titleParts.push(tokenDisplay);
   if (sessionTime) titleParts.push(sessionTime);
+  if (turnDuration) titleParts.push(turnDuration);
   if (countdownSuffix) titleParts.push(countdownSuffix);
   const titleSuffix = titleParts.join(" · ");
 
@@ -341,7 +359,7 @@ export function ClaudePanel({
     const errorPadding = Math.max(0, contentWidth - data.error.length);
     return (
       <Box flexDirection="column" width={width}>
-        <Text>{createTitleLine("Claude", titleSuffix, width)}</Text>
+        <Text>{createTitleLine(panelTitle, titleSuffix, width)}</Text>
         <Text>
           {BOX.v} <Text color="red">{data.error}</Text>
           {" ".repeat(errorPadding)}
@@ -375,7 +393,7 @@ export function ClaudePanel({
     const noActivePadding = Math.max(0, contentWidth - noActiveText.length);
     return (
       <Box flexDirection="column" width={width}>
-        <Text>{createTitleLine("Claude", titleSuffix, width)}</Text>
+        <Text>{createTitleLine(panelTitle, titleSuffix, width)}</Text>
         <Text>
           {BOX.v} <Text dimColor>{noActiveText}</Text>
           {" ".repeat(noActivePadding)}
@@ -555,7 +573,7 @@ export function ClaudePanel({
 
   return (
     <Box flexDirection="column" width={width}>
-      <Text>{createTitleLine("Claude", titleSuffix, width)}</Text>
+      <Text>{createTitleLine(panelTitle, titleSuffix, width)}</Text>
       {lines}
       {showTodoSection && <TodoSection todos={state.todos!} width={width} />}
       <Text>{createBottomLine(width)}</Text>

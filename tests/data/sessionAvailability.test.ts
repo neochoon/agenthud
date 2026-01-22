@@ -71,9 +71,18 @@ describe("sessionAvailability", () => {
   describe("getProjectsWithSessions", () => {
     it("returns list of projects sorted by most recent modification time", () => {
       mockGetAllProjects.mockReturnValue([
-        { encodedPath: "-Users-test-project-a", decodedPath: "/Users/test/project-a" },
-        { encodedPath: "-Users-test-project-b", decodedPath: "/Users/test/project-b" },
-        { encodedPath: "-Users-test-project-c", decodedPath: "/Users/test/project-c" },
+        {
+          encodedPath: "-Users-test-project-a",
+          decodedPath: "/Users/test/project-a",
+        },
+        {
+          encodedPath: "-Users-test-project-b",
+          decodedPath: "/Users/test/project-b",
+        },
+        {
+          encodedPath: "-Users-test-project-c",
+          decodedPath: "/Users/test/project-c",
+        },
       ]);
 
       // Mock session directories exist
@@ -81,18 +90,24 @@ describe("sessionAvailability", () => {
 
       // Mock session files for each project
       mockReaddirSync.mockImplementation((dir) => {
-        if (String(dir).includes("-Users-test-project-a")) return ["session1.jsonl"];
-        if (String(dir).includes("-Users-test-project-b")) return ["session1.jsonl"];
-        if (String(dir).includes("-Users-test-project-c")) return ["session1.jsonl"];
+        if (String(dir).includes("-Users-test-project-a"))
+          return ["session1.jsonl"];
+        if (String(dir).includes("-Users-test-project-b"))
+          return ["session1.jsonl"];
+        if (String(dir).includes("-Users-test-project-c"))
+          return ["session1.jsonl"];
         return [];
       });
 
       // Mock modification times: project-c is newest, project-a is oldest
       mockStatSync.mockImplementation((path) => {
         const pathStr = String(path);
-        if (pathStr.includes("-Users-test-project-a")) return { mtimeMs: 1000, isDirectory: () => true } as any;
-        if (pathStr.includes("-Users-test-project-b")) return { mtimeMs: 2000, isDirectory: () => true } as any;
-        if (pathStr.includes("-Users-test-project-c")) return { mtimeMs: 3000, isDirectory: () => true } as any;
+        if (pathStr.includes("-Users-test-project-a"))
+          return { mtimeMs: 1000, isDirectory: () => true } as any;
+        if (pathStr.includes("-Users-test-project-b"))
+          return { mtimeMs: 2000, isDirectory: () => true } as any;
+        if (pathStr.includes("-Users-test-project-c"))
+          return { mtimeMs: 3000, isDirectory: () => true } as any;
         return { mtimeMs: 0, isDirectory: () => true } as any;
       });
 
@@ -108,14 +123,26 @@ describe("sessionAvailability", () => {
 
     it("excludes current project from the list", () => {
       mockGetAllProjects.mockReturnValue([
-        { encodedPath: "-Users-test-project-a", decodedPath: "/Users/test/project-a" },
-        { encodedPath: "-Users-test-current", decodedPath: "/Users/test/current" },
-        { encodedPath: "-Users-test-project-b", decodedPath: "/Users/test/project-b" },
+        {
+          encodedPath: "-Users-test-project-a",
+          decodedPath: "/Users/test/project-a",
+        },
+        {
+          encodedPath: "-Users-test-current",
+          decodedPath: "/Users/test/current",
+        },
+        {
+          encodedPath: "-Users-test-project-b",
+          decodedPath: "/Users/test/project-b",
+        },
       ]);
 
       mockExistsSync.mockReturnValue(true);
       mockReaddirSync.mockReturnValue(["session1.jsonl"] as any);
-      mockStatSync.mockReturnValue({ mtimeMs: 1000, isDirectory: () => true } as any);
+      mockStatSync.mockReturnValue({
+        mtimeMs: 1000,
+        isDirectory: () => true,
+      } as any);
 
       const result = getProjectsWithSessions("/Users/test/current");
 
@@ -133,8 +160,14 @@ describe("sessionAvailability", () => {
 
     it("puts projects without sessions at the end", () => {
       mockGetAllProjects.mockReturnValue([
-        { encodedPath: "-Users-test-project-a", decodedPath: "/Users/test/project-a" },
-        { encodedPath: "-Users-test-project-b", decodedPath: "/Users/test/project-b" },
+        {
+          encodedPath: "-Users-test-project-a",
+          decodedPath: "/Users/test/project-a",
+        },
+        {
+          encodedPath: "-Users-test-project-b",
+          decodedPath: "/Users/test/project-b",
+        },
       ]);
 
       mockExistsSync.mockImplementation((path) => {
@@ -144,7 +177,10 @@ describe("sessionAvailability", () => {
       });
 
       mockReaddirSync.mockReturnValue(["session1.jsonl"] as any);
-      mockStatSync.mockReturnValue({ mtimeMs: 1000, isDirectory: () => true } as any);
+      mockStatSync.mockReturnValue({
+        mtimeMs: 1000,
+        isDirectory: () => true,
+      } as any);
 
       const result = getProjectsWithSessions("/Users/test/current");
 
@@ -155,9 +191,18 @@ describe("sessionAvailability", () => {
 
     it("excludes projects whose decoded path does not exist", () => {
       mockGetAllProjects.mockReturnValue([
-        { encodedPath: "-Users-test-project-a", decodedPath: "/Users/test/project-a" },
-        { encodedPath: "-Users-test-nonexistent", decodedPath: "/Users/test/nonexistent" },
-        { encodedPath: "-Users-test-project-b", decodedPath: "/Users/test/project-b" },
+        {
+          encodedPath: "-Users-test-project-a",
+          decodedPath: "/Users/test/project-a",
+        },
+        {
+          encodedPath: "-Users-test-nonexistent",
+          decodedPath: "/Users/test/nonexistent",
+        },
+        {
+          encodedPath: "-Users-test-project-b",
+          decodedPath: "/Users/test/project-b",
+        },
       ]);
 
       // Mock: project-a and project-b exist with .git, nonexistent doesn't exist
@@ -169,7 +214,10 @@ describe("sessionAvailability", () => {
       });
 
       mockReaddirSync.mockReturnValue(["session1.jsonl"] as any);
-      mockStatSync.mockReturnValue({ mtimeMs: 1000, isDirectory: () => true } as any);
+      mockStatSync.mockReturnValue({
+        mtimeMs: 1000,
+        isDirectory: () => true,
+      } as any);
 
       const result = getProjectsWithSessions("/Users/test/current");
 
@@ -200,9 +248,14 @@ describe("sessionAvailability", () => {
       });
 
       mockReaddirSync.mockReturnValue(["session1.jsonl"] as any);
-      mockStatSync.mockReturnValue({ mtimeMs: 1000, isDirectory: () => true } as any);
+      mockStatSync.mockReturnValue({
+        mtimeMs: 1000,
+        isDirectory: () => true,
+      } as any);
 
-      const result = getProjectsWithSessions(join("/Users", "other", "current"));
+      const result = getProjectsWithSessions(
+        join("/Users", "other", "current"),
+      );
 
       // Should only include project, not home dir
       expect(result.length).toBe(1);
@@ -300,8 +353,14 @@ describe("sessionAvailability", () => {
       });
 
       mockGetAllProjects.mockReturnValue([
-        { encodedPath: "-Users-test-project-a", decodedPath: "/Users/test/project-a" },
-        { encodedPath: "-Users-test-project-b", decodedPath: "/Users/test/project-b" },
+        {
+          encodedPath: "-Users-test-project-a",
+          decodedPath: "/Users/test/project-a",
+        },
+        {
+          encodedPath: "-Users-test-project-b",
+          decodedPath: "/Users/test/project-b",
+        },
       ]);
 
       mockReaddirSync.mockReturnValue(["session1.jsonl"] as any);
@@ -309,8 +368,10 @@ describe("sessionAvailability", () => {
       // project-b is more recent than project-a
       mockStatSync.mockImplementation((path) => {
         const pathStr = String(path);
-        if (pathStr.includes("-Users-test-project-a")) return { mtimeMs: 1000, isDirectory: () => true } as any;
-        if (pathStr.includes("-Users-test-project-b")) return { mtimeMs: 2000, isDirectory: () => true } as any;
+        if (pathStr.includes("-Users-test-project-a"))
+          return { mtimeMs: 1000, isDirectory: () => true } as any;
+        if (pathStr.includes("-Users-test-project-b"))
+          return { mtimeMs: 2000, isDirectory: () => true } as any;
         return { mtimeMs: 0, isDirectory: () => true } as any;
       });
 

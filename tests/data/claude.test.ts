@@ -1285,6 +1285,197 @@ describe("claude data module", () => {
       expect(result.todos).toBeNull();
     });
 
+    it("extracts model name from assistant message", () => {
+      const now = new Date();
+      const lines = [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            model: "claude-opus-4-5-20251101",
+            content: [{ type: "text", text: "Hello there!" }],
+          },
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
+
+      const result = parseSessionState("/fake/session.jsonl");
+
+      expect(result.modelName).toBe("opus-4.5");
+    });
+
+    it("extracts model name for sonnet model", () => {
+      const now = new Date();
+      const lines = [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            model: "claude-sonnet-4-20250514",
+            content: [{ type: "text", text: "Hello!" }],
+          },
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
+
+      const result = parseSessionState("/fake/session.jsonl");
+
+      expect(result.modelName).toBe("sonnet-4");
+    });
+
+    it("extracts model name for haiku model", () => {
+      const now = new Date();
+      const lines = [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            model: "claude-3-5-haiku-20241022",
+            content: [{ type: "text", text: "Hello!" }],
+          },
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
+
+      const result = parseSessionState("/fake/session.jsonl");
+
+      expect(result.modelName).toBe("haiku-3.5");
+    });
+
+    it("uses latest model name when multiple assistant messages exist", () => {
+      const now = new Date();
+      const lines = [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            model: "claude-sonnet-4-20250514",
+            content: [{ type: "text", text: "First" }],
+          },
+          timestamp: new Date(now.getTime() - 5000).toISOString(),
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            model: "claude-opus-4-5-20251101",
+            content: [{ type: "text", text: "Second" }],
+          },
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
+
+      const result = parseSessionState("/fake/session.jsonl");
+
+      expect(result.modelName).toBe("opus-4.5");
+    });
+
+    it("returns null modelName when no assistant messages exist", () => {
+      const now = new Date();
+      const lines = [
+        JSON.stringify({
+          type: "user",
+          message: { role: "user", content: "Hello" },
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
+
+      const result = parseSessionState("/fake/session.jsonl");
+
+      expect(result.modelName).toBeNull();
+    });
+
+    it("extracts lastTurnDuration from system turn_duration entry", () => {
+      const now = new Date();
+      const lines = [
+        JSON.stringify({
+          type: "user",
+          message: { role: "user", content: "Do something" },
+          timestamp: new Date(now.getTime() - 50000).toISOString(),
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            model: "claude-opus-4-5-20251101",
+            content: [{ type: "text", text: "Done!" }],
+          },
+          timestamp: new Date(now.getTime() - 5000).toISOString(),
+        }),
+        JSON.stringify({
+          type: "system",
+          subtype: "turn_duration",
+          durationMs: 44649,
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
+
+      const result = parseSessionState("/fake/session.jsonl");
+
+      expect(result.lastTurnDuration).toBe(44649);
+    });
+
+    it("uses latest turn_duration when multiple exist", () => {
+      const now = new Date();
+      const lines = [
+        JSON.stringify({
+          type: "system",
+          subtype: "turn_duration",
+          durationMs: 10000,
+          timestamp: new Date(now.getTime() - 60000).toISOString(),
+        }),
+        JSON.stringify({
+          type: "system",
+          subtype: "turn_duration",
+          durationMs: 25000,
+          timestamp: new Date(now.getTime() - 30000).toISOString(),
+        }),
+        JSON.stringify({
+          type: "system",
+          subtype: "turn_duration",
+          durationMs: 44649,
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
+
+      const result = parseSessionState("/fake/session.jsonl");
+
+      expect(result.lastTurnDuration).toBe(44649);
+    });
+
+    it("returns null lastTurnDuration when no turn_duration entries exist", () => {
+      const now = new Date();
+      const lines = [
+        JSON.stringify({
+          type: "user",
+          message: { role: "user", content: "Hello" },
+          timestamp: now.toISOString(),
+        }),
+      ].join("\n");
+
+      mockExistsSync.mockReturnValue(true);
+      mockReadFileSync.mockReturnValue(lines);
+
+      const result = parseSessionState("/fake/session.jsonl");
+
+      expect(result.lastTurnDuration).toBeNull();
+    });
+
     it("skips TodoWrite tool from activities", () => {
       const now = new Date();
       const lines = [

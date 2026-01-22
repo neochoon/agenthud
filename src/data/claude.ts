@@ -42,6 +42,7 @@ interface JsonlUserEntry {
 interface JsonlAssistantEntry {
   type: "assistant";
   message: {
+    model?: string;
     content: Array<{
       type: string;
       text?: string;
@@ -65,7 +66,37 @@ interface JsonlAssistantEntry {
 interface JsonlSystemEntry {
   type: "system";
   subtype?: string;
+  durationMs?: number;
   timestamp: string;
+}
+
+/**
+ * Parse model ID to friendly name
+ * e.g., "claude-opus-4-5-20251101" → "opus-4.5"
+ * e.g., "claude-sonnet-4-20250514" → "sonnet-4"
+ * e.g., "claude-3-5-haiku-20241022" → "haiku-3.5"
+ */
+function parseModelName(modelId: string): string {
+  // Handle opus format: claude-opus-4-5-20251101
+  const opusMatch = modelId.match(/claude-opus-(\d+)-(\d+)/);
+  if (opusMatch) {
+    return `opus-${opusMatch[1]}.${opusMatch[2]}`;
+  }
+
+  // Handle sonnet format: claude-sonnet-4-20250514
+  const sonnetMatch = modelId.match(/claude-sonnet-(\d+)/);
+  if (sonnetMatch) {
+    return `sonnet-${sonnetMatch[1]}`;
+  }
+
+  // Handle haiku format: claude-3-5-haiku-20241022
+  const haikuMatch = modelId.match(/claude-(\d+)-(\d+)-haiku/);
+  if (haikuMatch) {
+    return `haiku-${haikuMatch[1]}.${haikuMatch[2]}`;
+  }
+
+  // Fallback: return model name without date suffix
+  return modelId.replace(/-\d{8}$/, "");
 }
 
 type JsonlEntry =
@@ -273,6 +304,8 @@ export function parseSessionState(
     tokenCount: 0,
     sessionStartTime: null,
     todos: null,
+    modelName: null,
+    lastTurnDuration: null,
   };
 
   if (!existsSync(sessionFile)) {
@@ -311,6 +344,8 @@ export function parseSessionState(
   let lastTimestamp: Date | null = null;
   let lastType: "user" | "tool" | "response" | "stop" | null = null;
   let todos: TodoItem[] | null = null;
+  let modelName: string | null = null;
+  let lastTurnDuration: number | null = null;
 
   // Parse recent lines (up to MAX_LINES_TO_SCAN)
   const recentLines = lines.slice(-MAX_LINES_TO_SCAN);
@@ -435,6 +470,11 @@ export function parseSessionState(
             (usage.cache_read_input_tokens || 0) +
             (usage.output_tokens || 0);
         }
+
+        // Extract model name (keep latest)
+        if (assistantEntry.message?.model) {
+          modelName = parseModelName(assistantEntry.message.model);
+        }
       }
 
       if (entry.type === "system") {
@@ -444,6 +484,10 @@ export function parseSessionState(
           if (systemEntry.timestamp) {
             lastTimestamp = new Date(systemEntry.timestamp);
           }
+        }
+        // Extract turn duration (keep latest)
+        if (systemEntry.subtype === "turn_duration" && systemEntry.durationMs) {
+          lastTurnDuration = systemEntry.durationMs;
         }
       }
     } catch {
@@ -528,6 +572,8 @@ export function parseSessionState(
     tokenCount,
     sessionStartTime,
     todos,
+    modelName,
+    lastTurnDuration,
   };
 }
 
@@ -547,6 +593,8 @@ export function getClaudeData(
     tokenCount: 0,
     sessionStartTime: null,
     todos: null,
+    modelName: null,
+    lastTurnDuration: null,
   };
 
   try {

@@ -117,6 +117,8 @@ export interface ClaudeSessionState {
   tokenCount: number;
   sessionStartTime: Date | null;
   todos: TodoItem[] | null;
+  modelName: string | null;
+  lastTurnDuration: number | null; // in milliseconds
 }
 
 export interface ClaudeData {

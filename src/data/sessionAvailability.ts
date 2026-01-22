@@ -22,8 +22,8 @@ export function shortenPath(path: string): string {
   if (path === home) {
     return "~";
   }
-  if (path.startsWith(home + "/") || path.startsWith(home + "\\")) {
-    return "~" + path.slice(home.length);
+  if (path.startsWith(`${home}/`) || path.startsWith(`${home}\\`)) {
+    return `~${path.slice(home.length)}`;
   }
   return path;
 }
@@ -32,18 +32,18 @@ export function shortenPath(path: string): string {
  * Project indicator files that suggest a directory is a development project
  */
 const PROJECT_INDICATORS = [
-  ".git",           // Git repository
-  "package.json",   // Node.js
-  "Cargo.toml",     // Rust
+  ".git", // Git repository
+  "package.json", // Node.js
+  "Cargo.toml", // Rust
   "pyproject.toml", // Python (modern)
-  "setup.py",       // Python (legacy)
-  "go.mod",         // Go
-  "Makefile",       // Make-based projects
+  "setup.py", // Python (legacy)
+  "go.mod", // Go
+  "Makefile", // Make-based projects
   "CMakeLists.txt", // CMake projects
-  "pom.xml",        // Java Maven
-  "build.gradle",   // Java Gradle
-  "Gemfile",        // Ruby
-  "composer.json",  // PHP
+  "pom.xml", // Java Maven
+  "build.gradle", // Java Gradle
+  "Gemfile", // Ruby
+  "composer.json", // PHP
 ];
 
 /**
@@ -148,7 +148,9 @@ export function getProjectsWithSessions(currentPath: string): ProjectInfo[] {
  * Check session availability for the application startup logic
  * Returns whether current project has session and list of other projects with sessions
  */
-export function checkSessionAvailability(cwd: string): SessionAvailabilityResult {
+export function checkSessionAvailability(
+  cwd: string,
+): SessionAvailabilityResult {
   const hasCurrentSession = hasCurrentProjectSession(cwd);
 
   if (hasCurrentSession) {

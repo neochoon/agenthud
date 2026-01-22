@@ -129,11 +129,12 @@ export function OtherSessionsPanel({
         {projectsText}
       </Text>
       <Text dimColor={!hasActive} color={hasActive ? "yellow" : undefined}>
-        {" "}| * {activeCount} active
+        {" "}
+        | * {activeCount} active
       </Text>
       {" ".repeat(headerPadding)}
       {BOX.v}
-          </Text>,
+    </Text>,
   );
 
   // Empty line
@@ -141,7 +142,7 @@ export function OtherSessionsPanel({
     <Text key="empty">
       {BOX.v} {" ".repeat(contentWidth)}
       {BOX.v}
-          </Text>,
+    </Text>,
   );
 
   // Recent session or empty state
@@ -158,7 +159,7 @@ export function OtherSessionsPanel({
         {BOX.v} <Text>{sessionLine}</Text>
         {" ".repeat(sessionLinePadding)}
         {BOX.v}
-              </Text>,
+      </Text>,
     );
 
     // Last message (if available)
@@ -184,7 +185,7 @@ export function OtherSessionsPanel({
           {BOX.v} <Text dimColor>{messageText}</Text>
           {" ".repeat(messagePadding)}
           {BOX.v}
-                  </Text>,
+        </Text>,
       );
     }
   } else {
@@ -197,7 +198,7 @@ export function OtherSessionsPanel({
         {BOX.v} <Text dimColor>{noSessionText}</Text>
         {" ".repeat(noSessionPadding)}
         {BOX.v}
-              </Text>,
+      </Text>,
     );
   }
 

@@ -179,18 +179,22 @@ describe("sessionAvailability", () => {
     });
 
     it("excludes directories that are not development projects", () => {
+      const projectPath = join("/Users", "test", "project");
+      const homePath = join("/Users", "test");
+      const projectGitPath = join(projectPath, ".git");
+
       mockGetAllProjects.mockReturnValue([
-        { encodedPath: "-Users-test-project", decodedPath: "/Users/test/project" },
-        { encodedPath: "-Users-test-home", decodedPath: "/Users/test" }, // home dir, not a project
+        { encodedPath: "-Users-test-project", decodedPath: projectPath },
+        { encodedPath: "-Users-test-home", decodedPath: homePath }, // home dir, not a project
       ]);
 
       // Mock: project has .git, home dir doesn't have any project indicators
       mockExistsSync.mockImplementation((path) => {
         const pathStr = String(path);
         // Both paths exist
-        if (pathStr === "/Users/test/project" || pathStr === "/Users/test") return true;
+        if (pathStr === projectPath || pathStr === homePath) return true;
         // project has .git
-        if (pathStr === "/Users/test/project/.git") return true;
+        if (pathStr === projectGitPath) return true;
         // home dir has no project indicators
         return false;
       });
@@ -198,7 +202,7 @@ describe("sessionAvailability", () => {
       mockReaddirSync.mockReturnValue(["session1.jsonl"] as any);
       mockStatSync.mockReturnValue({ mtimeMs: 1000, isDirectory: () => true } as any);
 
-      const result = getProjectsWithSessions("/Users/other/current");
+      const result = getProjectsWithSessions(join("/Users", "other", "current"));
 
       // Should only include project, not home dir
       expect(result.length).toBe(1);
@@ -219,49 +223,59 @@ describe("sessionAvailability", () => {
 
   describe("isDevProject", () => {
     it("returns true if .git directory exists", () => {
+      const projectPath = join("/Users", "test", "project");
+      const gitPath = join(projectPath, ".git");
       mockExistsSync.mockImplementation((path) => {
-        return String(path) === "/Users/test/project/.git";
+        return String(path) === gitPath;
       });
 
-      expect(isDevProject("/Users/test/project")).toBe(true);
+      expect(isDevProject(projectPath)).toBe(true);
     });
 
     it("returns true if package.json exists", () => {
+      const projectPath = join("/Users", "test", "project");
+      const pkgPath = join(projectPath, "package.json");
       mockExistsSync.mockImplementation((path) => {
-        return String(path) === "/Users/test/project/package.json";
+        return String(path) === pkgPath;
       });
 
-      expect(isDevProject("/Users/test/project")).toBe(true);
+      expect(isDevProject(projectPath)).toBe(true);
     });
 
     it("returns true if Cargo.toml exists", () => {
+      const projectPath = join("/Users", "test", "project");
+      const cargoPath = join(projectPath, "Cargo.toml");
       mockExistsSync.mockImplementation((path) => {
-        return String(path) === "/Users/test/project/Cargo.toml";
+        return String(path) === cargoPath;
       });
 
-      expect(isDevProject("/Users/test/project")).toBe(true);
+      expect(isDevProject(projectPath)).toBe(true);
     });
 
     it("returns true if pyproject.toml exists", () => {
+      const projectPath = join("/Users", "test", "project");
+      const pyPath = join(projectPath, "pyproject.toml");
       mockExistsSync.mockImplementation((path) => {
-        return String(path) === "/Users/test/project/pyproject.toml";
+        return String(path) === pyPath;
       });
 
-      expect(isDevProject("/Users/test/project")).toBe(true);
+      expect(isDevProject(projectPath)).toBe(true);
     });
 
     it("returns true if go.mod exists", () => {
+      const projectPath = join("/Users", "test", "project");
+      const goPath = join(projectPath, "go.mod");
       mockExistsSync.mockImplementation((path) => {
-        return String(path) === "/Users/test/project/go.mod";
+        return String(path) === goPath;
       });
 
-      expect(isDevProject("/Users/test/project")).toBe(true);
+      expect(isDevProject(projectPath)).toBe(true);
     });
 
     it("returns false if no project indicators exist", () => {
       mockExistsSync.mockReturnValue(false);
 
-      expect(isDevProject("/Users/test/random-folder")).toBe(false);
+      expect(isDevProject(join("/Users", "test", "random-folder"))).toBe(false);
     });
   });
 

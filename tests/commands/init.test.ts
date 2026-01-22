@@ -96,8 +96,12 @@ panels:
   });
 
   describe("updates .gitignore", () => {
-    it("creates .gitignore with .agenthud/ when it doesn't exist", () => {
-      mockExistsSync.mockReturnValue(false);
+    it("creates .gitignore with .agenthud/ when .git exists but .gitignore doesn't", () => {
+      mockExistsSync.mockImplementation((path: any) => {
+        const pathStr = String(path);
+        if (pathStr === ".git") return true;
+        return false;
+      });
 
       runInit();
 
@@ -107,10 +111,24 @@ panels:
       );
     });
 
-    it("appends .agenthud/ to existing .gitignore", () => {
-      mockExistsSync.mockImplementation(
-        (path: any) => String(path) === ".gitignore",
+    it("does NOT create .gitignore when .git doesn't exist", () => {
+      mockExistsSync.mockReturnValue(false);
+
+      runInit();
+
+      expect(mockWriteFileSync).not.toHaveBeenCalledWith(
+        ".gitignore",
+        ".agenthud/\n",
       );
+    });
+
+    it("appends .agenthud/ to existing .gitignore when .git exists", () => {
+      mockExistsSync.mockImplementation((path: any) => {
+        const pathStr = String(path);
+        if (pathStr === ".git") return true;
+        if (pathStr === ".gitignore") return true;
+        return false;
+      });
       mockReadFileSync.mockImplementation((path: any) => {
         if (String(path) === ".gitignore") return "node_modules/\n";
         if (
@@ -131,9 +149,12 @@ panels:
     });
 
     it("skips if .gitignore already contains .agenthud/", () => {
-      mockExistsSync.mockImplementation(
-        (path: any) => String(path) === ".gitignore",
-      );
+      mockExistsSync.mockImplementation((path: any) => {
+        const pathStr = String(path);
+        if (pathStr === ".git") return true;
+        if (pathStr === ".gitignore") return true;
+        return false;
+      });
       mockReadFileSync.mockImplementation((path: any) => {
         if (String(path) === ".gitignore") return "node_modules/\n.agenthud/\n";
         if (
@@ -181,8 +202,11 @@ panels:
   });
 
   describe("return value", () => {
-    it("returns list of created files", () => {
-      mockExistsSync.mockReturnValue(false);
+    it("returns list of created files (with .git)", () => {
+      mockExistsSync.mockImplementation((path: any) => {
+        if (String(path) === ".git") return true;
+        return false;
+      });
 
       const result = runInit();
 
@@ -190,6 +214,17 @@ panels:
       expect(result.created).toContain(".agenthud/tests/");
       expect(result.created).toContain(".agenthud/config.yaml");
       expect(result.created).toContain(".gitignore");
+    });
+
+    it("returns list of created files (without .git, no .gitignore)", () => {
+      mockExistsSync.mockReturnValue(false);
+
+      const result = runInit();
+
+      expect(result.created).toContain(".agenthud/");
+      expect(result.created).toContain(".agenthud/tests/");
+      expect(result.created).toContain(".agenthud/config.yaml");
+      expect(result.created).not.toContain(".gitignore");
     });
 
     it("returns list of skipped files", () => {

@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [0.7.2] - 2025-01-22
+
+### Improved
+- **Project List Display** - Shows project paths with `~` shorthand for home directory
+- **Smart Sorting** - Projects sorted by most recent modification time (newest first)
+- **Project Filtering** - Filters out non-existent paths and non-development directories
+- **Copy-Paste Command** - Shows ready-to-use `cd` command for quick navigation
+
+### Fixed
+- **Init Command** - `agenthud init` no longer creates `.gitignore` in non-git directories
+- **Windows Compatibility** - Fixed path separator issues in session availability tests
+
 ## [0.7.1] - 2025-01-17
 
 ### Fixed
@@ -132,7 +144,8 @@
 - **Test Panel** - Test results at a glance
 - Watch mode for live updates
 
-[Unreleased]: https://github.com/neochoon/agenthud/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/neochoon/agenthud/compare/v0.7.2...HEAD
+[0.7.2]: https://github.com/neochoon/agenthud/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/neochoon/agenthud/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/neochoon/agenthud/compare/v0.6.5...v0.7.0
 [0.6.5]: https://github.com/neochoon/agenthud/compare/v0.6.4...v0.6.5

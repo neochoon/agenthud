@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import { getAllProjects } from "./otherSessions.js";
@@ -38,6 +38,45 @@ function getSessionPath(projectPath: string): string {
 }
 
 /**
+ * Get the most recent modification time of session files in a project directory
+ * Returns 0 if no session files exist
+ */
+function getProjectMostRecentMtime(encodedPath: string): number {
+  const projectDir = join(homedir(), ".claude", "projects", encodedPath);
+
+  if (!existsSync(projectDir)) {
+    return 0;
+  }
+
+  let files: string[];
+  try {
+    files = readdirSync(projectDir) as string[];
+  } catch {
+    return 0;
+  }
+
+  const jsonlFiles = files.filter((f) => f.endsWith(".jsonl"));
+  if (jsonlFiles.length === 0) {
+    return 0;
+  }
+
+  let latestMtime = 0;
+  for (const file of jsonlFiles) {
+    const filePath = join(projectDir, file);
+    try {
+      const stat = statSync(filePath);
+      if (stat.mtimeMs && stat.mtimeMs > latestMtime) {
+        latestMtime = stat.mtimeMs;
+      }
+    } catch {
+      // Skip files we can't stat
+    }
+  }
+
+  return latestMtime;
+}
+
+/**
  * Check if current project has a Claude session
  */
 export function hasCurrentProjectSession(cwd: string): boolean {
@@ -47,17 +86,26 @@ export function hasCurrentProjectSession(cwd: string): boolean {
 
 /**
  * Get list of projects that have Claude sessions, excluding current project
+ * Sorted by most recent modification time (newest first)
  */
 export function getProjectsWithSessions(currentPath: string): ProjectInfo[] {
   const allProjects = getAllProjects();
   const currentEncoded = currentPath.replace(/[/\\]/g, "-");
 
-  return allProjects
+  // Get projects with their modification times
+  const projectsWithMtime = allProjects
     .filter((p) => p.encodedPath !== currentEncoded)
     .map((p) => ({
       name: basename(p.decodedPath),
       path: p.decodedPath,
+      mtime: getProjectMostRecentMtime(p.encodedPath),
     }));
+
+  // Sort by modification time (newest first), projects without sessions go last
+  projectsWithMtime.sort((a, b) => b.mtime - a.mtime);
+
+  // Return without mtime
+  return projectsWithMtime.map(({ name, path }) => ({ name, path }));
 }
 
 /**

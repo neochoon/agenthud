@@ -87,14 +87,17 @@ export function hasCurrentProjectSession(cwd: string): boolean {
 /**
  * Get list of projects that have Claude sessions, excluding current project
  * Sorted by most recent modification time (newest first)
+ * Excludes projects whose decoded path doesn't exist on filesystem
  */
 export function getProjectsWithSessions(currentPath: string): ProjectInfo[] {
   const allProjects = getAllProjects();
   const currentEncoded = currentPath.replace(/[/\\]/g, "-");
 
   // Get projects with their modification times
+  // Filter out: current project, and projects whose decoded path doesn't exist
   const projectsWithMtime = allProjects
     .filter((p) => p.encodedPath !== currentEncoded)
+    .filter((p) => existsSync(p.decodedPath)) // Only include projects that exist
     .map((p) => ({
       name: basename(p.decodedPath),
       path: p.decodedPath,

@@ -151,6 +151,30 @@ describe("sessionAvailability", () => {
       expect(result[0].name).toBe("project-b");
       expect(result[1].name).toBe("project-a");
     });
+
+    it("excludes projects whose decoded path does not exist", () => {
+      mockGetAllProjects.mockReturnValue([
+        { encodedPath: "-Users-test-project-a", decodedPath: "/Users/test/project-a" },
+        { encodedPath: "-Users-test-nonexistent", decodedPath: "/Users/test/nonexistent" },
+        { encodedPath: "-Users-test-project-b", decodedPath: "/Users/test/project-b" },
+      ]);
+
+      // Mock: project-a and project-b exist, nonexistent doesn't
+      mockExistsSync.mockImplementation((path) => {
+        const pathStr = String(path);
+        if (pathStr === "/Users/test/nonexistent") return false;
+        return true;
+      });
+
+      mockReaddirSync.mockReturnValue(["session1.jsonl"] as any);
+      mockStatSync.mockReturnValue({ mtimeMs: 1000, isDirectory: () => true } as any);
+
+      const result = getProjectsWithSessions("/Users/test/current");
+
+      // Should only include existing projects
+      expect(result.length).toBe(2);
+      expect(result.map((p) => p.name)).not.toContain("nonexistent");
+    });
   });
 
   describe("shortenPath", () => {

@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.7.4] - 2025-01-23
+
+### Fixed
+- **Other Sessions Panel** - Fixed session detection and display issues
+- **Session Timeout** - Improved session timeout handling
+- **Test Compatibility** - Fixed test compatibility issues across platforms
+
 ## [0.7.3] - 2025-01-23
 
 ### New
@@ -154,7 +161,8 @@
 - **Test Panel** - Test results at a glance
 - Watch mode for live updates
 
-[Unreleased]: https://github.com/neochoon/agenthud/compare/v0.7.3...HEAD
+[Unreleased]: https://github.com/neochoon/agenthud/compare/v0.7.4...HEAD
+[0.7.4]: https://github.com/neochoon/agenthud/compare/v0.7.3...v0.7.4
 [0.7.3]: https://github.com/neochoon/agenthud/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/neochoon/agenthud/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/neochoon/agenthud/compare/v0.7.0...v0.7.1

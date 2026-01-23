@@ -15,6 +15,7 @@ vi.mock("fs", async (importOriginal) => {
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import {
+  encodeProjectPath,
   findActiveSession,
   getClaudeData,
   getClaudeSessionPath,
@@ -36,14 +37,62 @@ describe("claude data module", () => {
     vi.resetAllMocks();
   });
 
+  describe("encodeProjectPath", () => {
+    it("replaces forward slashes with dashes (Unix)", () => {
+      expect(encodeProjectPath("/Users/test/project")).toBe(
+        "-Users-test-project",
+      );
+    });
+
+    it("replaces backslashes with dashes (Windows)", () => {
+      expect(encodeProjectPath("\\Users\\test\\project")).toBe(
+        "-Users-test-project",
+      );
+    });
+
+    it("replaces colons with dashes (Windows drive letter)", () => {
+      expect(encodeProjectPath("C:\\Users\\test\\project")).toBe(
+        "C--Users-test-project",
+      );
+    });
+
+    it("handles Windows path with drive letter correctly", () => {
+      // This is the exact format that caused the bug on Windows
+      expect(encodeProjectPath("C:\\Users\\neoch\\WestbrookAI\\agenthud")).toBe(
+        "C--Users-neoch-WestbrookAI-agenthud",
+      );
+    });
+
+    it("handles mixed separators", () => {
+      expect(encodeProjectPath("C:/Users/test/project")).toBe(
+        "C--Users-test-project",
+      );
+    });
+
+    it("handles path with existing dashes", () => {
+      expect(encodeProjectPath("/Users/test/my-project")).toBe(
+        "-Users-test-my-project",
+      );
+    });
+  });
+
   describe("getClaudeSessionPath", () => {
-    it("converts project path to Claude session directory", () => {
+    it("converts Unix project path to Claude session directory", () => {
       const projectPath = "/Users/neochoon/agenthud";
       const result = getClaudeSessionPath(projectPath);
       // Check path contains expected components (platform-independent)
       expect(result).toContain(".claude");
       expect(result).toContain("projects");
       expect(result).toContain("-Users-neochoon-agenthud");
+    });
+
+    it("converts Windows project path with drive letter", () => {
+      const projectPath = "C:\\Users\\test\\project";
+      const result = getClaudeSessionPath(projectPath);
+      expect(result).toContain(".claude");
+      expect(result).toContain("projects");
+      // Windows drive letter C: should become C- (colon replaced)
+      expect(result).toContain("C--Users-test-project");
     });
 
     it("handles paths with multiple slashes", () => {

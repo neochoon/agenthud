@@ -107,15 +107,23 @@ type JsonlEntry =
 
 const MAX_LINES_TO_SCAN = 200;
 const DEFAULT_MAX_ACTIVITIES = 10;
+
+/**
+ * Encode project path to match Claude Code's session directory naming
+ * e.g., /Users/test/project → -Users-test-project
+ * e.g., C:\Users\test\project → C--Users-test-project (Windows)
+ */
+export function encodeProjectPath(projectPath: string): string {
+  return projectPath.replace(/[/\\:]/g, "-");
+}
+
 /**
  * Convert project path to Claude session directory path
  * e.g., /Users/neochoon/agenthud → ~/.claude/projects/-Users-neochoon-agenthud
- * e.g., C:\Users\test\project → ~/.claude/projects/-C--Users-test-project (Windows)
+ * e.g., C:\Users\test\project → ~/.claude/projects/C--Users-test-project (Windows)
  */
 export function getClaudeSessionPath(projectPath: string): string {
-  // Replace both forward and backslashes for cross-platform support
-  const encoded = projectPath.replace(/[/\\]/g, "-");
-  return join(homedir(), ".claude", "projects", encoded);
+  return join(homedir(), ".claude", "projects", encodeProjectPath(projectPath));
 }
 
 /**

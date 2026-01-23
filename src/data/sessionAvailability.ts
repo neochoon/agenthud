@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
+import { encodeProjectPath, getClaudeSessionPath } from "./claude.js";
 import { getAllProjects } from "./otherSessions.js";
 
 export interface ProjectInfo {
@@ -59,14 +60,6 @@ export function isDevProject(projectPath: string): boolean {
   return false;
 }
 
-/**
- * Convert project path to Claude session directory path
- * e.g., /Users/test/project → ~/.claude/projects/-Users-test-project
- */
-function getSessionPath(projectPath: string): string {
-  const encoded = projectPath.replace(/[/\\]/g, "-");
-  return join(homedir(), ".claude", "projects", encoded);
-}
 
 /**
  * Get the most recent modification time of session files in a project directory
@@ -111,7 +104,7 @@ function getProjectMostRecentMtime(encodedPath: string): number {
  * Check if current project has a Claude session
  */
 export function hasCurrentProjectSession(cwd: string): boolean {
-  const sessionPath = getSessionPath(cwd);
+  const sessionPath = getClaudeSessionPath(cwd);
   return existsSync(sessionPath);
 }
 
@@ -123,7 +116,7 @@ export function hasCurrentProjectSession(cwd: string): boolean {
  */
 export function getProjectsWithSessions(currentPath: string): ProjectInfo[] {
   const allProjects = getAllProjects();
-  const currentEncoded = currentPath.replace(/[/\\]/g, "-");
+  const currentEncoded = encodeProjectPath(currentPath);
 
   // Get projects with their modification times
   // Filter out: current project, non-existent paths, and non-dev directories

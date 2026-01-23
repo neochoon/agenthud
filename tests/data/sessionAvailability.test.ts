@@ -23,6 +23,7 @@ vi.mock("../../src/data/otherSessions.js", () => ({
 }));
 
 import { existsSync, readdirSync, statSync } from "node:fs";
+import { encodeProjectPath } from "../../src/data/claude.js";
 import { getAllProjects } from "../../src/data/otherSessions.js";
 import {
   checkSessionAvailability,
@@ -65,6 +66,22 @@ describe("sessionAvailability", () => {
       const result = hasCurrentProjectSession("/Users/test/my-project");
 
       expect(result).toBe(false);
+    });
+
+    it("correctly encodes Windows path with drive letter", () => {
+      mockExistsSync.mockReturnValue(true);
+
+      const result = hasCurrentProjectSession("C:\\Users\\test\\my-project");
+
+      expect(result).toBe(true);
+      // Windows path C:\Users\test\my-project should become C--Users-test-my-project
+      const expectedPath = join(
+        "/home/user",
+        ".claude",
+        "projects",
+        "C--Users-test-my-project",
+      );
+      expect(mockExistsSync).toHaveBeenCalledWith(expectedPath);
     });
   });
 
@@ -260,6 +277,48 @@ describe("sessionAvailability", () => {
       // Should only include project, not home dir
       expect(result.length).toBe(1);
       expect(result[0].name).toBe("project");
+    });
+
+    it("correctly excludes current Windows project with drive letter", () => {
+      // This test verifies the Windows path encoding bug fix
+      // The current project path has a drive letter that must be encoded correctly
+      mockGetAllProjects.mockReturnValue([
+        {
+          encodedPath: "C--Users-test-project-a",
+          decodedPath: "C:\\Users\\test\\project-a",
+        },
+        {
+          encodedPath: "C--Users-test-current",
+          decodedPath: "C:\\Users\\test\\current",
+        },
+        {
+          encodedPath: "C--Users-test-project-b",
+          decodedPath: "C:\\Users\\test\\project-b",
+        },
+      ]);
+
+      mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockReturnValue(["session1.jsonl"] as any);
+      mockStatSync.mockReturnValue({
+        mtimeMs: 1000,
+        isDirectory: () => true,
+      } as any);
+
+      // Pass Windows path as current project
+      const result = getProjectsWithSessions("C:\\Users\\test\\current");
+
+      // Should exclude "current" project - this requires correct colon encoding
+      expect(result.map((p) => p.name)).not.toContain("current");
+      expect(result.length).toBe(2);
+    });
+
+    it("uses encodeProjectPath consistently for Windows paths", () => {
+      // Verify that encodeProjectPath produces the same encoding as Claude Code
+      const windowsPath = "C:\\Users\\test\\my-project";
+      const encoded = encodeProjectPath(windowsPath);
+
+      // Should match Claude Code's encoding format
+      expect(encoded).toBe("C--Users-test-my-project");
     });
   });
 

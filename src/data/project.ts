@@ -1,6 +1,5 @@
-import { execSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { basename } from "node:path";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { basename, join } from "node:path";
 
 // Language detection order (first match wins)
 const LANGUAGE_INDICATORS: Array<{ file: string; language: string }> = [
@@ -277,11 +276,7 @@ function parseSetupPy(content: string): ProjectInfo {
 }
 
 function getFolderName(): string {
-  try {
-    return execSync('basename "$PWD"', { encoding: "utf-8" }).trim();
-  } catch {
-    return basename(process.cwd());
-  }
+  return basename(process.cwd());
 }
 
 export function getProjectInfo(): ProjectInfo {
@@ -355,6 +350,51 @@ function findSourceDir(): string | null {
   return null;
 }
 
+/**
+ * Convert glob pattern to regex (e.g., "*.ts" -> /\.ts$/)
+ */
+function globToRegex(pattern: string): RegExp {
+  // Extract extension from pattern like "*.ts" or "*.tsx"
+  const ext = pattern.replace("*", "").replace(".", "\\.");
+  return new RegExp(`${ext}$`, "i");
+}
+
+/**
+ * Recursively find all files matching patterns, excluding certain directories
+ * Cross-platform implementation using Node.js fs module
+ */
+function findFiles(
+  dir: string,
+  patterns: RegExp[],
+  excludeDirs: string[],
+): string[] {
+  const files: string[] = [];
+
+  try {
+    const entries = readdirSync(dir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const fullPath = join(dir, entry.name);
+
+      if (entry.isDirectory()) {
+        // Skip excluded directories
+        if (!excludeDirs.includes(entry.name)) {
+          files.push(...findFiles(fullPath, patterns, excludeDirs));
+        }
+      } else if (entry.isFile()) {
+        // Check if file matches any pattern
+        if (patterns.some((regex) => regex.test(entry.name))) {
+          files.push(fullPath);
+        }
+      }
+    }
+  } catch {
+    // Ignore errors (permission denied, etc.)
+  }
+
+  return files;
+}
+
 export function countFiles(language: string | null): FileCount {
   const sourceDir = findSourceDir();
   if (!sourceDir || !language) {
@@ -367,17 +407,9 @@ export function countFiles(language: string | null): FileCount {
   }
 
   try {
-    // Build find command with exclusions
-    const excludes = EXCLUDE_DIRS.map((d) => `-path "*/${d}/*"`).join(" -o ");
-    const namePatterns = config.patterns
-      .map((p) => `-name "${p}"`)
-      .join(" -o ");
-
-    const cmd = `find ${sourceDir} \\( ${excludes} \\) -prune -o -type f \\( ${namePatterns} \\) -print | wc -l`;
-    const result = execSync(cmd, { encoding: "utf-8" });
-    const count = parseInt(result.trim(), 10) || 0;
-
-    return { count, extension: config.ext };
+    const patterns = config.patterns.map(globToRegex);
+    const files = findFiles(sourceDir, patterns, EXCLUDE_DIRS);
+    return { count: files.length, extension: config.ext };
   } catch {
     return { count: 0, extension: config.ext };
   }
@@ -395,15 +427,22 @@ export function countLines(language: string | null): number {
   }
 
   try {
-    // Build find command with exclusions, then count lines
-    const excludes = EXCLUDE_DIRS.map((d) => `-path "*/${d}/*"`).join(" -o ");
-    const namePatterns = config.patterns
-      .map((p) => `-name "${p}"`)
-      .join(" -o ");
+    const patterns = config.patterns.map(globToRegex);
+    const files = findFiles(sourceDir, patterns, EXCLUDE_DIRS);
 
-    const cmd = `find ${sourceDir} \\( ${excludes} \\) -prune -o -type f \\( ${namePatterns} \\) -print0 | xargs -0 wc -l 2>/dev/null | tail -1 | awk '{print $1}'`;
-    const result = execSync(cmd, { encoding: "utf-8" });
-    return parseInt(result.trim(), 10) || 0;
+    let totalLines = 0;
+    for (const file of files) {
+      try {
+        const content = readFileSync(file, "utf-8");
+        // Count newlines (add 1 for last line if file doesn't end with newline)
+        const lines = content.split("\n").length;
+        totalLines += lines;
+      } catch {
+        // Skip files that can't be read
+      }
+    }
+
+    return totalLines;
   } catch {
     return 0;
   }

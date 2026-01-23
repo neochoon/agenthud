@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [0.7.3] - 2025-01-23
+
+### New
+- **Model Name Display** - Shows the model name in Claude panel title (e.g., `Claude [opus-4.5]`)
+- **Turn Duration** - Displays last response time (e.g., `Last: 45s`)
+
+### Fixed
+- **Windows Compatibility** - Fixed path encoding for Windows file systems (replaces `:` with `@` in encoded paths)
+- **Cross-platform File Operations** - Improved path handling for Windows environments
+
 ## [0.7.2] - 2025-01-22
 
 ### Improved
@@ -144,7 +154,8 @@
 - **Test Panel** - Test results at a glance
 - Watch mode for live updates
 
-[Unreleased]: https://github.com/neochoon/agenthud/compare/v0.7.2...HEAD
+[Unreleased]: https://github.com/neochoon/agenthud/compare/v0.7.3...HEAD
+[0.7.3]: https://github.com/neochoon/agenthud/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/neochoon/agenthud/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/neochoon/agenthud/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/neochoon/agenthud/compare/v0.6.5...v0.7.0

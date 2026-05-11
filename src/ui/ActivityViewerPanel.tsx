@@ -138,29 +138,50 @@ export function ActivityViewerPanel({
       const prefixWidth = 2 + timestampWidth + iconWidth + 1; // "│ " + timestamp + icon + " "
       const labelPart = detail ? `${label}: ` : label;
       const labelWidth = labelPart.length;
-      const availableForDetail = contentWidth - prefixWidth - labelWidth - countSuffixWidth + 1;
+      const _availableForDetail =
+        contentWidth - prefixWidth - labelWidth - countSuffixWidth + 1;
       // Note: contentWidth already accounts for trailing │, so adjust:
       // Full line width: 1 (│) + 1 ( ) + timestamp + icon + 1 ( ) + labelPart + detail + countSuffix + padding + 1 (│)
       // = 2 + timestampWidth + iconWidth + 1 + labelWidth + detail + suffix + 1
       // available for detail = width - 2 - timestampWidth - iconWidth - 1 - labelWidth - countSuffixWidth - 1
-      const detailMaxWidth = width - 2 - timestampWidth - iconWidth - 1 - labelWidth - countSuffixWidth - 1;
+      const detailMaxWidth =
+        width -
+        2 -
+        timestampWidth -
+        iconWidth -
+        1 -
+        labelWidth -
+        countSuffixWidth -
+        1;
 
       let labelContent: string;
-      let displayWidth: number;
+      let _displayWidth: number;
 
       if (detail) {
         const truncated = truncateDetail(detail, Math.max(0, detailMaxWidth));
         labelContent = `${labelPart}${truncated}${countSuffix}`;
-        displayWidth = prefixWidth - 1 + labelWidth + getDisplayWidth(truncated) + countSuffixWidth;
+        _displayWidth =
+          prefixWidth -
+          1 +
+          labelWidth +
+          getDisplayWidth(truncated) +
+          countSuffixWidth;
       } else {
         labelContent = label + countSuffix;
-        displayWidth = prefixWidth - 1 + label.length + countSuffixWidth;
+        _displayWidth = prefixWidth - 1 + label.length + countSuffixWidth;
       }
 
       // Padding to fill the line up to the closing │
       // Full line: │(1) + space(1) + timestamp + icon + space(1) + labelContent + padding + │(1) = width
       // So padding = width - 1 - 1 - timestampWidth - iconWidth - 1 - labelContent_display_width - 1
-      const usedWidth = 1 + 1 + timestampWidth + iconWidth + 1 + getDisplayWidth(labelContent) + 1;
+      const usedWidth =
+        1 +
+        1 +
+        timestampWidth +
+        iconWidth +
+        1 +
+        getDisplayWidth(labelContent) +
+        1;
       const padding = Math.max(0, width - usedWidth);
 
       lines.push(

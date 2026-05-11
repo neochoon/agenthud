@@ -1,8 +1,7 @@
 import { render } from "ink-testing-library";
-import React from "react";
 import { describe, expect, it } from "vitest";
-import { SessionTreePanel } from "../../src/ui/SessionTreePanel.js";
 import type { SessionNode } from "../../src/types/index.js";
+import { SessionTreePanel } from "../../src/ui/SessionTreePanel.js";
 
 const makeSession = (overrides: Partial<SessionNode> = {}): SessionNode => ({
   id: "abc123",

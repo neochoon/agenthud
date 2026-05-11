@@ -2,19 +2,24 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Box, Text, useApp, useInput, useStdout } from "ink";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type React from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { getVersion } from "../cli.js";
 import {
   ensureLogDir,
   hasProjectLevelConfig,
   loadGlobalConfig,
 } from "../config/globalConfig.js";
-import { discoverSessions } from "../data/sessions.js";
 import { parseSessionHistory } from "../data/sessionHistory.js";
-import type { ActivityEntry, SessionNode, SessionTree } from "../types/index.js";
+import { discoverSessions } from "../data/sessions.js";
+import type {
+  ActivityEntry,
+  SessionNode,
+  SessionTree,
+} from "../types/index.js";
 import { ActivityViewerPanel } from "./ActivityViewerPanel.js";
-import { SessionTreePanel } from "./SessionTreePanel.js";
 import { useHotkeys } from "./hooks/useHotkeys.js";
+import { SessionTreePanel } from "./SessionTreePanel.js";
 
 const VIEWER_HEIGHT_FRACTION = 0.55;
 
@@ -81,18 +86,24 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   const selectedIndex = allFlat.findIndex((s) => s.id === selectedId);
   const height = stdout?.rows ?? 40;
   const width = stdout?.columns ?? 80;
-  const viewerRows = Math.max(5, Math.floor(height * VIEWER_HEIGHT_FRACTION) - 4);
+  const viewerRows = Math.max(
+    5,
+    Math.floor(height * VIEWER_HEIGHT_FRACTION) - 4,
+  );
 
   const saveLog = useCallback(() => {
     if (!activities.length || !selectedId) return;
     ensureLogDir(config.logDir);
     const date = new Date().toISOString().slice(0, 10);
-    const filePath = join(config.logDir, `${date}-${selectedId.slice(0, 8)}.txt`);
+    const filePath = join(
+      config.logDir,
+      `${date}-${selectedId.slice(0, 8)}.txt`,
+    );
     const lines = activities.map(
       (a) => `[${a.timestamp.toISOString()}] ${a.icon} ${a.label} ${a.detail}`,
     );
     try {
-      writeFileSync(filePath, lines.join("\n") + "\n", "utf-8");
+      writeFileSync(filePath, `${lines.join("\n")}\n`, "utf-8");
     } catch {
       // silently fail — log dir may not be writable
     }
@@ -135,10 +146,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     onQuit: exit,
   });
 
-  useInput(
-    (input, key) => handleInput(input, key),
-    { isActive: isWatchMode },
-  );
+  useInput((input, key) => handleInput(input, key), { isActive: isWatchMode });
 
   const selectedSession = allFlat.find((s) => s.id === selectedId);
   const sessionDisplayName =

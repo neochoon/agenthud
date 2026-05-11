@@ -36,14 +36,18 @@ describe("useHotkeys", () => {
 
     it("calls onSwitchFocus when Tab is pressed", () => {
       const onSwitchFocus = vi.fn();
-      const { result } = renderHook(() => useHotkeys(makeOptions({ onSwitchFocus })));
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ onSwitchFocus })),
+      );
       act(() => result.current.handleInput("\t", noopKey));
       expect(onSwitchFocus).toHaveBeenCalledTimes(1);
     });
 
     it("calls onRefresh when r is pressed", () => {
       const onRefresh = vi.fn();
-      const { result } = renderHook(() => useHotkeys(makeOptions({ onRefresh })));
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ onRefresh })),
+      );
       act(() => result.current.handleInput("r", noopKey));
       expect(onRefresh).toHaveBeenCalledTimes(1);
     });

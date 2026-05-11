@@ -104,9 +104,9 @@ export function parseActivitiesFromLines(lines: string[]): ParseResult {
       if (typeof msgContent === "string") {
         userText = msgContent;
       } else if (Array.isArray(msgContent)) {
-        const textBlock = (msgContent as Array<{ type: string; text?: string }>).find(
-          (c) => c.type === "text" && c.text,
-        );
+        const textBlock = (
+          msgContent as Array<{ type: string; text?: string }>
+        ).find((c) => c.type === "text" && c.text);
         if (textBlock?.text) userText = textBlock.text;
       }
       if (userText) {
@@ -140,7 +140,8 @@ export function parseActivitiesFromLines(lines: string[]): ParseResult {
         for (const block of content) {
           if (block.type === "tool_use" && block.name) {
             if (block.name === "TodoWrite") continue;
-            const icon = (ICONS as Record<string, string>)[block.name] ?? ICONS.Default;
+            const icon =
+              (ICONS as Record<string, string>)[block.name] ?? ICONS.Default;
             const detail = getToolDetail(block.name, block.input);
             const last = activities[activities.length - 1];
             if (
@@ -152,9 +153,19 @@ export function parseActivitiesFromLines(lines: string[]): ParseResult {
               last.count = (last.count ?? 1) + 1;
               last.timestamp = timestamp;
             } else {
-              activities.push({ timestamp, type: "tool", icon, label: block.name, detail });
+              activities.push({
+                timestamp,
+                type: "tool",
+                icon,
+                label: block.name,
+                detail,
+              });
             }
-          } else if (block.type === "text" && block.text && block.text.length > 10) {
+          } else if (
+            block.type === "text" &&
+            block.text &&
+            block.text.length > 10
+          ) {
             activities.push({
               timestamp,
               type: "response",

@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
-import { parseActivitiesFromLines } from "./activityParser.js";
 import type { ActivityEntry } from "../types/index.js";
+import { parseActivitiesFromLines } from "./activityParser.js";
 
 // Parse the full, untruncated activity history from a JSONL file.
 // Returns entries in chronological order (oldest first).

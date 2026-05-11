@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseArgs, getHelp } from "../src/cli.js";
+import { getHelp, parseArgs } from "../src/cli.js";
 
 describe("parseArgs", () => {
   it("defaults to watch mode", () => {
@@ -19,7 +19,10 @@ describe("parseArgs", () => {
   });
 
   it("parses --version", () => {
-    expect(parseArgs(["--version"])).toEqual({ mode: "watch", command: "version" });
+    expect(parseArgs(["--version"])).toEqual({
+      mode: "watch",
+      command: "version",
+    });
   });
 
   it("parses -V", () => {

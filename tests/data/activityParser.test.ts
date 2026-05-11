@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  parseModelName,
-  parseActivitiesFromLines,
   getToolDetail,
+  parseActivitiesFromLines,
+  parseModelName,
 } from "../../src/data/activityParser.js";
 
 describe("parseModelName", () => {
@@ -29,7 +29,9 @@ describe("getToolDetail", () => {
   });
 
   it("returns basename for file_path", () => {
-    expect(getToolDetail("Read", { file_path: "/src/auth.ts" })).toBe("auth.ts");
+    expect(getToolDetail("Read", { file_path: "/src/auth.ts" })).toBe(
+      "auth.ts",
+    );
   });
 
   it("returns empty string when no input", () => {
@@ -54,7 +56,11 @@ describe("parseActivitiesFromLines", () => {
       message: {
         model: "claude-sonnet-4-20250514",
         content: [
-          { type: "tool_use", name: "Read", input: { file_path: "/src/auth.ts" } },
+          {
+            type: "tool_use",
+            name: "Read",
+            input: { file_path: "/src/auth.ts" },
+          },
         ],
         usage: { input_tokens: 100, output_tokens: 20 },
       },
@@ -95,6 +101,8 @@ describe("parseActivitiesFromLines", () => {
       }),
     ];
     const result = parseActivitiesFromLines(todoLines);
-    expect(result.activities.filter((a) => a.label === "TodoWrite")).toHaveLength(0);
+    expect(
+      result.activities.filter((a) => a.label === "TodoWrite"),
+    ).toHaveLength(0);
   });
 });

@@ -1,6 +1,6 @@
-import React from "react";
 import { render } from "ink";
-import { parseArgs, getHelp, getVersion, clearScreen } from "./cli.js";
+import React from "react";
+import { clearScreen, getHelp, getVersion, parseArgs } from "./cli.js";
 import { App } from "./ui/App.js";
 
 const options = parseArgs(process.argv.slice(2));

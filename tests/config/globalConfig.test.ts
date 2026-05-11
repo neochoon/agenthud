@@ -1,6 +1,6 @@
-import { describe, expect, it, vi, afterEach } from "vitest";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("node:fs", () => ({
   existsSync: vi.fn(),

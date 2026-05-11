@@ -12,7 +12,10 @@ interface UseHotkeysOptions {
 }
 
 export interface UseHotkeysResult {
-  handleInput: (input: string, key: { upArrow: boolean; downArrow: boolean }) => void;
+  handleInput: (
+    input: string,
+    key: { upArrow: boolean; downArrow: boolean },
+  ) => void;
   statusBarItems: string[];
 }
 
@@ -31,21 +34,51 @@ export function useHotkeys({
     input: string,
     key: { upArrow: boolean; downArrow: boolean },
   ) => {
-    if (input === "q") { onQuit(); return; }
-    if (input === "\t") { onSwitchFocus(); return; }
-    if (input === "r") { onRefresh(); return; }
+    if (input === "q") {
+      onQuit();
+      return;
+    }
+    if (input === "\t") {
+      onSwitchFocus();
+      return;
+    }
+    if (input === "r") {
+      onRefresh();
+      return;
+    }
 
     if (focus === "viewer") {
-      if (key.upArrow || input === "k") { onScrollUp(); return; }
-      if (key.downArrow || input === "j") { onScrollDown(); return; }
-      if (input === "g") { onScrollTop(); return; }
-      if (input === "G") { onScrollBottom(); return; }
-      if (input === "s") { onSaveLog(); return; }
+      if (key.upArrow || input === "k") {
+        onScrollUp();
+        return;
+      }
+      if (key.downArrow || input === "j") {
+        onScrollDown();
+        return;
+      }
+      if (input === "g") {
+        onScrollTop();
+        return;
+      }
+      if (input === "G") {
+        onScrollBottom();
+        return;
+      }
+      if (input === "s") {
+        onSaveLog();
+        return;
+      }
     }
 
     if (focus === "tree") {
-      if (key.upArrow || input === "k") { onScrollUp(); return; }
-      if (key.downArrow || input === "j") { onScrollDown(); return; }
+      if (key.upArrow || input === "k") {
+        onScrollUp();
+        return;
+      }
+      if (key.downArrow || input === "j") {
+        onScrollDown();
+        return;
+      }
     }
   };
 

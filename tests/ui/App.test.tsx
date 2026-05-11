@@ -1,6 +1,5 @@
 // tests/ui/App.test.tsx
 import { render } from "ink-testing-library";
-import React from "react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/config/globalConfig.js", () => ({

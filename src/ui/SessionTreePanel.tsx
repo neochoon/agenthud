@@ -86,17 +86,14 @@ function SessionRow({
   return (
     <Text>
       {BOX.v}{" "}
-      <Text
-        backgroundColor={highlight ? "blue" : undefined}
-        bold={highlight}
-      >
+      <Text backgroundColor={highlight ? "blue" : undefined} bold={highlight}>
         <Text>{prefix}</Text>
         <Text bold>{name}</Text>
         <Text> </Text>
         <Text color={statusColor}>{badge}</Text>
         <Text>{gap}</Text>
         <Text dimColor>{elapsed}</Text>
-        {model ? <Text dimColor>{"  " + model}</Text> : null}
+        {model ? <Text dimColor>{`  ${model}`}</Text> : null}
       </Text>
       {" ".repeat(linePadding)}
       {BOX.v}
@@ -107,7 +104,11 @@ function SessionRow({
 function flattenSessions(
   sessions: SessionNode[],
 ): Array<{ session: SessionNode; prefix: string; isLast: boolean }> {
-  const result: Array<{ session: SessionNode; prefix: string; isLast: boolean }> = [];
+  const result: Array<{
+    session: SessionNode;
+    prefix: string;
+    isLast: boolean;
+  }> = [];
 
   for (const session of sessions) {
     result.push({ session, prefix: "", isLast: false });

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, afterEach } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("node:fs", () => ({
   existsSync: vi.fn(),
@@ -6,7 +6,9 @@ vi.mock("node:fs", () => ({
 }));
 
 const { existsSync, readFileSync } = await import("node:fs");
-const { parseSessionHistory } = await import("../../src/data/sessionHistory.js");
+const { parseSessionHistory } = await import(
+  "../../src/data/sessionHistory.js"
+);
 
 afterEach(() => vi.resetAllMocks());
 

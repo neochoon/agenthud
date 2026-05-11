@@ -1,8 +1,8 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
-import { parseModelName } from "./activityParser.js";
 import type { GlobalConfig, SessionNode, SessionTree } from "../types/index.js";
+import { parseModelName } from "./activityParser.js";
 
 const RUNNING_THRESHOLD_MS = 30 * 1000;
 
@@ -144,9 +144,7 @@ export function discoverSessions(config: GlobalConfig): SessionTree {
           modelName: readModelName(filePath),
           subAgents,
         });
-      } catch {
-        continue;
-      }
+      } catch {}
     }
   }
 

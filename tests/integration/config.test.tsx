@@ -4,7 +4,6 @@
 // to the new split-view App. Comprehensive integration tests will be added in Task 10.
 
 import { render } from "ink-testing-library";
-import React from "react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/config/globalConfig.js", () => ({

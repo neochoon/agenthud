@@ -1,8 +1,7 @@
 import { render } from "ink-testing-library";
-import React from "react";
 import { describe, expect, it } from "vitest";
-import { ActivityViewerPanel } from "../../src/ui/ActivityViewerPanel.js";
 import type { ActivityEntry } from "../../src/types/index.js";
+import { ActivityViewerPanel } from "../../src/ui/ActivityViewerPanel.js";
 
 const makeActivity = (label: string, i: number): ActivityEntry => ({
   timestamp: new Date(1_700_000_000_000 + i * 1000),

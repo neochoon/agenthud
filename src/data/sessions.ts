@@ -2,9 +2,8 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import type { GlobalConfig, SessionNode, SessionTree } from "../types/index.js";
+import { THIRTY_SECONDS_MS } from "../ui/constants.js";
 import { parseModelName } from "./activityParser.js";
-
-const RUNNING_THRESHOLD_MS = 30 * 1000;
 
 function getProjectsDir(): string {
   return join(homedir(), ".claude", "projects");
@@ -25,7 +24,7 @@ function getSessionStatus(
   config: GlobalConfig,
 ): "running" | "idle" | "done" {
   const age = Date.now() - mtimeMs;
-  if (age < RUNNING_THRESHOLD_MS) return "running";
+  if (age < THIRTY_SECONDS_MS) return "running";
   if (age < config.sessionTimeoutMs) return "idle";
   return "done";
 }
@@ -88,7 +87,7 @@ function buildSubAgents(
         return null;
       }
     })
-    .filter((n): n is SessionNode => n !== null)
+    .filter((n): n is SessionNode => n !== null && n.status !== "done")
     .sort((a, b) => b.lastModifiedMs - a.lastModifiedMs);
 }
 

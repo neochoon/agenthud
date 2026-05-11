@@ -39,35 +39,49 @@ agenthud/
 ├── tsconfig.json
 ├── src/
 │   ├── index.ts          # Entry point
+│   ├── main.ts           # App bootstrap
 │   ├── cli.ts            # CLI argument parsing
-│   ├── ui/
-│   │   ├── App.tsx       # Main Ink component
-│   │   ├── Dashboard.tsx # Dashboard layout
-│   │   ├── GitPanel.tsx  # Git info panel
-│   │   ├── ClaudePanel.tsx # Claude Code session panel
-│   │   └── TestPanel.tsx # Test results panel
+│   ├── config/
+│   │   └── globalConfig.ts # ~/.agenthud/config.yaml parser
 │   ├── data/
-│   │   ├── git.ts        # Git data collection
-│   │   ├── claude.ts     # Claude Code session data
-│   │   ├── tests.ts      # Parse test results
-│   │   └── watcher.ts    # File watcher for live updates
-│   └── types/
-│       └── index.ts      # Type definitions
+│   │   ├── activityParser.ts  # JSONL activity parsing utilities
+│   │   ├── sessions.ts        # Global session discovery
+│   │   └── sessionHistory.ts  # Full session history parsing
+│   ├── ui/
+│   │   ├── App.tsx            # Main Ink component (split view)
+│   │   ├── SessionTreePanel.tsx  # Top pane: session tree
+│   │   ├── ActivityViewerPanel.tsx # Bottom pane: scrollable history
+│   │   ├── constants.ts       # Box drawing, width constants
+│   │   └── hooks/
+│   │       └── useHotkeys.ts  # Keyboard handling
+│   ├── types/
+│   │   └── index.ts      # Type definitions
+│   └── utils/
+│       ├── nodeVersion.ts
+│       └── performance.ts
 └── tests/
-    ├── git.test.ts
-    ├── claude.test.ts
-    └── App.test.tsx
+    ├── config/
+    │   └── globalConfig.test.ts
+    ├── data/
+    │   ├── activityParser.test.ts
+    │   ├── sessions.test.ts
+    │   └── sessionHistory.test.ts
+    └── ui/
+        ├── App.test.tsx
+        ├── SessionTreePanel.test.tsx
+        ├── ActivityViewerPanel.test.tsx
+        └── hooks/
+            └── useHotkeys.test.ts
 ```
 
 ## Data Sources
 
 | Data | Source | Method |
 |------|--------|--------|
-| Branch | git | `git branch --show-current` |
-| Commits today | git | `git log --since=midnight --oneline` |
-| Lines changed | git | `git diff --stat HEAD~n` |
-| Claude | `~/.claude/projects/` | JSONL file watch |
-| Tests | `test-results.json` | Jest/Vitest JSON output |
+| Sessions | `~/.claude/projects/` | JSONL file scan |
+| Sub-agents | `~/.claude/projects/{id}/subagents/` | Directory structure |
+| Config | `~/.agenthud/config.yaml` | YAML parse |
+| Logs | `~/.agenthud/logs/` | File write on `s` key |
 
 ## CLI Interface
 
@@ -79,9 +93,6 @@ agenthud -w
 
 # One-shot - print and exit
 agenthud --once
-
-# Specify project directory
-agenthud --dir /path/to/project
 
 # JSON output (for scripting)
 agenthud --json

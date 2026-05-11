@@ -14,7 +14,6 @@ interface SessionTreePanelProps {
   sessions: SessionNode[];
   selectedId: string | null;
   hasFocus: boolean;
-  onSelect: (id: string) => void;
   width?: number;
 }
 
@@ -132,7 +131,6 @@ export function SessionTreePanel({
   sessions,
   selectedId,
   hasFocus,
-  onSelect: _onSelect,
   width = DEFAULT_PANEL_WIDTH,
 }: SessionTreePanelProps): React.ReactElement {
   const innerWidth = getInnerWidth(width);

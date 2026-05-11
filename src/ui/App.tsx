@@ -118,7 +118,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
         setSelectedId(allFlat[prev]?.id ?? selectedId);
       } else {
         setIsLive(false);
-        setScrollOffset((o) => o + 1);
+        setScrollOffset((o) => Math.min(o + 1, Math.max(0, activities.length - viewerRows)));
       }
     },
     onScrollDown: () => {
@@ -165,10 +165,6 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
         sessions={sessionTree.sessions}
         selectedId={selectedId}
         hasFocus={focus === "tree"}
-        onSelect={(id) => {
-          setSelectedId(id);
-          setFocus("viewer");
-        }}
         width={width}
       />
 

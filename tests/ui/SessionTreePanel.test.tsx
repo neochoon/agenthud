@@ -22,7 +22,7 @@ describe("SessionTreePanel", () => {
         sessions={[makeSession()]}
         selectedId="abc123"
         hasFocus={true}
-        onSelect={() => {}}
+
         width={80}
       />,
     );
@@ -35,7 +35,7 @@ describe("SessionTreePanel", () => {
         sessions={[makeSession({ status: "running" })]}
         selectedId={null}
         hasFocus={false}
-        onSelect={() => {}}
+
         width={80}
       />,
     );
@@ -58,7 +58,7 @@ describe("SessionTreePanel", () => {
         sessions={[session]}
         selectedId={null}
         hasFocus={false}
-        onSelect={() => {}}
+
         width={80}
       />,
     );
@@ -71,7 +71,7 @@ describe("SessionTreePanel", () => {
         sessions={[makeSession({ modelName: "sonnet-4.6" })]}
         selectedId={null}
         hasFocus={false}
-        onSelect={() => {}}
+
         width={80}
       />,
     );
@@ -84,7 +84,7 @@ describe("SessionTreePanel", () => {
         sessions={[]}
         selectedId={null}
         hasFocus={false}
-        onSelect={() => {}}
+
         width={80}
       />,
     );

@@ -8,7 +8,37 @@ import {
   getDisplayWidth,
   getInnerWidth,
 } from "./constants.js";
-import { getActivityStyle } from "./ClaudePanel.js";
+
+export interface ActivityStyle {
+  color?: string;
+  dimColor: boolean;
+}
+
+export function getActivityStyle(activity: ActivityEntry): ActivityStyle {
+  // User input - bright white
+  if (activity.type === "user") {
+    return { color: "white", dimColor: false };
+  }
+
+  // Claude's response - green
+  if (activity.type === "response") {
+    return { color: "green", dimColor: false };
+  }
+
+  // Tool types
+  if (activity.type === "tool") {
+    // Bash commands - gray (secondary but visible)
+    if (activity.label === "Bash") {
+      return { color: "gray", dimColor: false };
+    }
+
+    // All other tools (Edit, Read, Write, Grep, Glob, TodoWrite, etc.) - dim
+    return { dimColor: true };
+  }
+
+  // Default fallback - dim
+  return { dimColor: true };
+}
 
 export interface ActivityViewerPanelProps {
   activities: ActivityEntry[];

@@ -16,4 +16,4 @@ if (majorVersion < MIN_NODE_VERSION) {
 }
 
 // Version is OK, dynamically import the main application
-import("./main.js").then(({ main }) => main());
+import("./main.js");

@@ -46,3 +46,6 @@ coverage/
 vitest.config.ts.timestamp-*
 
 .agenthud/
+
+# Git worktrees
+.worktrees/

@@ -6,312 +6,168 @@ import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { useHotkeys } from "../../../src/ui/hooks/useHotkeys.js";
 
+const noopKey = { upArrow: false, downArrow: false };
+const upKey = { upArrow: true, downArrow: false };
+const downKey = { upArrow: false, downArrow: true };
+
+function makeOptions(overrides = {}) {
+  return {
+    focus: "tree" as const,
+    onSwitchFocus: vi.fn(),
+    onScrollUp: vi.fn(),
+    onScrollDown: vi.fn(),
+    onScrollTop: vi.fn(),
+    onScrollBottom: vi.fn(),
+    onSaveLog: vi.fn(),
+    onRefresh: vi.fn(),
+    onQuit: vi.fn(),
+    ...overrides,
+  };
+}
+
 describe("useHotkeys", () => {
-  describe("hotkey generation", () => {
-    it("generates hotkey from first character of panel name", () => {
-      const onRefreshAll = vi.fn();
-      const onQuit = vi.fn();
-
-      const { result } = renderHook(() =>
-        useHotkeys({
-          manualPanels: [
-            { name: "tests", label: "run tests", action: vi.fn() },
-          ],
-          onRefreshAll,
-          onQuit,
-        }),
-      );
-
-      const testsHotkey = result.current.hotkeys.find(
-        (h) => h.label === "run tests",
-      );
-      expect(testsHotkey).toBeDefined();
-      expect(testsHotkey?.key).toBe("t");
-    });
-
-    it("skips reserved keys (r, q)", () => {
-      const { result } = renderHook(() =>
-        useHotkeys({
-          manualPanels: [
-            { name: "refresh", label: "refresh panel", action: vi.fn() },
-            { name: "query", label: "run query", action: vi.fn() },
-          ],
-          onRefreshAll: vi.fn(),
-          onQuit: vi.fn(),
-        }),
-      );
-
-      // 'r' is reserved, should use 'e' from "refresh"
-      const refreshHotkey = result.current.hotkeys.find(
-        (h) => h.label === "refresh panel",
-      );
-      expect(refreshHotkey?.key).toBe("e");
-
-      // 'q' is reserved, should use 'u' from "query"
-      const queryHotkey = result.current.hotkeys.find(
-        (h) => h.label === "run query",
-      );
-      expect(queryHotkey?.key).toBe("u");
-    });
-
-    it("skips already used keys", () => {
-      const { result } = renderHook(() =>
-        useHotkeys({
-          manualPanels: [
-            { name: "tests", label: "run tests", action: vi.fn() },
-            { name: "types", label: "check types", action: vi.fn() },
-          ],
-          onRefreshAll: vi.fn(),
-          onQuit: vi.fn(),
-        }),
-      );
-
-      const testsHotkey = result.current.hotkeys.find(
-        (h) => h.label === "run tests",
-      );
-      const typesHotkey = result.current.hotkeys.find(
-        (h) => h.label === "check types",
-      );
-
-      expect(testsHotkey?.key).toBe("t");
-      // 't' already used, should use 'y' from "types"
-      expect(typesHotkey?.key).toBe("y");
-    });
-
-    it("handles panel with no available characters", () => {
-      const { result } = renderHook(() =>
-        useHotkeys({
-          manualPanels: [
-            { name: "rq", label: "reserved only", action: vi.fn() }, // only r and q
-          ],
-          onRefreshAll: vi.fn(),
-          onQuit: vi.fn(),
-        }),
-      );
-
-      // No valid key available, should not create hotkey
-      const hotkey = result.current.hotkeys.find(
-        (h) => h.label === "reserved only",
-      );
-      expect(hotkey).toBeUndefined();
-    });
-
-    it("includes refresh all hotkey (r)", () => {
-      const { result } = renderHook(() =>
-        useHotkeys({
-          manualPanels: [],
-          onRefreshAll: vi.fn(),
-          onQuit: vi.fn(),
-        }),
-      );
-
-      const refreshHotkey = result.current.hotkeys.find((h) => h.key === "r");
-      expect(refreshHotkey).toBeDefined();
-      expect(refreshHotkey?.label).toBe("refresh all");
-    });
-
-    it("includes quit hotkey (q)", () => {
-      const { result } = renderHook(() =>
-        useHotkeys({
-          manualPanels: [],
-          onRefreshAll: vi.fn(),
-          onQuit: vi.fn(),
-        }),
-      );
-
-      const quitHotkey = result.current.hotkeys.find((h) => h.key === "q");
-      expect(quitHotkey).toBeDefined();
-      expect(quitHotkey?.label).toBe("quit");
-    });
-
-    it("orders hotkeys: manual panels first, then r, then q", () => {
-      const { result } = renderHook(() =>
-        useHotkeys({
-          manualPanels: [
-            { name: "tests", label: "run tests", action: vi.fn() },
-            { name: "build", label: "run build", action: vi.fn() },
-          ],
-          onRefreshAll: vi.fn(),
-          onQuit: vi.fn(),
-        }),
-      );
-
-      const keys = result.current.hotkeys.map((h) => h.key);
-      expect(keys).toEqual(["t", "b", "r", "q"]);
-    });
-  });
-
-  describe("handleInput", () => {
-    it("calls panel action when matching key is pressed", () => {
-      const testsAction = vi.fn();
-
-      const { result } = renderHook(() =>
-        useHotkeys({
-          manualPanels: [
-            { name: "tests", label: "run tests", action: testsAction },
-          ],
-          onRefreshAll: vi.fn(),
-          onQuit: vi.fn(),
-        }),
-      );
-
-      act(() => {
-        result.current.handleInput("t");
-      });
-
-      expect(testsAction).toHaveBeenCalledTimes(1);
-    });
-
-    it("calls onRefreshAll when r is pressed", () => {
-      const onRefreshAll = vi.fn();
-
-      const { result } = renderHook(() =>
-        useHotkeys({
-          manualPanels: [],
-          onRefreshAll,
-          onQuit: vi.fn(),
-        }),
-      );
-
-      act(() => {
-        result.current.handleInput("r");
-      });
-
-      expect(onRefreshAll).toHaveBeenCalledTimes(1);
-    });
-
+  describe("global keys (work regardless of focus)", () => {
     it("calls onQuit when q is pressed", () => {
       const onQuit = vi.fn();
-
-      const { result } = renderHook(() =>
-        useHotkeys({
-          manualPanels: [],
-          onRefreshAll: vi.fn(),
-          onQuit,
-        }),
-      );
-
-      act(() => {
-        result.current.handleInput("q");
-      });
-
+      const { result } = renderHook(() => useHotkeys(makeOptions({ onQuit })));
+      act(() => result.current.handleInput("q", noopKey));
       expect(onQuit).toHaveBeenCalledTimes(1);
     });
 
-    it("does nothing for unregistered keys", () => {
-      const testsAction = vi.fn();
-      const onRefreshAll = vi.fn();
-      const onQuit = vi.fn();
-
-      const { result } = renderHook(() =>
-        useHotkeys({
-          manualPanels: [
-            { name: "tests", label: "run tests", action: testsAction },
-          ],
-          onRefreshAll,
-          onQuit,
-        }),
-      );
-
-      act(() => {
-        result.current.handleInput("x");
-      });
-
-      expect(testsAction).not.toHaveBeenCalled();
-      expect(onRefreshAll).not.toHaveBeenCalled();
-      expect(onQuit).not.toHaveBeenCalled();
+    it("calls onSwitchFocus when Tab is pressed", () => {
+      const onSwitchFocus = vi.fn();
+      const { result } = renderHook(() => useHotkeys(makeOptions({ onSwitchFocus })));
+      act(() => result.current.handleInput("\t", noopKey));
+      expect(onSwitchFocus).toHaveBeenCalledTimes(1);
     });
 
-    it("handles multiple panels correctly", () => {
-      const testsAction = vi.fn();
-      const buildAction = vi.fn();
+    it("calls onRefresh when r is pressed", () => {
+      const onRefresh = vi.fn();
+      const { result } = renderHook(() => useHotkeys(makeOptions({ onRefresh })));
+      act(() => result.current.handleInput("r", noopKey));
+      expect(onRefresh).toHaveBeenCalledTimes(1);
+    });
+  });
 
+  describe("tree focus", () => {
+    it("calls onScrollUp when upArrow is pressed", () => {
+      const onScrollUp = vi.fn();
       const { result } = renderHook(() =>
-        useHotkeys({
-          manualPanels: [
-            { name: "tests", label: "run tests", action: testsAction },
-            { name: "build", label: "run build", action: buildAction },
-          ],
-          onRefreshAll: vi.fn(),
-          onQuit: vi.fn(),
-        }),
+        useHotkeys(makeOptions({ focus: "tree", onScrollUp })),
       );
+      act(() => result.current.handleInput("", upKey));
+      expect(onScrollUp).toHaveBeenCalledTimes(1);
+    });
 
-      act(() => {
-        result.current.handleInput("b");
-      });
+    it("calls onScrollUp when k is pressed", () => {
+      const onScrollUp = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ focus: "tree", onScrollUp })),
+      );
+      act(() => result.current.handleInput("k", noopKey));
+      expect(onScrollUp).toHaveBeenCalledTimes(1);
+    });
 
-      expect(testsAction).not.toHaveBeenCalled();
-      expect(buildAction).toHaveBeenCalledTimes(1);
+    it("calls onScrollDown when downArrow is pressed", () => {
+      const onScrollDown = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ focus: "tree", onScrollDown })),
+      );
+      act(() => result.current.handleInput("", downKey));
+      expect(onScrollDown).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls onScrollDown when j is pressed", () => {
+      const onScrollDown = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ focus: "tree", onScrollDown })),
+      );
+      act(() => result.current.handleInput("j", noopKey));
+      expect(onScrollDown).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not call onSaveLog when s is pressed in tree focus", () => {
+      const onSaveLog = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ focus: "tree", onSaveLog })),
+      );
+      act(() => result.current.handleInput("s", noopKey));
+      expect(onSaveLog).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("viewer focus", () => {
+    it("calls onScrollUp when upArrow is pressed", () => {
+      const onScrollUp = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ focus: "viewer", onScrollUp })),
+      );
+      act(() => result.current.handleInput("", upKey));
+      expect(onScrollUp).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls onScrollDown when j is pressed", () => {
+      const onScrollDown = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ focus: "viewer", onScrollDown })),
+      );
+      act(() => result.current.handleInput("j", noopKey));
+      expect(onScrollDown).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls onScrollTop when g is pressed", () => {
+      const onScrollTop = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ focus: "viewer", onScrollTop })),
+      );
+      act(() => result.current.handleInput("g", noopKey));
+      expect(onScrollTop).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls onScrollBottom when G is pressed", () => {
+      const onScrollBottom = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ focus: "viewer", onScrollBottom })),
+      );
+      act(() => result.current.handleInput("G", noopKey));
+      expect(onScrollBottom).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls onSaveLog when s is pressed", () => {
+      const onSaveLog = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ focus: "viewer", onSaveLog })),
+      );
+      act(() => result.current.handleInput("s", noopKey));
+      expect(onSaveLog).toHaveBeenCalledTimes(1);
     });
   });
 
   describe("statusBarItems", () => {
-    it("returns formatted status bar items", () => {
+    it("returns tree-focus status bar items when focus is tree", () => {
       const { result } = renderHook(() =>
-        useHotkeys({
-          manualPanels: [
-            { name: "tests", label: "run tests", action: vi.fn() },
-          ],
-          onRefreshAll: vi.fn(),
-          onQuit: vi.fn(),
-        }),
+        useHotkeys(makeOptions({ focus: "tree" })),
       );
-
       expect(result.current.statusBarItems).toEqual([
-        "t: run tests",
-        "r: refresh all",
+        "Tab: viewer",
+        "↑↓: select",
+        "r: refresh",
         "q: quit",
       ]);
     });
 
-    it("returns only r and q when no manual panels", () => {
+    it("returns viewer-focus status bar items when focus is viewer", () => {
       const { result } = renderHook(() =>
-        useHotkeys({
-          manualPanels: [],
-          onRefreshAll: vi.fn(),
-          onQuit: vi.fn(),
-        }),
+        useHotkeys(makeOptions({ focus: "viewer" })),
       );
-
       expect(result.current.statusBarItems).toEqual([
-        "r: refresh all",
+        "Tab: tree",
+        "↑↓: scroll",
+        "g: top",
+        "G: live",
+        "s: save",
         "q: quit",
       ]);
-    });
-  });
-
-  describe("dynamic updates", () => {
-    it("updates hotkeys when manualPanels change", () => {
-      const action1 = vi.fn();
-      const action2 = vi.fn();
-
-      const { result, rerender } = renderHook(
-        ({ panels }) =>
-          useHotkeys({
-            manualPanels: panels,
-            onRefreshAll: vi.fn(),
-            onQuit: vi.fn(),
-          }),
-        {
-          initialProps: {
-            panels: [{ name: "tests", label: "run tests", action: action1 }],
-          },
-        },
-      );
-
-      expect(result.current.hotkeys.find((h) => h.key === "t")).toBeDefined();
-      expect(result.current.hotkeys.find((h) => h.key === "b")).toBeUndefined();
-
-      rerender({
-        panels: [
-          { name: "tests", label: "run tests", action: action1 },
-          { name: "build", label: "run build", action: action2 },
-        ],
-      });
-
-      expect(result.current.hotkeys.find((h) => h.key === "t")).toBeDefined();
-      expect(result.current.hotkeys.find((h) => h.key === "b")).toBeDefined();
     });
   });
 });

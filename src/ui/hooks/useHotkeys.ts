@@ -1,101 +1,58 @@
-import { useCallback, useMemo } from "react";
-
-interface ManualPanel {
-  name: string;
-  label: string;
-  action: () => void;
-}
-
-interface Hotkey {
-  key: string;
-  label: string;
-  action: () => void;
-}
-
+// src/ui/hooks/useHotkeys.ts
 interface UseHotkeysOptions {
-  manualPanels: ManualPanel[];
-  onRefreshAll: () => void;
+  focus: "tree" | "viewer";
+  onSwitchFocus: () => void;
+  onScrollUp: () => void;
+  onScrollDown: () => void;
+  onScrollTop: () => void;
+  onScrollBottom: () => void;
+  onSaveLog: () => void;
+  onRefresh: () => void;
   onQuit: () => void;
 }
 
-interface UseHotkeysResult {
-  hotkeys: Hotkey[];
-  handleInput: (key: string) => void;
+export interface UseHotkeysResult {
+  handleInput: (input: string, key: { upArrow: boolean; downArrow: boolean }) => void;
   statusBarItems: string[];
 }
 
-// Reserved keys that cannot be used by panels
-const RESERVED_KEYS = new Set(["r", "q"]);
-
 export function useHotkeys({
-  manualPanels,
-  onRefreshAll,
+  focus,
+  onSwitchFocus,
+  onScrollUp,
+  onScrollDown,
+  onScrollTop,
+  onScrollBottom,
+  onSaveLog,
+  onRefresh,
   onQuit,
 }: UseHotkeysOptions): UseHotkeysResult {
-  // Generate hotkeys for manual panels
-  const hotkeys = useMemo(() => {
-    const result: Hotkey[] = [];
-    const usedKeys = new Set<string>(RESERVED_KEYS);
+  const handleInput = (
+    input: string,
+    key: { upArrow: boolean; downArrow: boolean },
+  ) => {
+    if (input === "q") { onQuit(); return; }
+    if (input === "\t") { onSwitchFocus(); return; }
+    if (input === "r") { onRefresh(); return; }
 
-    // Generate hotkeys for manual panels
-    for (const panel of manualPanels) {
-      let assignedKey: string | null = null;
-
-      // Find first available character from panel name
-      for (const char of panel.name.toLowerCase()) {
-        if (!usedKeys.has(char)) {
-          assignedKey = char;
-          usedKeys.add(char);
-          break;
-        }
-      }
-
-      // Only add hotkey if we found an available key
-      if (assignedKey) {
-        result.push({
-          key: assignedKey,
-          label: panel.label,
-          action: panel.action,
-        });
-      }
+    if (focus === "viewer") {
+      if (key.upArrow || input === "k") { onScrollUp(); return; }
+      if (key.downArrow || input === "j") { onScrollDown(); return; }
+      if (input === "g") { onScrollTop(); return; }
+      if (input === "G") { onScrollBottom(); return; }
+      if (input === "s") { onSaveLog(); return; }
     }
 
-    // Add refresh all hotkey
-    result.push({
-      key: "r",
-      label: "refresh all",
-      action: onRefreshAll,
-    });
-
-    // Add quit hotkey
-    result.push({
-      key: "q",
-      label: "quit",
-      action: onQuit,
-    });
-
-    return result;
-  }, [manualPanels, onRefreshAll, onQuit]);
-
-  // Handle keyboard input
-  const handleInput = useCallback(
-    (key: string) => {
-      const hotkey = hotkeys.find((h) => h.key === key);
-      if (hotkey) {
-        hotkey.action();
-      }
-    },
-    [hotkeys],
-  );
-
-  // Generate status bar items
-  const statusBarItems = useMemo(() => {
-    return hotkeys.map((h) => `${h.key}: ${h.label}`);
-  }, [hotkeys]);
-
-  return {
-    hotkeys,
-    handleInput,
-    statusBarItems,
+    if (focus === "tree") {
+      if (key.upArrow || input === "k") { onScrollUp(); return; }
+      if (key.downArrow || input === "j") { onScrollDown(); return; }
+    }
   };
+
+  const statusBarItems =
+    focus === "tree"
+      ? ["Tab: viewer", "↑↓: select", "r: refresh", "q: quit"]
+      : ["Tab: tree", "↑↓: scroll", "g: top", "G: live", "s: save", "q: quit"];
+
+  return { handleInput, statusBarItems };
 }

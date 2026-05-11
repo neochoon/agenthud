@@ -66,6 +66,8 @@ describe("discoverSessions", () => {
       }) + "\n",
     );
 
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
     const tree = discoverSessions(mockConfig);
     expect(tree.sessions).toHaveLength(1);
     expect(tree.sessions[0].id).toBe("abc123");
@@ -122,11 +124,40 @@ describe("discoverSessions", () => {
     });
     vi.mocked(readFileSync).mockReturnValue("");
 
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
     const tree = discoverSessions(mockConfig);
     expect(tree.sessions).toHaveLength(1);
     expect(tree.sessions[0].id).toBe("parent-id");
     expect(tree.sessions[0].subAgents).toHaveLength(1);
     expect(tree.sessions[0].subAgents[0].id).toBe("child-id");
     expect(tree.totalCount).toBe(2);
+  });
+
+  it("excludes sessions older than sessionTimeout (done)", () => {
+    const projectsDir = join(process.env.HOME ?? "/home/user", ".claude", "projects");
+    const projectDir = join(projectsDir, "-Users-neo-oldproject");
+
+    vi.mocked(existsSync).mockImplementation((p) => {
+      const path = String(p);
+      return path === projectsDir || path.includes("oldproject");
+    });
+    vi.mocked(readdirSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === projectsDir) return ["-Users-neo-oldproject"] as unknown as ReturnType<typeof readdirSync>;
+      if (path === projectDir) return ["old-sess.jsonl"] as unknown as ReturnType<typeof readdirSync>;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    // mtime is way older than sessionTimeout (2 hours ago vs 30min timeout)
+    vi.mocked(statSync).mockImplementation((p) => {
+      const path = String(p);
+      const isDir = !path.endsWith(".jsonl");
+      return { isDirectory: () => isDir, mtimeMs: Date.now() - 2 * 60 * 60 * 1000, size: 100 } as ReturnType<typeof statSync>;
+    });
+    vi.mocked(readFileSync).mockReturnValue("");
+
+    const tree = discoverSessions(mockConfig);
+    expect(tree.sessions).toHaveLength(0);
+    expect(tree.totalCount).toBe(0);
   });
 });

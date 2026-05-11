@@ -157,12 +157,12 @@ export function discoverSessions(config: GlobalConfig): SessionTree {
     return b.lastModifiedMs - a.lastModifiedMs;
   });
 
+  const visible = allSessions.filter((s) => s.status !== "done");
   const totalCount =
-    allSessions.length +
-    allSessions.reduce((sum, s) => sum + s.subAgents.length, 0);
+    visible.length + visible.reduce((sum, s) => sum + s.subAgents.length, 0);
 
   return {
-    sessions: allSessions,
+    sessions: visible,
     totalCount,
     timestamp: new Date().toISOString(),
   };

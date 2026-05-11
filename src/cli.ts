@@ -4,20 +4,22 @@ import { fileURLToPath } from "node:url";
 
 export interface CliOptions {
   mode: "watch" | "once";
-  command?: "init" | "version" | "help";
+  command?: "version" | "help";
 }
 
 export function getHelp(): string {
-  return `Usage: agenthud [command] [options]
+  return `Usage: agenthud [options]
 
-Commands:
-  init              Initialize agenthud in current directory
+Monitors all running Claude Code sessions in real-time.
 
 Options:
-  -w, --watch       Watch mode (default)
-  --once            Run once and exit
+  -w, --watch       Watch mode (default) — live updates
+  --once            Print once and exit
   -V, --version     Show version number
   -h, --help        Show this help message
+
+Config: ~/.agenthud/config.yaml
+Logs:   ~/.agenthud/logs/
 `;
 }
 
@@ -34,28 +36,14 @@ export function clearScreen(): void {
 }
 
 export function parseArgs(args: string[]): CliOptions {
-  const hasOnce = args.includes("--once");
-  const hasVersion = args.includes("--version") || args.includes("-V");
-  const hasHelp = args.includes("--help") || args.includes("-h");
-
-  // Check for help flag first
-  if (hasHelp) {
+  if (args.includes("--help") || args.includes("-h")) {
     return { mode: "watch", command: "help" };
   }
-
-  // Check for version flag
-  if (hasVersion) {
+  if (args.includes("--version") || args.includes("-V")) {
     return { mode: "watch", command: "version" };
   }
-
-  // Check for init command (must be first argument)
-  const command = args[0] === "init" ? "init" : undefined;
-
-  // --once takes precedence
-  if (hasOnce) {
-    return { mode: "once", command };
+  if (args.includes("--once")) {
+    return { mode: "once" };
   }
-
-  // Default is watch mode
-  return { mode: "watch", command };
+  return { mode: "watch" };
 }

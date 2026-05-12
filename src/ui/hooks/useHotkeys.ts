@@ -11,6 +11,7 @@ interface UseHotkeysOptions {
   onSaveLog: () => void;
   onRefresh: () => void;
   onQuit: () => void;
+  onEnter: () => void;
 }
 
 export interface UseHotkeysResult {
@@ -22,6 +23,7 @@ export interface UseHotkeysResult {
       tab: boolean;
       pageUp: boolean;
       pageDown: boolean;
+      return: boolean;
     },
   ) => void;
   statusBarItems: string[];
@@ -39,6 +41,7 @@ export function useHotkeys({
   onSaveLog,
   onRefresh,
   onQuit,
+  onEnter,
 }: UseHotkeysOptions): UseHotkeysResult {
   const handleInput = (
     input: string,
@@ -48,6 +51,7 @@ export function useHotkeys({
       tab: boolean;
       pageUp: boolean;
       pageDown: boolean;
+      return: boolean;
     },
   ) => {
     if (input === "q") {
@@ -56,6 +60,10 @@ export function useHotkeys({
     }
     if (key.tab) {
       onSwitchFocus();
+      return;
+    }
+    if (key.return) {
+      onEnter();
       return;
     }
     if (input === "r") {
@@ -113,6 +121,7 @@ export function useHotkeys({
           "Tab: viewer",
           "↑↓/jk: select",
           "PgUp/Dn: page",
+          "↵: expand",
           "r: refresh",
           "q: quit",
         ]

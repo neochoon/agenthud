@@ -166,6 +166,37 @@ describe("SessionTreePanel", () => {
     expect(frame).toContain("more");
   });
 
+  it("shows idle sub-agents individually when parent is in expandedIds", () => {
+    const session = makeSession({
+      subAgents: [
+        makeSession({
+          id: "i1",
+          projectName: "",
+          status: "idle",
+          subAgents: [],
+        }),
+        makeSession({
+          id: "i2",
+          projectName: "",
+          status: "idle",
+          subAgents: [],
+        }),
+      ],
+    });
+    const { lastFrame } = render(
+      <SessionTreePanel
+        sessions={[session]}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+        expandedIds={new Set(["abc123"])}
+      />,
+    );
+    const frame = lastFrame() ?? "";
+    expect(frame).toContain("»");
+    expect(frame).not.toContain("... 2 idle");
+  });
+
   it("renders empty message when no sessions", () => {
     const { lastFrame } = render(
       <SessionTreePanel

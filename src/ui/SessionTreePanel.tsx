@@ -16,6 +16,7 @@ interface SessionTreePanelProps {
   hasFocus: boolean;
   width?: number;
   maxRows?: number;
+  expandedIds?: Set<string>;
 }
 
 function formatElapsed(lastModifiedMs: number): string {
@@ -105,7 +106,10 @@ type FlatRow =
   | { kind: "session"; session: SessionNode; prefix: string }
   | { kind: "idle-summary"; count: number };
 
-function flattenSessions(sessions: SessionNode[]): FlatRow[] {
+function flattenSessions(
+  sessions: SessionNode[],
+  expandedIds: Set<string>,
+): FlatRow[] {
   const result: FlatRow[] = [];
 
   for (const session of sessions) {
@@ -113,20 +117,33 @@ function flattenSessions(sessions: SessionNode[]): FlatRow[] {
 
     const running = session.subAgents.filter((s) => s.status === "running");
     const idle = session.subAgents.filter((s) => s.status === "idle");
-    const hasIdleSummary = idle.length > 0;
+    const isExpanded = expandedIds.has(session.id);
 
-    for (let i = 0; i < running.length; i++) {
-      const isLast = i === running.length - 1 && !hasIdleSummary;
-      const treeChar = isLast ? "└─ " : "├─ ";
-      result.push({
-        kind: "session",
-        session: running[i],
-        prefix: `${treeChar}» `,
-      });
-    }
-
-    if (hasIdleSummary) {
-      result.push({ kind: "idle-summary", count: idle.length });
+    if (isExpanded) {
+      const all = [...running, ...idle];
+      for (let i = 0; i < all.length; i++) {
+        const isLast = i === all.length - 1;
+        const treeChar = isLast ? "└─ " : "├─ ";
+        result.push({
+          kind: "session",
+          session: all[i],
+          prefix: `${treeChar}» `,
+        });
+      }
+    } else {
+      const hasIdleSummary = idle.length > 0;
+      for (let i = 0; i < running.length; i++) {
+        const isLast = i === running.length - 1 && !hasIdleSummary;
+        const treeChar = isLast ? "└─ " : "├─ ";
+        result.push({
+          kind: "session",
+          session: running[i],
+          prefix: `${treeChar}» `,
+        });
+      }
+      if (hasIdleSummary) {
+        result.push({ kind: "idle-summary", count: idle.length });
+      }
     }
   }
 
@@ -157,6 +174,7 @@ export function SessionTreePanel({
   hasFocus,
   width = DEFAULT_PANEL_WIDTH,
   maxRows,
+  expandedIds = new Set(),
 }: SessionTreePanelProps): React.ReactElement {
   const innerWidth = getInnerWidth(width);
   const contentWidth = innerWidth - 1; // account for space after │
@@ -180,7 +198,7 @@ export function SessionTreePanel({
     );
   }
 
-  const flatRows = flattenSessions(sessions);
+  const flatRows = flattenSessions(sessions, expandedIds);
 
   // Truncate to maxRows, reserving 1 row for the overflow indicator
   const limit =

@@ -12,6 +12,7 @@ const noopKey = {
   tab: false,
   pageUp: false,
   pageDown: false,
+  return: false,
 };
 const upKey = {
   upArrow: true,
@@ -19,6 +20,7 @@ const upKey = {
   tab: false,
   pageUp: false,
   pageDown: false,
+  return: false,
 };
 const downKey = {
   upArrow: false,
@@ -33,6 +35,7 @@ const tabKey = {
   tab: true,
   pageUp: false,
   pageDown: false,
+  return: false,
 };
 const pageUpKey = {
   upArrow: false,
@@ -40,6 +43,7 @@ const pageUpKey = {
   tab: false,
   pageUp: true,
   pageDown: false,
+  return: false,
 };
 const pageDownKey = {
   upArrow: false,
@@ -47,6 +51,15 @@ const pageDownKey = {
   tab: false,
   pageUp: false,
   pageDown: true,
+  return: false,
+};
+const returnKey = {
+  upArrow: false,
+  downArrow: false,
+  tab: false,
+  pageUp: false,
+  pageDown: false,
+  return: true,
 };
 
 function makeOptions(overrides = {}) {
@@ -62,6 +75,7 @@ function makeOptions(overrides = {}) {
     onSaveLog: vi.fn(),
     onRefresh: vi.fn(),
     onQuit: vi.fn(),
+    onEnter: vi.fn(),
     ...overrides,
   };
 }
@@ -127,6 +141,24 @@ describe("useHotkeys", () => {
       );
       act(() => result.current.handleInput("", pageDownKey));
       expect(onScrollPageDown).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls onEnter when Enter is pressed (tree focus)", () => {
+      const onEnter = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ focus: "tree", onEnter })),
+      );
+      act(() => result.current.handleInput("", returnKey));
+      expect(onEnter).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls onEnter when Enter is pressed (viewer focus)", () => {
+      const onEnter = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ focus: "viewer", onEnter })),
+      );
+      act(() => result.current.handleInput("", returnKey));
+      expect(onEnter).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -233,6 +265,7 @@ describe("useHotkeys", () => {
         "Tab: viewer",
         "↑↓/jk: select",
         "PgUp/Dn: page",
+        "↵: expand",
         "r: refresh",
         "q: quit",
       ]);

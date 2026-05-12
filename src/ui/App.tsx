@@ -23,11 +23,18 @@ import { SessionTreePanel } from "./SessionTreePanel.js";
 
 const VIEWER_HEIGHT_FRACTION = 0.55;
 
-function flattenSessions(tree: SessionTree): SessionNode[] {
+function flattenSessions(
+  tree: SessionTree,
+  expandedIds: Set<string>,
+): SessionNode[] {
   const result: SessionNode[] = [];
   for (const s of tree.sessions) {
     result.push(s);
-    result.push(...s.subAgents);
+    if (expandedIds.has(s.id)) {
+      result.push(...s.subAgents);
+    } else {
+      result.push(...s.subAgents.filter((sub) => sub.status === "running"));
+    }
   }
   return result;
 }
@@ -52,8 +59,12 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   const [isLive, setIsLive] = useState(true);
   const [activities, setActivities] = useState<ActivityEntry[]>([]);
   const [newCount, setNewCount] = useState(0);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
-  const allFlat = useMemo(() => flattenSessions(sessionTree), [sessionTree]);
+  const allFlat = useMemo(
+    () => flattenSessions(sessionTree, expandedIds),
+    [sessionTree, expandedIds],
+  );
 
   const allFlatRef = useRef<SessionNode[]>(allFlat);
   useEffect(() => {
@@ -81,7 +92,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   const refresh = useCallback(() => {
     const tree = discoverSessions(config);
     setSessionTree(tree);
-    const updatedFlat = flattenSessions(tree);
+    const updatedFlat = flattenSessions(tree, expandedIds);
     const node = updatedFlat.find((s) => s.id === selectedId);
     if (!node) return;
     const newActivities = parseSessionHistory(node.filePath);
@@ -91,7 +102,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
       setScrollOffset((o) => o + delta);
       setNewCount((n) => n + delta);
     }
-  }, [config, selectedId, isLive]);
+  }, [config, selectedId, isLive, expandedIds]);
 
   // Auto-refresh in watch mode
   useEffect(() => {
@@ -195,6 +206,26 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
       setScrollOffset(0);
       setNewCount(0);
     },
+    onEnter: () => {
+      if (focus !== "tree" || !selectedId) return;
+      const parentSession = sessionTree.sessions.find(
+        (s) => s.id === selectedId,
+      );
+      if (
+        !parentSession ||
+        !parentSession.subAgents.some((s) => s.status === "idle")
+      )
+        return;
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(selectedId)) {
+          next.delete(selectedId);
+        } else {
+          next.add(selectedId);
+        }
+        return next;
+      });
+    },
     onSaveLog: saveLog,
     onRefresh: refresh,
     onQuit: exit,
@@ -221,6 +252,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
         hasFocus={focus === "tree"}
         width={width}
         maxRows={treeRows}
+        expandedIds={expandedIds}
       />
 
       <Box marginTop={1}>

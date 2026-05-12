@@ -3,7 +3,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Box, Text, useApp, useInput, useStdout } from "ink";
 import type React from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getVersion } from "../cli.js";
 import {
   ensureLogDir,
@@ -51,28 +51,45 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   const [scrollOffset, setScrollOffset] = useState(0);
   const [isLive, setIsLive] = useState(true);
   const [activities, setActivities] = useState<ActivityEntry[]>([]);
+  const [newCount, setNewCount] = useState(0);
 
   const allFlat = useMemo(() => flattenSessions(sessionTree), [sessionTree]);
 
+  const allFlatRef = useRef<SessionNode[]>([]);
+  useEffect(() => {
+    allFlatRef.current = allFlat;
+  }, [allFlat]);
+
+  const activitiesLengthRef = useRef(0);
+  useEffect(() => {
+    activitiesLengthRef.current = activities.length;
+  }, [activities.length]);
+
   // Load activities whenever selected session changes
   useEffect(() => {
-    const node = allFlat.find((s) => s.id === selectedId);
+    const node = allFlatRef.current.find((s) => s.id === selectedId);
     if (node) {
       setActivities(parseSessionHistory(node.filePath));
       setScrollOffset(0);
       setIsLive(true);
+      setNewCount(0);
     } else {
       setActivities([]);
     }
-  }, [selectedId, allFlat]);
+  }, [selectedId]);
 
   const refresh = useCallback(() => {
     const tree = discoverSessions(config);
     setSessionTree(tree);
     const updatedFlat = flattenSessions(tree);
     const node = updatedFlat.find((s) => s.id === selectedId);
-    if (node && isLive) {
-      setActivities(parseSessionHistory(node.filePath));
+    if (!node) return;
+    const newActivities = parseSessionHistory(node.filePath);
+    const delta = newActivities.length - activitiesLengthRef.current;
+    setActivities(newActivities);
+    if (!isLive && delta > 0) {
+      setScrollOffset((o) => o + delta);
+      setNewCount((n) => n + delta);
     }
   }, [config, selectedId, isLive]);
 
@@ -117,8 +134,15 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
         const prev = Math.max(0, selectedIndex - 1);
         setSelectedId(allFlat[prev]?.id ?? selectedId);
       } else {
-        setIsLive(false);
-        setScrollOffset((o) => Math.min(o + 1, Math.max(0, activities.length - viewerRows)));
+        // ↑ = toward newer (decrease offset, newest is at top)
+        setScrollOffset((o) => {
+          const newOffset = Math.max(0, o - 1);
+          if (newOffset === 0) {
+            setIsLive(true);
+            setNewCount(0);
+          }
+          return newOffset;
+        });
       }
     },
     onScrollDown: () => {
@@ -126,11 +150,11 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
         const next = Math.min(allFlat.length - 1, selectedIndex + 1);
         setSelectedId(allFlat[next]?.id ?? selectedId);
       } else {
-        setScrollOffset((o) => {
-          const newOffset = Math.max(0, o - 1);
-          if (newOffset === 0) setIsLive(true);
-          return newOffset;
-        });
+        // ↓ = toward older (increase offset, newest is at top)
+        setIsLive(false);
+        setScrollOffset((o) =>
+          Math.min(o + 1, Math.max(0, activities.length - viewerRows)),
+        );
       }
     },
     onScrollTop: () => {
@@ -138,8 +162,10 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
       setScrollOffset(Math.max(0, activities.length - viewerRows));
     },
     onScrollBottom: () => {
+      // G = jump to newest (live, scrollOffset 0)
       setIsLive(true);
       setScrollOffset(0);
+      setNewCount(0);
     },
     onSaveLog: saveLog,
     onRefresh: refresh,
@@ -172,9 +198,9 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
         <ActivityViewerPanel
           activities={activities}
           sessionName={sessionDisplayName}
-          hasFocus={focus === "viewer"}
           scrollOffset={scrollOffset}
           isLive={isLive}
+          newCount={newCount}
           visibleRows={viewerRows}
           width={width}
         />

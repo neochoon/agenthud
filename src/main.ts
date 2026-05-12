@@ -15,8 +15,4 @@ if (options.command === "version") {
   process.exit(0);
 }
 
-if (options.mode !== "watch") {
-  clearScreen();
-}
-
-render(React.createElement(App, { mode: options.mode }));
+render(React.createElement(App, { mode: options.mode }), { clearScreen: options.mode === "watch" });

@@ -11,17 +11,22 @@ const makeActivity = (label: string, i: number): ActivityEntry => ({
   detail: `file${i}.ts`,
 });
 
+const baseProps = {
+  sessionName: "s",
+  scrollOffset: 0,
+  isLive: true,
+  newCount: 0,
+  visibleRows: 10,
+  width: 80,
+};
+
 describe("ActivityViewerPanel", () => {
   it("renders session name in title", () => {
     const { lastFrame } = render(
       <ActivityViewerPanel
+        {...baseProps}
         activities={[makeActivity("Read", 0)]}
         sessionName="feat/auth"
-        hasFocus={false}
-        scrollOffset={0}
-        isLive={true}
-        visibleRows={10}
-        width={80}
       />,
     );
     expect(lastFrame()).toContain("feat/auth");
@@ -30,13 +35,8 @@ describe("ActivityViewerPanel", () => {
   it("renders activity label and detail", () => {
     const { lastFrame } = render(
       <ActivityViewerPanel
+        {...baseProps}
         activities={[makeActivity("Read", 0)]}
-        sessionName="session"
-        hasFocus={false}
-        scrollOffset={0}
-        isLive={true}
-        visibleRows={10}
-        width={80}
       />,
     );
     expect(lastFrame()).toContain("Read");
@@ -46,13 +46,8 @@ describe("ActivityViewerPanel", () => {
   it("shows LIVE indicator when isLive is true", () => {
     const { lastFrame } = render(
       <ActivityViewerPanel
+        {...baseProps}
         activities={[makeActivity("Read", 0)]}
-        sessionName="s"
-        hasFocus={false}
-        scrollOffset={0}
-        isLive={true}
-        visibleRows={10}
-        width={80}
       />,
     );
     expect(lastFrame()).toContain("LIVE");
@@ -61,13 +56,9 @@ describe("ActivityViewerPanel", () => {
   it("shows PAUSED indicator when isLive is false", () => {
     const { lastFrame } = render(
       <ActivityViewerPanel
+        {...baseProps}
         activities={[makeActivity("Read", 0)]}
-        sessionName="s"
-        hasFocus={false}
-        scrollOffset={0}
         isLive={false}
-        visibleRows={10}
-        width={80}
       />,
     );
     expect(lastFrame()).toContain("PAUSED");
@@ -75,16 +66,54 @@ describe("ActivityViewerPanel", () => {
 
   it("shows empty message when no activities", () => {
     const { lastFrame } = render(
-      <ActivityViewerPanel
-        activities={[]}
-        sessionName="s"
-        hasFocus={false}
-        scrollOffset={0}
-        isLive={true}
-        visibleRows={10}
-        width={80}
-      />,
+      <ActivityViewerPanel {...baseProps} activities={[]} />,
     );
     expect(lastFrame()).toContain("No activity");
+  });
+
+  it("shows newest activity first (at top of rendered output)", () => {
+    const activities = [
+      makeActivity("OldestAction", 0),
+      makeActivity("MiddleAction", 1),
+      makeActivity("NewestAction", 2),
+    ];
+    const { lastFrame } = render(
+      <ActivityViewerPanel {...baseProps} activities={activities} />,
+    );
+    const frame = lastFrame() ?? "";
+    const newestIdx = frame.indexOf("NewestAction");
+    const oldestIdx = frame.indexOf("OldestAction");
+    expect(newestIdx).toBeGreaterThanOrEqual(0);
+    expect(oldestIdx).toBeGreaterThanOrEqual(0);
+    expect(newestIdx).toBeLessThan(oldestIdx);
+  });
+
+  it("shows PAUSED title with scroll position indicator", () => {
+    const activities = Array.from({ length: 20 }, (_, i) =>
+      makeActivity("Read", i),
+    );
+    const { lastFrame } = render(
+      <ActivityViewerPanel
+        {...baseProps}
+        activities={activities}
+        scrollOffset={5}
+        isLive={false}
+      />,
+    );
+    expect(lastFrame()).toContain("PAUSED");
+    expect(lastFrame()).toContain("↓5");
+  });
+
+  it("shows new item badge in PAUSED title when newCount > 0", () => {
+    const { lastFrame } = render(
+      <ActivityViewerPanel
+        {...baseProps}
+        activities={[makeActivity("Read", 0)]}
+        scrollOffset={1}
+        isLive={false}
+        newCount={3}
+      />,
+    );
+    expect(lastFrame()).toContain("+3↑");
   });
 });

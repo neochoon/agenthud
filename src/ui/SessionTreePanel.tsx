@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import { Box, Text } from "ink";
 import type React from "react";
 import type { SessionNode, SessionStatus } from "../types/index.js";
@@ -52,6 +53,20 @@ interface SessionRowProps {
   contentWidth: number;
 }
 
+function formatProjectPath(projectPath: string): string {
+  const home = homedir();
+  const raw = projectPath.startsWith(home)
+    ? `~${projectPath.slice(home.length)}`
+    : projectPath;
+  return raw;
+}
+
+function truncatePath(path: string, maxWidth: number): string {
+  if (getDisplayWidth(path) <= maxWidth) return path;
+  if (maxWidth < 4) return "";
+  return `...${path.slice(-(maxWidth - 3))}`;
+}
+
 function SessionRow({
   session,
   isSelected,
@@ -59,27 +74,35 @@ function SessionRow({
   prefix,
   contentWidth,
 }: SessionRowProps): React.ReactElement {
+  const isParent = prefix === "";
   const statusColor = getStatusColor(session.status);
   const badge = `[${session.status}]`;
   const elapsed = formatElapsed(session.lastModifiedMs);
   const name = session.projectName || session.id.slice(0, 8);
   const model = session.modelName ?? "";
+  const shortId =
+    isParent && session.projectName ? ` #${session.id.slice(0, 4)}` : "";
 
-  // Build right side: elapsed + model (if any)
   const rightParts: string[] = [elapsed];
   if (model) rightParts.push(model);
   const rightSide = rightParts.join(" ");
 
-  // Build left side: prefix + name + badge
-  const leftSide = `${prefix}${name} ${badge}`;
+  const leftSide = `${prefix}${name}${shortId} ${badge}`;
 
-  // Compute spacing
   const leftWidth = getDisplayWidth(leftSide);
   const rightWidth = getDisplayWidth(rightSide);
-  const gapWidth = contentWidth - leftWidth - rightWidth;
-  const gap = " ".repeat(Math.max(1, gapWidth));
+  const available = contentWidth - leftWidth - rightWidth;
 
-  const fullLine = leftSide + gap + rightSide;
+  let pathText = "";
+  if (isParent && session.projectPath && available > 4) {
+    const raw = formatProjectPath(session.projectPath);
+    pathText = truncatePath(raw, available - 1);
+  }
+
+  const gapWidth = Math.max(1, available - getDisplayWidth(pathText));
+  const gap = " ".repeat(gapWidth);
+
+  const fullLine = leftSide + gap + pathText + rightSide;
   const linePadding = Math.max(0, contentWidth - getDisplayWidth(fullLine));
 
   const highlight = isSelected && hasFocus;
@@ -90,9 +113,11 @@ function SessionRow({
       <Text backgroundColor={highlight ? "blue" : undefined} bold={highlight}>
         <Text>{prefix}</Text>
         <Text bold>{name}</Text>
+        {shortId ? <Text dimColor>{shortId}</Text> : null}
         <Text> </Text>
         <Text color={statusColor}>{badge}</Text>
         <Text>{gap}</Text>
+        {pathText ? <Text dimColor>{pathText}</Text> : null}
         <Text dimColor>{elapsed}</Text>
         {model ? <Text dimColor>{` ${model}`}</Text> : null}
       </Text>

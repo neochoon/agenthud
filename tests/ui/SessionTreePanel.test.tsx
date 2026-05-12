@@ -134,6 +134,52 @@ describe("SessionTreePanel", () => {
     expect(frame).toContain("2 idle");
   });
 
+  it("shows short session ID for parent sessions with a project name", () => {
+    const { lastFrame } = render(
+      <SessionTreePanel
+        sessions={[makeSession({ id: "abc12345", projectName: "myproject" })]}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+      />,
+    );
+    expect(lastFrame()).toContain("#abc1");
+  });
+
+  it("shows project path for parent sessions", () => {
+    const { lastFrame } = render(
+      <SessionTreePanel
+        sessions={[makeSession({ projectPath: "/test/path/myproject" })]}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+      />,
+    );
+    expect(lastFrame()).toContain("/test/path/myproject");
+  });
+
+  it("does not show short ID for sub-agents", () => {
+    const session = makeSession({
+      subAgents: [
+        makeSession({
+          id: "child111",
+          projectName: "myproject",
+          status: "running",
+          subAgents: [],
+        }),
+      ],
+    });
+    const { lastFrame } = render(
+      <SessionTreePanel
+        sessions={[session]}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+      />,
+    );
+    expect(lastFrame()).not.toContain("#chil");
+  });
+
   it("renders model name when present", () => {
     const { lastFrame } = render(
       <SessionTreePanel

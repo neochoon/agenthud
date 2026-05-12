@@ -6,9 +6,10 @@ import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { useHotkeys } from "../../../src/ui/hooks/useHotkeys.js";
 
-const noopKey = { upArrow: false, downArrow: false };
-const upKey = { upArrow: true, downArrow: false };
-const downKey = { upArrow: false, downArrow: true };
+const noopKey = { upArrow: false, downArrow: false, tab: false };
+const upKey = { upArrow: true, downArrow: false, tab: false };
+const downKey = { upArrow: false, downArrow: true, tab: false };
+const tabKey = { upArrow: false, downArrow: false, tab: true };
 
 function makeOptions(overrides = {}) {
   return {
@@ -39,7 +40,7 @@ describe("useHotkeys", () => {
       const { result } = renderHook(() =>
         useHotkeys(makeOptions({ onSwitchFocus })),
       );
-      act(() => result.current.handleInput("\t", noopKey));
+      act(() => result.current.handleInput("", tabKey));
       expect(onSwitchFocus).toHaveBeenCalledTimes(1);
     });
 

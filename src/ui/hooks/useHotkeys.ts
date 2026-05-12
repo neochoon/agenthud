@@ -14,7 +14,7 @@ interface UseHotkeysOptions {
 export interface UseHotkeysResult {
   handleInput: (
     input: string,
-    key: { upArrow: boolean; downArrow: boolean },
+    key: { upArrow: boolean; downArrow: boolean; tab: boolean },
   ) => void;
   statusBarItems: string[];
 }
@@ -32,13 +32,13 @@ export function useHotkeys({
 }: UseHotkeysOptions): UseHotkeysResult {
   const handleInput = (
     input: string,
-    key: { upArrow: boolean; downArrow: boolean },
+    key: { upArrow: boolean; downArrow: boolean; tab: boolean },
   ) => {
     if (input === "q") {
       onQuit();
       return;
     }
-    if (input === "\t") {
+    if (key.tab) {
       onSwitchFocus();
       return;
     }

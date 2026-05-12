@@ -11,6 +11,8 @@ export interface SessionNode {
   status: SessionStatus;
   modelName: string | null; // e.g. "sonnet-4.6", null if not yet known
   subAgents: SessionNode[]; // direct sub-agents of this session
+  agentId?: string; // short agent ID from JSONL (sub-agents only)
+  taskDescription?: string; // extracted task summary from first message (sub-agents only)
 }
 
 // Full session tree returned by discoverSessions()

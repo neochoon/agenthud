@@ -180,6 +180,32 @@ describe("SessionTreePanel", () => {
     expect(lastFrame()).not.toContain("#chil");
   });
 
+  it("shows agentId as name for sub-agents", () => {
+    const session = makeSession({
+      subAgents: [
+        makeSession({
+          id: "agent-a26daaf",
+          projectName: "",
+          status: "running",
+          subAgents: [],
+          agentId: "a26daaf",
+          taskDescription: "Task 3: Create .env.example",
+        }),
+      ],
+    });
+    const { lastFrame } = render(
+      <SessionTreePanel
+        sessions={[session]}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+      />,
+    );
+    const frame = lastFrame() ?? "";
+    expect(frame).toContain("a26daaf");
+    expect(frame).toContain("Task 3: Create .env.example");
+  });
+
   it("renders model name when present", () => {
     const { lastFrame } = render(
       <SessionTreePanel

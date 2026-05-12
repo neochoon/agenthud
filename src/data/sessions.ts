@@ -29,6 +29,39 @@ function getSessionStatus(
   return "done";
 }
 
+function extractTaskDescription(content: string): string {
+  // "## Task N: Title" markdown header
+  const headerMatch = content.match(/##\s*(Task\s+\d+[:\s].+)/m);
+  if (headerMatch) return headerMatch[1].trim().slice(0, 60);
+
+  // "**This Task (Task N of M):** Title"
+  const thisTaskMatch = content.match(/\*\*This Task[^:]+:\*\*\s*(.+)/);
+  if (thisTaskMatch) return thisTaskMatch[1].trim().slice(0, 60);
+
+  // Fall back to first non-empty line
+  const firstLine = content.split("\n").find((l) => l.trim());
+  return (firstLine ?? "").trim().slice(0, 60);
+}
+
+function readSubAgentInfo(filePath: string): {
+  agentId: string | null;
+  taskDescription: string | null;
+} {
+  if (!existsSync(filePath)) return { agentId: null, taskDescription: null };
+  try {
+    const firstLine = readFileSync(filePath, "utf-8").split("\n")[0];
+    if (!firstLine) return { agentId: null, taskDescription: null };
+    const entry = JSON.parse(firstLine);
+    const agentId = typeof entry.agentId === "string" ? entry.agentId : null;
+    const content =
+      typeof entry.message?.content === "string" ? entry.message.content : null;
+    const taskDescription = content ? extractTaskDescription(content) : null;
+    return { agentId, taskDescription };
+  } catch {
+    return { agentId: null, taskDescription: null };
+  }
+}
+
 function readModelName(filePath: string): string | null {
   if (!existsSync(filePath)) return null;
   try {
@@ -73,6 +106,7 @@ function buildSubAgents(
       const filePath = join(subagentsDir, file);
       try {
         const stat = statSync(filePath);
+        const { agentId, taskDescription } = readSubAgentInfo(filePath);
         return {
           id,
           filePath,
@@ -82,6 +116,8 @@ function buildSubAgents(
           status: getSessionStatus(stat.mtimeMs, config),
           modelName: readModelName(filePath),
           subAgents: [],
+          agentId: agentId ?? undefined,
+          taskDescription: taskDescription ?? undefined,
         };
       } catch {
         return null;

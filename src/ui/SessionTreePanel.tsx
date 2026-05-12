@@ -78,8 +78,14 @@ function SessionRow({
   const statusColor = getStatusColor(session.status);
   const badge = `[${session.status}]`;
   const elapsed = formatElapsed(session.lastModifiedMs);
-  const name = session.projectName || session.id.slice(0, 8);
   const model = session.modelName ?? "";
+
+  // Name: parent uses projectName, sub-agent uses agentId
+  const name = isParent
+    ? session.projectName || session.id.slice(0, 8)
+    : (session.agentId ?? session.id.slice(0, 8));
+
+  // Short ID suffix for parent sessions only (to distinguish same-named sessions)
   const shortId =
     isParent && session.projectName ? ` #${session.id.slice(0, 4)}` : "";
 
@@ -88,22 +94,28 @@ function SessionRow({
   const rightSide = rightParts.join(" ");
 
   const leftSide = `${prefix}${name}${shortId} ${badge}`;
-
   const leftWidth = getDisplayWidth(leftSide);
   const rightWidth = getDisplayWidth(rightSide);
   const available = contentWidth - leftWidth - rightWidth;
 
-  let pathText = "";
-  if (isParent && session.projectPath && available > 5) {
-    const raw = formatProjectPath(session.projectPath);
-    const truncated = truncatePath(raw, available - 2); // -2: gap(1) + separator(1)
-    if (truncated) pathText = `${truncated} `; // trailing space separates path from elapsed
+  // Middle text: project path for parents, task description for sub-agents
+  let middleText = "";
+  if (available > 5) {
+    const raw = isParent
+      ? session.projectPath
+        ? formatProjectPath(session.projectPath)
+        : ""
+      : (session.taskDescription ?? "");
+    if (raw) {
+      const truncated = truncatePath(raw, available - 2);
+      if (truncated) middleText = `${truncated} `;
+    }
   }
 
-  const gapWidth = Math.max(1, available - getDisplayWidth(pathText));
+  const gapWidth = Math.max(1, available - getDisplayWidth(middleText));
   const gap = " ".repeat(gapWidth);
 
-  const fullLine = leftSide + gap + pathText + rightSide;
+  const fullLine = leftSide + gap + middleText + rightSide;
   const linePadding = Math.max(0, contentWidth - getDisplayWidth(fullLine));
 
   const highlight = isSelected && hasFocus;
@@ -118,7 +130,7 @@ function SessionRow({
         <Text> </Text>
         <Text color={statusColor}>{badge}</Text>
         <Text>{gap}</Text>
-        {pathText ? <Text dimColor>{pathText}</Text> : null}
+        {middleText ? <Text dimColor>{middleText}</Text> : null}
         <Text dimColor>{elapsed}</Text>
         {model ? <Text dimColor>{` ${model}`}</Text> : null}
       </Text>

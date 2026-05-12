@@ -107,6 +107,8 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     5,
     Math.floor(height * VIEWER_HEIGHT_FRACTION) - 4,
   );
+  // sessions(N+2) + margin(1) + viewer(viewerRows+2) + margin(1) + statusBar(1) = height
+  const treeRows = Math.max(3, height - viewerRows - 7);
 
   const saveLog = useCallback(() => {
     if (!activities.length || !selectedId) return;
@@ -192,6 +194,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
         selectedId={selectedId}
         hasFocus={focus === "tree"}
         width={width}
+        maxRows={treeRows}
       />
 
       <Box marginTop={1}>

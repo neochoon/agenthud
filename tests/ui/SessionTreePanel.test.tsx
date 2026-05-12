@@ -22,7 +22,6 @@ describe("SessionTreePanel", () => {
         sessions={[makeSession()]}
         selectedId="abc123"
         hasFocus={true}
-
         width={80}
       />,
     );
@@ -35,7 +34,6 @@ describe("SessionTreePanel", () => {
         sessions={[makeSession({ status: "running" })]}
         selectedId={null}
         hasFocus={false}
-
         width={80}
       />,
     );
@@ -58,7 +56,6 @@ describe("SessionTreePanel", () => {
         sessions={[session]}
         selectedId={null}
         hasFocus={false}
-
         width={80}
       />,
     );
@@ -71,11 +68,30 @@ describe("SessionTreePanel", () => {
         sessions={[makeSession({ modelName: "sonnet-4.6" })]}
         selectedId={null}
         hasFocus={false}
-
         width={80}
       />,
     );
     expect(lastFrame()).toContain("sonnet-4.6");
+  });
+
+  it("truncates sessions and shows overflow indicator when maxRows is set", () => {
+    const sessions = Array.from({ length: 5 }, (_, i) =>
+      makeSession({ id: `sess${i}`, projectName: `proj${i}`, subAgents: [] }),
+    );
+    const { lastFrame } = render(
+      <SessionTreePanel
+        sessions={sessions}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+        maxRows={3}
+      />,
+    );
+    const frame = lastFrame() ?? "";
+    expect(frame).toContain("proj0");
+    expect(frame).toContain("proj1");
+    expect(frame).not.toContain("proj2");
+    expect(frame).toContain("more");
   });
 
   it("renders empty message when no sessions", () => {
@@ -84,7 +100,6 @@ describe("SessionTreePanel", () => {
         sessions={[]}
         selectedId={null}
         hasFocus={false}
-
         width={80}
       />,
     );

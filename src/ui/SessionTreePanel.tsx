@@ -15,6 +15,7 @@ interface SessionTreePanelProps {
   selectedId: string | null;
   hasFocus: boolean;
   width?: number;
+  maxRows?: number;
 }
 
 function formatElapsed(lastModifiedMs: number): string {
@@ -92,7 +93,7 @@ function SessionRow({
         <Text color={statusColor}>{badge}</Text>
         <Text>{gap}</Text>
         <Text dimColor>{elapsed}</Text>
-        {model ? <Text dimColor>{`  ${model}`}</Text> : null}
+        {model ? <Text dimColor>{` ${model}`}</Text> : null}
       </Text>
       {" ".repeat(linePadding)}
       {BOX.v}
@@ -132,6 +133,7 @@ export function SessionTreePanel({
   selectedId,
   hasFocus,
   width = DEFAULT_PANEL_WIDTH,
+  maxRows,
 }: SessionTreePanelProps): React.ReactElement {
   const innerWidth = getInnerWidth(width);
   const contentWidth = innerWidth - 1; // account for space after │
@@ -157,10 +159,18 @@ export function SessionTreePanel({
 
   const flatRows = flattenSessions(sessions);
 
+  // Truncate to maxRows, reserving 1 row for the overflow indicator
+  const limit =
+    maxRows !== undefined && flatRows.length > maxRows
+      ? maxRows - 1
+      : flatRows.length;
+  const displayRows = flatRows.slice(0, limit);
+  const hiddenCount = flatRows.length - displayRows.length;
+
   return (
     <Box flexDirection="column" width={width}>
       <Text>{titleLine}</Text>
-      {flatRows.map(({ session, prefix }, idx) => (
+      {displayRows.map(({ session, prefix }, idx) => (
         <SessionRow
           key={`${session.id}-${idx}`}
           session={session}
@@ -170,6 +180,15 @@ export function SessionTreePanel({
           contentWidth={contentWidth}
         />
       ))}
+      {hiddenCount > 0 && (
+        <Text>
+          {BOX.v} <Text dimColor>{`... ${hiddenCount} more`}</Text>
+          {" ".repeat(
+            Math.max(0, contentWidth - `... ${hiddenCount} more`.length - 1),
+          )}
+          {BOX.v}
+        </Text>
+      )}
       <Text>{bottomLine}</Text>
     </Box>
   );

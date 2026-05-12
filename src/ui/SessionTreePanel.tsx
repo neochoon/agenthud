@@ -101,31 +101,54 @@ function SessionRow({
   );
 }
 
-function flattenSessions(
-  sessions: SessionNode[],
-): Array<{ session: SessionNode; prefix: string; isLast: boolean }> {
-  const result: Array<{
-    session: SessionNode;
-    prefix: string;
-    isLast: boolean;
-  }> = [];
+type FlatRow =
+  | { kind: "session"; session: SessionNode; prefix: string }
+  | { kind: "idle-summary"; count: number };
+
+function flattenSessions(sessions: SessionNode[]): FlatRow[] {
+  const result: FlatRow[] = [];
 
   for (const session of sessions) {
-    result.push({ session, prefix: "", isLast: false });
+    result.push({ kind: "session", session, prefix: "" });
 
-    const subAgents = session.subAgents;
-    for (let i = 0; i < subAgents.length; i++) {
-      const isLast = i === subAgents.length - 1;
+    const running = session.subAgents.filter((s) => s.status === "running");
+    const idle = session.subAgents.filter((s) => s.status === "idle");
+    const hasIdleSummary = idle.length > 0;
+
+    for (let i = 0; i < running.length; i++) {
+      const isLast = i === running.length - 1 && !hasIdleSummary;
       const treeChar = isLast ? "└─ " : "├─ ";
       result.push({
-        session: subAgents[i],
+        kind: "session",
+        session: running[i],
         prefix: `${treeChar}» `,
-        isLast,
       });
+    }
+
+    if (hasIdleSummary) {
+      result.push({ kind: "idle-summary", count: idle.length });
     }
   }
 
   return result;
+}
+
+function IdleSummaryRow({
+  count,
+  contentWidth,
+}: {
+  count: number;
+  contentWidth: number;
+}): React.ReactElement {
+  const text = `└─ ... ${count} idle`;
+  const padding = Math.max(0, contentWidth - getDisplayWidth(text) - 1);
+  return (
+    <Text>
+      {BOX.v} <Text dimColor>{text}</Text>
+      {" ".repeat(padding)}
+      {BOX.v}
+    </Text>
+  );
 }
 
 export function SessionTreePanel({
@@ -170,16 +193,24 @@ export function SessionTreePanel({
   return (
     <Box flexDirection="column" width={width}>
       <Text>{titleLine}</Text>
-      {displayRows.map(({ session, prefix }, idx) => (
-        <SessionRow
-          key={`${session.id}-${idx}`}
-          session={session}
-          isSelected={session.id === selectedId}
-          hasFocus={hasFocus}
-          prefix={prefix}
-          contentWidth={contentWidth}
-        />
-      ))}
+      {displayRows.map((row, idx) =>
+        row.kind === "session" ? (
+          <SessionRow
+            key={`${row.session.id}-${idx}`}
+            session={row.session}
+            isSelected={row.session.id === selectedId}
+            hasFocus={hasFocus}
+            prefix={row.prefix}
+            contentWidth={contentWidth}
+          />
+        ) : (
+          <IdleSummaryRow
+            key={`idle-${idx}`}
+            count={row.count}
+            contentWidth={contentWidth}
+          />
+        ),
+      )}
       {hiddenCount > 0 && (
         <Text>
           {BOX.v} <Text dimColor>{`... ${hiddenCount} more`}</Text>

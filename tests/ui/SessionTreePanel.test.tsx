@@ -40,13 +40,13 @@ describe("SessionTreePanel", () => {
     expect(lastFrame()).toContain("running");
   });
 
-  it("renders sub-agent indented under parent", () => {
+  it("renders running sub-agent indented under parent", () => {
     const session = makeSession({
       subAgents: [
         makeSession({
           id: "child1",
           projectName: "",
-          status: "done",
+          status: "running",
           subAgents: [],
         }),
       ],
@@ -60,6 +60,78 @@ describe("SessionTreePanel", () => {
       />,
     );
     expect(lastFrame()).toContain("»");
+  });
+
+  it("collapses idle sub-agents into a summary line", () => {
+    const session = makeSession({
+      subAgents: [
+        makeSession({
+          id: "c1",
+          projectName: "",
+          status: "idle",
+          subAgents: [],
+        }),
+        makeSession({
+          id: "c2",
+          projectName: "",
+          status: "idle",
+          subAgents: [],
+        }),
+        makeSession({
+          id: "c3",
+          projectName: "",
+          status: "idle",
+          subAgents: [],
+        }),
+      ],
+    });
+    const { lastFrame } = render(
+      <SessionTreePanel
+        sessions={[session]}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+      />,
+    );
+    const frame = lastFrame() ?? "";
+    expect(frame).not.toContain("»");
+    expect(frame).toContain("3 idle");
+  });
+
+  it("shows running sub-agents individually and summarizes idle ones", () => {
+    const session = makeSession({
+      subAgents: [
+        makeSession({
+          id: "r1",
+          projectName: "",
+          status: "running",
+          subAgents: [],
+        }),
+        makeSession({
+          id: "i1",
+          projectName: "",
+          status: "idle",
+          subAgents: [],
+        }),
+        makeSession({
+          id: "i2",
+          projectName: "",
+          status: "idle",
+          subAgents: [],
+        }),
+      ],
+    });
+    const { lastFrame } = render(
+      <SessionTreePanel
+        sessions={[session]}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+      />,
+    );
+    const frame = lastFrame() ?? "";
+    expect(frame).toContain("»");
+    expect(frame).toContain("2 idle");
   });
 
   it("renders model name when present", () => {

@@ -93,29 +93,35 @@ function SessionRow({
   if (model) rightParts.push(model);
   const rightSide = rightParts.join(" ");
 
-  const leftSide = `${prefix}${name}${shortId} ${badge}`;
-  const leftWidth = getDisplayWidth(leftSide);
+  const leftCore = `${prefix}${name}${shortId} ${badge}`;
+  const leftCoreWidth = getDisplayWidth(leftCore);
   const rightWidth = getDisplayWidth(rightSide);
-  const available = contentWidth - leftWidth - rightWidth;
+
+  // Middle text sits right after badge; reserve 1 space prefix + 1 min gap
+  const middleAvailable = contentWidth - leftCoreWidth - 1 - rightWidth - 1;
 
   // Middle text: project path for parents, task description for sub-agents
   let middleText = "";
-  if (available > 5) {
+  if (middleAvailable > 3) {
     const raw = isParent
       ? session.projectPath
         ? formatProjectPath(session.projectPath)
         : ""
       : (session.taskDescription ?? "");
     if (raw) {
-      const truncated = truncatePath(raw, available - 2);
-      if (truncated) middleText = `${truncated} `;
+      const truncated = truncatePath(raw, middleAvailable);
+      if (truncated) middleText = truncated;
     }
   }
 
-  const gapWidth = Math.max(1, available - getDisplayWidth(middleText));
+  const middleSection = middleText ? ` ${middleText}` : "";
+  const gapWidth = Math.max(
+    1,
+    contentWidth - leftCoreWidth - getDisplayWidth(middleSection) - rightWidth,
+  );
   const gap = " ".repeat(gapWidth);
 
-  const fullLine = leftSide + gap + middleText + rightSide;
+  const fullLine = leftCore + middleSection + gap + rightSide;
   const linePadding = Math.max(0, contentWidth - getDisplayWidth(fullLine));
 
   const highlight = isSelected && hasFocus;
@@ -129,8 +135,8 @@ function SessionRow({
         {shortId ? <Text dimColor>{shortId}</Text> : null}
         <Text> </Text>
         <Text color={statusColor}>{badge}</Text>
+        {middleText ? <Text dimColor>{middleSection}</Text> : null}
         <Text>{gap}</Text>
-        {middleText ? <Text dimColor>{middleText}</Text> : null}
         <Text dimColor>{elapsed}</Text>
         {model ? <Text dimColor>{` ${model}`}</Text> : null}
       </Text>

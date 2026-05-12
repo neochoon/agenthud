@@ -159,6 +159,32 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
         );
       }
     },
+    onScrollPageUp: () => {
+      if (focus === "tree") {
+        const prev = Math.max(0, selectedIndex - 5);
+        setSelectedId(allFlat[prev]?.id ?? selectedId);
+      } else {
+        setScrollOffset((o) => {
+          const newOffset = Math.max(0, o - viewerRows);
+          if (newOffset === 0) {
+            setIsLive(true);
+            setNewCount(0);
+          }
+          return newOffset;
+        });
+      }
+    },
+    onScrollPageDown: () => {
+      if (focus === "tree") {
+        const next = Math.min(allFlat.length - 1, selectedIndex + 5);
+        setSelectedId(allFlat[next]?.id ?? selectedId);
+      } else {
+        setIsLive(false);
+        setScrollOffset((o) =>
+          Math.min(o + viewerRows, Math.max(0, activities.length - viewerRows)),
+        );
+      }
+    },
     onScrollTop: () => {
       setIsLive(false);
       setScrollOffset(Math.max(0, activities.length - viewerRows));

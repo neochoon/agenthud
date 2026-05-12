@@ -6,10 +6,48 @@ import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { useHotkeys } from "../../../src/ui/hooks/useHotkeys.js";
 
-const noopKey = { upArrow: false, downArrow: false, tab: false };
-const upKey = { upArrow: true, downArrow: false, tab: false };
-const downKey = { upArrow: false, downArrow: true, tab: false };
-const tabKey = { upArrow: false, downArrow: false, tab: true };
+const noopKey = {
+  upArrow: false,
+  downArrow: false,
+  tab: false,
+  pageUp: false,
+  pageDown: false,
+};
+const upKey = {
+  upArrow: true,
+  downArrow: false,
+  tab: false,
+  pageUp: false,
+  pageDown: false,
+};
+const downKey = {
+  upArrow: false,
+  downArrow: true,
+  tab: false,
+  pageUp: false,
+  pageDown: false,
+};
+const tabKey = {
+  upArrow: false,
+  downArrow: false,
+  tab: true,
+  pageUp: false,
+  pageDown: false,
+};
+const pageUpKey = {
+  upArrow: false,
+  downArrow: false,
+  tab: false,
+  pageUp: true,
+  pageDown: false,
+};
+const pageDownKey = {
+  upArrow: false,
+  downArrow: false,
+  tab: false,
+  pageUp: false,
+  pageDown: true,
+};
 
 function makeOptions(overrides = {}) {
   return {
@@ -17,6 +55,8 @@ function makeOptions(overrides = {}) {
     onSwitchFocus: vi.fn(),
     onScrollUp: vi.fn(),
     onScrollDown: vi.fn(),
+    onScrollPageUp: vi.fn(),
+    onScrollPageDown: vi.fn(),
     onScrollTop: vi.fn(),
     onScrollBottom: vi.fn(),
     onSaveLog: vi.fn(),
@@ -51,6 +91,42 @@ describe("useHotkeys", () => {
       );
       act(() => result.current.handleInput("r", noopKey));
       expect(onRefresh).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls onScrollPageUp when PageUp is pressed (tree focus)", () => {
+      const onScrollPageUp = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ focus: "tree", onScrollPageUp })),
+      );
+      act(() => result.current.handleInput("", pageUpKey));
+      expect(onScrollPageUp).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls onScrollPageDown when PageDown is pressed (tree focus)", () => {
+      const onScrollPageDown = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ focus: "tree", onScrollPageDown })),
+      );
+      act(() => result.current.handleInput("", pageDownKey));
+      expect(onScrollPageDown).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls onScrollPageUp when PageUp is pressed (viewer focus)", () => {
+      const onScrollPageUp = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ focus: "viewer", onScrollPageUp })),
+      );
+      act(() => result.current.handleInput("", pageUpKey));
+      expect(onScrollPageUp).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls onScrollPageDown when PageDown is pressed (viewer focus)", () => {
+      const onScrollPageDown = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ focus: "viewer", onScrollPageDown })),
+      );
+      act(() => result.current.handleInput("", pageDownKey));
+      expect(onScrollPageDown).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -155,7 +231,8 @@ describe("useHotkeys", () => {
       );
       expect(result.current.statusBarItems).toEqual([
         "Tab: viewer",
-        "↑↓: select",
+        "↑↓/jk: select",
+        "PgUp/Dn: page",
         "r: refresh",
         "q: quit",
       ]);
@@ -167,7 +244,8 @@ describe("useHotkeys", () => {
       );
       expect(result.current.statusBarItems).toEqual([
         "Tab: tree",
-        "↑↓: scroll",
+        "↑↓/jk: scroll",
+        "PgUp/Dn: page",
         "g: top",
         "G: live",
         "s: save",

@@ -4,6 +4,8 @@ interface UseHotkeysOptions {
   onSwitchFocus: () => void;
   onScrollUp: () => void;
   onScrollDown: () => void;
+  onScrollPageUp: () => void;
+  onScrollPageDown: () => void;
   onScrollTop: () => void;
   onScrollBottom: () => void;
   onSaveLog: () => void;
@@ -14,7 +16,13 @@ interface UseHotkeysOptions {
 export interface UseHotkeysResult {
   handleInput: (
     input: string,
-    key: { upArrow: boolean; downArrow: boolean; tab: boolean },
+    key: {
+      upArrow: boolean;
+      downArrow: boolean;
+      tab: boolean;
+      pageUp: boolean;
+      pageDown: boolean;
+    },
   ) => void;
   statusBarItems: string[];
 }
@@ -24,6 +32,8 @@ export function useHotkeys({
   onSwitchFocus,
   onScrollUp,
   onScrollDown,
+  onScrollPageUp,
+  onScrollPageDown,
   onScrollTop,
   onScrollBottom,
   onSaveLog,
@@ -32,7 +42,13 @@ export function useHotkeys({
 }: UseHotkeysOptions): UseHotkeysResult {
   const handleInput = (
     input: string,
-    key: { upArrow: boolean; downArrow: boolean; tab: boolean },
+    key: {
+      upArrow: boolean;
+      downArrow: boolean;
+      tab: boolean;
+      pageUp: boolean;
+      pageDown: boolean;
+    },
   ) => {
     if (input === "q") {
       onQuit();
@@ -44,6 +60,15 @@ export function useHotkeys({
     }
     if (input === "r") {
       onRefresh();
+      return;
+    }
+
+    if (key.pageUp) {
+      onScrollPageUp();
+      return;
+    }
+    if (key.pageDown) {
+      onScrollPageDown();
       return;
     }
 
@@ -84,8 +109,22 @@ export function useHotkeys({
 
   const statusBarItems =
     focus === "tree"
-      ? ["Tab: viewer", "↑↓: select", "r: refresh", "q: quit"]
-      : ["Tab: tree", "↑↓: scroll", "g: top", "G: live", "s: save", "q: quit"];
+      ? [
+          "Tab: viewer",
+          "↑↓/jk: select",
+          "PgUp/Dn: page",
+          "r: refresh",
+          "q: quit",
+        ]
+      : [
+          "Tab: tree",
+          "↑↓/jk: scroll",
+          "PgUp/Dn: page",
+          "g: top",
+          "G: live",
+          "s: save",
+          "q: quit",
+        ];
 
   return { handleInput, statusBarItems };
 }

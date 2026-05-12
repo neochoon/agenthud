@@ -22,7 +22,7 @@ describe("loadGlobalConfig", () => {
     vi.mocked(existsSync).mockReturnValue(false);
     const config = loadGlobalConfig();
     expect(config.refreshIntervalMs).toBe(2000);
-    expect(config.sessionTimeoutMs).toBe(30 * 60 * 1000);
+    expect(config.sessionTimeoutMs).toBe(24 * 60 * 60 * 1000);
     expect(config.logDir).toBe(join(homedir(), ".agenthud", "logs"));
   });
 

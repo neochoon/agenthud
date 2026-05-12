@@ -8,7 +8,7 @@ const CONFIG_PATH = join(homedir(), ".agenthud", "config.yaml");
 
 export const DEFAULT_GLOBAL_CONFIG: GlobalConfig = {
   refreshIntervalMs: 2000,
-  sessionTimeoutMs: 30 * 60 * 1000,
+  sessionTimeoutMs: 24 * 60 * 60 * 1000,
   logDir: join(homedir(), ".agenthud", "logs"),
 };
 

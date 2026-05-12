@@ -55,7 +55,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
 
   const allFlat = useMemo(() => flattenSessions(sessionTree), [sessionTree]);
 
-  const allFlatRef = useRef<SessionNode[]>([]);
+  const allFlatRef = useRef<SessionNode[]>(allFlat);
   useEffect(() => {
     allFlatRef.current = allFlat;
   }, [allFlat]);

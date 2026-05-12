@@ -89,7 +89,7 @@ describe("discoverSessions", () => {
     expect(tree.sessions[0].modelName).toBe("sonnet-4");
   });
 
-  it("marks session as running when mtime is within 30s", () => {
+  it("marks session as running when mtime is within 30m", () => {
     const projectsDir = join(
       process.env.HOME ?? "/home/user",
       ".claude",

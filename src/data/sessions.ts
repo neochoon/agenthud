@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import type { GlobalConfig, SessionNode, SessionTree } from "../types/index.js";
-import { THIRTY_SECONDS_MS } from "../ui/constants.js";
+import { THIRTY_MINUTES_MS } from "../ui/constants.js";
 import { parseModelName } from "./activityParser.js";
 
 function getProjectsDir(): string {
@@ -24,7 +24,7 @@ function getSessionStatus(
   config: GlobalConfig,
 ): "running" | "idle" | "done" {
   const age = Date.now() - mtimeMs;
-  if (age < THIRTY_SECONDS_MS) return "running";
+  if (age < THIRTY_MINUTES_MS) return "running";
   if (age < config.sessionTimeoutMs) return "idle";
   return "done";
 }

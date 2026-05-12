@@ -94,9 +94,10 @@ function SessionRow({
   const available = contentWidth - leftWidth - rightWidth;
 
   let pathText = "";
-  if (isParent && session.projectPath && available > 4) {
+  if (isParent && session.projectPath && available > 5) {
     const raw = formatProjectPath(session.projectPath);
-    pathText = truncatePath(raw, available - 1);
+    const truncated = truncatePath(raw, available - 2); // -2: gap(1) + separator(1)
+    if (truncated) pathText = `${truncated} `; // trailing space separates path from elapsed
   }
 
   const gapWidth = Math.max(1, available - getDisplayWidth(pathText));

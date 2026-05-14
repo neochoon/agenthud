@@ -129,7 +129,8 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   }, [selectedId]);
 
   const refresh = useCallback(() => {
-    const tree = discoverSessions(config);
+    const freshConfig = loadGlobalConfig();
+    const tree = discoverSessions(freshConfig);
     setSessionTree(tree);
     const updatedFlat = flattenSessions(tree, expandedIds);
     const node = updatedFlat.find((s) => s.id === selectedId);
@@ -141,7 +142,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
       setScrollOffset((o) => o + delta);
       setNewCount((n) => n + delta);
     }
-  }, [config, selectedId, isLive, expandedIds]);
+  }, [selectedId, isLive, expandedIds]);
 
   // Auto-refresh in watch mode
   useEffect(() => {

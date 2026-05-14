@@ -255,6 +255,49 @@ describe("discoverSessions", () => {
     expect(tree.sessions[0].status).toBe("cool");
   });
 
+  it("excludes sessions in hiddenSessions config", () => {
+    const projectsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".claude",
+      "projects",
+    );
+    const projectDir = join(projectsDir, "-Users-neo-myproject");
+
+    vi.mocked(existsSync).mockImplementation((p) => {
+      const path = String(p);
+      return path === projectsDir || path.includes("myproject");
+    });
+    vi.mocked(readdirSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === projectsDir)
+        return ["-Users-neo-myproject"] as unknown as ReturnType<
+          typeof readdirSync
+        >;
+      if (path === projectDir)
+        return ["abc123.jsonl"] as unknown as ReturnType<typeof readdirSync>;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(statSync).mockImplementation((p) => {
+      const path = String(p);
+      return {
+        isDirectory: () => !path.endsWith(".jsonl"),
+        mtimeMs: NOW - 5_000,
+        size: 100,
+      } as ReturnType<typeof statSync>;
+    });
+    vi.mocked(readFileSync).mockReturnValue("");
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const configWithHidden = {
+      ...mockConfig,
+      hiddenSessions: ["abc123"],
+    };
+
+    const tree = discoverSessions(configWithHidden);
+    expect(tree.sessions).toHaveLength(0);
+    expect(tree.totalCount).toBe(0);
+  });
+
   describe("session status calendar logic", () => {
     it("marks session as cool when mtime is today (UTC) but older than 1 hour", () => {
       const projectsDir = join(

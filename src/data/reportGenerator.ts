@@ -7,16 +7,28 @@ export interface ReportOptions {
   include: string[]; // activity types: "response" | "bash" | "edit" | "thinking" | "read" | "glob" | "user"
 }
 
-function activityMatchesInclude(activity: ActivityEntry, include: string[]): boolean {
+function activityMatchesInclude(
+  activity: ActivityEntry,
+  include: string[],
+): boolean {
   const label = activity.label.toLowerCase();
   const type = activity.type;
   if (include.includes("response") && type === "response") return true;
   if (include.includes("thinking") && type === "thinking") return true;
   if (include.includes("user") && type === "user") return true;
   if (include.includes("bash") && label === "bash") return true;
-  if (include.includes("edit") && (label === "edit" || label === "write" || label === "todowrite")) return true;
-  if (include.includes("read") && (label === "read" || label === "glob" || label === "grep")) return true;
-  if (include.includes("glob") && (label === "glob" || label === "grep")) return true;
+  if (
+    include.includes("edit") &&
+    (label === "edit" || label === "write" || label === "todowrite")
+  )
+    return true;
+  if (
+    include.includes("read") &&
+    (label === "read" || label === "glob" || label === "grep")
+  )
+    return true;
+  if (include.includes("glob") && (label === "glob" || label === "grep"))
+    return true;
   return false;
 }
 
@@ -35,7 +47,9 @@ function formatTime(date: Date): string {
 function formatActivity(activity: ActivityEntry): string {
   const time = formatTime(activity.timestamp);
   const detail =
-    activity.detail.length > 120 ? activity.detail.slice(0, 120) : activity.detail;
+    activity.detail.length > 120
+      ? activity.detail.slice(0, 120)
+      : activity.detail;
   const suffix = detail ? `: ${detail}` : "";
   return `[${time}] ${activity.icon} ${activity.label}${suffix}`;
 }
@@ -44,7 +58,11 @@ function formatDateString(date: Date): string {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
 }
 
-function sessionIsOnDate(session: SessionNode, date: Date, activities: ActivityEntry[]): boolean {
+function sessionIsOnDate(
+  session: SessionNode,
+  date: Date,
+  activities: ActivityEntry[],
+): boolean {
   try {
     const mtime = new Date(statSync(session.filePath).mtimeMs);
     if (isSameUTCDay(mtime, date)) return true;
@@ -54,11 +72,18 @@ function sessionIsOnDate(session: SessionNode, date: Date, activities: ActivityE
   return activities.some((a) => isSameUTCDay(a.timestamp, date));
 }
 
-export function generateReport(sessions: SessionNode[], options: ReportOptions): string {
+export function generateReport(
+  sessions: SessionNode[],
+  options: ReportOptions,
+): string {
   const { date, include } = options;
   const dateStr = formatDateString(date);
 
-  type SessionBlock = { session: SessionNode; activities: ActivityEntry[]; firstTime: number };
+  type SessionBlock = {
+    session: SessionNode;
+    activities: ActivityEntry[];
+    firstTime: number;
+  };
   const blocks: SessionBlock[] = [];
 
   for (const session of sessions) {

@@ -241,12 +241,11 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   const selectedIndex = allFlat.findIndex((s) => s.id === selectedId);
   const height = (stdout?.rows ?? 41) - 1;
   const width = stdout?.columns ?? 80;
-  const viewerRows = Math.max(
-    5,
-    Math.floor(height * VIEWER_HEIGHT_FRACTION) - 4,
-  );
-  // sessions(N+2) + margin(1) + viewer(viewerRows+2) + margin(1) + statusBar(1) = height
-  const treeRows = Math.max(3, height - viewerRows - 7);
+  const maxTreeRows = Math.floor(height * (1 - VIEWER_HEIGHT_FRACTION));
+  const naturalTreeRows = allFlat.length;
+  const treeRows = Math.max(1, Math.min(naturalTreeRows, maxTreeRows));
+  // statusBar(1) + margin(1) + tree(treeRows+2) + margin(1) + viewer(viewerRows+2) = height
+  const viewerRows = Math.max(5, height - 7 - treeRows);
 
   const saveLog = useCallback(() => {
     if (!activities.length || !selectedId) return;

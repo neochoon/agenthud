@@ -104,6 +104,43 @@ describe("ActivityViewerPanel", () => {
     expect(lastFrame()).toContain("↓5");
   });
 
+  it("shows MM/DD prefix for activities from a different day", () => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const activity: ActivityEntry = {
+      timestamp: yesterday,
+      type: "tool",
+      icon: "○",
+      label: "Read",
+      detail: "old.ts",
+    };
+    const { lastFrame } = render(
+      <ActivityViewerPanel {...baseProps} activities={[activity]} />,
+    );
+    const frame = lastFrame() ?? "";
+    const month = String(yesterday.getMonth() + 1).padStart(2, "0");
+    const day = String(yesterday.getDate()).padStart(2, "0");
+    expect(frame).toContain(`${month}/${day}`);
+  });
+
+  it("does not show date prefix for today's activities", () => {
+    const now = new Date();
+    const activity: ActivityEntry = {
+      timestamp: now,
+      type: "tool",
+      icon: "○",
+      label: "Read",
+      detail: "new.ts",
+    };
+    const { lastFrame } = render(
+      <ActivityViewerPanel {...baseProps} activities={[activity]} />,
+    );
+    const frame = lastFrame() ?? "";
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    expect(frame).not.toContain(`${month}/${day}`);
+  });
+
   it("shows new item badge in PAUSED title when newCount > 0", () => {
     const { lastFrame } = render(
       <ActivityViewerPanel

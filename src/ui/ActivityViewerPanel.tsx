@@ -40,11 +40,21 @@ export interface ActivityViewerPanelProps {
   width: number;
 }
 
-function formatActivityTime(date: Date): string {
+function formatActivityTime(date: Date, now: Date): string {
   const hours = String(date.getHours()).padStart(2, "0");
   const minutes = String(date.getMinutes()).padStart(2, "0");
   const seconds = String(date.getSeconds()).padStart(2, "0");
-  return `${hours}:${minutes}:${seconds}`;
+  const time = `${hours}:${minutes}:${seconds}`;
+
+  const sameDay =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+  if (sameDay) return time;
+
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${month}/${day} ${time}`;
 }
 
 function truncateDetail(detail: string, maxWidth: number): string {
@@ -95,6 +105,7 @@ export function ActivityViewerPanel({
     visibleActivities = activities.slice(start, end).reverse();
   }
 
+  const now = new Date();
   const lines: React.ReactElement[] = [];
 
   if (visibleActivities.length === 0) {
@@ -112,7 +123,7 @@ export function ActivityViewerPanel({
       const activity = visibleActivities[i];
       const style = getActivityStyle(activity);
 
-      const time = formatActivityTime(activity.timestamp);
+      const time = formatActivityTime(activity.timestamp, now);
       const timestamp = `[${time}] `;
       const timestampWidth = timestamp.length;
       const icon = activity.icon;

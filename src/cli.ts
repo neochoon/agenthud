@@ -2,7 +2,15 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const ALL_TYPES = ["response", "bash", "edit", "thinking", "read", "glob", "user"];
+const ALL_TYPES = [
+  "response",
+  "bash",
+  "edit",
+  "thinking",
+  "read",
+  "glob",
+  "user",
+];
 const DEFAULT_TYPES = ["response", "bash", "edit", "thinking"];
 
 export interface CliOptions {
@@ -56,7 +64,9 @@ export function clearScreen(): void {
 function parseUTCMidnight(dateStr: string): Date | null {
   if (dateStr === "today") {
     const now = new Date();
-    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    return new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    );
   }
   const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return null;
@@ -68,7 +78,9 @@ function parseUTCMidnight(dateStr: string): Date | null {
 
 function todayUTCMidnight(): Date {
   const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  return new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+  );
 }
 
 export function parseArgs(args: string[]): CliOptions {
@@ -109,7 +121,10 @@ export function parseArgs(args: string[]): CliOptions {
       if (includeStr === "all") {
         reportInclude = ALL_TYPES;
       } else if (includeStr) {
-        reportInclude = includeStr.split(",").map((s) => s.trim()).filter(Boolean);
+        reportInclude = includeStr
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
       }
     }
 

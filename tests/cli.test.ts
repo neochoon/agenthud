@@ -57,12 +57,25 @@ describe("parseArgs", () => {
 
     it("uses default include types when --include not given", () => {
       const opts = parseArgs(["report"]);
-      expect(opts.reportInclude).toEqual(["response", "bash", "edit", "thinking"]);
+      expect(opts.reportInclude).toEqual([
+        "response",
+        "bash",
+        "edit",
+        "thinking",
+      ]);
     });
 
     it("parses --include all", () => {
       const opts = parseArgs(["report", "--include", "all"]);
-      expect(opts.reportInclude).toEqual(["response", "bash", "edit", "thinking", "read", "glob", "user"]);
+      expect(opts.reportInclude).toEqual([
+        "response",
+        "bash",
+        "edit",
+        "thinking",
+        "read",
+        "glob",
+        "user",
+      ]);
     });
 
     it("parses --include response,edit", () => {

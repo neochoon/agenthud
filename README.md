@@ -105,6 +105,31 @@ Press `↵` on any activity to open a scrollable full-content view.
 | `↓` / `j` | Scroll down |
 | `↵` / `Esc` / `q` | Close |
 
+## Report
+
+Print a Markdown summary of all activity on a given date, suitable for piping to scripts or LLMs:
+
+```bash
+agenthud report                          # today
+agenthud report --date 2026-05-14        # specific date
+agenthud report --date today --include all  # all activity types
+```
+
+Output is written to stdout in Markdown format:
+
+```
+# AgentHUD Report: 2026-05-14
+
+## myproject (10:23 – 14:45)
+
+[10:23] $ npm test
+[10:35] ~ src/ui/App.tsx
+[11:15] < Added spinner hook to make the UI feel alive.
+```
+
+**`--include` types:** `response`, `bash`, `edit`, `thinking`, `read`, `glob`, `user`  
+Default: `response,bash,edit,thinking`
+
 ## Configuration
 
 Optional. Create `~/.agenthud/config.yaml`:
@@ -119,6 +144,12 @@ hiddenSessions:
 hiddenSubAgents:
   - code-reviewer
 ```
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CLAUDE_PROJECTS_DIR` | `~/.claude/projects` | Path to Claude Code projects directory. Useful for backups or mounted volumes. |
 
 ## Feedback
 

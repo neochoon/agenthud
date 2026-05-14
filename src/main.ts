@@ -60,6 +60,7 @@ if (options.mode === "report") {
   const markdown = generateReport(tree.sessions, {
     date: options.reportDate!,
     include: options.reportInclude!,
+    format: options.reportFormat,
   });
   process.stdout.write(`${markdown}\n`);
   process.exit(0);

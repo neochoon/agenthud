@@ -109,6 +109,27 @@ describe("parseArgs", () => {
       expect(opts.mode).toBe("report");
       expect(opts.reportError).toContain("Invalid date");
     });
+
+    it("defaults to markdown format", () => {
+      const opts = parseArgs(["report"]);
+      expect(opts.reportFormat).toBe("markdown");
+    });
+
+    it("parses --format json", () => {
+      const opts = parseArgs(["report", "--format", "json"]);
+      expect(opts.reportFormat).toBe("json");
+    });
+
+    it("parses --format markdown", () => {
+      const opts = parseArgs(["report", "--format", "markdown"]);
+      expect(opts.reportFormat).toBe("markdown");
+    });
+
+    it("returns error for invalid format", () => {
+      const opts = parseArgs(["report", "--format", "csv"]);
+      expect(opts.reportError).toContain("Invalid format");
+      expect(opts.reportError).toContain("csv");
+    });
   });
 });
 

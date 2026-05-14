@@ -19,6 +19,7 @@ export interface CliOptions {
   error?: string;
   reportDate?: Date;
   reportInclude?: string[];
+  reportFormat?: "markdown" | "json";
   reportError?: string;
 }
 
@@ -31,7 +32,7 @@ const KNOWN_WATCH_FLAGS = new Set([
   "-h",
   "--help",
 ]);
-const KNOWN_REPORT_FLAGS = new Set(["--date", "--include"]);
+const KNOWN_REPORT_FLAGS = new Set(["--date", "--include", "--format"]);
 const KNOWN_SUBCOMMANDS = new Set(["report"]);
 
 export function getHelp(): string {
@@ -52,6 +53,7 @@ Commands:
     --include TYPES             Comma-separated types or "all"
                                 Types: response,bash,edit,thinking,read,glob,user
                                 Default: response,bash,edit,thinking
+    --format FORMAT             Output format: markdown (default) or json
 
 Environment:
   CLAUDE_PROJECTS_DIR           Path to Claude projects directory
@@ -149,7 +151,26 @@ export function parseArgs(args: string[]): CliOptions {
       }
     }
 
-    return { mode: "report", reportDate, reportInclude, reportError };
+    let reportFormat: "markdown" | "json" = "markdown";
+    const formatIdx = rest.indexOf("--format");
+    if (formatIdx !== -1) {
+      const fmt = rest[formatIdx + 1];
+      if (fmt === "json" || fmt === "markdown") {
+        reportFormat = fmt;
+      } else if (fmt) {
+        reportError = `Invalid format: "${fmt}". Use "markdown" or "json".`;
+      } else {
+        reportError = "Invalid format: missing value for --format.";
+      }
+    }
+
+    return {
+      mode: "report",
+      reportDate,
+      reportInclude,
+      reportFormat,
+      reportError,
+    };
   }
 
   // Unknown subcommand (positional arg that's not a known command)

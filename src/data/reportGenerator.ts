@@ -5,6 +5,7 @@ import { parseSessionHistory } from "./sessionHistory.js";
 export interface ReportOptions {
   date: Date; // UTC midnight of target day
   include: string[]; // activity types: "response" | "bash" | "edit" | "thinking" | "read" | "glob" | "user"
+  format?: "markdown" | "json"; // default: "markdown"
 }
 
 function activityMatchesInclude(
@@ -76,7 +77,7 @@ export function generateReport(
   sessions: SessionNode[],
   options: ReportOptions,
 ): string {
-  const { date, include } = options;
+  const { date, include, format = "markdown" } = options;
   const dateStr = formatDateString(date);
 
   type SessionBlock = {
@@ -104,10 +105,34 @@ export function generateReport(
   }
 
   if (blocks.length === 0) {
+    if (format === "json") {
+      return JSON.stringify({ date: dateStr, sessions: [] }, null, 2);
+    }
     return `No activity found for ${dateStr}.`;
   }
 
   blocks.sort((a, b) => a.firstTime - b.firstTime);
+
+  if (format === "json") {
+    return JSON.stringify(
+      {
+        date: dateStr,
+        sessions: blocks.map(({ session, activities }) => ({
+          project: session.projectName,
+          start: formatTime(activities[0].timestamp),
+          end: formatTime(activities[activities.length - 1].timestamp),
+          activities: activities.map((a) => ({
+            time: formatTime(a.timestamp),
+            icon: a.icon,
+            label: a.label,
+            detail: a.detail.length > 120 ? a.detail.slice(0, 120) : a.detail,
+          })),
+        })),
+      },
+      null,
+      2,
+    );
+  }
 
   const lines: string[] = [`# AgentHUD Report: ${dateStr}`, ""];
 

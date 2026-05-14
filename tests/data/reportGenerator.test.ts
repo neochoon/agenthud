@@ -318,4 +318,51 @@ describe("generateReport", () => {
     expect(result).toContain("[10:23] < Response");
     expect(result).not.toContain("[10:23] < Response:");
   });
+
+  it("outputs valid JSON when format is json", () => {
+    vi.mocked(statSync).mockReturnValue({
+      mtimeMs: new Date("2026-05-14T10:00:00Z").getTime(),
+    } as ReturnType<typeof statSync>);
+    vi.mocked(parseSessionHistory).mockReturnValue([
+      makeActivity({
+        type: "response",
+        icon: "<",
+        label: "Response",
+        detail: "Done.",
+      }),
+    ]);
+
+    const result = generateReport([makeSession()], {
+      date: DAY,
+      include: ["response"],
+      format: "json",
+    });
+    const parsed = JSON.parse(result);
+    expect(parsed.date).toBe("2026-05-14");
+    expect(parsed.sessions).toHaveLength(1);
+    expect(parsed.sessions[0].project).toBe("myproject");
+    expect(parsed.sessions[0].start).toBe("10:23");
+    expect(parsed.sessions[0].activities[0]).toEqual({
+      time: "10:23",
+      icon: "<",
+      label: "Response",
+      detail: "Done.",
+    });
+  });
+
+  it("outputs empty sessions array as JSON when no activity found", () => {
+    vi.mocked(statSync).mockReturnValue({
+      mtimeMs: new Date("2026-05-13T10:00:00Z").getTime(),
+    } as ReturnType<typeof statSync>);
+    vi.mocked(parseSessionHistory).mockReturnValue([]);
+
+    const result = generateReport([makeSession()], {
+      date: DAY,
+      include: ["response"],
+      format: "json",
+    });
+    const parsed = JSON.parse(result);
+    expect(parsed.date).toBe("2026-05-14");
+    expect(parsed.sessions).toHaveLength(0);
+  });
 });

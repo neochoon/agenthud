@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-05-14
+
+### New
+- **Animated LIVE badge** - Spinner replaces static ▼ in `[LIVE ⠙]`
+- **Detail view colors** - Title icon/label now matches activity type colors (cyan icon, type-specific label color)
+
 ## [0.8.0] - 2026-05-14
 
 ### New

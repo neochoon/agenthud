@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-05-14
+
+### New
+- **Detail View** - Press `↵` on any activity in the viewer to open a full-content scrollable modal (`↑↓/jk` to scroll, `↵/Esc/q` to close)
+- **Thinking blocks** - Parses and displays Claude's thinking blocks (`…`) when `showThinkingSummaries: true` is set in Claude Code settings
+- **Spinner** - Animated braille spinner in the status bar shows the app is live
+- **Status bar moved to top** - Shortcuts and spinner now appear at the top of the screen
+
+### Fixed
+- **Layout scroll bug** - Screen no longer shifts up by one line when terminal is full
+- **Viewer always fills screen** - Activity viewer now pads to full height even when content is sparse
+
+### Changed
+- **Hidden sessions format** - Config now stores `projectName/uuid` instead of bare UUID (e.g. `agenthud/569708ba-...`) for readability
+- **Status bar layout** - AgentHUD name on the left, shortcuts on the right
+- **Save shortcut hidden** - `s: save` removed from visible shortcuts (key still works)
+- **Updated README** - Reflects current split-view UI, keyboard shortcuts, and config options
+
 ## [0.7.4] - 2025-01-23
 
 ### Fixed

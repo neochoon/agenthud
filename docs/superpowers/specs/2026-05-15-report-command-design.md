@@ -121,6 +121,16 @@ if (opts.mode === "report") {
 
 Note: `discoverSessions` respects `hiddenSessions` config. For the report, hidden sessions are still excluded (consistent with what the user sees in the UI).
 
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CLAUDE_PROJECTS_DIR` | `~/.claude/projects` | Path to Claude Code projects directory. Use for backups or mounted volumes. |
+
+`getProjectsDir()` in `src/data/sessions.ts` reads this variable first and falls back to the default. Applies to all modes (watch, once, report).
+
+The help text (`--help`) should document this variable.
+
 ## Date Filtering Logic
 
 A session is included in the report if **either**:

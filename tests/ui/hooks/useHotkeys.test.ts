@@ -296,7 +296,7 @@ describe("useHotkeys", () => {
         useHotkeys(makeOptions({ focus: "viewer" })),
       );
       expect(result.current.statusBarItems).toEqual([
-        "Tab: tree",
+        "Tab: sessions",
         "↑↓/jk: scroll",
         "PgUp/Dn: page",
         "g: top",

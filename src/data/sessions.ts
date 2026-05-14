@@ -1,8 +1,8 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
-import type { GlobalConfig, SessionNode, SessionTree } from "../types/index.js";
-import { THIRTY_MINUTES_MS } from "../ui/constants.js";
+import type { GlobalConfig, SessionNode, SessionStatus, SessionTree } from "../types/index.js";
+import { ONE_HOUR_MS, THIRTY_MINUTES_MS } from "../ui/constants.js";
 import { parseModelName } from "./activityParser.js";
 
 function getProjectsDir(): string {
@@ -19,14 +19,14 @@ function decodeProjectPath(encoded: string): string {
   return encoded.replace(/-/g, "/");
 }
 
-function getSessionStatus(
-  mtimeMs: number,
-  config: GlobalConfig,
-): "running" | "idle" | "done" {
-  const age = Date.now() - mtimeMs;
-  if (age < THIRTY_MINUTES_MS) return "running";
-  if (age < config.sessionTimeoutMs) return "idle";
-  return "done";
+function getSessionStatus(mtimeMs: number): SessionStatus {
+  const now = Date.now();
+  const age = now - mtimeMs;
+  if (age < THIRTY_MINUTES_MS) return "hot";
+  if (age < ONE_HOUR_MS) return "warm";
+  // Calendar-based cool vs cold — Task 3 adds full calendar logic
+  // For now, treat everything >= 1h as "cool" (Task 3 fixes this)
+  return "cool";
 }
 
 function extractTaskDescription(content: string): string {
@@ -113,7 +113,7 @@ function buildSubAgents(
           projectPath: "",
           projectName: "",
           lastModifiedMs: stat.mtimeMs,
-          status: getSessionStatus(stat.mtimeMs, config),
+          status: getSessionStatus(stat.mtimeMs),
           modelName: readModelName(filePath),
           subAgents: [],
           agentId: agentId ?? undefined,
@@ -123,7 +123,7 @@ function buildSubAgents(
         return null;
       }
     })
-    .filter((n): n is SessionNode => n !== null && n.status !== "done")
+    .filter((n): n is SessionNode => n !== null && !config.hiddenSubAgents.includes(n.id))
     .sort((a, b) => b.lastModifiedMs - a.lastModifiedMs);
 }
 
@@ -175,7 +175,7 @@ export function discoverSessions(config: GlobalConfig): SessionTree {
           projectPath: decodedPath,
           projectName,
           lastModifiedMs: stat.mtimeMs,
-          status: getSessionStatus(stat.mtimeMs, config),
+          status: getSessionStatus(stat.mtimeMs),
           modelName: readModelName(filePath),
           subAgents,
         });
@@ -184,13 +184,20 @@ export function discoverSessions(config: GlobalConfig): SessionTree {
   }
 
   allSessions.sort((a, b) => {
-    const statusOrder = { running: 0, idle: 1, done: 2 };
+    const statusOrder: Record<SessionStatus, number> = {
+      hot: 0,
+      warm: 1,
+      cool: 2,
+      cold: 3,
+    };
     const statusDiff = statusOrder[a.status] - statusOrder[b.status];
     if (statusDiff !== 0) return statusDiff;
     return b.lastModifiedMs - a.lastModifiedMs;
   });
 
-  const visible = allSessions.filter((s) => s.status !== "done");
+  const visible = allSessions.filter(
+    (s) => !config.hiddenSessions.includes(s.id),
+  );
   const totalCount =
     visible.length + visible.reduce((sum, s) => sum + s.subAgents.length, 0);
 

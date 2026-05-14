@@ -33,7 +33,11 @@ function flattenSessions(
     if (expandedIds.has(s.id)) {
       result.push(...s.subAgents);
     } else {
-      result.push(...s.subAgents.filter((sub) => sub.status === "running"));
+      result.push(
+        ...s.subAgents.filter(
+          (sub) => sub.status === "hot" || sub.status === "warm",
+        ),
+      );
     }
   }
   return result;
@@ -213,7 +217,9 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
       );
       if (
         !parentSession ||
-        !parentSession.subAgents.some((s) => s.status === "idle")
+        !parentSession.subAgents.some(
+          (s) => s.status === "cool" || s.status === "cold",
+        )
       )
         return;
       setExpandedIds((prev) => {

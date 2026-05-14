@@ -22,18 +22,16 @@ describe("loadGlobalConfig", () => {
     vi.mocked(existsSync).mockReturnValue(false);
     const config = loadGlobalConfig();
     expect(config.refreshIntervalMs).toBe(2000);
-    expect(config.sessionTimeoutMs).toBe(24 * 60 * 60 * 1000);
     expect(config.logDir).toBe(join(homedir(), ".agenthud", "logs"));
+    expect(config.hiddenSessions).toEqual([]);
+    expect(config.hiddenSubAgents).toEqual([]);
   });
 
-  it("overrides defaults with values from config file", () => {
+  it("overrides refreshInterval from config file", () => {
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockReturnValue(
-      "refreshInterval: 5s\nsessionTimeout: 10m\n",
-    );
+    vi.mocked(readFileSync).mockReturnValue("refreshInterval: 5s\n");
     const config = loadGlobalConfig();
     expect(config.refreshIntervalMs).toBe(5000);
-    expect(config.sessionTimeoutMs).toBe(10 * 60 * 1000);
   });
 
   it("ignores unknown keys", () => {

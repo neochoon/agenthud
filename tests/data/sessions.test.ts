@@ -17,8 +17,9 @@ const NOW = 1_700_000_000_000;
 
 const mockConfig = {
   refreshIntervalMs: 2000,
-  sessionTimeoutMs: 30 * 60 * 1000,
   logDir: "/tmp/logs",
+  hiddenSessions: [] as string[],
+  hiddenSubAgents: [] as string[],
 };
 
 afterEach(() => {
@@ -89,7 +90,7 @@ describe("discoverSessions", () => {
     expect(tree.sessions[0].modelName).toBe("sonnet-4");
   });
 
-  it("marks session as running when mtime is within 30m", () => {
+  it("marks session as hot when mtime is within 30m", () => {
     const projectsDir = join(
       process.env.HOME ?? "/home/user",
       ".claude",
@@ -124,7 +125,7 @@ describe("discoverSessions", () => {
     vi.spyOn(Date, "now").mockReturnValue(NOW);
 
     const tree = discoverSessions(mockConfig);
-    expect(tree.sessions[0].status).toBe("running");
+    expect(tree.sessions[0].status).toBe("hot");
   });
 
   it("nests sub-agents under their parent", () => {
@@ -176,7 +177,7 @@ describe("discoverSessions", () => {
     expect(tree.totalCount).toBe(2);
   });
 
-  it("excludes sessions older than sessionTimeout (done)", () => {
+  it("includes sessions older than 1 hour (no longer excluded by timeout)", () => {
     const projectsDir = join(
       process.env.HOME ?? "/home/user",
       ".claude",
@@ -198,20 +199,21 @@ describe("discoverSessions", () => {
         return ["old-sess.jsonl"] as unknown as ReturnType<typeof readdirSync>;
       return [] as unknown as ReturnType<typeof readdirSync>;
     });
-    // mtime is way older than sessionTimeout (2 hours ago vs 30min timeout)
     vi.mocked(statSync).mockImplementation((p) => {
       const path = String(p);
       const isDir = !path.endsWith(".jsonl");
       return {
         isDirectory: () => isDir,
-        mtimeMs: Date.now() - 2 * 60 * 60 * 1000,
+        mtimeMs: NOW - 2 * 60 * 60 * 1000,
         size: 100,
       } as ReturnType<typeof statSync>;
     });
     vi.mocked(readFileSync).mockReturnValue("");
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
 
     const tree = discoverSessions(mockConfig);
-    expect(tree.sessions).toHaveLength(0);
-    expect(tree.totalCount).toBe(0);
+    expect(tree.sessions).toHaveLength(1);
+    // Status is cool (same UTC day as NOW) — calendar logic added in Task 3
+    expect(tree.sessions[0].status).toBe("cool");
   });
 });

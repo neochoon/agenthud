@@ -34,14 +34,14 @@ function formatElapsed(lastModifiedMs: number): string {
 
 function getStatusColor(status: SessionStatus): string {
   switch (status) {
-    case "running":
+    case "hot":
       return "green";
-    case "idle":
+    case "warm":
       return "yellow";
-    case "done":
+    case "cool":
+      return "cyan";
+    case "cold":
       return "gray";
-    default:
-      return "white";
   }
 }
 
@@ -159,8 +159,12 @@ function flattenSessions(
   for (const session of sessions) {
     result.push({ kind: "session", session, prefix: "" });
 
-    const running = session.subAgents.filter((s) => s.status === "running");
-    const idle = session.subAgents.filter((s) => s.status === "idle");
+    const running = session.subAgents.filter(
+      (s) => s.status === "hot" || s.status === "warm",
+    );
+    const idle = session.subAgents.filter(
+      (s) => s.status === "cool" || s.status === "cold",
+    );
     const isExpanded = expandedIds.has(session.id);
 
     if (isExpanded) {
@@ -201,7 +205,7 @@ function IdleSummaryRow({
   count: number;
   contentWidth: number;
 }): React.ReactElement {
-  const text = `└─ ... ${count} idle`;
+  const text = `└─ ... ${count} cool`;
   const padding = Math.max(0, contentWidth - getDisplayWidth(text) - 1);
   return (
     <Text>

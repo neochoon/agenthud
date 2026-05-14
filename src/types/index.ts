@@ -1,5 +1,5 @@
 // Session status
-export type SessionStatus = "running" | "idle" | "done";
+export type SessionStatus = "hot" | "warm" | "cool" | "cold";
 
 // A single Claude session node (top-level or sub-agent)
 export interface SessionNode {
@@ -25,8 +25,9 @@ export interface SessionTree {
 // Global config (~/.agenthud/config.yaml)
 export interface GlobalConfig {
   refreshIntervalMs: number; // default: 2000
-  sessionTimeoutMs: number; // sessions older than this are "done"; default: 30 * 60 * 1000
   logDir: string; // default: ~/.agenthud/logs
+  hiddenSessions: string[];
+  hiddenSubAgents: string[];
 }
 
 // Centralized icon definitions

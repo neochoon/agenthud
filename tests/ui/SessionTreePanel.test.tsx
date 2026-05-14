@@ -9,7 +9,7 @@ const makeSession = (overrides: Partial<SessionNode> = {}): SessionNode => ({
   projectPath: "/Users/neo/myproject",
   projectName: "myproject",
   lastModifiedMs: Date.now() - 5000,
-  status: "running",
+  status: "hot",
   modelName: "sonnet-4.6",
   subAgents: [],
   ...overrides,
@@ -28,16 +28,16 @@ describe("SessionTreePanel", () => {
     expect(lastFrame()).toContain("myproject");
   });
 
-  it("renders status badge for running session", () => {
+  it("renders status badge for hot session", () => {
     const { lastFrame } = render(
       <SessionTreePanel
-        sessions={[makeSession({ status: "running" })]}
+        sessions={[makeSession({ status: "hot" })]}
         selectedId={null}
         hasFocus={false}
         width={80}
       />,
     );
-    expect(lastFrame()).toContain("running");
+    expect(lastFrame()).toContain("hot");
   });
 
   it("renders running sub-agent indented under parent", () => {
@@ -46,7 +46,7 @@ describe("SessionTreePanel", () => {
         makeSession({
           id: "child1",
           projectName: "",
-          status: "running",
+          status: "hot",
           subAgents: [],
         }),
       ],
@@ -68,19 +68,19 @@ describe("SessionTreePanel", () => {
         makeSession({
           id: "c1",
           projectName: "",
-          status: "idle",
+          status: "cool",
           subAgents: [],
         }),
         makeSession({
           id: "c2",
           projectName: "",
-          status: "idle",
+          status: "cool",
           subAgents: [],
         }),
         makeSession({
           id: "c3",
           projectName: "",
-          status: "idle",
+          status: "cool",
           subAgents: [],
         }),
       ],
@@ -95,7 +95,7 @@ describe("SessionTreePanel", () => {
     );
     const frame = lastFrame() ?? "";
     expect(frame).not.toContain("»");
-    expect(frame).toContain("3 idle");
+    expect(frame).toContain("3 cool");
   });
 
   it("shows running sub-agents individually and summarizes idle ones", () => {
@@ -104,19 +104,19 @@ describe("SessionTreePanel", () => {
         makeSession({
           id: "r1",
           projectName: "",
-          status: "running",
+          status: "hot",
           subAgents: [],
         }),
         makeSession({
           id: "i1",
           projectName: "",
-          status: "idle",
+          status: "cool",
           subAgents: [],
         }),
         makeSession({
           id: "i2",
           projectName: "",
-          status: "idle",
+          status: "cool",
           subAgents: [],
         }),
       ],
@@ -131,7 +131,7 @@ describe("SessionTreePanel", () => {
     );
     const frame = lastFrame() ?? "";
     expect(frame).toContain("»");
-    expect(frame).toContain("2 idle");
+    expect(frame).toContain("2 cool");
   });
 
   it("shows short session ID for parent sessions with a project name", () => {
@@ -164,7 +164,7 @@ describe("SessionTreePanel", () => {
         makeSession({
           id: "child111",
           projectName: "myproject",
-          status: "running",
+          status: "hot",
           subAgents: [],
         }),
       ],
@@ -186,7 +186,7 @@ describe("SessionTreePanel", () => {
         makeSession({
           id: "agent-a26daaf",
           projectName: "",
-          status: "running",
+          status: "hot",
           subAgents: [],
           agentId: "a26daaf",
           taskDescription: "Task 3: Create .env.example",
@@ -244,13 +244,13 @@ describe("SessionTreePanel", () => {
         makeSession({
           id: "i1",
           projectName: "",
-          status: "idle",
+          status: "cool",
           subAgents: [],
         }),
         makeSession({
           id: "i2",
           projectName: "",
-          status: "idle",
+          status: "cool",
           subAgents: [],
         }),
       ],
@@ -266,7 +266,7 @@ describe("SessionTreePanel", () => {
     );
     const frame = lastFrame() ?? "";
     expect(frame).toContain("»");
-    expect(frame).not.toContain("... 2 idle");
+    expect(frame).not.toContain("... 2 cool");
   });
 
   it("renders empty message when no sessions", () => {

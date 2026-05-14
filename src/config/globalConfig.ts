@@ -8,8 +8,9 @@ const CONFIG_PATH = join(homedir(), ".agenthud", "config.yaml");
 
 export const DEFAULT_GLOBAL_CONFIG: GlobalConfig = {
   refreshIntervalMs: 2000,
-  sessionTimeoutMs: 24 * 60 * 60 * 1000,
   logDir: join(homedir(), ".agenthud", "logs"),
+  hiddenSessions: [],
+  hiddenSubAgents: [],
 };
 
 function parseInterval(value: string): number | null {
@@ -43,10 +44,6 @@ export function loadGlobalConfig(): GlobalConfig {
   if (typeof parsed.refreshInterval === "string") {
     const ms = parseInterval(parsed.refreshInterval);
     if (ms !== null) config.refreshIntervalMs = ms;
-  }
-  if (typeof parsed.sessionTimeout === "string") {
-    const ms = parseInterval(parsed.sessionTimeout);
-    if (ms !== null) config.sessionTimeoutMs = ms;
   }
   if (typeof parsed.logDir === "string") {
     config.logDir = parsed.logDir.replace(/^~/, homedir());

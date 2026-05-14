@@ -24,6 +24,7 @@ import type {
 import { ActivityViewerPanel } from "./ActivityViewerPanel.js";
 import { DetailViewPanel } from "./DetailViewPanel.js";
 import { useHotkeys } from "./hooks/useHotkeys.js";
+import { useSpinner } from "./hooks/useSpinner.js";
 import { SessionTreePanel } from "./SessionTreePanel.js";
 
 const VIEWER_HEIGHT_FRACTION = 0.55;
@@ -238,7 +239,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   }, [isWatchMode, config.refreshIntervalMs]);
 
   const selectedIndex = allFlat.findIndex((s) => s.id === selectedId);
-  const height = stdout?.rows ?? 40;
+  const height = (stdout?.rows ?? 41) - 1;
   const width = stdout?.columns ?? 80;
   const viewerRows = Math.max(
     5,
@@ -265,6 +266,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     }
   }, [activities, selectedId, config.logDir]);
 
+  const spinner = useSpinner(isWatchMode);
   const { handleInput, statusBarItems } = useHotkeys({
     focus,
     detailMode,
@@ -525,6 +527,13 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
         </Box>
       )}
 
+      {isWatchMode && (
+        <Box marginBottom={1} justifyContent="space-between" width={width}>
+          <Text dimColor>{spinner} AgentHUD v{getVersion()}</Text>
+          <Text dimColor>{statusBarItems.join(" · ")}</Text>
+        </Box>
+      )}
+
       <SessionTreePanel
         sessions={sessionTree.sessions}
         selectedId={selectedId}
@@ -557,13 +566,6 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
           />
         )}
       </Box>
-
-      {isWatchMode && (
-        <Box marginTop={1} justifyContent="space-between" width={width}>
-          <Text dimColor>{statusBarItems.join(" · ")}</Text>
-          <Text dimColor>AgentHUD v{getVersion()}</Text>
-        </Box>
-      )}
     </Box>
   );
 }

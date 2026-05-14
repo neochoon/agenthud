@@ -206,6 +206,11 @@ export function ActivityViewerPanel({
     }
   }
 
+  const emptyRow = `${BOX.v}${" ".repeat(contentWidth + 1)}${BOX.v}`;
+  while (lines.length < visibleRows) {
+    lines.push(<Text key={`pad-${lines.length}`}>{emptyRow}</Text>);
+  }
+
   return (
     <Box flexDirection="column" width={width}>
       <Text color={isLive ? undefined : "yellow"}>

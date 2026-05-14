@@ -347,7 +347,6 @@ describe("useHotkeys", () => {
         "g: top",
         "G: live",
         "↵: detail",
-        "s: save",
         "q: quit",
       ]);
     });

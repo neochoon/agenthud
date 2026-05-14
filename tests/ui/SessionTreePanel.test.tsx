@@ -40,7 +40,7 @@ describe("SessionTreePanel", () => {
     expect(lastFrame()).toContain("hot");
   });
 
-  it("renders running sub-agent indented under parent", () => {
+  it("renders hot sub-agent indented under parent", () => {
     const session = makeSession({
       subAgents: [
         makeSession({
@@ -62,7 +62,7 @@ describe("SessionTreePanel", () => {
     expect(lastFrame()).toContain("»");
   });
 
-  it("collapses idle sub-agents into a summary line", () => {
+  it("collapses cool sub-agents into a summary line", () => {
     const session = makeSession({
       subAgents: [
         makeSession({
@@ -238,7 +238,7 @@ describe("SessionTreePanel", () => {
     expect(frame).toContain("more");
   });
 
-  it("shows idle sub-agents individually when parent is in expandedIds", () => {
+  it("shows cool sub-agents individually when parent is in expandedIds", () => {
     const session = makeSession({
       subAgents: [
         makeSession({

@@ -269,6 +269,86 @@ describe("SessionTreePanel", () => {
     expect(frame).not.toContain("... 2 cool");
   });
 
+  it("shows hot and warm sub-agents individually", () => {
+    const session = makeSession({
+      subAgents: [
+        makeSession({ id: "h1", projectName: "", status: "hot", subAgents: [] }),
+        makeSession({ id: "w1", projectName: "", status: "warm", subAgents: [] }),
+      ],
+    });
+    const { lastFrame } = render(
+      <SessionTreePanel
+        sessions={[session]}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+      />,
+    );
+    expect(lastFrame()).toContain("»");
+  });
+
+  it("collapses cool sub-agents into a summary line", () => {
+    const session = makeSession({
+      subAgents: [
+        makeSession({ id: "c1", projectName: "", status: "cool", subAgents: [] }),
+        makeSession({ id: "c2", projectName: "", status: "cool", subAgents: [] }),
+      ],
+    });
+    const { lastFrame } = render(
+      <SessionTreePanel
+        sessions={[session]}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+      />,
+    );
+    const frame = lastFrame() ?? "";
+    expect(frame).not.toContain("»");
+    expect(frame).toContain("2 cool");
+  });
+
+  it("shows combined cool and cold sub-agent summary", () => {
+    const session = makeSession({
+      subAgents: [
+        makeSession({ id: "c1", projectName: "", status: "cool", subAgents: [] }),
+        makeSession({ id: "d1", projectName: "", status: "cold", subAgents: [] }),
+      ],
+    });
+    const { lastFrame } = render(
+      <SessionTreePanel
+        sessions={[session]}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+      />,
+    );
+    const frame = lastFrame() ?? "";
+    expect(frame).toContain("1 cool");
+    expect(frame).toContain("1 cold");
+  });
+
+  it("shows hot sub-agent individually and summarizes cool/cold", () => {
+    const session = makeSession({
+      subAgents: [
+        makeSession({ id: "h1", projectName: "", status: "hot", subAgents: [] }),
+        makeSession({ id: "c1", projectName: "", status: "cool", subAgents: [] }),
+        makeSession({ id: "d1", projectName: "", status: "cold", subAgents: [] }),
+      ],
+    });
+    const { lastFrame } = render(
+      <SessionTreePanel
+        sessions={[session]}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+      />,
+    );
+    const frame = lastFrame() ?? "";
+    expect(frame).toContain("»");
+    expect(frame).toContain("1 cool");
+    expect(frame).toContain("1 cold");
+  });
+
   it("renders empty message when no sessions", () => {
     const { lastFrame } = render(
       <SessionTreePanel

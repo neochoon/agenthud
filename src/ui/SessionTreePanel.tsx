@@ -148,7 +148,8 @@ function SessionRow({
 
 type FlatRow =
   | { kind: "session"; session: SessionNode; prefix: string }
-  | { kind: "idle-summary"; count: number };
+  | { kind: "subagent-summary"; coolCount: number; coldCount: number }
+  | { kind: "cold-sessions-summary"; count: number };
 
 function flattenSessions(
   sessions: SessionNode[],
@@ -156,19 +157,21 @@ function flattenSessions(
 ): FlatRow[] {
   const result: FlatRow[] = [];
 
-  for (const session of sessions) {
+  const visibleSessions = sessions.filter((s) => s.status !== "cold");
+  const coldSessions = sessions.filter((s) => s.status === "cold");
+
+  for (const session of visibleSessions) {
     result.push({ kind: "session", session, prefix: "" });
 
-    const running = session.subAgents.filter(
+    const isExpanded = expandedIds.has(session.id);
+    const hotWarm = session.subAgents.filter(
       (s) => s.status === "hot" || s.status === "warm",
     );
-    const idle = session.subAgents.filter(
-      (s) => s.status === "cool" || s.status === "cold",
-    );
-    const isExpanded = expandedIds.has(session.id);
+    const cool = session.subAgents.filter((s) => s.status === "cool");
+    const cold = session.subAgents.filter((s) => s.status === "cold");
 
     if (isExpanded) {
-      const all = [...running, ...idle];
+      const all = [...hotWarm, ...cool, ...cold];
       for (let i = 0; i < all.length; i++) {
         const isLast = i === all.length - 1;
         const treeChar = isLast ? "└─ " : "├─ ";
@@ -179,18 +182,68 @@ function flattenSessions(
         });
       }
     } else {
-      const hasIdleSummary = idle.length > 0;
-      for (let i = 0; i < running.length; i++) {
-        const isLast = i === running.length - 1 && !hasIdleSummary;
+      const hasSummary = cool.length > 0 || cold.length > 0;
+      for (let i = 0; i < hotWarm.length; i++) {
+        const isLast = i === hotWarm.length - 1 && !hasSummary;
         const treeChar = isLast ? "└─ " : "├─ ";
         result.push({
           kind: "session",
-          session: running[i],
+          session: hotWarm[i],
           prefix: `${treeChar}» `,
         });
       }
-      if (hasIdleSummary) {
-        result.push({ kind: "idle-summary", count: idle.length });
+      if (hasSummary) {
+        result.push({
+          kind: "subagent-summary",
+          coolCount: cool.length,
+          coldCount: cold.length,
+        });
+      }
+    }
+  }
+
+  if (coldSessions.length > 0) {
+    result.push({ kind: "cold-sessions-summary", count: coldSessions.length });
+
+    if (expandedIds.has("__cold__")) {
+      for (const session of coldSessions) {
+        result.push({ kind: "session", session, prefix: "" });
+
+        const isExpanded = expandedIds.has(session.id);
+        const hotWarm = session.subAgents.filter(
+          (s) => s.status === "hot" || s.status === "warm",
+        );
+        const cool = session.subAgents.filter((s) => s.status === "cool");
+        const cold = session.subAgents.filter((s) => s.status === "cold");
+
+        if (isExpanded) {
+          const all = [...hotWarm, ...cool, ...cold];
+          for (let i = 0; i < all.length; i++) {
+            const isLast = i === all.length - 1;
+            result.push({
+              kind: "session",
+              session: all[i],
+              prefix: `${isLast ? "└─ " : "├─ "}» `,
+            });
+          }
+        } else {
+          const hasSummary = cool.length > 0 || cold.length > 0;
+          for (let i = 0; i < hotWarm.length; i++) {
+            const isLast = i === hotWarm.length - 1 && !hasSummary;
+            result.push({
+              kind: "session",
+              session: hotWarm[i],
+              prefix: `${isLast ? "└─ " : "├─ "}» `,
+            });
+          }
+          if (hasSummary) {
+            result.push({
+              kind: "subagent-summary",
+              coolCount: cool.length,
+              coldCount: cold.length,
+            });
+          }
+        }
       }
     }
   }
@@ -198,20 +251,64 @@ function flattenSessions(
   return result;
 }
 
-function IdleSummaryRow({
-  count,
+function SubagentSummaryRow({
+  coolCount,
+  coldCount,
   contentWidth,
 }: {
-  count: number;
+  coolCount: number;
+  coldCount: number;
   contentWidth: number;
 }): React.ReactElement {
-  const text = `└─ ... ${count} cool`;
+  const parts: string[] = [];
+  if (coolCount > 0) parts.push(`${coolCount} cool`);
+  if (coldCount > 0) parts.push(`${coldCount} cold`);
+  const text = `└─ ... ${parts.join("  ")}`;
   const padding = Math.max(0, contentWidth - getDisplayWidth(text) - 1);
   return (
     <Text>
       {BOX.v} <Text dimColor>{text}</Text>
       {" ".repeat(padding)}
       {BOX.v}
+    </Text>
+  );
+}
+
+function ColdSessionsSummaryRow({
+  count,
+  isSelected,
+  hasFocus,
+  width,
+}: {
+  count: number;
+  isSelected: boolean;
+  hasFocus: boolean;
+  width: number;
+}): React.ReactElement {
+  const innerWidth = getInnerWidth(width);
+  const label = ` ${count} cold `;
+  const hint = isSelected && hasFocus ? " ↵ " : "";
+  const hintWidth = getDisplayWidth(hint);
+  const dashCount = Math.max(
+    0,
+    innerWidth - 2 - getDisplayWidth(label) - hintWidth,
+  );
+  const dashes = BOX.h.repeat(dashCount);
+  const highlight = isSelected && hasFocus;
+  return (
+    <Text>
+      <Text
+        backgroundColor={highlight ? "blue" : undefined}
+        bold={highlight}
+        dimColor={!highlight}
+      >
+        {BOX.ml}
+        {BOX.h}
+        {label}
+        {dashes}
+        {hint}
+        {BOX.mr}
+      </Text>
     </Text>
   );
 }
@@ -269,11 +366,20 @@ export function SessionTreePanel({
             prefix={row.prefix}
             contentWidth={contentWidth}
           />
-        ) : (
-          <IdleSummaryRow
-            key={`idle-${idx}`}
-            count={row.count}
+        ) : row.kind === "subagent-summary" ? (
+          <SubagentSummaryRow
+            key={`subagent-summary-${idx}`}
+            coolCount={row.coolCount}
+            coldCount={row.coldCount}
             contentWidth={contentWidth}
+          />
+        ) : (
+          <ColdSessionsSummaryRow
+            key="cold-summary"
+            count={row.count}
+            isSelected={selectedId === "__cold__"}
+            hasFocus={hasFocus}
+            width={width}
           />
         ),
       )}

@@ -43,6 +43,7 @@ export interface ActivityViewerPanelProps {
   width: number;
   cursorLine: number;
   hasFocus: boolean;
+  spinner?: string;
 }
 
 function formatActivityTime(date: Date, now: Date): string {
@@ -88,13 +89,14 @@ export function ActivityViewerPanel({
   width,
   cursorLine,
   hasFocus,
+  spinner = "",
 }: ActivityViewerPanelProps): React.ReactElement {
   const innerWidth = getInnerWidth(width);
   const contentWidth = innerWidth - 1;
 
   let titleSuffix: string;
   if (isLive) {
-    titleSuffix = "[LIVE ▼]";
+    titleSuffix = `[LIVE ${spinner || "▼"}]`;
   } else {
     const badge = newCount > 0 ? ` +${newCount}↑` : "";
     titleSuffix = `[PAUSED ↓${scrollOffset}${badge}]`;

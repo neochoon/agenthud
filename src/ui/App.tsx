@@ -563,6 +563,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
             width={width}
             cursorLine={viewerCursorLine}
             hasFocus={focus === "viewer"}
+            spinner={spinner}
           />
         )}
       </Box>

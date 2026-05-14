@@ -4,10 +4,10 @@ import type { ActivityEntry } from "../types/index.js";
 import {
   BOX,
   createBottomLine,
-  createTitleLine,
   getDisplayWidth,
   getInnerWidth,
 } from "./constants.js";
+import { getActivityStyle } from "./ActivityViewerPanel.js";
 
 export function wrapText(text: string, maxWidth: number): string[] {
   if (!text) return ["(empty)"];
@@ -56,11 +56,22 @@ export function DetailViewPanel({
     clampedOffset + visibleRows,
   );
 
-  const titleLabel = `${activity.icon} ${activity.label}`;
+  const style = getActivityStyle(activity);
   const scrollSuffix =
     totalLines > visibleRows
       ? `[${clampedOffset + 1}-${Math.min(clampedOffset + visibleRows, totalLines)}/${totalLines}]`
       : "";
+
+  const iconWidth = getDisplayWidth(activity.icon);
+  const labelWidth = activity.label.length;
+  const scrollPart = scrollSuffix ? ` ${scrollSuffix} ${BOX.h}` : "";
+  const scrollPartWidth = scrollSuffix ? getDisplayWidth(scrollPart) : 0;
+  const dashCount = Math.max(
+    0,
+    width - 3 - iconWidth - 1 - labelWidth - 1 - scrollPartWidth - 1,
+  );
+  const dashes = BOX.h.repeat(dashCount);
+  const titleRight = `${dashes}${scrollPart}${BOX.tr}`;
 
   const contentRows: React.ReactElement[] = [];
   for (let i = 0; i < visibleRows; i++) {
@@ -77,7 +88,13 @@ export function DetailViewPanel({
 
   return (
     <Box flexDirection="column" width={width}>
-      <Text>{createTitleLine(titleLabel, scrollSuffix, width)}</Text>
+      <Text>
+        {BOX.tl}{BOX.h}{" "}
+        <Text color="cyan">{activity.icon}</Text>
+        {" "}
+        <Text color={style.color} dimColor={style.dimColor}>{activity.label}</Text>
+        {" "}{titleRight}
+      </Text>
       {contentRows}
       <Text>{createBottomLine(width)}</Text>
     </Box>

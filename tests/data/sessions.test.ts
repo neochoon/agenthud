@@ -86,6 +86,7 @@ describe("discoverSessions", () => {
     const tree = discoverSessions(mockConfig);
     expect(tree.sessions).toHaveLength(1);
     expect(tree.sessions[0].id).toBe("abc123");
+    expect(tree.sessions[0].hideKey).toBe("myproject/abc123");
     expect(tree.sessions[0].subAgents).toHaveLength(0);
     expect(tree.sessions[0].modelName).toBe("sonnet-4");
   });
@@ -210,8 +211,10 @@ describe("discoverSessions", () => {
     const tree = discoverSessions(mockConfig);
     expect(tree.sessions).toHaveLength(1);
     expect(tree.sessions[0].id).toBe("parent-id");
+    expect(tree.sessions[0].hideKey).toBe("proj/parent-id");
     expect(tree.sessions[0].subAgents).toHaveLength(1);
     expect(tree.sessions[0].subAgents[0].id).toBe("child-id");
+    expect(tree.sessions[0].subAgents[0].hideKey).toBe("proj/child-id");
     expect(tree.totalCount).toBe(2);
   });
 
@@ -290,7 +293,7 @@ describe("discoverSessions", () => {
 
     const configWithHidden = {
       ...mockConfig,
-      hiddenSessions: ["abc123"],
+      hiddenSessions: ["myproject/abc123"],
     };
 
     const tree = discoverSessions(configWithHidden);

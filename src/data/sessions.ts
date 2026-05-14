@@ -101,6 +101,7 @@ function buildSubAgents(
   parentId: string,
   projectDir: string,
   config: GlobalConfig,
+  projectName: string,
 ): SessionNode[] {
   const subagentsDir = join(projectDir, parentId, "subagents");
   if (!existsSync(subagentsDir)) return [];
@@ -117,12 +118,14 @@ function buildSubAgents(
   return files
     .map((file): SessionNode | null => {
       const id = file.replace(/\.jsonl$/, "");
+      const hideKey = `${projectName}/${id}`;
       const filePath = join(subagentsDir, file);
       try {
         const stat = statSync(filePath);
         const { agentId, taskDescription } = readSubAgentInfo(filePath);
         return {
           id,
+          hideKey,
           filePath,
           projectPath: "",
           projectName: "",
@@ -139,7 +142,7 @@ function buildSubAgents(
     })
     .filter(
       (n): n is SessionNode =>
-        n !== null && !config.hiddenSubAgents.includes(n.id),
+        n !== null && !config.hiddenSubAgents.includes(n.hideKey),
     )
     .sort((a, b) => b.lastModifiedMs - a.lastModifiedMs);
 }
@@ -182,12 +185,14 @@ export function discoverSessions(config: GlobalConfig): SessionTree {
 
     for (const file of files) {
       const id = file.replace(/\.jsonl$/, "");
+      const hideKey = `${projectName}/${id}`;
       const filePath = join(projectDir, file);
       try {
         const stat = statSync(filePath);
-        const subAgents = buildSubAgents(id, projectDir, config);
+        const subAgents = buildSubAgents(id, projectDir, config, projectName);
         allSessions.push({
           id,
+          hideKey,
           filePath,
           projectPath: decodedPath,
           projectName,
@@ -213,7 +218,7 @@ export function discoverSessions(config: GlobalConfig): SessionTree {
   });
 
   const visible = allSessions.filter(
-    (s) => !config.hiddenSessions.includes(s.id),
+    (s) => !config.hiddenSessions.includes(s.hideKey),
   );
   const totalCount =
     visible.length + visible.reduce((sum, s) => sum + s.subAgents.length, 0);

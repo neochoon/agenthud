@@ -4,6 +4,7 @@ export type SessionStatus = "hot" | "warm" | "cool" | "cold";
 // A single Claude session node (top-level or sub-agent)
 export interface SessionNode {
   id: string; // UUID from JSONL filename (without .jsonl)
+  hideKey: string; // "projectName/uuid" — used for hiddenSessions/hiddenSubAgents config
   filePath: string; // absolute path to .jsonl file
   projectPath: string; // decoded project path (e.g. /Users/neo/myproject)
   projectName: string; // basename(projectPath)

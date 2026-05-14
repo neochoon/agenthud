@@ -5,6 +5,7 @@ import { SessionTreePanel } from "../../src/ui/SessionTreePanel.js";
 
 const makeSession = (overrides: Partial<SessionNode> = {}): SessionNode => ({
   id: "abc123",
+  hideKey: "myproject/abc123",
   filePath: "/home/user/.claude/projects/-proj/abc123.jsonl",
   projectPath: "/Users/neo/myproject",
   projectName: "myproject",

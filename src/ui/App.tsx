@@ -461,7 +461,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
         const coldSessions = sessionTree.sessions.filter(
           (s) => s.status === "cold",
         );
-        for (const s of coldSessions) hideSession(s.id);
+        for (const s of coldSessions) hideSession(s.hideKey);
         // __cold__ and everything below it disappears — move up
         const nextId = allFlat[selectedIndex - 1]?.id ?? null;
         refresh();
@@ -469,8 +469,11 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
         return;
       }
 
-      if (sessionTree.sessions.some((s) => s.id === selectedId)) {
-        hideSession(selectedId);
+      const selectedSession = sessionTree.sessions.find(
+        (s) => s.id === selectedId,
+      );
+      if (selectedSession) {
+        hideSession(selectedSession.hideKey);
         const nextId =
           allFlat[selectedIndex + 1]?.id ??
           allFlat[selectedIndex - 1]?.id ??
@@ -481,8 +484,9 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
       }
 
       for (const s of sessionTree.sessions) {
-        if (s.subAgents.some((sa) => sa.id === selectedId)) {
-          hideSubAgent(selectedId);
+        const selectedSubAgent = s.subAgents.find((sa) => sa.id === selectedId);
+        if (selectedSubAgent) {
+          hideSubAgent(selectedSubAgent.hideKey);
           const nextId =
             allFlat[selectedIndex + 1]?.id ??
             allFlat[selectedIndex - 1]?.id ??

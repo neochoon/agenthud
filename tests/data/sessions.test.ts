@@ -128,6 +128,44 @@ describe("discoverSessions", () => {
     expect(tree.sessions[0].status).toBe("hot");
   });
 
+  it("marks session as warm when mtime is between 30m and 1h ago", () => {
+    const projectsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".claude",
+      "projects",
+    );
+    const projectDir = join(projectsDir, "-Users-neo-myproject");
+
+    vi.mocked(existsSync).mockImplementation((p) => {
+      const path = String(p);
+      return path === projectsDir || path.includes("myproject");
+    });
+    vi.mocked(readdirSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === projectsDir)
+        return ["-Users-neo-myproject"] as unknown as ReturnType<
+          typeof readdirSync
+        >;
+      if (path === projectDir)
+        return ["sess1.jsonl"] as unknown as ReturnType<typeof readdirSync>;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(statSync).mockImplementation((p) => {
+      const path = String(p);
+      const isDir = !path.endsWith(".jsonl");
+      return {
+        isDirectory: () => isDir,
+        mtimeMs: NOW - 45 * 60 * 1000,
+        size: 100,
+      } as ReturnType<typeof statSync>;
+    });
+    vi.mocked(readFileSync).mockReturnValue("");
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const tree = discoverSessions(mockConfig);
+    expect(tree.sessions[0].status).toBe("warm");
+  });
+
   it("nests sub-agents under their parent", () => {
     const projectsDir = join(
       process.env.HOME ?? "/home/user",
@@ -213,7 +251,7 @@ describe("discoverSessions", () => {
 
     const tree = discoverSessions(mockConfig);
     expect(tree.sessions).toHaveLength(1);
-    // Status is cool (same UTC day as NOW) — calendar logic added in Task 3
+    // NOW-2h is same UTC day as NOW, so status is cool (calendar-based).
     expect(tree.sessions[0].status).toBe("cool");
   });
 

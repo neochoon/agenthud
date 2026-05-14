@@ -28,6 +28,54 @@ describe("parseArgs", () => {
   it("parses -V", () => {
     expect(parseArgs(["-V"])).toEqual({ mode: "watch", command: "version" });
   });
+
+  describe("report subcommand", () => {
+    it("returns report mode with today when no date given", () => {
+      const opts = parseArgs(["report"]);
+      expect(opts.mode).toBe("report");
+      expect(opts.reportDate).toBeDefined();
+      const today = new Date();
+      expect(opts.reportDate!.getUTCFullYear()).toBe(today.getUTCFullYear());
+      expect(opts.reportDate!.getUTCMonth()).toBe(today.getUTCMonth());
+      expect(opts.reportDate!.getUTCDate()).toBe(today.getUTCDate());
+    });
+
+    it("parses --date YYYY-MM-DD", () => {
+      const opts = parseArgs(["report", "--date", "2026-05-14"]);
+      expect(opts.mode).toBe("report");
+      expect(opts.reportDate!.getUTCFullYear()).toBe(2026);
+      expect(opts.reportDate!.getUTCMonth()).toBe(4); // May = 4
+      expect(opts.reportDate!.getUTCDate()).toBe(14);
+    });
+
+    it("parses --date today", () => {
+      const opts = parseArgs(["report", "--date", "today"]);
+      expect(opts.mode).toBe("report");
+      const today = new Date();
+      expect(opts.reportDate!.getUTCDate()).toBe(today.getUTCDate());
+    });
+
+    it("uses default include types when --include not given", () => {
+      const opts = parseArgs(["report"]);
+      expect(opts.reportInclude).toEqual(["response", "bash", "edit", "thinking"]);
+    });
+
+    it("parses --include all", () => {
+      const opts = parseArgs(["report", "--include", "all"]);
+      expect(opts.reportInclude).toEqual(["response", "bash", "edit", "thinking", "read", "glob", "user"]);
+    });
+
+    it("parses --include response,edit", () => {
+      const opts = parseArgs(["report", "--include", "response,edit"]);
+      expect(opts.reportInclude).toEqual(["response", "edit"]);
+    });
+
+    it("returns error for invalid date", () => {
+      const opts = parseArgs(["report", "--date", "not-a-date"]);
+      expect(opts.mode).toBe("report");
+      expect(opts.reportError).toContain("Invalid date");
+    });
+  });
 });
 
 describe("getHelp", () => {

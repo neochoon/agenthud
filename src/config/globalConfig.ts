@@ -36,7 +36,7 @@ export function loadGlobalConfig(): GlobalConfig {
 
   let parsed: Record<string, unknown>;
   try {
-    parsed = parseYaml(raw) as Record<string, unknown>;
+    parsed = (parseYaml(raw) as Record<string, unknown>) ?? {};
   } catch {
     return config;
   }

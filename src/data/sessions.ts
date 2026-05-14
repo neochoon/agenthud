@@ -24,9 +24,18 @@ function getSessionStatus(mtimeMs: number): SessionStatus {
   const age = now - mtimeMs;
   if (age < THIRTY_MINUTES_MS) return "hot";
   if (age < ONE_HOUR_MS) return "warm";
-  // Calendar-based cool vs cold — Task 3 adds full calendar logic
-  // For now, treat everything >= 1h as "cool" (Task 3 fixes this)
-  return "cool";
+
+  // Use UTC date comparison for timezone-consistent behavior.
+  const mtime = new Date(mtimeMs);
+  const nowDate = new Date(now);
+  if (
+    mtime.getUTCFullYear() === nowDate.getUTCFullYear() &&
+    mtime.getUTCMonth() === nowDate.getUTCMonth() &&
+    mtime.getUTCDate() === nowDate.getUTCDate()
+  ) {
+    return "cool";
+  }
+  return "cold";
 }
 
 function extractTaskDescription(content: string): string {

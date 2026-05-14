@@ -216,4 +216,78 @@ describe("discoverSessions", () => {
     // Status is cool (same UTC day as NOW) — calendar logic added in Task 3
     expect(tree.sessions[0].status).toBe("cool");
   });
+
+  describe("session status calendar logic", () => {
+    it("marks session as cool when mtime is today (UTC) but older than 1 hour", () => {
+      const projectsDir = join(
+        process.env.HOME ?? "/home/user",
+        ".claude",
+        "projects",
+      );
+      const projectDir = join(projectsDir, "-Users-neo-proj");
+
+      vi.mocked(existsSync).mockImplementation((p) => {
+        const path = String(p);
+        return path === projectsDir || path.includes("-neo-proj");
+      });
+      vi.mocked(readdirSync).mockImplementation((p) => {
+        const path = String(p);
+        if (path === projectsDir)
+          return ["-Users-neo-proj"] as unknown as ReturnType<typeof readdirSync>;
+        if (path === projectDir)
+          return ["sess.jsonl"] as unknown as ReturnType<typeof readdirSync>;
+        return [] as unknown as ReturnType<typeof readdirSync>;
+      });
+      // NOW = 2023-11-14 22:13 UTC. 2 hours earlier = 20:13 UTC same day.
+      vi.mocked(statSync).mockImplementation((p) => {
+        const path = String(p);
+        return {
+          isDirectory: () => !path.endsWith(".jsonl"),
+          mtimeMs: NOW - 2 * 60 * 60 * 1000,
+          size: 100,
+        } as ReturnType<typeof statSync>;
+      });
+      vi.mocked(readFileSync).mockReturnValue("");
+      vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+      const tree = discoverSessions(mockConfig);
+      expect(tree.sessions[0].status).toBe("cool");
+    });
+
+    it("marks session as cold when mtime is a previous UTC day", () => {
+      const projectsDir = join(
+        process.env.HOME ?? "/home/user",
+        ".claude",
+        "projects",
+      );
+      const projectDir = join(projectsDir, "-Users-neo-proj");
+
+      vi.mocked(existsSync).mockImplementation((p) => {
+        const path = String(p);
+        return path === projectsDir || path.includes("-neo-proj");
+      });
+      vi.mocked(readdirSync).mockImplementation((p) => {
+        const path = String(p);
+        if (path === projectsDir)
+          return ["-Users-neo-proj"] as unknown as ReturnType<typeof readdirSync>;
+        if (path === projectDir)
+          return ["sess.jsonl"] as unknown as ReturnType<typeof readdirSync>;
+        return [] as unknown as ReturnType<typeof readdirSync>;
+      });
+      // 72 hours ago is always a previous UTC day regardless of timezone.
+      vi.mocked(statSync).mockImplementation((p) => {
+        const path = String(p);
+        return {
+          isDirectory: () => !path.endsWith(".jsonl"),
+          mtimeMs: NOW - 72 * 60 * 60 * 1000,
+          size: 100,
+        } as ReturnType<typeof statSync>;
+      });
+      vi.mocked(readFileSync).mockReturnValue("");
+      vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+      const tree = discoverSessions(mockConfig);
+      expect(tree.sessions[0].status).toBe("cold");
+    });
+  });
 });

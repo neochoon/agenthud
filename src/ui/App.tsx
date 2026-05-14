@@ -8,6 +8,8 @@ import { getVersion } from "../cli.js";
 import {
   ensureLogDir,
   hasProjectLevelConfig,
+  hideSession,
+  hideSubAgent,
   loadGlobalConfig,
 } from "../config/globalConfig.js";
 import { parseSessionHistory } from "../data/sessionHistory.js";
@@ -278,6 +280,32 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
         }
         return next;
       });
+    },
+    onHide: () => {
+      if (focus !== "tree" || !selectedId) return;
+
+      if (selectedId === "__cold__") {
+        const coldSessions = sessionTree.sessions.filter(
+          (s) => s.status === "cold",
+        );
+        for (const s of coldSessions) hideSession(s.id);
+        refresh();
+        return;
+      }
+
+      if (sessionTree.sessions.some((s) => s.id === selectedId)) {
+        hideSession(selectedId);
+        refresh();
+        return;
+      }
+
+      for (const s of sessionTree.sessions) {
+        if (s.subAgents.some((sa) => sa.id === selectedId)) {
+          hideSubAgent(selectedId);
+          refresh();
+          return;
+        }
+      }
     },
     onSaveLog: saveLog,
     onRefresh: refresh,

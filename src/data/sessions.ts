@@ -1,7 +1,12 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
-import type { GlobalConfig, SessionNode, SessionStatus, SessionTree } from "../types/index.js";
+import type {
+  GlobalConfig,
+  SessionNode,
+  SessionStatus,
+  SessionTree,
+} from "../types/index.js";
 import { ONE_HOUR_MS, THIRTY_MINUTES_MS } from "../ui/constants.js";
 import { parseModelName } from "./activityParser.js";
 
@@ -132,7 +137,10 @@ function buildSubAgents(
         return null;
       }
     })
-    .filter((n): n is SessionNode => n !== null && !config.hiddenSubAgents.includes(n.id))
+    .filter(
+      (n): n is SessionNode =>
+        n !== null && !config.hiddenSubAgents.includes(n.id),
+    )
     .sort((a, b) => b.lastModifiedMs - a.lastModifiedMs);
 }
 

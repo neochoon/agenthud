@@ -76,6 +76,7 @@ function makeOptions(overrides = {}) {
     onRefresh: vi.fn(),
     onQuit: vi.fn(),
     onEnter: vi.fn(),
+    onHide: vi.fn(),
     ...overrides,
   };
 }
@@ -159,6 +160,24 @@ describe("useHotkeys", () => {
       );
       act(() => result.current.handleInput("", returnKey));
       expect(onEnter).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls onHide when h is pressed in tree focus", () => {
+      const onHide = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ focus: "tree", onHide })),
+      );
+      act(() => result.current.handleInput("h", noopKey));
+      expect(onHide).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not call onHide when h is pressed in viewer focus", () => {
+      const onHide = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ focus: "viewer", onHide })),
+      );
+      act(() => result.current.handleInput("h", noopKey));
+      expect(onHide).not.toHaveBeenCalled();
     });
   });
 
@@ -266,6 +285,7 @@ describe("useHotkeys", () => {
         "↑↓/jk: select",
         "PgUp/Dn: page",
         "↵: expand",
+        "h: hide",
         "r: refresh",
         "q: quit",
       ]);

@@ -272,8 +272,18 @@ describe("SessionTreePanel", () => {
   it("shows hot and warm sub-agents individually", () => {
     const session = makeSession({
       subAgents: [
-        makeSession({ id: "h1", projectName: "", status: "hot", subAgents: [] }),
-        makeSession({ id: "w1", projectName: "", status: "warm", subAgents: [] }),
+        makeSession({
+          id: "h1",
+          projectName: "",
+          status: "hot",
+          subAgents: [],
+        }),
+        makeSession({
+          id: "w1",
+          projectName: "",
+          status: "warm",
+          subAgents: [],
+        }),
       ],
     });
     const { lastFrame } = render(
@@ -290,8 +300,18 @@ describe("SessionTreePanel", () => {
   it("collapses two cool sub-agents into a summary line", () => {
     const session = makeSession({
       subAgents: [
-        makeSession({ id: "c1", projectName: "", status: "cool", subAgents: [] }),
-        makeSession({ id: "c2", projectName: "", status: "cool", subAgents: [] }),
+        makeSession({
+          id: "c1",
+          projectName: "",
+          status: "cool",
+          subAgents: [],
+        }),
+        makeSession({
+          id: "c2",
+          projectName: "",
+          status: "cool",
+          subAgents: [],
+        }),
       ],
     });
     const { lastFrame } = render(
@@ -310,8 +330,18 @@ describe("SessionTreePanel", () => {
   it("shows combined cool and cold sub-agent summary", () => {
     const session = makeSession({
       subAgents: [
-        makeSession({ id: "c1", projectName: "", status: "cool", subAgents: [] }),
-        makeSession({ id: "d1", projectName: "", status: "cold", subAgents: [] }),
+        makeSession({
+          id: "c1",
+          projectName: "",
+          status: "cool",
+          subAgents: [],
+        }),
+        makeSession({
+          id: "d1",
+          projectName: "",
+          status: "cold",
+          subAgents: [],
+        }),
       ],
     });
     const { lastFrame } = render(
@@ -330,9 +360,24 @@ describe("SessionTreePanel", () => {
   it("shows hot sub-agent individually and summarizes cool/cold", () => {
     const session = makeSession({
       subAgents: [
-        makeSession({ id: "h1", projectName: "", status: "hot", subAgents: [] }),
-        makeSession({ id: "c1", projectName: "", status: "cool", subAgents: [] }),
-        makeSession({ id: "d1", projectName: "", status: "cold", subAgents: [] }),
+        makeSession({
+          id: "h1",
+          projectName: "",
+          status: "hot",
+          subAgents: [],
+        }),
+        makeSession({
+          id: "c1",
+          projectName: "",
+          status: "cool",
+          subAgents: [],
+        }),
+        makeSession({
+          id: "d1",
+          projectName: "",
+          status: "cold",
+          subAgents: [],
+        }),
       ],
     });
     const { lastFrame } = render(

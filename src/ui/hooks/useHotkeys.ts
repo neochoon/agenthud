@@ -1,4 +1,3 @@
-// src/ui/hooks/useHotkeys.ts
 interface UseHotkeysOptions {
   focus: "tree" | "viewer";
   onSwitchFocus: () => void;
@@ -12,6 +11,7 @@ interface UseHotkeysOptions {
   onRefresh: () => void;
   onQuit: () => void;
   onEnter: () => void;
+  onHide: () => void;
 }
 
 export interface UseHotkeysResult {
@@ -42,6 +42,7 @@ export function useHotkeys({
   onRefresh,
   onQuit,
   onEnter,
+  onHide,
 }: UseHotkeysOptions): UseHotkeysResult {
   const handleInput = (
     input: string,
@@ -80,6 +81,21 @@ export function useHotkeys({
       return;
     }
 
+    if (focus === "tree") {
+      if (input === "h") {
+        onHide();
+        return;
+      }
+      if (key.upArrow || input === "k") {
+        onScrollUp();
+        return;
+      }
+      if (key.downArrow || input === "j") {
+        onScrollDown();
+        return;
+      }
+    }
+
     if (focus === "viewer") {
       if (key.upArrow || input === "k") {
         onScrollUp();
@@ -102,17 +118,6 @@ export function useHotkeys({
         return;
       }
     }
-
-    if (focus === "tree") {
-      if (key.upArrow || input === "k") {
-        onScrollUp();
-        return;
-      }
-      if (key.downArrow || input === "j") {
-        onScrollDown();
-        return;
-      }
-    }
   };
 
   const statusBarItems =
@@ -122,6 +127,7 @@ export function useHotkeys({
           "↑↓/jk: select",
           "PgUp/Dn: page",
           "↵: expand",
+          "h: hide",
           "r: refresh",
           "q: quit",
         ]

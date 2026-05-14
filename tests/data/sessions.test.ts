@@ -314,7 +314,9 @@ describe("discoverSessions", () => {
       vi.mocked(readdirSync).mockImplementation((p) => {
         const path = String(p);
         if (path === projectsDir)
-          return ["-Users-neo-proj"] as unknown as ReturnType<typeof readdirSync>;
+          return ["-Users-neo-proj"] as unknown as ReturnType<
+            typeof readdirSync
+          >;
         if (path === projectDir)
           return ["sess.jsonl"] as unknown as ReturnType<typeof readdirSync>;
         return [] as unknown as ReturnType<typeof readdirSync>;
@@ -350,7 +352,9 @@ describe("discoverSessions", () => {
       vi.mocked(readdirSync).mockImplementation((p) => {
         const path = String(p);
         if (path === projectsDir)
-          return ["-Users-neo-proj"] as unknown as ReturnType<typeof readdirSync>;
+          return ["-Users-neo-proj"] as unknown as ReturnType<
+            typeof readdirSync
+          >;
         if (path === projectDir)
           return ["sess.jsonl"] as unknown as ReturnType<typeof readdirSync>;
         return [] as unknown as ReturnType<typeof readdirSync>;

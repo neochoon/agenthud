@@ -74,9 +74,7 @@ describe("hideSession", () => {
 
   it("does not add duplicate id", () => {
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockReturnValue(
-      "hiddenSessions:\n  - abc123\n",
-    );
+    vi.mocked(readFileSync).mockReturnValue("hiddenSessions:\n  - abc123\n");
     vi.mocked(writeFileSync).mockImplementation(() => {});
 
     hideSession("abc123");

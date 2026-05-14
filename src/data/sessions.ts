@@ -11,7 +11,7 @@ import { ONE_HOUR_MS, THIRTY_MINUTES_MS } from "../ui/constants.js";
 import { parseModelName } from "./activityParser.js";
 
 export function getProjectsDir(): string {
-  return join(homedir(), ".claude", "projects");
+  return process.env.CLAUDE_PROJECTS_DIR ?? join(homedir(), ".claude", "projects");
 }
 
 function decodeProjectPath(encoded: string): string {

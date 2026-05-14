@@ -301,6 +301,19 @@ describe("discoverSessions", () => {
     expect(tree.totalCount).toBe(0);
   });
 
+  it("uses CLAUDE_PROJECTS_DIR env var when set", () => {
+    const customDir = "/custom/projects";
+    process.env.CLAUDE_PROJECTS_DIR = customDir;
+
+    vi.mocked(existsSync).mockReturnValue(false);
+
+    const tree = discoverSessions(mockConfig);
+    expect(vi.mocked(existsSync)).toHaveBeenCalledWith(customDir);
+    expect(tree.sessions).toHaveLength(0);
+
+    delete process.env.CLAUDE_PROJECTS_DIR;
+  });
+
   describe("session status calendar logic", () => {
     it("marks session as cool when mtime is today (UTC) but older than 1 hour", () => {
       const projectsDir = join(

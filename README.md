@@ -4,15 +4,13 @@
 [![CI](https://github.com/neochoon/agenthud/actions/workflows/ci.yml/badge.svg)](https://github.com/neochoon/agenthud/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/neochoon/agenthud/branch/main/graph/badge.svg)](https://codecov.io/gh/neochoon/agenthud)
 
-When working with AI coding agents like Claude Code, you lose visibility into what's happening. The agent reads files, runs commands, makes changes - but you're staring at a single terminal, waiting.
-
-**AgentHUD** gives you a live dashboard in a separate terminal. See exactly what Claude is doing, track git changes, monitor test results - all updating in real-time.
+When working with AI coding agents like Claude Code, you lose visibility into what's happening across sessions. **AgentHUD** gives you a live session browser in a separate terminal — see every session, sub-agent, and activity as it happens.
 
 ![demo](./output960.gif)
 
 ## Install
 
-Requires Node.js 20+. Tested on Ubuntu, Windows, macOS.
+Requires Node.js 20+.
 
 ```bash
 npx agenthud
@@ -20,158 +18,107 @@ npx agenthud
 
 Run this in a separate terminal while using Claude Code.
 
-## Why?
+## What it shows
 
-- **See what the agent is doing** - Watch file reads, edits, bash commands as they happen
-- **Track your git state** - Commits, branches, uncommitted changes at a glance
-- **Know if tests pass** - Results update automatically, shows if outdated
-- **Stay oriented** - Project info, dependencies, file counts
-- **Monitor other sessions** - See what's happening in your other Claude Code projects
-
-## Usage
+AgentHUD reads Claude Code's session files from `~/.claude/projects/` and displays them in a split view:
 
 ```
-agenthud [command] [options]
-
-Commands:
-  init              Create config file in current directory
-
-Options:
-  -w, --watch       Watch mode (default)
-  --once            Run once and exit
-  -V, --version     Show version
-  -h, --help        Show help
+┌─ Sessions ──────────────────────────────────────────────┐
+│ > agenthud                                              │
+│     sub-agent: code-reviewer                            │
+│   myproject                                             │
+│   dotfiles                                              │
+└─────────────────────────────────────────────────────────┘
+┌─ Activity · agenthud ───────────────────────────────────┐
+│ [10:23:45] ○ Read  src/ui/App.tsx                       │
+│ [10:23:46] ~ Edit  src/ui/App.tsx                       │
+│ [10:23:47] $ Bash  npm test                             │
+│ [10:23:50] < Response  Tests passed successfully        │
+│ [10:23:51] … Thinking  Analyzing the test results...    │
+└─────────────────────────────────────────────────────────┘
 ```
+
+**Session tree (top pane)**
+- All Claude Code sessions across all projects
+- Sub-agents shown nested under their parent session
+- Live indicator on currently active session
+
+**Activity viewer (bottom pane)**
+- Real-time activity feed for the selected session
+- File reads, edits, bash commands, responses, thinking blocks
+- Automatically tails the live session; press `g` to scroll back to top
+
+## Activity types
+
+| Icon | Type | Description |
+|------|------|-------------|
+| `○` | Read | File being read |
+| `~` | Edit / Write | File being modified |
+| `$` | Bash | Shell command |
+| `*` | Glob / Grep | File search |
+| `@` | WebFetch / WebSearch | Web request |
+| `»` | Task | Sub-agent task |
+| `<` | Response | Claude's text response |
+| `>` | User | Your message |
+| `…` | Thinking | Claude's thinking (requires `showThinkingSummaries: true`) |
+
+## Keyboard shortcuts
+
+### Session tree focus
+
+| Key | Action |
+|-----|--------|
+| `↑` / `k` | Select previous session |
+| `↓` / `j` | Select next session |
+| `↵` | Expand / collapse sub-agents |
+| `h` | Hide session or sub-agent |
+| `Tab` | Switch to activity viewer |
+| `PgUp` / `Ctrl+B` | Page up |
+| `PgDn` / `Ctrl+F` | Page down |
+| `r` | Refresh |
+| `q` | Quit |
+
+### Activity viewer focus
+
+| Key | Action |
+|-----|--------|
+| `↑` / `k` | Scroll up |
+| `↓` / `j` | Scroll down |
+| `g` | Jump to top |
+| `G` | Jump to bottom (live) |
+| `↵` | Open detail view |
+| `s` | Save log to `~/.agenthud/logs/` |
+| `Tab` | Switch to session tree |
+| `PgUp` / `Ctrl+B` | Page up |
+| `PgDn` / `Ctrl+F` | Page down |
+| `Ctrl+U` | Half page up |
+| `Ctrl+D` | Half page down |
+| `q` | Quit |
+
+### Detail view (full content)
+
+Press `↵` on any activity to open a scrollable full-content view.
+
+| Key | Action |
+|-----|--------|
+| `↑` / `k` | Scroll up |
+| `↓` / `j` | Scroll down |
+| `↵` / `Esc` / `q` | Close |
 
 ## Configuration
 
-Optional. Create `.agenthud.yaml` to customize:
+Optional. Create `~/.agenthud/config.yaml`:
 
 ```yaml
-panels:
-  claude:
-    enabled: true
-    interval: 5s
-    max_activities: 20
-  git:
-    enabled: true
-    interval: 30s
-  tests:
-    enabled: true
-    interval: manual  # press 't' to run
-  project:
-    enabled: true
-    interval: 60s
-  other_sessions:
-    enabled: true
-    interval: 10s
+refreshInterval: 2s       # How often to poll for updates (default: 2s)
+logDir: ~/.agenthud/logs  # Where to save logs with 's' key
+
+# Sessions/sub-agents to hide from the tree
+hiddenSessions:
+  - old-project
+hiddenSubAgents:
+  - code-reviewer
 ```
-
-## Panels
-
-### Claude Panel
-
-Shows real-time Claude Code activity:
-
-```
-┌─ Claude ─────────────────────────────────────────────┐
-│ [10:23:45] ○ Read: src/components/Button.tsx         │
-│ [10:23:46] ~ Edit: src/components/Button.tsx         │
-│ [10:23:47] $ Bash: npm test                          │
-│ [10:23:50] < Response: Tests passed successfully...  │
-└──────────────────────────────────────────────────────┘
-```
-
-- **○ Read**: File being read
-- **~ Edit/Write**: File being modified
-- **$ Bash**: Command being executed
-- **< Response**: Claude's text response
-
-### Git Panel
-
-Shows today's git activity and current state:
-
-```
-┌─ Git ────────────────────────────────────────────────┐
-│ feat/add-dashboard · +142 -23 · 3 commits · 5 files  │
-│ • abc1234 Add dashboard component                    │
-│ • def5678 Fix styling issues                         │
-└──────────────────────────────────────────────────────┘
-```
-
-- **Branch name**: Current working branch (green)
-- **Stats**: Lines added/deleted, commits, files changed
-- **dirty**: Shows uncommitted change count (yellow)
-
-### Tests Panel
-
-Shows test results with staleness detection:
-
-```
-┌─ Tests ──────────────────────────────────────────────┐
-│ ✓ 42 passed  ✗ 1 failed  ○ 2 skipped · abc1234       │
-│ ⚠ Outdated (3 commits behind)                        │
-│──────────────────────────────────────────────────────│
-│ ✗ Button.test.tsx                                    │
-│   • should render correctly                          │
-└──────────────────────────────────────────────────────┘
-```
-
-- **✓ passed** (green), **✗ failed** (red), **○ skipped**
-- **⚠ Outdated**: Warning if tests are behind commits
-- **Failures**: Shows failing test file and name
-
-**Auto-detection**: During `agenthud init`, the test framework is automatically detected:
-
-| Framework | Detection |
-|-----------|-----------|
-| vitest | package.json devDependencies |
-| jest | package.json devDependencies |
-| mocha | package.json devDependencies |
-| pytest | pytest.ini, conftest.py, pyproject.toml, requirements.txt |
-
-If the test command fails, the panel is automatically disabled.
-
-### Project Panel
-
-Shows project overview and structure:
-
-```
-┌─ Project ────────────────────────────────────────────┐
-│ agenthud · TypeScript · MIT                          │
-│ Stack: react, ink, vitest                            │
-│ Files: 45 .ts · Lines: 3.2k                          │
-│ Deps: 12 prod · 8 dev                                │
-└──────────────────────────────────────────────────────┘
-```
-
-- **Name/Language/License**: Project basics
-- **Stack**: Detected frameworks and tools
-- **Files/Lines**: Source code stats
-- **Deps**: Dependency counts
-
-### Other Sessions Panel
-
-Shows activity from your other Claude Code projects:
-
-```
-┌─ Other Sessions ─────────────────────────────────────┐
-│ dotfiles, pain-radar, myapp +4 | * 1 active          │
-│                                                      │
-│ * dotfiles (2m ago)                                  │
-│    "Updated the config file as requested..."         │
-└──────────────────────────────────────────────────────┘
-```
-
-- **Project names**: Shows up to 3 recent projects, +N for more
-- **Active indicator**: `*` active (within 5 min), `o` inactive
-- **Last message**: Most recent assistant response from that session
-
-## Keyboard
-
-- `q` quit
-- `r` refresh all
-- `t` run tests (when manual)
 
 ## Feedback
 

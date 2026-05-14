@@ -148,7 +148,12 @@ function SessionRow({
 
 type FlatRow =
   | { kind: "session"; session: SessionNode; prefix: string }
-  | { kind: "subagent-summary"; coolCount: number; coldCount: number }
+  | {
+      kind: "subagent-summary";
+      parentId: string;
+      coolCount: number;
+      coldCount: number;
+    }
   | { kind: "cold-sessions-summary"; count: number };
 
 function appendSessionRows(
@@ -186,6 +191,7 @@ function appendSessionRows(
     if (hasSummary) {
       result.push({
         kind: "subagent-summary",
+        parentId: session.id,
         coolCount: cool.length,
         coldCount: cold.length,
       });
@@ -225,20 +231,33 @@ function SubagentSummaryRow({
   coolCount,
   coldCount,
   contentWidth,
+  isSelected,
+  hasFocus,
 }: {
   coolCount: number;
   coldCount: number;
   contentWidth: number;
+  isSelected: boolean;
+  hasFocus: boolean;
 }): React.ReactElement {
   const parts: string[] = [];
   if (coolCount > 0) parts.push(`${coolCount} cool`);
   if (coldCount > 0) parts.push(`${coldCount} cold`);
+  const hint = " +";
   const text = `└─ ... ${parts.join("  ")}`;
-  const padding = Math.max(0, contentWidth - getDisplayWidth(text) - 1);
+  const padding = Math.max(
+    0,
+    contentWidth - getDisplayWidth(text) - getDisplayWidth(hint),
+  );
+  const active = isSelected && hasFocus;
   return (
     <Text>
-      {BOX.v} <Text dimColor>{text}</Text>
-      {" ".repeat(padding)}
+      {BOX.v}{" "}
+      <Text dimColor={!active} inverse={active}>
+        {text}
+        {" ".repeat(padding)}
+        {hint}
+      </Text>
       {BOX.v}
     </Text>
   );
@@ -257,28 +276,20 @@ function ColdSessionsSummaryRow({
 }): React.ReactElement {
   const innerWidth = getInnerWidth(width);
   const label = ` ${count} cold `;
-  const hint = isSelected && hasFocus ? " ↵ " : "";
+  const hint = isSelected && hasFocus ? " + " : "";
   const hintWidth = getDisplayWidth(hint);
-  const dashCount = Math.max(
-    0,
-    innerWidth - 1 - getDisplayWidth(label) - hintWidth,
-  );
+  const labelWidth = getDisplayWidth(label);
+  const dashCount = Math.max(0, innerWidth - 1 - labelWidth - hintWidth);
   const dashes = BOX.h.repeat(dashCount);
+  const line = `${BOX.ml}${BOX.h}${label}${dashes}${hint}${BOX.mr}`;
   const highlight = isSelected && hasFocus;
   return (
-    <Text>
-      <Text
-        backgroundColor={highlight ? "blue" : undefined}
-        bold={highlight}
-        dimColor={!highlight}
-      >
-        {BOX.ml}
-        {BOX.h}
-        {label}
-        {dashes}
-        {hint}
-        {BOX.mr}
-      </Text>
+    <Text
+      backgroundColor={highlight ? "blue" : undefined}
+      bold={highlight}
+      dimColor={!highlight}
+    >
+      {line}
     </Text>
   );
 }
@@ -314,14 +325,28 @@ export function SessionTreePanel({
   }
 
   const flatRows = flattenSessions(sessions, expandedIds);
+  const totalRows = flatRows.length;
 
-  // Truncate to maxRows, reserving 1 row for the overflow indicator
-  const limit =
-    maxRows !== undefined && flatRows.length > maxRows
-      ? maxRows - 1
-      : flatRows.length;
-  const displayRows = flatRows.slice(0, limit);
-  const hiddenCount = flatRows.length - displayRows.length;
+  // Find the index of the currently selected row
+  const selectedFlatIndex = flatRows.findIndex((row) => {
+    if (row.kind === "session") return row.session.id === selectedId;
+    if (row.kind === "subagent-summary")
+      return selectedId === `__sub-${row.parentId}__`;
+    if (row.kind === "cold-sessions-summary") return selectedId === "__cold__";
+    return false;
+  });
+
+  // Compute scrollTop so the selected row stays visible
+  const needsOverflow = maxRows !== undefined && totalRows > maxRows;
+  const visibleCount = needsOverflow ? maxRows - 1 : totalRows;
+  let scrollTop = 0;
+  if (needsOverflow && selectedFlatIndex >= 0) {
+    scrollTop = Math.max(0, selectedFlatIndex - visibleCount + 1);
+    scrollTop = Math.min(scrollTop, Math.max(0, totalRows - visibleCount));
+  }
+
+  const displayRows = flatRows.slice(scrollTop, scrollTop + visibleCount);
+  const hiddenBelow = totalRows - (scrollTop + displayRows.length);
 
   return (
     <Box flexDirection="column" width={width}>
@@ -342,6 +367,8 @@ export function SessionTreePanel({
             coolCount={row.coolCount}
             coldCount={row.coldCount}
             contentWidth={contentWidth}
+            isSelected={selectedId === `__sub-${row.parentId}__`}
+            hasFocus={hasFocus}
           />
         ) : (
           <ColdSessionsSummaryRow
@@ -353,11 +380,11 @@ export function SessionTreePanel({
           />
         ),
       )}
-      {hiddenCount > 0 && (
+      {hiddenBelow > 0 && (
         <Text>
-          {BOX.v} <Text dimColor>{`... ${hiddenCount} more`}</Text>
+          {BOX.v} <Text dimColor>{`... ${hiddenBelow} more`}</Text>
           {" ".repeat(
-            Math.max(0, contentWidth - `... ${hiddenCount} more`.length - 1),
+            Math.max(0, contentWidth - `... ${hiddenBelow} more`.length - 1),
           )}
           {BOX.v}
         </Text>

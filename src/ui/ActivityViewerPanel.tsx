@@ -21,6 +21,9 @@ export function getActivityStyle(activity: ActivityEntry): ActivityStyle {
   if (activity.type === "response") {
     return { color: "green", dimColor: false };
   }
+  if (activity.type === "thinking") {
+    return { color: "magenta", dimColor: true };
+  }
   if (activity.type === "tool") {
     if (activity.label === "Bash") {
       return { color: "gray", dimColor: false };
@@ -38,6 +41,8 @@ export interface ActivityViewerPanelProps {
   newCount: number;
   visibleRows: number;
   width: number;
+  cursorLine: number;
+  hasFocus: boolean;
 }
 
 function formatActivityTime(date: Date, now: Date): string {
@@ -81,6 +86,8 @@ export function ActivityViewerPanel({
   newCount,
   visibleRows,
   width,
+  cursorLine,
+  hasFocus,
 }: ActivityViewerPanelProps): React.ReactElement {
   const innerWidth = getInnerWidth(width);
   const contentWidth = innerWidth - 1;
@@ -119,9 +126,11 @@ export function ActivityViewerPanel({
       </Text>,
     );
   } else {
+    const effectiveCursor = Math.min(cursorLine, visibleActivities.length - 1);
     for (let i = 0; i < visibleActivities.length; i++) {
       const activity = visibleActivities[i];
       const style = getActivityStyle(activity);
+      const isCursor = hasFocus && i === effectiveCursor;
 
       const time = formatActivityTime(activity.timestamp, now);
       const timestamp = `[${time}] `;
@@ -179,12 +188,18 @@ export function ActivityViewerPanel({
 
       lines.push(
         <Text key={`activity-${i}`}>
-          {BOX.v} <Text dimColor>{timestamp}</Text>
-          <Text color="cyan">{icon}</Text>{" "}
-          <Text color={style.color} dimColor={style.dimColor}>
-            {labelContent}
+          {BOX.v}{" "}
+          <Text backgroundColor={isCursor ? "blue" : undefined}>
+            <Text dimColor={!isCursor}>{timestamp}</Text>
+            <Text color="cyan">{icon}</Text>{" "}
+            <Text
+              color={isCursor ? undefined : style.color}
+              dimColor={!isCursor && style.dimColor}
+            >
+              {labelContent}
+            </Text>
+            {" ".repeat(padding)}
           </Text>
-          {" ".repeat(padding)}
           {BOX.v}
         </Text>,
       );

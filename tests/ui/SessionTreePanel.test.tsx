@@ -458,6 +458,6 @@ describe("SessionTreePanel", () => {
         width={80}
       />,
     );
-    expect(lastFrame()).toContain("↵");
+    expect(lastFrame()).toContain("+");
   });
 });

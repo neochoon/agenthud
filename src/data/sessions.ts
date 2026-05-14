@@ -10,7 +10,7 @@ import type {
 import { ONE_HOUR_MS, THIRTY_MINUTES_MS } from "../ui/constants.js";
 import { parseModelName } from "./activityParser.js";
 
-function getProjectsDir(): string {
+export function getProjectsDir(): string {
   return join(homedir(), ".claude", "projects");
 }
 

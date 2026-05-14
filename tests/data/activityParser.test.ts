@@ -105,4 +105,31 @@ describe("parseActivitiesFromLines", () => {
       result.activities.filter((a) => a.label === "TodoWrite"),
     ).toHaveLength(0);
   });
+
+  it("parses thinking blocks", () => {
+    const thinkingLines = [
+      JSON.stringify({
+        type: "assistant",
+        message: {
+          content: [
+            {
+              type: "thinking",
+              thinking: "I need to carefully analyze this problem.",
+            },
+            { type: "text", text: "Here is my answer to the question." },
+          ],
+        },
+        timestamp: "2025-01-15T10:00:00.000Z",
+      }),
+    ];
+    const result = parseActivitiesFromLines(thinkingLines);
+    const thinkingActivity = result.activities.find(
+      (a) => a.type === "thinking",
+    );
+    expect(thinkingActivity).toBeDefined();
+    expect(thinkingActivity?.label).toBe("Thinking");
+    expect(thinkingActivity?.detail).toBe(
+      "I need to carefully analyze this problem.",
+    );
+  });
 });

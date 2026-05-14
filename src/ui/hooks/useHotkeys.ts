@@ -1,10 +1,13 @@
 interface UseHotkeysOptions {
   focus: "tree" | "viewer";
+  detailMode: boolean;
   onSwitchFocus: () => void;
   onScrollUp: () => void;
   onScrollDown: () => void;
   onScrollPageUp: () => void;
   onScrollPageDown: () => void;
+  onScrollHalfPageUp: () => void;
+  onScrollHalfPageDown: () => void;
   onScrollTop: () => void;
   onScrollBottom: () => void;
   onSaveLog: () => void;
@@ -12,6 +15,9 @@ interface UseHotkeysOptions {
   onQuit: () => void;
   onEnter: () => void;
   onHide: () => void;
+  onDetailClose: () => void;
+  onDetailScrollUp: () => void;
+  onDetailScrollDown: () => void;
 }
 
 export interface UseHotkeysResult {
@@ -24,6 +30,8 @@ export interface UseHotkeysResult {
       pageUp: boolean;
       pageDown: boolean;
       return: boolean;
+      ctrl: boolean;
+      escape?: boolean;
     },
   ) => void;
   statusBarItems: string[];
@@ -31,11 +39,14 @@ export interface UseHotkeysResult {
 
 export function useHotkeys({
   focus,
+  detailMode,
   onSwitchFocus,
   onScrollUp,
   onScrollDown,
   onScrollPageUp,
   onScrollPageDown,
+  onScrollHalfPageUp,
+  onScrollHalfPageDown,
   onScrollTop,
   onScrollBottom,
   onSaveLog,
@@ -43,6 +54,9 @@ export function useHotkeys({
   onQuit,
   onEnter,
   onHide,
+  onDetailClose,
+  onDetailScrollUp,
+  onDetailScrollDown,
 }: UseHotkeysOptions): UseHotkeysResult {
   const handleInput = (
     input: string,
@@ -53,8 +67,26 @@ export function useHotkeys({
       pageUp: boolean;
       pageDown: boolean;
       return: boolean;
+      ctrl: boolean;
+      escape?: boolean;
     },
   ) => {
+    if (detailMode) {
+      if (key.upArrow || input === "k") {
+        onDetailScrollUp();
+        return;
+      }
+      if (key.downArrow || input === "j") {
+        onDetailScrollDown();
+        return;
+      }
+      if (key.return || key.escape || input === "q") {
+        onDetailClose();
+        return;
+      }
+      return;
+    }
+
     if (input === "q") {
       onQuit();
       return;
@@ -79,6 +111,25 @@ export function useHotkeys({
     if (key.pageDown) {
       onScrollPageDown();
       return;
+    }
+
+    if (key.ctrl) {
+      if (input === "b") {
+        onScrollPageUp();
+        return;
+      }
+      if (input === "f") {
+        onScrollPageDown();
+        return;
+      }
+      if (input === "u") {
+        onScrollHalfPageUp();
+        return;
+      }
+      if (input === "d") {
+        onScrollHalfPageDown();
+        return;
+      }
     }
 
     if (focus === "tree") {
@@ -120,8 +171,9 @@ export function useHotkeys({
     }
   };
 
-  const statusBarItems =
-    focus === "tree"
+  const statusBarItems = detailMode
+    ? ["↑↓/jk: scroll", "↵/Esc: close"]
+    : focus === "tree"
       ? [
           "Tab: viewer",
           "↑↓/jk: select",
@@ -137,6 +189,7 @@ export function useHotkeys({
           "PgUp/Dn: page",
           "g: top",
           "G: live",
+          "↵: detail",
           "s: save",
           "q: quit",
         ];

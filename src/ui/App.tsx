@@ -1,5 +1,7 @@
 // src/ui/App.tsx
-import { writeFileSync } from "node:fs";
+
+import type { FSWatcher } from "node:fs";
+import { existsSync, watch, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Box, Text, useApp, useInput, useStdout } from "ink";
 import type React from "react";
@@ -13,17 +15,54 @@ import {
   loadGlobalConfig,
 } from "../config/globalConfig.js";
 import { parseSessionHistory } from "../data/sessionHistory.js";
-import { discoverSessions } from "../data/sessions.js";
+import { discoverSessions, getProjectsDir } from "../data/sessions.js";
 import type {
   ActivityEntry,
   SessionNode,
   SessionTree,
 } from "../types/index.js";
 import { ActivityViewerPanel } from "./ActivityViewerPanel.js";
+import { DetailViewPanel } from "./DetailViewPanel.js";
 import { useHotkeys } from "./hooks/useHotkeys.js";
 import { SessionTreePanel } from "./SessionTreePanel.js";
 
 const VIEWER_HEIGHT_FRACTION = 0.55;
+
+function subSummarySentinel(parentId: string): SessionNode {
+  return {
+    id: `__sub-${parentId}__`,
+    filePath: "",
+    projectPath: "",
+    projectName: "",
+    lastModifiedMs: 0,
+    status: "cold",
+    modelName: null,
+    subAgents: [],
+  };
+}
+
+function appendSubAgentRows(
+  result: SessionNode[],
+  session: SessionNode,
+  expandedIds: Set<string>,
+): void {
+  if (expandedIds.has(session.id)) {
+    result.push(...session.subAgents);
+  } else {
+    result.push(
+      ...session.subAgents.filter(
+        (sub) => sub.status === "hot" || sub.status === "warm",
+      ),
+    );
+    if (
+      session.subAgents.some(
+        (sub) => sub.status === "cool" || sub.status === "cold",
+      )
+    ) {
+      result.push(subSummarySentinel(session.id));
+    }
+  }
+}
 
 function flattenSessions(
   tree: SessionTree,
@@ -36,15 +75,7 @@ function flattenSessions(
 
   for (const s of visible) {
     result.push(s);
-    if (expandedIds.has(s.id)) {
-      result.push(...s.subAgents);
-    } else {
-      result.push(
-        ...s.subAgents.filter(
-          (sub) => sub.status === "hot" || sub.status === "warm",
-        ),
-      );
-    }
+    appendSubAgentRows(result, s, expandedIds);
   }
 
   if (cold.length > 0) {
@@ -62,20 +93,32 @@ function flattenSessions(
     if (expandedIds.has("__cold__")) {
       for (const s of cold) {
         result.push(s);
-        if (expandedIds.has(s.id)) {
-          result.push(...s.subAgents);
-        } else {
-          result.push(
-            ...s.subAgents.filter(
-              (sub) => sub.status === "hot" || sub.status === "warm",
-            ),
-          );
-        }
+        appendSubAgentRows(result, s, expandedIds);
       }
     }
   }
 
   return result;
+}
+
+function getSelectedActivity(
+  acts: ActivityEntry[],
+  live: boolean,
+  scrollOff: number,
+  rows: number,
+  cursorLine: number,
+): ActivityEntry | null {
+  if (acts.length === 0) return null;
+  let visible: ActivityEntry[];
+  if (live) {
+    visible = acts.slice(-rows).reverse();
+  } else {
+    const end = Math.max(0, acts.length - scrollOff);
+    const start = Math.max(0, end - rows);
+    visible = acts.slice(start, end).reverse();
+  }
+  const effectiveCursor = Math.min(cursorLine, visible.length - 1);
+  return visible[effectiveCursor] ?? null;
 }
 
 export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
@@ -99,6 +142,12 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   const [activities, setActivities] = useState<ActivityEntry[]>([]);
   const [newCount, setNewCount] = useState(0);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [viewerCursorLine, setViewerCursorLine] = useState(0);
+  const [detailMode, setDetailMode] = useState(false);
+  const [detailActivity, setDetailActivity] = useState<ActivityEntry | null>(
+    null,
+  );
+  const [detailScrollOffset, setDetailScrollOffset] = useState(0);
 
   const allFlat = useMemo(
     () => flattenSessions(sessionTree, expandedIds),
@@ -123,6 +172,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
       setScrollOffset(0);
       setIsLive(true);
       setNewCount(0);
+      setViewerCursorLine(0);
     } else {
       setActivities([]);
     }
@@ -144,12 +194,48 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     }
   }, [selectedId, isLive, expandedIds]);
 
-  // Auto-refresh in watch mode
+  // Keep a stable ref so the watcher callback always calls the latest refresh
+  const refreshRef = useRef(refresh);
+  useEffect(() => {
+    refreshRef.current = refresh;
+  }, [refresh]);
+
+  // Auto-refresh in watch mode: fs.watch on macOS/Windows, polling fallback on Linux
   useEffect(() => {
     if (!isWatchMode) return;
-    const timer = setInterval(refresh, config.refreshIntervalMs);
-    return () => clearInterval(timer);
-  }, [isWatchMode, refresh, config.refreshIntervalMs]);
+
+    const projectsDir = getProjectsDir();
+    const usePolling = process.platform === "linux" || !existsSync(projectsDir);
+
+    if (usePolling) {
+      const timer = setInterval(
+        () => refreshRef.current(),
+        config.refreshIntervalMs,
+      );
+      return () => clearInterval(timer);
+    }
+
+    let debounce: ReturnType<typeof setTimeout> | null = null;
+    let watcher: FSWatcher | null = null;
+    try {
+      watcher = watch(projectsDir, { recursive: true }, () => {
+        if (debounce) clearTimeout(debounce);
+        debounce = setTimeout(() => refreshRef.current(), 150);
+      });
+    } catch {
+      // If watch() fails for any reason, fall back to polling
+      const timer = setInterval(
+        () => refreshRef.current(),
+        config.refreshIntervalMs,
+      );
+      return () => clearInterval(timer);
+    }
+
+    return () => {
+      watcher?.close();
+      if (debounce) clearTimeout(debounce);
+    };
+  }, [isWatchMode, config.refreshIntervalMs]);
 
   const selectedIndex = allFlat.findIndex((s) => s.id === selectedId);
   const height = stdout?.rows ?? 40;
@@ -181,21 +267,26 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
 
   const { handleInput, statusBarItems } = useHotkeys({
     focus,
+    detailMode,
     onSwitchFocus: () => setFocus((f) => (f === "tree" ? "viewer" : "tree")),
     onScrollUp: () => {
       if (focus === "tree") {
         const prev = Math.max(0, selectedIndex - 1);
         setSelectedId(allFlat[prev]?.id ?? selectedId);
       } else {
-        // ↑ = toward newer (decrease offset, newest is at top)
-        setScrollOffset((o) => {
-          const newOffset = Math.max(0, o - 1);
-          if (newOffset === 0) {
-            setIsLive(true);
-            setNewCount(0);
-          }
-          return newOffset;
-        });
+        if (viewerCursorLine > 0) {
+          setViewerCursorLine((c) => c - 1);
+        } else {
+          // cursor at top — scroll viewport toward newer
+          setScrollOffset((o) => {
+            const newOffset = Math.max(0, o - 1);
+            if (newOffset === 0) {
+              setIsLive(true);
+              setNewCount(0);
+            }
+            return newOffset;
+          });
+        }
       }
     },
     onScrollDown: () => {
@@ -203,11 +294,15 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
         const next = Math.min(allFlat.length - 1, selectedIndex + 1);
         setSelectedId(allFlat[next]?.id ?? selectedId);
       } else {
-        // ↓ = toward older (increase offset, newest is at top)
-        setIsLive(false);
-        setScrollOffset((o) =>
-          Math.min(o + 1, Math.max(0, activities.length - viewerRows)),
-        );
+        if (viewerCursorLine < viewerRows - 1) {
+          setViewerCursorLine((c) => c + 1);
+        } else {
+          // cursor at bottom — scroll viewport toward older
+          setIsLive(false);
+          setScrollOffset((o) =>
+            Math.min(o + 1, Math.max(0, activities.length - viewerRows)),
+          );
+        }
       }
     },
     onScrollPageUp: () => {
@@ -215,6 +310,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
         const prev = Math.max(0, selectedIndex - 5);
         setSelectedId(allFlat[prev]?.id ?? selectedId);
       } else {
+        setViewerCursorLine(0);
         setScrollOffset((o) => {
           const newOffset = Math.max(0, o - viewerRows);
           if (newOffset === 0) {
@@ -230,23 +326,84 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
         const next = Math.min(allFlat.length - 1, selectedIndex + 5);
         setSelectedId(allFlat[next]?.id ?? selectedId);
       } else {
+        setViewerCursorLine(0);
         setIsLive(false);
         setScrollOffset((o) =>
           Math.min(o + viewerRows, Math.max(0, activities.length - viewerRows)),
         );
       }
     },
+    onScrollHalfPageUp: () => {
+      if (focus === "tree") {
+        const prev = Math.max(0, selectedIndex - Math.ceil(5 / 2));
+        setSelectedId(allFlat[prev]?.id ?? selectedId);
+      } else {
+        setViewerCursorLine(0);
+        setScrollOffset((o) => {
+          const newOffset = Math.max(0, o - Math.floor(viewerRows / 2));
+          if (newOffset === 0) {
+            setIsLive(true);
+            setNewCount(0);
+          }
+          return newOffset;
+        });
+      }
+    },
+    onScrollHalfPageDown: () => {
+      if (focus === "tree") {
+        const next = Math.min(
+          allFlat.length - 1,
+          selectedIndex + Math.ceil(5 / 2),
+        );
+        setSelectedId(allFlat[next]?.id ?? selectedId);
+      } else {
+        setViewerCursorLine(0);
+        setIsLive(false);
+        setScrollOffset((o) =>
+          Math.min(
+            o + Math.floor(viewerRows / 2),
+            Math.max(0, activities.length - viewerRows),
+          ),
+        );
+      }
+    },
     onScrollTop: () => {
+      setViewerCursorLine(0);
       setIsLive(false);
       setScrollOffset(Math.max(0, activities.length - viewerRows));
     },
     onScrollBottom: () => {
       // G = jump to newest (live, scrollOffset 0)
+      setViewerCursorLine(0);
       setIsLive(true);
       setScrollOffset(0);
       setNewCount(0);
     },
+    onDetailClose: () => {
+      setDetailMode(false);
+    },
+    onDetailScrollUp: () => {
+      setDetailScrollOffset((o) => Math.max(0, o - 1));
+    },
+    onDetailScrollDown: () => {
+      setDetailScrollOffset((o) => o + 1);
+    },
     onEnter: () => {
+      if (focus === "viewer") {
+        const act = getSelectedActivity(
+          activities,
+          isLive,
+          scrollOffset,
+          viewerRows,
+          viewerCursorLine,
+        );
+        if (act) {
+          setDetailActivity(act);
+          setDetailMode(true);
+          setDetailScrollOffset(0);
+        }
+        return;
+      }
       if (focus !== "tree" || !selectedId) return;
 
       if (selectedId === "__cold__") {
@@ -256,6 +413,21 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
             next.delete("__cold__");
           } else {
             next.add("__cold__");
+          }
+          return next;
+        });
+        return;
+      }
+
+      // Sub-agent summary sentinel: __sub-{parentId}__
+      if (selectedId.startsWith("__sub-") && selectedId.endsWith("__")) {
+        const parentId = selectedId.slice(6, -2);
+        setExpandedIds((prev) => {
+          const next = new Set(prev);
+          if (next.has(parentId)) {
+            next.delete(parentId);
+          } else {
+            next.add(parentId);
           }
           return next;
         });
@@ -290,20 +462,33 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
           (s) => s.status === "cold",
         );
         for (const s of coldSessions) hideSession(s.id);
+        // __cold__ and everything below it disappears — move up
+        const nextId = allFlat[selectedIndex - 1]?.id ?? null;
         refresh();
+        setSelectedId(nextId);
         return;
       }
 
       if (sessionTree.sessions.some((s) => s.id === selectedId)) {
         hideSession(selectedId);
+        const nextId =
+          allFlat[selectedIndex + 1]?.id ??
+          allFlat[selectedIndex - 1]?.id ??
+          null;
         refresh();
+        setSelectedId(nextId);
         return;
       }
 
       for (const s of sessionTree.sessions) {
         if (s.subAgents.some((sa) => sa.id === selectedId)) {
           hideSubAgent(selectedId);
+          const nextId =
+            allFlat[selectedIndex + 1]?.id ??
+            allFlat[selectedIndex - 1]?.id ??
+            null;
           refresh();
+          setSelectedId(nextId);
           return;
         }
       }
@@ -316,11 +501,17 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   useInput((input, key) => handleInput(input, key), { isActive: isWatchMode });
 
   const selectedSession = allFlat.find((s) => s.id === selectedId);
-  const sessionDisplayName =
-    !selectedSession || selectedId === "__cold__"
-      ? "No session selected"
-      : selectedSession.projectName ||
-        `agent-${selectedSession.id.slice(0, 6)}`;
+  const isPlaceholderSelected =
+    !selectedSession ||
+    selectedId === "__cold__" ||
+    (!!selectedId &&
+      selectedId.startsWith("__sub-") &&
+      selectedId.endsWith("__"));
+  const sessionDisplayName = isPlaceholderSelected
+    ? "No session selected"
+    : selectedSession.projectPath
+      ? selectedSession.projectName || selectedSession.id.slice(0, 8)
+      : (selectedSession.agentId ?? selectedSession.id.slice(0, 8));
 
   return (
     <Box flexDirection="column">
@@ -340,15 +531,27 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
       />
 
       <Box marginTop={1}>
-        <ActivityViewerPanel
-          activities={activities}
-          sessionName={sessionDisplayName}
-          scrollOffset={scrollOffset}
-          isLive={isLive}
-          newCount={newCount}
-          visibleRows={viewerRows}
-          width={width}
-        />
+        {detailMode && detailActivity ? (
+          <DetailViewPanel
+            activity={detailActivity}
+            sessionName={sessionDisplayName}
+            scrollOffset={detailScrollOffset}
+            visibleRows={viewerRows}
+            width={width}
+          />
+        ) : (
+          <ActivityViewerPanel
+            activities={activities}
+            sessionName={sessionDisplayName}
+            scrollOffset={scrollOffset}
+            isLive={isLive}
+            newCount={newCount}
+            visibleRows={viewerRows}
+            width={width}
+            cursorLine={viewerCursorLine}
+            hasFocus={focus === "viewer"}
+          />
+        )}
       </Box>
 
       {isWatchMode && (

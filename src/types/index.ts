@@ -34,6 +34,7 @@ export interface GlobalConfig {
 export const ICONS = {
   User: ">",
   Response: "<",
+  Thinking: "…",
   Edit: "~",
   Write: "~",
   Read: "○",
@@ -51,7 +52,7 @@ export const ICONS = {
 // Activity entry (single item in a session's history)
 export interface ActivityEntry {
   timestamp: Date;
-  type: "tool" | "response" | "user";
+  type: "tool" | "response" | "user" | "thinking";
   icon: string;
   label: string;
   detail: string;

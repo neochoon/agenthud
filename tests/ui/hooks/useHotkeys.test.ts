@@ -13,6 +13,7 @@ const noopKey = {
   pageUp: false,
   pageDown: false,
   return: false,
+  ctrl: false,
 };
 const upKey = {
   upArrow: true,
@@ -65,11 +66,14 @@ const returnKey = {
 function makeOptions(overrides = {}) {
   return {
     focus: "tree" as const,
+    detailMode: false,
     onSwitchFocus: vi.fn(),
     onScrollUp: vi.fn(),
     onScrollDown: vi.fn(),
     onScrollPageUp: vi.fn(),
     onScrollPageDown: vi.fn(),
+    onScrollHalfPageUp: vi.fn(),
+    onScrollHalfPageDown: vi.fn(),
     onScrollTop: vi.fn(),
     onScrollBottom: vi.fn(),
     onSaveLog: vi.fn(),
@@ -77,6 +81,9 @@ function makeOptions(overrides = {}) {
     onQuit: vi.fn(),
     onEnter: vi.fn(),
     onHide: vi.fn(),
+    onDetailClose: vi.fn(),
+    onDetailScrollUp: vi.fn(),
+    onDetailScrollDown: vi.fn(),
     ...overrides,
   };
 }
@@ -275,6 +282,44 @@ describe("useHotkeys", () => {
     });
   });
 
+  describe("ctrl key aliases", () => {
+    it("calls onScrollPageUp when Ctrl+B is pressed", () => {
+      const onScrollPageUp = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ onScrollPageUp })),
+      );
+      act(() => result.current.handleInput("b", { ...noopKey, ctrl: true }));
+      expect(onScrollPageUp).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls onScrollPageDown when Ctrl+F is pressed", () => {
+      const onScrollPageDown = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ onScrollPageDown })),
+      );
+      act(() => result.current.handleInput("f", { ...noopKey, ctrl: true }));
+      expect(onScrollPageDown).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls onScrollHalfPageUp when Ctrl+U is pressed", () => {
+      const onScrollHalfPageUp = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ onScrollHalfPageUp })),
+      );
+      act(() => result.current.handleInput("u", { ...noopKey, ctrl: true }));
+      expect(onScrollHalfPageUp).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls onScrollHalfPageDown when Ctrl+D is pressed", () => {
+      const onScrollHalfPageDown = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ onScrollHalfPageDown })),
+      );
+      act(() => result.current.handleInput("d", { ...noopKey, ctrl: true }));
+      expect(onScrollHalfPageDown).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("statusBarItems", () => {
     it("returns tree-focus status bar items when focus is tree", () => {
       const { result } = renderHook(() =>
@@ -301,9 +346,82 @@ describe("useHotkeys", () => {
         "PgUp/Dn: page",
         "g: top",
         "G: live",
+        "↵: detail",
         "s: save",
         "q: quit",
       ]);
+    });
+
+    it("returns detail mode status bar items when detailMode is true", () => {
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ detailMode: true })),
+      );
+      expect(result.current.statusBarItems).toEqual([
+        "↑↓/jk: scroll",
+        "↵/Esc: close",
+      ]);
+    });
+  });
+
+  describe("detail mode", () => {
+    const escKey = { ...noopKey, escape: true };
+
+    it("calls onDetailScrollUp when upArrow pressed in detail mode", () => {
+      const onDetailScrollUp = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ detailMode: true, onDetailScrollUp })),
+      );
+      act(() => result.current.handleInput("", { ...noopKey, upArrow: true }));
+      expect(onDetailScrollUp).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls onDetailScrollDown when downArrow pressed in detail mode", () => {
+      const onDetailScrollDown = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ detailMode: true, onDetailScrollDown })),
+      );
+      act(() =>
+        result.current.handleInput("", { ...noopKey, downArrow: true }),
+      );
+      expect(onDetailScrollDown).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls onDetailClose when Enter pressed in detail mode", () => {
+      const onDetailClose = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ detailMode: true, onDetailClose })),
+      );
+      act(() => result.current.handleInput("", returnKey));
+      expect(onDetailClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls onDetailClose when Esc pressed in detail mode", () => {
+      const onDetailClose = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ detailMode: true, onDetailClose })),
+      );
+      act(() => result.current.handleInput("", escKey));
+      expect(onDetailClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls onDetailClose when q pressed in detail mode (not onQuit)", () => {
+      const onDetailClose = vi.fn();
+      const onQuit = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ detailMode: true, onDetailClose, onQuit })),
+      );
+      act(() => result.current.handleInput("q", noopKey));
+      expect(onDetailClose).toHaveBeenCalledTimes(1);
+      expect(onQuit).not.toHaveBeenCalled();
+    });
+
+    it("does not call onQuit when q pressed in detail mode", () => {
+      const onQuit = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ detailMode: true, onQuit })),
+      );
+      act(() => result.current.handleInput("q", noopKey));
+      expect(onQuit).not.toHaveBeenCalled();
     });
   });
 });

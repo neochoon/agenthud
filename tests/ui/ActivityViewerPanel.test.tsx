@@ -18,6 +18,8 @@ const baseProps = {
   newCount: 0,
   visibleRows: 10,
   width: 80,
+  cursorLine: 0,
+  hasFocus: false,
 };
 
 describe("ActivityViewerPanel", () => {

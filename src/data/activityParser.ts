@@ -53,6 +53,7 @@ interface JsonlAssistantEntry {
     content: Array<{
       type: string;
       text?: string;
+      thinking?: string;
       name?: string;
       input?: {
         command?: string;
@@ -138,7 +139,15 @@ export function parseActivitiesFromLines(lines: string[]): ParseResult {
       const content = assistantEntry.message?.content;
       if (Array.isArray(content)) {
         for (const block of content) {
-          if (block.type === "tool_use" && block.name) {
+          if (block.type === "thinking" && block.thinking) {
+            activities.push({
+              timestamp,
+              type: "thinking",
+              icon: ICONS.Thinking,
+              label: "Thinking",
+              detail: block.thinking.replace(/\n/g, " "),
+            });
+          } else if (block.type === "tool_use" && block.name) {
             if (block.name === "TodoWrite") continue;
             const icon =
               (ICONS as Record<string, string>)[block.name] ?? ICONS.Default;

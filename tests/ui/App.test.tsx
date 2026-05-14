@@ -19,6 +19,7 @@ vi.mock("../../src/data/sessions.js", () => ({
     totalCount: 0,
     timestamp: new Date().toISOString(),
   }),
+  getProjectsDir: () => "/tmp/nonexistent-projects-dir",
 }));
 
 vi.mock("../../src/data/sessionHistory.js", () => ({

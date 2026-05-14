@@ -107,4 +107,68 @@ describe("generateReport", () => {
     const result = generateReport([makeSession()], { date: DAY, include: ["response"] });
     expect(result).toContain("# AgentHUD Report: 2026-05-14");
   });
+
+  it("sorts sessions by first activity timestamp", () => {
+    const session1 = makeSession({ projectName: "late-project", filePath: "/late.jsonl" });
+    const session2 = makeSession({ projectName: "early-project", filePath: "/early.jsonl" });
+
+    vi.mocked(statSync).mockReturnValue({ mtimeMs: new Date("2026-05-14T10:00:00Z").getTime() } as ReturnType<typeof statSync>);
+    vi.mocked(parseSessionHistory).mockImplementation((path) => {
+      if (path === "/late.jsonl") {
+        return [makeActivity({ timestamp: new Date("2026-05-14T12:00:00Z"), type: "response", icon: "<", label: "Response", detail: "Late." })];
+      }
+      return [makeActivity({ timestamp: new Date("2026-05-14T08:00:00Z"), type: "response", icon: "<", label: "Response", detail: "Early." })];
+    });
+
+    const result = generateReport([session1, session2], { date: DAY, include: ["response"] });
+    const earlyIdx = result.indexOf("early-project");
+    const lateIdx = result.indexOf("late-project");
+    expect(earlyIdx).toBeLessThan(lateIdx);
+  });
+
+  it("includes time range in session header", () => {
+    vi.mocked(statSync).mockReturnValue({ mtimeMs: new Date("2026-05-14T10:00:00Z").getTime() } as ReturnType<typeof statSync>);
+    vi.mocked(parseSessionHistory).mockReturnValue([
+      makeActivity({ timestamp: new Date("2026-05-14T09:00:00Z"), type: "response", icon: "<", label: "Response", detail: "First." }),
+      makeActivity({ timestamp: new Date("2026-05-14T17:30:00Z"), type: "response", icon: "<", label: "Response", detail: "Last." }),
+    ]);
+
+    const result = generateReport([makeSession()], { date: DAY, include: ["response"] });
+    expect(result).toContain("## myproject (09:00 – 17:30)");
+  });
+
+  it("matches edit label variants for include:edit", () => {
+    vi.mocked(statSync).mockReturnValue({ mtimeMs: new Date("2026-05-14T10:00:00Z").getTime() } as ReturnType<typeof statSync>);
+    vi.mocked(parseSessionHistory).mockReturnValue([
+      makeActivity({ type: "tool", icon: "~", label: "Write", detail: "file.ts" }),
+      makeActivity({ type: "tool", icon: "~", label: "TodoWrite", detail: "todo.md" }),
+    ]);
+
+    const result = generateReport([makeSession()], { date: DAY, include: ["edit"] });
+    expect(result).toContain("Write");
+    expect(result).toContain("TodoWrite");
+  });
+
+  it("matches glob/grep labels for include:read", () => {
+    vi.mocked(statSync).mockReturnValue({ mtimeMs: new Date("2026-05-14T10:00:00Z").getTime() } as ReturnType<typeof statSync>);
+    vi.mocked(parseSessionHistory).mockReturnValue([
+      makeActivity({ type: "tool", icon: "*", label: "Glob", detail: "*.ts" }),
+      makeActivity({ type: "tool", icon: "*", label: "Grep", detail: "pattern" }),
+    ]);
+
+    const result = generateReport([makeSession()], { date: DAY, include: ["read"] });
+    expect(result).toContain("Glob");
+    expect(result).toContain("Grep");
+  });
+
+  it("omits detail colon when detail is empty", () => {
+    vi.mocked(statSync).mockReturnValue({ mtimeMs: new Date("2026-05-14T10:00:00Z").getTime() } as ReturnType<typeof statSync>);
+    vi.mocked(parseSessionHistory).mockReturnValue([
+      makeActivity({ type: "response", icon: "<", label: "Response", detail: "" }),
+    ]);
+
+    const result = generateReport([makeSession()], { date: DAY, include: ["response"] });
+    expect(result).toContain("[10:23] < Response");
+    expect(result).not.toContain("[10:23] < Response:");
+  });
 });

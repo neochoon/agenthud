@@ -287,7 +287,7 @@ describe("SessionTreePanel", () => {
     expect(lastFrame()).toContain("»");
   });
 
-  it("collapses cool sub-agents into a summary line", () => {
+  it("collapses two cool sub-agents into a summary line", () => {
     const session = makeSession({
       subAgents: [
         makeSession({ id: "c1", projectName: "", status: "cool", subAgents: [] }),

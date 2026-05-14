@@ -151,6 +151,48 @@ type FlatRow =
   | { kind: "subagent-summary"; coolCount: number; coldCount: number }
   | { kind: "cold-sessions-summary"; count: number };
 
+function appendSessionRows(
+  result: FlatRow[],
+  session: SessionNode,
+  expandedIds: Set<string>,
+): void {
+  const isExpanded = expandedIds.has(session.id);
+  const hotWarm = session.subAgents.filter(
+    (s) => s.status === "hot" || s.status === "warm",
+  );
+  const cool = session.subAgents.filter((s) => s.status === "cool");
+  const cold = session.subAgents.filter((s) => s.status === "cold");
+
+  if (isExpanded) {
+    const all = [...hotWarm, ...cool, ...cold];
+    for (let i = 0; i < all.length; i++) {
+      const isLast = i === all.length - 1;
+      result.push({
+        kind: "session",
+        session: all[i],
+        prefix: `${isLast ? "└─ " : "├─ "}» `,
+      });
+    }
+  } else {
+    const hasSummary = cool.length > 0 || cold.length > 0;
+    for (let i = 0; i < hotWarm.length; i++) {
+      const isLast = i === hotWarm.length - 1 && !hasSummary;
+      result.push({
+        kind: "session",
+        session: hotWarm[i],
+        prefix: `${isLast ? "└─ " : "├─ "}» `,
+      });
+    }
+    if (hasSummary) {
+      result.push({
+        kind: "subagent-summary",
+        coolCount: cool.length,
+        coldCount: cold.length,
+      });
+    }
+  }
+}
+
 function flattenSessions(
   sessions: SessionNode[],
   expandedIds: Set<string>,
@@ -162,44 +204,7 @@ function flattenSessions(
 
   for (const session of visibleSessions) {
     result.push({ kind: "session", session, prefix: "" });
-
-    const isExpanded = expandedIds.has(session.id);
-    const hotWarm = session.subAgents.filter(
-      (s) => s.status === "hot" || s.status === "warm",
-    );
-    const cool = session.subAgents.filter((s) => s.status === "cool");
-    const cold = session.subAgents.filter((s) => s.status === "cold");
-
-    if (isExpanded) {
-      const all = [...hotWarm, ...cool, ...cold];
-      for (let i = 0; i < all.length; i++) {
-        const isLast = i === all.length - 1;
-        const treeChar = isLast ? "└─ " : "├─ ";
-        result.push({
-          kind: "session",
-          session: all[i],
-          prefix: `${treeChar}» `,
-        });
-      }
-    } else {
-      const hasSummary = cool.length > 0 || cold.length > 0;
-      for (let i = 0; i < hotWarm.length; i++) {
-        const isLast = i === hotWarm.length - 1 && !hasSummary;
-        const treeChar = isLast ? "└─ " : "├─ ";
-        result.push({
-          kind: "session",
-          session: hotWarm[i],
-          prefix: `${treeChar}» `,
-        });
-      }
-      if (hasSummary) {
-        result.push({
-          kind: "subagent-summary",
-          coolCount: cool.length,
-          coldCount: cold.length,
-        });
-      }
-    }
+    appendSessionRows(result, session, expandedIds);
   }
 
   if (coldSessions.length > 0) {
@@ -208,42 +213,7 @@ function flattenSessions(
     if (expandedIds.has("__cold__")) {
       for (const session of coldSessions) {
         result.push({ kind: "session", session, prefix: "" });
-
-        const isExpanded = expandedIds.has(session.id);
-        const hotWarm = session.subAgents.filter(
-          (s) => s.status === "hot" || s.status === "warm",
-        );
-        const cool = session.subAgents.filter((s) => s.status === "cool");
-        const cold = session.subAgents.filter((s) => s.status === "cold");
-
-        if (isExpanded) {
-          const all = [...hotWarm, ...cool, ...cold];
-          for (let i = 0; i < all.length; i++) {
-            const isLast = i === all.length - 1;
-            result.push({
-              kind: "session",
-              session: all[i],
-              prefix: `${isLast ? "└─ " : "├─ "}» `,
-            });
-          }
-        } else {
-          const hasSummary = cool.length > 0 || cold.length > 0;
-          for (let i = 0; i < hotWarm.length; i++) {
-            const isLast = i === hotWarm.length - 1 && !hasSummary;
-            result.push({
-              kind: "session",
-              session: hotWarm[i],
-              prefix: `${isLast ? "└─ " : "├─ "}» `,
-            });
-          }
-          if (hasSummary) {
-            result.push({
-              kind: "subagent-summary",
-              coolCount: cool.length,
-              coldCount: cold.length,
-            });
-          }
-        }
+        appendSessionRows(result, session, expandedIds);
       }
     }
   }
@@ -291,7 +261,7 @@ function ColdSessionsSummaryRow({
   const hintWidth = getDisplayWidth(hint);
   const dashCount = Math.max(
     0,
-    innerWidth - 2 - getDisplayWidth(label) - hintWidth,
+    innerWidth - 1 - getDisplayWidth(label) - hintWidth,
   );
   const dashes = BOX.h.repeat(dashCount);
   const highlight = isSelected && hasFocus;

@@ -118,7 +118,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   // Load activities whenever selected session changes
   useEffect(() => {
     const node = allFlatRef.current.find((s) => s.id === selectedId);
-    if (node && node.filePath) {
+    if (node?.filePath) {
       setActivities(parseSessionHistory(node.filePath));
       setScrollOffset(0);
       setIsLive(true);

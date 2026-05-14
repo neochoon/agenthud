@@ -16,10 +16,23 @@ const DEFAULT_TYPES = ["response", "bash", "edit", "thinking"];
 export interface CliOptions {
   mode: "watch" | "once" | "report";
   command?: "version" | "help";
+  error?: string;
   reportDate?: Date;
   reportInclude?: string[];
   reportError?: string;
 }
+
+const KNOWN_WATCH_FLAGS = new Set([
+  "-w",
+  "--watch",
+  "--once",
+  "-V",
+  "--version",
+  "-h",
+  "--help",
+]);
+const KNOWN_REPORT_FLAGS = new Set(["--date", "--include"]);
+const KNOWN_SUBCOMMANDS = new Set(["report"]);
 
 export function getHelp(): string {
   return `Usage: agenthud [options]
@@ -100,6 +113,14 @@ export function parseArgs(args: string[]): CliOptions {
     let reportInclude = DEFAULT_TYPES;
     let reportError: string | undefined;
 
+    // Check for unknown flags in report subcommand
+    for (const arg of rest) {
+      if (arg.startsWith("-") && !KNOWN_REPORT_FLAGS.has(arg)) {
+        reportError = `Unknown option: "${arg}". Run agenthud --help for usage.`;
+        break;
+      }
+    }
+
     const dateIdx = rest.indexOf("--date");
     if (dateIdx !== -1) {
       const dateStr = rest[dateIdx + 1];
@@ -129,6 +150,24 @@ export function parseArgs(args: string[]): CliOptions {
     }
 
     return { mode: "report", reportDate, reportInclude, reportError };
+  }
+
+  // Unknown subcommand (positional arg that's not a known command)
+  if (args[0] && !args[0].startsWith("-") && !KNOWN_SUBCOMMANDS.has(args[0])) {
+    return {
+      mode: "watch",
+      error: `Unknown command: "${args[0]}". Run agenthud --help for usage.`,
+    };
+  }
+
+  // Unknown flags in watch mode
+  for (const arg of args) {
+    if (arg.startsWith("-") && !KNOWN_WATCH_FLAGS.has(arg)) {
+      return {
+        mode: "watch",
+        error: `Unknown option: "${arg}". Run agenthud --help for usage.`,
+      };
+    }
   }
 
   return { mode: "watch" };

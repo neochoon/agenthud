@@ -13,6 +13,11 @@ import { App } from "./ui/App.js";
 
 const options = parseArgs(process.argv.slice(2));
 
+if (options.error) {
+  process.stderr.write(`agenthud: ${options.error}\n`);
+  process.exit(1);
+}
+
 if (options.command === "help") {
   console.log(getHelp());
   process.exit(0);

@@ -29,6 +29,27 @@ describe("parseArgs", () => {
     expect(parseArgs(["-V"])).toEqual({ mode: "watch", command: "version" });
   });
 
+  describe("unknown commands and flags", () => {
+    it("returns error for unknown subcommand", () => {
+      const opts = parseArgs(["foobar"]);
+      expect(opts.error).toContain("Unknown command");
+      expect(opts.error).toContain("foobar");
+    });
+
+    it("returns error for unknown flag", () => {
+      const opts = parseArgs(["--unknown"]);
+      expect(opts.error).toContain("Unknown option");
+      expect(opts.error).toContain("--unknown");
+    });
+
+    it("returns error for unknown flag in report subcommand", () => {
+      const opts = parseArgs(["report", "--unknown"]);
+      expect(opts.mode).toBe("report");
+      expect(opts.reportError).toContain("Unknown option");
+      expect(opts.reportError).toContain("--unknown");
+    });
+  });
+
   describe("report subcommand", () => {
     it("returns report mode with today when no date given", () => {
       const opts = parseArgs(["report"]);

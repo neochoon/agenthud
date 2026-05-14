@@ -288,8 +288,10 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
 
   const selectedSession = allFlat.find((s) => s.id === selectedId);
   const sessionDisplayName =
-    selectedSession?.projectName ||
-    (selectedId ? `agent-${selectedId.slice(0, 6)}` : "No session selected");
+    !selectedSession || selectedId === "__cold__"
+      ? "No session selected"
+      : selectedSession.projectName ||
+        `agent-${selectedSession.id.slice(0, 6)}`;
 
   return (
     <Box flexDirection="column">

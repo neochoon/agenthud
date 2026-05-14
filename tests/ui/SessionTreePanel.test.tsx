@@ -360,4 +360,59 @@ describe("SessionTreePanel", () => {
     );
     expect(lastFrame()).toContain("No Claude sessions");
   });
+
+  it("renders cold-sessions-summary row when cold sessions exist", () => {
+    const coldSession = makeSession({
+      id: "cold1",
+      projectName: "oldproj",
+      status: "cold",
+      subAgents: [],
+    });
+    const { lastFrame } = render(
+      <SessionTreePanel
+        sessions={[coldSession]}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+      />,
+    );
+    expect(lastFrame()).toContain("1 cold");
+    expect(lastFrame()).not.toContain("oldproj");
+  });
+
+  it("shows cold sessions when __cold__ is in expandedIds", () => {
+    const coldSession = makeSession({
+      id: "cold1",
+      projectName: "oldproj",
+      status: "cold",
+      subAgents: [],
+    });
+    const { lastFrame } = render(
+      <SessionTreePanel
+        sessions={[coldSession]}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+        expandedIds={new Set(["__cold__"])}
+      />,
+    );
+    expect(lastFrame()).toContain("oldproj");
+  });
+
+  it("highlights cold-sessions-summary row when selectedId is __cold__", () => {
+    const coldSession = makeSession({
+      id: "cold1",
+      status: "cold",
+      subAgents: [],
+    });
+    const { lastFrame } = render(
+      <SessionTreePanel
+        sessions={[coldSession]}
+        selectedId="__cold__"
+        hasFocus={true}
+        width={80}
+      />,
+    );
+    expect(lastFrame()).toContain("↵");
+  });
 });

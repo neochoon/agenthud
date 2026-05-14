@@ -28,7 +28,11 @@ function flattenSessions(
   expandedIds: Set<string>,
 ): SessionNode[] {
   const result: SessionNode[] = [];
-  for (const s of tree.sessions) {
+
+  const visible = tree.sessions.filter((s) => s.status !== "cold");
+  const cold = tree.sessions.filter((s) => s.status === "cold");
+
+  for (const s of visible) {
     result.push(s);
     if (expandedIds.has(s.id)) {
       result.push(...s.subAgents);
@@ -40,6 +44,35 @@ function flattenSessions(
       );
     }
   }
+
+  if (cold.length > 0) {
+    // Sentinel node — makes the cold summary row keyboard-navigable.
+    result.push({
+      id: "__cold__",
+      filePath: "",
+      projectPath: "",
+      projectName: `${cold.length} cold`,
+      lastModifiedMs: 0,
+      status: "cold",
+      modelName: null,
+      subAgents: [],
+    });
+    if (expandedIds.has("__cold__")) {
+      for (const s of cold) {
+        result.push(s);
+        if (expandedIds.has(s.id)) {
+          result.push(...s.subAgents);
+        } else {
+          result.push(
+            ...s.subAgents.filter(
+              (sub) => sub.status === "hot" || sub.status === "warm",
+            ),
+          );
+        }
+      }
+    }
+  }
+
   return result;
 }
 
@@ -83,7 +116,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   // Load activities whenever selected session changes
   useEffect(() => {
     const node = allFlatRef.current.find((s) => s.id === selectedId);
-    if (node) {
+    if (node && node.filePath) {
       setActivities(parseSessionHistory(node.filePath));
       setScrollOffset(0);
       setIsLive(true);
@@ -98,7 +131,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     setSessionTree(tree);
     const updatedFlat = flattenSessions(tree, expandedIds);
     const node = updatedFlat.find((s) => s.id === selectedId);
-    if (!node) return;
+    if (!node || !node.filePath) return;
     const newActivities = parseSessionHistory(node.filePath);
     const delta = newActivities.length - activitiesLengthRef.current;
     setActivities(newActivities);
@@ -212,6 +245,20 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     },
     onEnter: () => {
       if (focus !== "tree" || !selectedId) return;
+
+      if (selectedId === "__cold__") {
+        setExpandedIds((prev) => {
+          const next = new Set(prev);
+          if (next.has("__cold__")) {
+            next.delete("__cold__");
+          } else {
+            next.add("__cold__");
+          }
+          return next;
+        });
+        return;
+      }
+
       const parentSession = sessionTree.sessions.find(
         (s) => s.id === selectedId,
       );

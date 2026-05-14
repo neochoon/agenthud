@@ -24,6 +24,7 @@ const mockConfig = {
 
 afterEach(() => {
   vi.resetAllMocks();
+  delete process.env.CLAUDE_PROJECTS_DIR;
 });
 
 describe("discoverSessions", () => {
@@ -310,8 +311,6 @@ describe("discoverSessions", () => {
     const tree = discoverSessions(mockConfig);
     expect(vi.mocked(existsSync)).toHaveBeenCalledWith(customDir);
     expect(tree.sessions).toHaveLength(0);
-
-    delete process.env.CLAUDE_PROJECTS_DIR;
   });
 
   describe("session status calendar logic", () => {

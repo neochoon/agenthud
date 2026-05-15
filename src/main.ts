@@ -1,4 +1,3 @@
-import { execSync } from "node:child_process";
 import { existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
@@ -59,25 +58,12 @@ if (options.mode === "report") {
   const config = loadGlobalConfig();
   const tree = discoverSessions(config);
 
-  let gitLog: string | undefined;
-  if (options.reportWithGit) {
-    try {
-      const dateStr = options.reportDate!.toLocaleDateString("en-CA"); // YYYY-MM-DD
-      gitLog = execSync(
-        `git log --oneline --after="${dateStr} 00:00:00" --before="${dateStr} 23:59:59" 2>/dev/null`,
-        { encoding: "utf-8" },
-      ).trim();
-    } catch {
-      // not a git repo or git not available — silently skip
-    }
-  }
-
   const markdown = generateReport(tree.sessions, {
     date: options.reportDate!,
     include: options.reportInclude!,
     format: options.reportFormat,
     detailLimit: options.reportDetailLimit,
-    gitLog: gitLog || undefined,
+    withGit: options.reportWithGit,
   });
   process.stdout.write(`${markdown}\n`);
   process.exit(0);

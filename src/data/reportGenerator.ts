@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import { statSync } from "node:fs";
 import type { ActivityEntry, SessionNode } from "../types/index.js";
 import { parseSessionHistory } from "./sessionHistory.js";
@@ -7,7 +8,20 @@ export interface ReportOptions {
   include: string[]; // activity types: "response" | "bash" | "edit" | "thinking" | "read" | "glob" | "user"
   format?: "markdown" | "json"; // default: "markdown"
   detailLimit?: number; // max chars for detail field; 0 = unlimited; default: 120
-  gitLog?: string; // raw git log output to append to report
+  withGit?: boolean; // run git log in each session's projectPath and include commits
+}
+
+function getGitLog(projectPath: string, dateStr: string): string | null {
+  if (!projectPath) return null;
+  try {
+    const log = execSync(
+      `git log --oneline --after="${dateStr} 00:00:00" --before="${dateStr} 23:59:59"`,
+      { cwd: projectPath, encoding: "utf-8" },
+    ).trim();
+    return log || null;
+  } catch {
+    return null;
+  }
 }
 
 function activityMatchesInclude(
@@ -86,7 +100,7 @@ export function generateReport(
     include,
     format = "markdown",
     detailLimit = 120,
-    gitLog,
+    withGit = false,
   } = options;
   const dateStr = formatDateString(date);
 
@@ -116,11 +130,7 @@ export function generateReport(
 
   if (blocks.length === 0) {
     if (format === "json") {
-      return JSON.stringify(
-        { date: dateStr, sessions: [], ...(gitLog ? { commits: gitLog } : {}) },
-        null,
-        2,
-      );
+      return JSON.stringify({ date: dateStr, sessions: [] }, null, 2);
     }
     return `No activity found for ${dateStr}.`;
   }
@@ -145,6 +155,8 @@ export function generateReport(
         };
       });
 
+      const commits = withGit ? getGitLog(session.projectPath, dateStr) : null;
+
       return {
         project: session.projectName,
         start: formatTime(acts[0].timestamp),
@@ -156,6 +168,7 @@ export function generateReport(
           detail: truncateDetail(a.detail, detailLimit),
         })),
         subAgents: subAgentBlocks,
+        ...(commits ? { commits } : {}),
       };
     };
 
@@ -165,7 +178,6 @@ export function generateReport(
         sessions: blocks.map(({ session, activities }) =>
           buildJsonSession(session, activities),
         ),
-        ...(gitLog ? { commits: gitLog } : {}),
       },
       null,
       2,
@@ -182,14 +194,16 @@ export function generateReport(
     for (const activity of activities) {
       lines.push(formatActivity(activity, detailLimit));
     }
+    if (withGit) {
+      const commits = getGitLog(session.projectPath, dateStr);
+      if (commits) {
+        lines.push("");
+        lines.push("### Commits");
+        lines.push("");
+        lines.push(commits);
+      }
+    }
     lines.push("");
-  }
-
-  if (gitLog) {
-    lines.push("");
-    lines.push("## Git Commits");
-    lines.push("");
-    lines.push(gitLog);
   }
 
   return lines.join("\n").trimEnd();

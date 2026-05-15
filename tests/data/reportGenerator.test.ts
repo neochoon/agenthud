@@ -8,11 +8,15 @@ vi.mock("node:fs", () => ({
   statSync: vi.fn(),
   existsSync: vi.fn(),
 }));
+vi.mock("node:child_process", () => ({
+  execSync: vi.fn(),
+}));
 
 const { parseSessionHistory } = await import(
   "../../src/data/sessionHistory.js"
 );
 const { statSync } = await import("node:fs");
+const { execSync } = await import("node:child_process");
 const { generateReport } = await import("../../src/data/reportGenerator.js");
 
 const DAY = new Date(2026, 4, 14); // local midnight May 14
@@ -493,7 +497,7 @@ describe("generateReport", () => {
     expect(result).not.toContain("subAgents");
   });
 
-  it("appends git log section when gitLog is provided", () => {
+  it("runs git log in session projectPath and appends to markdown", () => {
     vi.mocked(statSync).mockReturnValue({
       mtimeMs: new Date("2026-05-14T10:00:00Z").getTime(),
     } as ReturnType<typeof statSync>);
@@ -505,20 +509,25 @@ describe("generateReport", () => {
         detail: "Done.",
       }),
     ]);
+    vi.mocked(execSync).mockReturnValue(
+      "abc1234 feat: add report command\ndef5678 fix: bug",
+    );
 
-    const gitLog =
-      "abc1234 feat: add report command\ndef5678 fix: timezone bug";
     const result = generateReport([makeSession()], {
       date: DAY,
       include: ["response"],
-      gitLog,
+      withGit: true,
     });
-    expect(result).toContain("## Git Commits");
+    expect(result).toContain("### Commits");
     expect(result).toContain("abc1234 feat: add report command");
-    expect(result).toContain("def5678 fix: timezone bug");
+    // execSync called with cwd = session.projectPath
+    expect(vi.mocked(execSync)).toHaveBeenCalledWith(
+      expect.stringContaining("git log"),
+      expect.objectContaining({ cwd: "/Users/neo/myproject" }),
+    );
   });
 
-  it("includes gitLog in JSON output under commits key", () => {
+  it("includes per-session commits in JSON output", () => {
     vi.mocked(statSync).mockReturnValue({
       mtimeMs: new Date("2026-05-14T10:00:00Z").getTime(),
     } as ReturnType<typeof statSync>);
@@ -530,15 +539,42 @@ describe("generateReport", () => {
         detail: "Done.",
       }),
     ]);
+    vi.mocked(execSync).mockReturnValue("abc1234 feat: add report command");
 
-    const gitLog = "abc1234 feat: add report command";
     const result = generateReport([makeSession()], {
       date: DAY,
       include: ["response"],
       format: "json",
-      gitLog,
+      withGit: true,
     });
     const parsed = JSON.parse(result);
-    expect(parsed.commits).toContain("abc1234 feat: add report command");
+    expect(parsed.sessions[0].commits).toContain(
+      "abc1234 feat: add report command",
+    );
+  });
+
+  it("silently skips git when not a git repo", () => {
+    vi.mocked(statSync).mockReturnValue({
+      mtimeMs: new Date("2026-05-14T10:00:00Z").getTime(),
+    } as ReturnType<typeof statSync>);
+    vi.mocked(parseSessionHistory).mockReturnValue([
+      makeActivity({
+        type: "response",
+        icon: "<",
+        label: "Response",
+        detail: "Done.",
+      }),
+    ]);
+    vi.mocked(execSync).mockImplementation(() => {
+      throw new Error("not a git repo");
+    });
+
+    const result = generateReport([makeSession()], {
+      date: DAY,
+      include: ["response"],
+      withGit: true,
+    });
+    expect(result).toContain("## myproject");
+    expect(result).not.toContain("Commits");
   });
 });

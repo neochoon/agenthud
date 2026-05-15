@@ -184,19 +184,42 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   }, [selectedId]);
 
   // Load git commits for selected session: on selection + every 30s
+  // Uses the date range of loaded activities (falls back to today if none)
   useEffect(() => {
     if (!isWatchMode) return;
     const node = allFlatRef.current.find((s) => s.id === selectedId);
     if (!node?.projectPath) return;
 
-    const today = new Date();
-    const day = new Date(
-      today.getFullYear(),
-      today.getMonth(),
-      today.getDate(),
-    );
     const load = () => {
-      const commits = parseGitCommits(node.projectPath, day);
+      const acts =
+        activitiesLengthRef.current > 0
+          ? parseSessionHistory(node.filePath)
+          : [];
+      const today = new Date();
+      const todayMidnight = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate(),
+      );
+
+      const startDate =
+        acts.length > 0
+          ? new Date(
+              acts[0].timestamp.getFullYear(),
+              acts[0].timestamp.getMonth(),
+              acts[0].timestamp.getDate(),
+            )
+          : todayMidnight;
+      const endDate =
+        acts.length > 0
+          ? new Date(
+              acts[acts.length - 1].timestamp.getFullYear(),
+              acts[acts.length - 1].timestamp.getMonth(),
+              acts[acts.length - 1].timestamp.getDate(),
+            )
+          : todayMidnight;
+
+      const commits = parseGitCommits(node.projectPath, startDate, endDate);
       setGitActivities(commits);
     };
 

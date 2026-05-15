@@ -55,13 +55,21 @@ describe("parseGitCommits", () => {
     expect(result).toHaveLength(0);
   });
 
-  it("filters commits to the given date", () => {
+  it("filters commits to the given date when no endDate", () => {
     vi.mocked(execSync).mockReturnValue("");
     parseGitCommits("/some/project", DAY);
-    expect(vi.mocked(execSync)).toHaveBeenCalledWith(
-      expect.stringContaining("2026-05-14"),
-      expect.objectContaining({ cwd: "/some/project" }),
-    );
+    const cmd = vi.mocked(execSync).mock.calls[0][0] as string;
+    expect(cmd).toContain("2026-05-14 00:00:00");
+    expect(cmd).toContain("2026-05-14 23:59:59");
+  });
+
+  it("uses endDate for --before when provided", () => {
+    vi.mocked(execSync).mockReturnValue("");
+    const endDay = new Date(2026, 4, 16); // May 16
+    parseGitCommits("/some/project", DAY, endDay);
+    const cmd = vi.mocked(execSync).mock.calls[0][0] as string;
+    expect(cmd).toContain("2026-05-14 00:00:00");
+    expect(cmd).toContain("2026-05-16 23:59:59");
   });
 
   it("skips malformed lines", () => {

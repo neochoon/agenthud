@@ -22,15 +22,17 @@ export function getCommitDetail(
 
 export function parseGitCommits(
   projectPath: string,
-  date: Date,
+  startDate: Date,
+  endDate?: Date,
 ): ActivityEntry[] {
   if (!projectPath) return [];
 
-  const dateStr = formatDateString(date);
+  const start = formatDateString(startDate);
+  const end = formatDateString(endDate ?? startDate);
   let raw: string;
   try {
     raw = execSync(
-      `git log --format="%ct|%h|%s" --after="${dateStr} 00:00:00" --before="${dateStr} 23:59:59"`,
+      `git log --format="%ct|%h|%s" --after="${start} 00:00:00" --before="${end} 23:59:59"`,
       { cwd: projectPath, encoding: "utf-8" },
     ).trim();
   } catch {

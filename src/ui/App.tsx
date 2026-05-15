@@ -233,9 +233,19 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   const refresh = useCallback(() => {
     const freshConfig = loadGlobalConfig();
     const tree = discoverSessions(freshConfig);
-    setSessionTree(tree);
     const updatedFlat = flattenSessions(tree, expandedIds);
+
+    // If selected item disappeared (e.g. sub-agent went cold), fall back to
+    // its parent session so navigation doesn't snap to index 0.
     const node = updatedFlat.find((s) => s.id === selectedId);
+    if (!node) {
+      const parentSession = tree.sessions.find((s) =>
+        s.subAgents.some((sa) => sa.id === selectedId),
+      );
+      if (parentSession) setSelectedId(parentSession.id);
+    }
+
+    setSessionTree(tree);
     if (!node || !node.filePath) return;
     const newActivities = parseSessionHistory(node.filePath);
     const delta = newActivities.length - activitiesLengthRef.current;
@@ -341,6 +351,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     onSwitchFocus: () => setFocus((f) => (f === "tree" ? "viewer" : "tree")),
     onScrollUp: () => {
       if (focus === "tree") {
+        if (selectedIndex === -1) return;
         const prev = Math.max(0, selectedIndex - 1);
         setSelectedId(allFlat[prev]?.id ?? selectedId);
       } else {
@@ -361,6 +372,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     },
     onScrollDown: () => {
       if (focus === "tree") {
+        if (selectedIndex === -1) return;
         const next = Math.min(allFlat.length - 1, selectedIndex + 1);
         setSelectedId(allFlat[next]?.id ?? selectedId);
       } else {

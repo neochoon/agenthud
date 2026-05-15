@@ -10,11 +10,12 @@ export function getCommitDetail(
   projectPath: string,
   hash: string,
 ): string | null {
+  if (!projectPath) return null;
   try {
-    return execSync(`git show --stat --no-color ${hash}`, {
-      cwd: projectPath,
-      encoding: "utf-8",
-    }).trim();
+    return execSync(
+      `git --git-dir="${projectPath}/.git" show --stat --no-color ${hash}`,
+      { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] },
+    ).trim();
   } catch {
     return null;
   }
@@ -32,8 +33,8 @@ export function parseGitCommits(
   let raw: string;
   try {
     raw = execSync(
-      `git log --format="%ct|%h|%s" --after="${start} 00:00:00" --before="${end} 23:59:59"`,
-      { cwd: projectPath, encoding: "utf-8" },
+      `git --git-dir="${projectPath}/.git" log --format="%ct|%h|%s" --after="${start} 00:00:00" --before="${end} 23:59:59"`,
+      { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] },
     ).trim();
   } catch {
     return [];

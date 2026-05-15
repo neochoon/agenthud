@@ -92,8 +92,8 @@ describe("getCommitDetail", () => {
     const result = getCommitDetail("/some/project", "abc1234");
     expect(result).toBe(statOutput);
     expect(vi.mocked(execSync)).toHaveBeenCalledWith(
-      expect.stringContaining("git show --stat"),
-      expect.objectContaining({ cwd: "/some/project" }),
+      expect.stringContaining('git --git-dir="/some/project/.git" show --stat'),
+      expect.anything(),
     );
     expect(vi.mocked(execSync)).toHaveBeenCalledWith(
       expect.stringContaining("abc1234"),

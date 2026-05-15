@@ -14,6 +14,7 @@ import {
   hideSubAgent,
   loadGlobalConfig,
 } from "../config/globalConfig.js";
+import { parseGitCommits } from "../data/gitCommits.js";
 import { parseSessionHistory } from "../data/sessionHistory.js";
 import { discoverSessions, getProjectsDir } from "../data/sessions.js";
 import type {
@@ -141,6 +142,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   const [scrollOffset, setScrollOffset] = useState(0);
   const [isLive, setIsLive] = useState(true);
   const [activities, setActivities] = useState<ActivityEntry[]>([]);
+  const [gitActivities, setGitActivities] = useState<ActivityEntry[]>([]);
   const [newCount, setNewCount] = useState(0);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [viewerCursorLine, setViewerCursorLine] = useState(0);
@@ -177,7 +179,30 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     } else {
       setActivities([]);
     }
+    setGitActivities([]);
   }, [selectedId]);
+
+  // Load git commits for selected session: on selection + every 30s
+  useEffect(() => {
+    if (!isWatchMode) return;
+    const node = allFlatRef.current.find((s) => s.id === selectedId);
+    if (!node?.projectPath) return;
+
+    const today = new Date();
+    const day = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+    );
+    const load = () => {
+      const commits = parseGitCommits(node.projectPath, day);
+      setGitActivities(commits);
+    };
+
+    load();
+    const timer = setInterval(load, 30_000);
+    return () => clearInterval(timer);
+  }, [selectedId, isWatchMode]);
 
   const refresh = useCallback(() => {
     const freshConfig = loadGlobalConfig();
@@ -237,6 +262,14 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
       if (debounce) clearTimeout(debounce);
     };
   }, [isWatchMode, config.refreshIntervalMs]);
+
+  const mergedActivities = useMemo(
+    () =>
+      [...activities, ...gitActivities].sort(
+        (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
+      ),
+    [activities, gitActivities],
+  );
 
   const selectedIndex = allFlat.findIndex((s) => s.id === selectedId);
   const height = (stdout?.rows ?? 41) - 1;
@@ -392,7 +425,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     onEnter: () => {
       if (focus === "viewer") {
         const act = getSelectedActivity(
-          activities,
+          mergedActivities,
           isLive,
           scrollOffset,
           viewerRows,
@@ -528,7 +561,9 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
 
       {isWatchMode && (
         <Box marginBottom={1} justifyContent="space-between" width={width}>
-          <Text dimColor>{spinner} AgentHUD v{getVersion()}</Text>
+          <Text dimColor>
+            {spinner} AgentHUD v{getVersion()}
+          </Text>
           <Text dimColor>{statusBarItems.join(" · ")}</Text>
         </Box>
       )}
@@ -553,7 +588,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
           />
         ) : (
           <ActivityViewerPanel
-            activities={activities}
+            activities={mergedActivities}
             sessionName={sessionDisplayName}
             scrollOffset={scrollOffset}
             isLive={isLive}

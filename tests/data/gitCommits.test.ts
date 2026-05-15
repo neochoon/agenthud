@@ -1,0 +1,72 @@
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("node:child_process", () => ({
+  execSync: vi.fn(),
+}));
+
+const { execSync } = await import("node:child_process");
+const { parseGitCommits } = await import("../../src/data/gitCommits.js");
+
+const DAY = new Date(2026, 4, 14); // local midnight May 14
+
+describe("parseGitCommits", () => {
+  it("returns empty array when git log output is empty", () => {
+    vi.mocked(execSync).mockReturnValue("");
+    const result = parseGitCommits("/some/project", DAY);
+    expect(result).toHaveLength(0);
+  });
+
+  it("parses git log into ActivityEntry objects", () => {
+    const ts = Math.floor(new Date(2026, 4, 14, 10, 30).getTime() / 1000);
+    vi.mocked(execSync).mockReturnValue(
+      `${ts}|abc1234|feat: add report command\n`,
+    );
+
+    const result = parseGitCommits("/some/project", DAY);
+    expect(result).toHaveLength(1);
+    expect(result[0].type).toBe("commit");
+    expect(result[0].label).toBe("abc1234");
+    expect(result[0].detail).toBe("feat: add report command");
+    expect(result[0].timestamp).toEqual(new Date(ts * 1000));
+  });
+
+  it("parses multiple commits and sorts by timestamp", () => {
+    const ts1 = Math.floor(new Date(2026, 4, 14, 9, 0).getTime() / 1000);
+    const ts2 = Math.floor(new Date(2026, 4, 14, 11, 0).getTime() / 1000);
+    vi.mocked(execSync).mockReturnValue(
+      `${ts2}|def5678|fix: timezone bug\n${ts1}|abc1234|feat: add command\n`,
+    );
+
+    const result = parseGitCommits("/some/project", DAY);
+    expect(result).toHaveLength(2);
+    expect(result[0].label).toBe("abc1234"); // earlier first
+    expect(result[1].label).toBe("def5678");
+  });
+
+  it("returns empty array when not a git repo", () => {
+    vi.mocked(execSync).mockImplementation(() => {
+      throw new Error("not a git repo");
+    });
+    const result = parseGitCommits("/not/a/repo", DAY);
+    expect(result).toHaveLength(0);
+  });
+
+  it("filters commits to the given date", () => {
+    vi.mocked(execSync).mockReturnValue("");
+    parseGitCommits("/some/project", DAY);
+    expect(vi.mocked(execSync)).toHaveBeenCalledWith(
+      expect.stringContaining("2026-05-14"),
+      expect.objectContaining({ cwd: "/some/project" }),
+    );
+  });
+
+  it("skips malformed lines", () => {
+    const ts = Math.floor(new Date(2026, 4, 14, 10, 0).getTime() / 1000);
+    vi.mocked(execSync).mockReturnValue(
+      `bad-line\n${ts}|abc1234|valid commit\n`,
+    );
+    const result = parseGitCommits("/some/project", DAY);
+    expect(result).toHaveLength(1);
+    expect(result[0].label).toBe("abc1234");
+  });
+});

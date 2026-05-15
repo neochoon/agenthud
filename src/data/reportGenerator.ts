@@ -1,6 +1,6 @@
-import { execSync } from "node:child_process";
 import { statSync } from "node:fs";
 import type { ActivityEntry, SessionNode } from "../types/index.js";
+import { parseGitCommits } from "./gitCommits.js";
 import { parseSessionHistory } from "./sessionHistory.js";
 
 export interface ReportOptions {
@@ -8,20 +8,7 @@ export interface ReportOptions {
   include: string[]; // activity types: "response" | "bash" | "edit" | "thinking" | "read" | "glob" | "user"
   format?: "markdown" | "json"; // default: "markdown"
   detailLimit?: number; // max chars for detail field; 0 = unlimited; default: 120
-  withGit?: boolean; // run git log in each session's projectPath and include commits
-}
-
-function getGitLog(projectPath: string, dateStr: string): string | null {
-  if (!projectPath) return null;
-  try {
-    const log = execSync(
-      `git log --oneline --after="${dateStr} 00:00:00" --before="${dateStr} 23:59:59"`,
-      { cwd: projectPath, encoding: "utf-8" },
-    ).trim();
-    return log || null;
-  } catch {
-    return null;
-  }
+  withGit?: boolean; // merge git commits into activity timeline per session
 }
 
 function activityMatchesInclude(
@@ -115,9 +102,13 @@ export function generateReport(
     const allActivities = parseSessionHistory(session.filePath);
     if (!sessionIsOnDate(session, date, allActivities)) continue;
 
-    const dayActivities = allActivities
-      .filter((a) => isSameLocalDay(a.timestamp, date))
-      .filter((a) => activityMatchesInclude(a, include));
+    const commits = withGit ? parseGitCommits(session.projectPath, date) : [];
+    const dayActivities = [
+      ...allActivities
+        .filter((a) => isSameLocalDay(a.timestamp, date))
+        .filter((a) => activityMatchesInclude(a, include)),
+      ...commits,
+    ].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 
     if (dayActivities.length === 0) continue;
 
@@ -155,8 +146,6 @@ export function generateReport(
         };
       });
 
-      const commits = withGit ? getGitLog(session.projectPath, dateStr) : null;
-
       return {
         project: session.projectName,
         start: formatTime(acts[0].timestamp),
@@ -168,7 +157,6 @@ export function generateReport(
           detail: truncateDetail(a.detail, detailLimit),
         })),
         subAgents: subAgentBlocks,
-        ...(commits ? { commits } : {}),
       };
     };
 
@@ -193,15 +181,6 @@ export function generateReport(
     lines.push("");
     for (const activity of activities) {
       lines.push(formatActivity(activity, detailLimit));
-    }
-    if (withGit) {
-      const commits = getGitLog(session.projectPath, dateStr);
-      if (commits) {
-        lines.push("");
-        lines.push("### Commits");
-        lines.push("");
-        lines.push(commits);
-      }
     }
     lines.push("");
   }

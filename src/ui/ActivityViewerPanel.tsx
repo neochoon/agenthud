@@ -24,6 +24,9 @@ export function getActivityStyle(activity: ActivityEntry): ActivityStyle {
   if (activity.type === "thinking") {
     return { color: "magenta", dimColor: true };
   }
+  if (activity.type === "commit") {
+    return { color: "yellow", dimColor: false };
+  }
   if (activity.type === "tool") {
     if (activity.label === "Bash") {
       return { color: "gray", dimColor: false };

@@ -47,13 +47,14 @@ export const ICONS = {
   Task: "»",
   TodoWrite: "~",
   AskUserQuestion: "?",
+  Commit: "◆",
   Default: "$",
 } as const;
 
 // Activity entry (single item in a session's history)
 export interface ActivityEntry {
   timestamp: Date;
-  type: "tool" | "response" | "user" | "thinking";
+  type: "tool" | "response" | "user" | "thinking" | "commit";
   icon: string;
   label: string;
   detail: string;

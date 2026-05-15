@@ -107,7 +107,7 @@ export function useHotkeys({
       onRefresh();
       return;
     }
-    if (input === "f" && focus === "viewer") {
+    if (input === "f" && !key.ctrl && focus === "viewer") {
       onFilter();
       return;
     }

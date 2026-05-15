@@ -164,9 +164,11 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   }, [allFlat]);
 
   const activitiesLengthRef = useRef(0);
+  const activitiesRef = useRef<ActivityEntry[]>(activities);
   useEffect(() => {
     activitiesLengthRef.current = activities.length;
-  }, [activities.length]);
+    activitiesRef.current = activities;
+  }, [activities]);
 
   // Load activities whenever selected session changes
   useEffect(() => {
@@ -191,14 +193,14 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   }, [filterIndex]);
 
   // Load git commits for selected session: on selection + every 30s
-  // Always reads activities from disk to avoid race with activity loading effect
+  // Uses activitiesRef to avoid re-reading the JSONL file every tick
   useEffect(() => {
     if (!isWatchMode) return;
     const node = allFlatRef.current.find((s) => s.id === selectedId);
     if (!node?.projectPath) return;
 
     const load = () => {
-      const acts = node.filePath ? parseSessionHistory(node.filePath) : [];
+      const acts = activitiesRef.current;
       const today = new Date();
       const todayMidnight = new Date(
         today.getFullYear(),
@@ -225,9 +227,13 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
       setGitActivities(commits);
     };
 
-    load();
+    // Defer initial load to next tick so activitiesRef is populated
+    const initial = setTimeout(load, 100);
     const timer = setInterval(load, 30_000);
-    return () => clearInterval(timer);
+    return () => {
+      clearTimeout(initial);
+      clearInterval(timer);
+    };
   }, [selectedId, isWatchMode]);
 
   const refresh = useCallback(() => {
@@ -300,9 +306,14 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   }, [isWatchMode, config.refreshIntervalMs]);
 
   const filterPresets = config.filterPresets;
-  const activePreset = filterPresets[filterIndex % filterPresets.length] ?? [];
-  const filterLabel =
-    activePreset.length === 0 ? "all" : activePreset.join("+");
+  const activePreset = useMemo(
+    () => filterPresets[filterIndex % filterPresets.length] ?? [],
+    [filterPresets, filterIndex],
+  );
+  const filterLabel = useMemo(
+    () => (activePreset.length === 0 ? "all" : activePreset.join("+")),
+    [activePreset],
+  );
 
   const mergedActivities = useMemo(() => {
     const merged = [...activities, ...gitActivities].sort(

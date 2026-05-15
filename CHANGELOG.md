@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.8.5] - 2026-05-15
+
+### Fixed
+- **Git access via `--git-dir`** — No longer requires `cwd` to be the project directory; only `.git` needs to be accessible (useful for mounted/read-only setups)
+- **Suppressed git stderr** — "fatal: not a git repository" messages no longer leak to terminal
+
 ## [0.8.4] - 2026-05-15
 
 ### New

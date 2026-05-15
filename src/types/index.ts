@@ -29,6 +29,7 @@ export interface GlobalConfig {
   logDir: string; // default: ~/.agenthud/logs
   hiddenSessions: string[];
   hiddenSubAgents: string[];
+  filterPresets: string[][]; // [] = all; default: [[], ["response"], ["commit"]]
 }
 
 // Centralized icon definitions

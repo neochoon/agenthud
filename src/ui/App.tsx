@@ -151,6 +151,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     null,
   );
   const [detailScrollOffset, setDetailScrollOffset] = useState(0);
+  const [filterIndex, setFilterIndex] = useState(0);
 
   const allFlat = useMemo(
     () => flattenSessions(sessionTree, expandedIds),
@@ -263,13 +264,23 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     };
   }, [isWatchMode, config.refreshIntervalMs]);
 
-  const mergedActivities = useMemo(
-    () =>
-      [...activities, ...gitActivities].sort(
-        (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
-      ),
-    [activities, gitActivities],
-  );
+  const filterPresets = config.filterPresets;
+  const activePreset = filterPresets[filterIndex % filterPresets.length] ?? [];
+  const filterLabel =
+    activePreset.length === 0 ? "all" : activePreset.join("+");
+
+  const mergedActivities = useMemo(() => {
+    const merged = [...activities, ...gitActivities].sort(
+      (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
+    );
+    if (activePreset.length === 0) return merged;
+    return merged.filter(
+      (a) =>
+        activePreset.includes(a.type) ||
+        (a.type === "tool" &&
+          activePreset.some((p) => a.label.toLowerCase() === p)),
+    );
+  }, [activities, gitActivities, activePreset]);
 
   const selectedIndex = allFlat.findIndex((s) => s.id === selectedId);
   const height = (stdout?.rows ?? 41) - 1;
@@ -542,6 +553,8 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     onSaveLog: saveLog,
     onRefresh: refresh,
     onQuit: exit,
+    onFilter: () => setFilterIndex((i) => (i + 1) % filterPresets.length),
+    filterLabel,
   });
 
   useInput((input, key) => handleInput(input, key), { isActive: isWatchMode });
@@ -606,6 +619,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
             cursorLine={viewerCursorLine}
             hasFocus={focus === "viewer"}
             spinner={spinner}
+            filterLabel={filterLabel}
           />
         )}
       </Box>

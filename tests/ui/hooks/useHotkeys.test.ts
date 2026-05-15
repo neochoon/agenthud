@@ -84,6 +84,8 @@ function makeOptions(overrides = {}) {
     onDetailClose: vi.fn(),
     onDetailScrollUp: vi.fn(),
     onDetailScrollDown: vi.fn(),
+    onFilter: vi.fn(),
+    filterLabel: "all",
     ...overrides,
   };
 }
@@ -347,6 +349,7 @@ describe("useHotkeys", () => {
         "g: top",
         "G: live",
         "↵: detail",
+        "f: all",
         "q: quit",
       ]);
     });

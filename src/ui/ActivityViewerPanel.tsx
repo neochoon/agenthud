@@ -47,6 +47,7 @@ export interface ActivityViewerPanelProps {
   cursorLine: number;
   hasFocus: boolean;
   spinner?: string;
+  filterLabel?: string;
 }
 
 function formatActivityTime(date: Date, now: Date): string {
@@ -93,16 +94,19 @@ export function ActivityViewerPanel({
   cursorLine,
   hasFocus,
   spinner = "",
+  filterLabel,
 }: ActivityViewerPanelProps): React.ReactElement {
   const innerWidth = getInnerWidth(width);
   const contentWidth = innerWidth - 1;
 
+  const filterSuffix =
+    filterLabel && filterLabel !== "all" ? ` · ${filterLabel}` : "";
   let titleSuffix: string;
   if (isLive) {
-    titleSuffix = `[LIVE ${spinner || "▼"}]`;
+    titleSuffix = `[LIVE ${spinner || "▼"}${filterSuffix}]`;
   } else {
     const badge = newCount > 0 ? ` +${newCount}↑` : "";
-    titleSuffix = `[PAUSED ↓${scrollOffset}${badge}]`;
+    titleSuffix = `[PAUSED ↓${scrollOffset}${badge}${filterSuffix}]`;
   }
 
   // Determine which slice to show, then reverse so newest is at top

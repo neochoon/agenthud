@@ -18,6 +18,8 @@ interface UseHotkeysOptions {
   onDetailClose: () => void;
   onDetailScrollUp: () => void;
   onDetailScrollDown: () => void;
+  onFilter: () => void;
+  filterLabel: string; // e.g. "all", "response", "commit"
 }
 
 export interface UseHotkeysResult {
@@ -57,6 +59,8 @@ export function useHotkeys({
   onDetailClose,
   onDetailScrollUp,
   onDetailScrollDown,
+  onFilter,
+  filterLabel,
 }: UseHotkeysOptions): UseHotkeysResult {
   const handleInput = (
     input: string,
@@ -101,6 +105,10 @@ export function useHotkeys({
     }
     if (input === "r") {
       onRefresh();
+      return;
+    }
+    if (input === "f" && focus === "viewer") {
+      onFilter();
       return;
     }
 
@@ -190,6 +198,7 @@ export function useHotkeys({
           "g: top",
           "G: live",
           "↵: detail",
+          `f: ${filterLabel}`,
           "q: quit",
         ];
 

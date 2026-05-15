@@ -11,6 +11,7 @@ export const DEFAULT_GLOBAL_CONFIG: GlobalConfig = {
   logDir: join(homedir(), ".agenthud", "logs"),
   hiddenSessions: [],
   hiddenSubAgents: [],
+  filterPresets: [[], ["response"], ["commit"]],
 };
 
 function parseInterval(value: string): number | null {
@@ -57,6 +58,14 @@ export function loadGlobalConfig(): GlobalConfig {
     config.hiddenSubAgents = (parsed.hiddenSubAgents as unknown[]).filter(
       (s): s is string => typeof s === "string",
     );
+  }
+  if (Array.isArray(parsed.filterPresets)) {
+    const presets = (parsed.filterPresets as unknown[])
+      .filter(Array.isArray)
+      .map((p) =>
+        (p as unknown[]).filter((t): t is string => typeof t === "string"),
+      );
+    if (presets.length > 0) config.filterPresets = presets;
   }
 
   return config;

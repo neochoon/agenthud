@@ -8,6 +8,7 @@ vi.mock("../../src/config/globalConfig.js", () => ({
     logDir: "/tmp/logs",
     hiddenSessions: [],
     hiddenSubAgents: [],
+    filterPresets: [[], ["response"], ["commit"]],
   }),
   ensureLogDir: vi.fn(),
   hasProjectLevelConfig: () => false,

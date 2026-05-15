@@ -145,6 +145,16 @@ describe("parseArgs", () => {
       const opts = parseArgs(["report", "--detail-limit", "abc"]);
       expect(opts.reportError).toContain("Invalid --detail-limit");
     });
+
+    it("sets reportWithGit when --with-git is passed", () => {
+      const opts = parseArgs(["report", "--with-git"]);
+      expect(opts.reportWithGit).toBe(true);
+    });
+
+    it("reportWithGit is falsy by default", () => {
+      const opts = parseArgs(["report"]);
+      expect(opts.reportWithGit).toBeFalsy();
+    });
   });
 });
 

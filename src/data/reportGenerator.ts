@@ -7,6 +7,7 @@ export interface ReportOptions {
   include: string[]; // activity types: "response" | "bash" | "edit" | "thinking" | "read" | "glob" | "user"
   format?: "markdown" | "json"; // default: "markdown"
   detailLimit?: number; // max chars for detail field; 0 = unlimited; default: 120
+  gitLog?: string; // raw git log output to append to report
 }
 
 function activityMatchesInclude(
@@ -80,7 +81,13 @@ export function generateReport(
   sessions: SessionNode[],
   options: ReportOptions,
 ): string {
-  const { date, include, format = "markdown", detailLimit = 120 } = options;
+  const {
+    date,
+    include,
+    format = "markdown",
+    detailLimit = 120,
+    gitLog,
+  } = options;
   const dateStr = formatDateString(date);
 
   type SessionBlock = {
@@ -109,7 +116,11 @@ export function generateReport(
 
   if (blocks.length === 0) {
     if (format === "json") {
-      return JSON.stringify({ date: dateStr, sessions: [] }, null, 2);
+      return JSON.stringify(
+        { date: dateStr, sessions: [], ...(gitLog ? { commits: gitLog } : {}) },
+        null,
+        2,
+      );
     }
     return `No activity found for ${dateStr}.`;
   }
@@ -154,6 +165,7 @@ export function generateReport(
         sessions: blocks.map(({ session, activities }) =>
           buildJsonSession(session, activities),
         ),
+        ...(gitLog ? { commits: gitLog } : {}),
       },
       null,
       2,
@@ -171,6 +183,13 @@ export function generateReport(
       lines.push(formatActivity(activity, detailLimit));
     }
     lines.push("");
+  }
+
+  if (gitLog) {
+    lines.push("");
+    lines.push("## Git Commits");
+    lines.push("");
+    lines.push(gitLog);
   }
 
   return lines.join("\n").trimEnd();

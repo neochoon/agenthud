@@ -21,6 +21,7 @@ export interface CliOptions {
   reportInclude?: string[];
   reportFormat?: "markdown" | "json";
   reportDetailLimit?: number;
+  reportWithGit?: boolean;
   reportError?: string;
 }
 
@@ -38,6 +39,7 @@ const KNOWN_REPORT_FLAGS = new Set([
   "--include",
   "--format",
   "--detail-limit",
+  "--with-git",
 ]);
 const KNOWN_SUBCOMMANDS = new Set(["report"]);
 
@@ -61,6 +63,7 @@ Commands:
                                 Default: response,bash,edit,thinking
     --format FORMAT             Output format: markdown (default) or json
     --detail-limit N            Max chars per activity detail (default: 120, 0 = unlimited)
+    --with-git                  Append today's git commits from cwd to report
 
 Environment:
   CLAUDE_PROJECTS_DIR           Path to Claude projects directory
@@ -179,12 +182,15 @@ export function parseArgs(args: string[]): CliOptions {
       }
     }
 
+    const reportWithGit = rest.includes("--with-git");
+
     return {
       mode: "report",
       reportDate,
       reportInclude,
       reportFormat,
       reportDetailLimit,
+      reportWithGit,
       reportError,
     };
   }

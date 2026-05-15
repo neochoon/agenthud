@@ -492,4 +492,53 @@ describe("generateReport", () => {
     });
     expect(result).not.toContain("subAgents");
   });
+
+  it("appends git log section when gitLog is provided", () => {
+    vi.mocked(statSync).mockReturnValue({
+      mtimeMs: new Date("2026-05-14T10:00:00Z").getTime(),
+    } as ReturnType<typeof statSync>);
+    vi.mocked(parseSessionHistory).mockReturnValue([
+      makeActivity({
+        type: "response",
+        icon: "<",
+        label: "Response",
+        detail: "Done.",
+      }),
+    ]);
+
+    const gitLog =
+      "abc1234 feat: add report command\ndef5678 fix: timezone bug";
+    const result = generateReport([makeSession()], {
+      date: DAY,
+      include: ["response"],
+      gitLog,
+    });
+    expect(result).toContain("## Git Commits");
+    expect(result).toContain("abc1234 feat: add report command");
+    expect(result).toContain("def5678 fix: timezone bug");
+  });
+
+  it("includes gitLog in JSON output under commits key", () => {
+    vi.mocked(statSync).mockReturnValue({
+      mtimeMs: new Date("2026-05-14T10:00:00Z").getTime(),
+    } as ReturnType<typeof statSync>);
+    vi.mocked(parseSessionHistory).mockReturnValue([
+      makeActivity({
+        type: "response",
+        icon: "<",
+        label: "Response",
+        detail: "Done.",
+      }),
+    ]);
+
+    const gitLog = "abc1234 feat: add report command";
+    const result = generateReport([makeSession()], {
+      date: DAY,
+      include: ["response"],
+      format: "json",
+      gitLog,
+    });
+    const parsed = JSON.parse(result);
+    expect(parsed.commits).toContain("abc1234 feat: add report command");
+  });
 });

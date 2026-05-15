@@ -20,6 +20,7 @@ export interface CliOptions {
   reportDate?: Date;
   reportInclude?: string[];
   reportFormat?: "markdown" | "json";
+  reportDetailLimit?: number;
   reportError?: string;
 }
 
@@ -32,7 +33,12 @@ const KNOWN_WATCH_FLAGS = new Set([
   "-h",
   "--help",
 ]);
-const KNOWN_REPORT_FLAGS = new Set(["--date", "--include", "--format"]);
+const KNOWN_REPORT_FLAGS = new Set([
+  "--date",
+  "--include",
+  "--format",
+  "--detail-limit",
+]);
 const KNOWN_SUBCOMMANDS = new Set(["report"]);
 
 export function getHelp(): string {
@@ -54,6 +60,7 @@ Commands:
                                 Types: response,bash,edit,thinking,read,glob,user
                                 Default: response,bash,edit,thinking
     --format FORMAT             Output format: markdown (default) or json
+    --detail-limit N            Max chars per activity detail (default: 120, 0 = unlimited)
 
 Environment:
   CLAUDE_PROJECTS_DIR           Path to Claude projects directory
@@ -160,11 +167,24 @@ export function parseArgs(args: string[]): CliOptions {
       }
     }
 
+    let reportDetailLimit: number | undefined;
+    const detailLimitIdx = rest.indexOf("--detail-limit");
+    if (detailLimitIdx !== -1) {
+      const val = rest[detailLimitIdx + 1];
+      const n = Number(val);
+      if (!val || Number.isNaN(n) || n < 0 || !Number.isInteger(n)) {
+        reportError = `Invalid --detail-limit: "${val}". Must be a non-negative integer.`;
+      } else {
+        reportDetailLimit = n;
+      }
+    }
+
     return {
       mode: "report",
       reportDate,
       reportInclude,
       reportFormat,
+      reportDetailLimit,
       reportError,
     };
   }

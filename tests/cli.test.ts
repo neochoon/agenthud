@@ -130,6 +130,21 @@ describe("parseArgs", () => {
       expect(opts.reportError).toContain("Invalid format");
       expect(opts.reportError).toContain("csv");
     });
+
+    it("parses --detail-limit N", () => {
+      const opts = parseArgs(["report", "--detail-limit", "500"]);
+      expect(opts.reportDetailLimit).toBe(500);
+    });
+
+    it("parses --detail-limit 0 (unlimited)", () => {
+      const opts = parseArgs(["report", "--detail-limit", "0"]);
+      expect(opts.reportDetailLimit).toBe(0);
+    });
+
+    it("returns error for invalid --detail-limit", () => {
+      const opts = parseArgs(["report", "--detail-limit", "abc"]);
+      expect(opts.reportError).toContain("Invalid --detail-limit");
+    });
   });
 });
 

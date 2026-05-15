@@ -6,6 +6,7 @@ export interface ReportOptions {
   date: Date; // local midnight of target day
   include: string[]; // activity types: "response" | "bash" | "edit" | "thinking" | "read" | "glob" | "user"
   format?: "markdown" | "json"; // default: "markdown"
+  detailLimit?: number; // max chars for detail field; 0 = unlimited; default: 120
 }
 
 function activityMatchesInclude(
@@ -45,12 +46,9 @@ function formatTime(date: Date): string {
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
-function formatActivity(activity: ActivityEntry): string {
+function formatActivity(activity: ActivityEntry, limit: number): string {
   const time = formatTime(activity.timestamp);
-  const detail =
-    activity.detail.length > 120
-      ? activity.detail.slice(0, 120)
-      : activity.detail;
+  const detail = truncateDetail(activity.detail, limit);
   const suffix = detail ? `: ${detail}` : "";
   return `[${time}] ${activity.icon} ${activity.label}${suffix}`;
 }
@@ -73,11 +71,16 @@ function sessionIsOnDate(
   return activities.some((a) => isSameLocalDay(a.timestamp, date));
 }
 
+function truncateDetail(detail: string, limit: number): string {
+  if (limit === 0 || detail.length <= limit) return detail;
+  return detail.slice(0, limit);
+}
+
 export function generateReport(
   sessions: SessionNode[],
   options: ReportOptions,
 ): string {
-  const { date, include, format = "markdown" } = options;
+  const { date, include, format = "markdown", detailLimit = 120 } = options;
   const dateStr = formatDateString(date);
 
   type SessionBlock = {
@@ -125,7 +128,7 @@ export function generateReport(
             time: formatTime(a.timestamp),
             icon: a.icon,
             label: a.label,
-            detail: a.detail.length > 120 ? a.detail.slice(0, 120) : a.detail,
+            detail: truncateDetail(a.detail, detailLimit),
           })),
         })),
       },
@@ -142,7 +145,7 @@ export function generateReport(
     lines.push(`## ${session.projectName} (${first} – ${last})`);
     lines.push("");
     for (const activity of activities) {
-      lines.push(formatActivity(activity));
+      lines.push(formatActivity(activity, detailLimit));
     }
     lines.push("");
   }

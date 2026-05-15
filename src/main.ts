@@ -61,6 +61,7 @@ if (options.mode === "report") {
     date: options.reportDate!,
     include: options.reportInclude!,
     format: options.reportFormat,
+    detailLimit: options.reportDetailLimit,
   });
   process.stdout.write(`${markdown}\n`);
   process.exit(0);

@@ -163,6 +163,51 @@ describe("generateReport", () => {
     expect(result).not.toContain("x".repeat(121));
   });
 
+  it("respects detailLimit option", () => {
+    vi.mocked(statSync).mockReturnValue({
+      mtimeMs: new Date("2026-05-14T10:00:00Z").getTime(),
+    } as ReturnType<typeof statSync>);
+    const longDetail = "y".repeat(500);
+    vi.mocked(parseSessionHistory).mockReturnValue([
+      makeActivity({
+        type: "response",
+        icon: "<",
+        label: "Response",
+        detail: longDetail,
+      }),
+    ]);
+
+    const result = generateReport([makeSession()], {
+      date: DAY,
+      include: ["response"],
+      detailLimit: 300,
+    });
+    expect(result).toContain("y".repeat(300));
+    expect(result).not.toContain("y".repeat(301));
+  });
+
+  it("shows full detail when detailLimit is 0 (unlimited)", () => {
+    vi.mocked(statSync).mockReturnValue({
+      mtimeMs: new Date("2026-05-14T10:00:00Z").getTime(),
+    } as ReturnType<typeof statSync>);
+    const longDetail = "z".repeat(2000);
+    vi.mocked(parseSessionHistory).mockReturnValue([
+      makeActivity({
+        type: "response",
+        icon: "<",
+        label: "Response",
+        detail: longDetail,
+      }),
+    ]);
+
+    const result = generateReport([makeSession()], {
+      date: DAY,
+      include: ["response"],
+      detailLimit: 0,
+    });
+    expect(result).toContain("z".repeat(2000));
+  });
+
   it("includes report header with date", () => {
     vi.mocked(statSync).mockReturnValue({
       mtimeMs: new Date("2026-05-14T10:00:00Z").getTime(),

@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-05-15
+
+### New
+- **Git commits in viewer** — `◆` commit entries appear in the activity timeline (session date range, refreshed every 30s)
+- **Git commits in report** — `--with-git` merges commits into the timeline chronologically
+- **Detail view for commits** — Press `↵` on a commit to see `git show --stat`
+- **Activity filter** — Press `f` to cycle through filter presets (configurable in `~/.agenthud/config.yaml`)
+- **`--detail-limit`** — Control truncation in `agenthud report` (0 = unlimited)
+- **`--format json`** — JSON output with sub-agents nested under parent sessions
+
+### Fixed
+- **g/G keys swapped** — `g` now goes to live (newest), `G` goes to oldest, matching visual vim convention
+- **Filter resets scroll** — Applying a filter no longer leaves the viewport pointing outside the results
+- **Git date range** — Viewer fetches commits across the full session date range, not just today
+- **Ctrl+F no longer triggers filter** — `f` key only fires without Ctrl
+- **Sub-agent navigation snap** — Arrow keys no longer jump to first session when sub-agent disappears from flat list
+- **Sentinel expansion** — Expanding `__sub-parent__` sentinel now moves selection to first newly-visible sub-agent
+
 ## [0.8.3] - 2026-05-15
 
 ### Fixed

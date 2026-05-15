@@ -183,25 +183,28 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     setGitActivities([]);
   }, [selectedId]);
 
+  // Reset scroll when filter changes
+  useEffect(() => {
+    setScrollOffset(0);
+    setIsLive(true);
+    setViewerCursorLine(0);
+  }, [filterIndex]);
+
   // Load git commits for selected session: on selection + every 30s
-  // Uses the date range of loaded activities (falls back to today if none)
+  // Always reads activities from disk to avoid race with activity loading effect
   useEffect(() => {
     if (!isWatchMode) return;
     const node = allFlatRef.current.find((s) => s.id === selectedId);
     if (!node?.projectPath) return;
 
     const load = () => {
-      const acts =
-        activitiesLengthRef.current > 0
-          ? parseSessionHistory(node.filePath)
-          : [];
+      const acts = node.filePath ? parseSessionHistory(node.filePath) : [];
       const today = new Date();
       const todayMidnight = new Date(
         today.getFullYear(),
         today.getMonth(),
         today.getDate(),
       );
-
       const startDate =
         acts.length > 0
           ? new Date(
@@ -218,7 +221,6 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
               acts[acts.length - 1].timestamp.getDate(),
             )
           : todayMidnight;
-
       const commits = parseGitCommits(node.projectPath, startDate, endDate);
       setGitActivities(commits);
     };

@@ -91,10 +91,14 @@ describe("runSummary cache behavior", () => {
   it("bypasses cache when force is true", async () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readFileSync).mockReturnValue("ignored");
-    vi.mocked(createWriteStream).mockReturnValue({
+    const mockStream = {
       write: vi.fn(),
       end: vi.fn(),
-    } as unknown as ReturnType<typeof createWriteStream>);
+      on: vi.fn().mockReturnThis(),
+    };
+    vi.mocked(createWriteStream).mockReturnValue(
+      mockStream as unknown as ReturnType<typeof createWriteStream>,
+    );
     vi.mocked(spawn).mockReturnValue(
       mockClaudeProcess() as unknown as ReturnType<typeof spawn>,
     );
@@ -111,10 +115,14 @@ describe("runSummary cache behavior", () => {
   it("bypasses cache for today's date even without force", async () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readFileSync).mockReturnValue("ignored");
-    vi.mocked(createWriteStream).mockReturnValue({
+    const mockStream = {
       write: vi.fn(),
       end: vi.fn(),
-    } as unknown as ReturnType<typeof createWriteStream>);
+      on: vi.fn().mockReturnThis(),
+    };
+    vi.mocked(createWriteStream).mockReturnValue(
+      mockStream as unknown as ReturnType<typeof createWriteStream>,
+    );
     vi.mocked(spawn).mockReturnValue(
       mockClaudeProcess() as unknown as ReturnType<typeof spawn>,
     );
@@ -132,10 +140,14 @@ describe("runSummary cache behavior", () => {
 describe("runSummary prompt resolution", () => {
   it("uses --prompt override when provided", async () => {
     vi.mocked(existsSync).mockReturnValue(false);
-    vi.mocked(createWriteStream).mockReturnValue({
+    const mockStream = {
       write: vi.fn(),
       end: vi.fn(),
-    } as unknown as ReturnType<typeof createWriteStream>);
+      on: vi.fn().mockReturnThis(),
+    };
+    vi.mocked(createWriteStream).mockReturnValue(
+      mockStream as unknown as ReturnType<typeof createWriteStream>,
+    );
     vi.mocked(spawn).mockReturnValue(
       mockClaudeProcess() as unknown as ReturnType<typeof spawn>,
     );
@@ -157,10 +169,14 @@ describe("runSummary prompt resolution", () => {
       String(p).endsWith("summary-prompt.md"),
     );
     vi.mocked(readFileSync).mockReturnValue("user file prompt");
-    vi.mocked(createWriteStream).mockReturnValue({
+    const mockStream = {
       write: vi.fn(),
       end: vi.fn(),
-    } as unknown as ReturnType<typeof createWriteStream>);
+      on: vi.fn().mockReturnThis(),
+    };
+    vi.mocked(createWriteStream).mockReturnValue(
+      mockStream as unknown as ReturnType<typeof createWriteStream>,
+    );
     vi.mocked(spawn).mockReturnValue(
       mockClaudeProcess() as unknown as ReturnType<typeof spawn>,
     );
@@ -177,10 +193,14 @@ describe("runSummary prompt resolution", () => {
 
   it("copies built-in template to user dir on first run", async () => {
     vi.mocked(existsSync).mockReturnValue(false);
-    vi.mocked(createWriteStream).mockReturnValue({
+    const mockStream = {
       write: vi.fn(),
       end: vi.fn(),
-    } as unknown as ReturnType<typeof createWriteStream>);
+      on: vi.fn().mockReturnThis(),
+    };
+    vi.mocked(createWriteStream).mockReturnValue(
+      mockStream as unknown as ReturnType<typeof createWriteStream>,
+    );
     vi.mocked(spawn).mockReturnValue(
       mockClaudeProcess() as unknown as ReturnType<typeof spawn>,
     );
@@ -195,5 +215,57 @@ describe("runSummary prompt resolution", () => {
       expect.stringContaining("summary-prompt.md"),
       expect.stringContaining(".agenthud/summary-prompt.md"),
     );
+  });
+});
+
+describe("runSummary cache write error", () => {
+  it("emits warning to stderr and continues when cache stream errors", async () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+
+    const writeFn = vi.fn();
+    const endFn = vi.fn();
+    let errorHandler: ((err: Error) => void) | undefined;
+    const fakeStream = {
+      write: writeFn,
+      end: endFn,
+      on: (ev: string, fn: (err: Error) => void) => {
+        if (ev === "error") errorHandler = fn;
+        return fakeStream;
+      },
+    };
+    vi.mocked(createWriteStream).mockReturnValue(
+      fakeStream as unknown as ReturnType<typeof createWriteStream>,
+    );
+
+    const stderrChunks: string[] = [];
+    const origErr = process.stderr.write.bind(process.stderr);
+    process.stderr.write = ((c: string | Uint8Array) => {
+      stderrChunks.push(String(c));
+      return true;
+    }) as typeof process.stderr.write;
+
+    vi.mocked(spawn).mockReturnValue(
+      mockClaudeProcess() as unknown as ReturnType<typeof spawn>,
+    );
+
+    const promise = runSummary({
+      date: new Date(2026, 4, 15),
+      force: false,
+      today: new Date(2026, 4, 15),
+    });
+
+    // Trigger error before stream operations complete
+    await new Promise((resolve) => setImmediate(resolve));
+    errorHandler?.(new Error("EACCES"));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const code = await promise;
+
+    // Check stderr output contains the error warning
+    const output = stderrChunks.join("");
+    expect(output).toContain("cannot write cache");
+    expect(code).toBe(0);
+
+    process.stderr.write = origErr;
   });
 });

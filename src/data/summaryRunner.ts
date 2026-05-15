@@ -115,13 +115,13 @@ export async function runSummary(options: SummaryOptions): Promise<number> {
     });
 
     let cacheStream: ReturnType<typeof createWriteStream> | null = null;
-    try {
-      cacheStream = createWriteStream(cached, { encoding: "utf-8" });
-    } catch (err) {
+    cacheStream = createWriteStream(cached, { encoding: "utf-8" });
+    cacheStream.on("error", (err: Error) => {
       process.stderr.write(
-        `agenthud: warning: cannot write cache (${(err as Error).message})\n`,
+        `agenthud: warning: cannot write cache (${err.message})\n`,
       );
-    }
+      cacheStream = null;
+    });
 
     let stderrBuf = "";
 

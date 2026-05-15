@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-05-15
+
+### Fixed
+- **Report uses local date for filtering and display** — activity times and date boundaries now match the system timezone instead of UTC
+
 ## [0.8.2] - 2026-05-15
 
 ### New

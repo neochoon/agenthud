@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-05-15
+
+### New
+- **`agenthud report` command** - Print Markdown or JSON summary of activity for a given date
+  - `--date YYYY-MM-DD|today` - Target date (default: today)
+  - `--include TYPES` - Filter activity types (default: response,bash,edit,thinking)
+  - `--format markdown|json` - Output format (default: markdown)
+- **`CLAUDE_PROJECTS_DIR` env var** - Override the Claude projects directory for backups or mounted volumes
+
+### Fixed
+- **Layout fills screen on startup** - Viewer panel now always fills remaining height
+- **Dynamic tree height** - Session tree shrinks when few sessions, giving more space to viewer
+- **Error on unknown commands/flags** - `agenthud foobar` now exits with an error instead of silently starting watch mode
+
 ## [0.8.1] - 2026-05-14
 
 ### New

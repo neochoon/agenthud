@@ -76,26 +76,22 @@ export function clearScreen(): void {
   console.clear();
 }
 
-function parseUTCMidnight(dateStr: string): Date | null {
+function parseLocalMidnight(dateStr: string): Date | null {
   if (dateStr === "today") {
     const now = new Date();
-    return new Date(
-      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-    );
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
   }
   const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return null;
   const [, y, m, d] = match.map(Number);
-  const date = new Date(Date.UTC(y, m - 1, d));
+  const date = new Date(y, m - 1, d);
   if (Number.isNaN(date.getTime())) return null;
   return date;
 }
 
-function todayUTCMidnight(): Date {
+function todayLocalMidnight(): Date {
   const now = new Date();
-  return new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-  );
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
 export function parseArgs(args: string[]): CliOptions {
@@ -111,7 +107,7 @@ export function parseArgs(args: string[]): CliOptions {
 
   if (args[0] === "report") {
     const rest = args.slice(1);
-    let reportDate = todayUTCMidnight();
+    let reportDate = todayLocalMidnight();
     let reportInclude = DEFAULT_TYPES;
     let reportError: string | undefined;
 
@@ -129,7 +125,7 @@ export function parseArgs(args: string[]): CliOptions {
       if (!dateStr) {
         reportError = "Invalid date: missing value for --date";
       } else {
-        const parsed = parseUTCMidnight(dateStr);
+        const parsed = parseLocalMidnight(dateStr);
         if (!parsed) {
           reportError = `Invalid date: "${dateStr}". Use YYYY-MM-DD or "today".`;
         } else {

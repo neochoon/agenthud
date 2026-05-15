@@ -56,24 +56,24 @@ describe("parseArgs", () => {
       expect(opts.mode).toBe("report");
       expect(opts.reportDate).toBeDefined();
       const today = new Date();
-      expect(opts.reportDate!.getUTCFullYear()).toBe(today.getUTCFullYear());
-      expect(opts.reportDate!.getUTCMonth()).toBe(today.getUTCMonth());
-      expect(opts.reportDate!.getUTCDate()).toBe(today.getUTCDate());
+      expect(opts.reportDate!.getFullYear()).toBe(today.getFullYear());
+      expect(opts.reportDate!.getMonth()).toBe(today.getMonth());
+      expect(opts.reportDate!.getDate()).toBe(today.getDate());
     });
 
     it("parses --date YYYY-MM-DD", () => {
       const opts = parseArgs(["report", "--date", "2026-05-14"]);
       expect(opts.mode).toBe("report");
-      expect(opts.reportDate!.getUTCFullYear()).toBe(2026);
-      expect(opts.reportDate!.getUTCMonth()).toBe(4); // May = 4
-      expect(opts.reportDate!.getUTCDate()).toBe(14);
+      expect(opts.reportDate!.getFullYear()).toBe(2026);
+      expect(opts.reportDate!.getMonth()).toBe(4); // May = 4
+      expect(opts.reportDate!.getDate()).toBe(14);
     });
 
     it("parses --date today", () => {
       const opts = parseArgs(["report", "--date", "today"]);
       expect(opts.mode).toBe("report");
       const today = new Date();
-      expect(opts.reportDate!.getUTCDate()).toBe(today.getUTCDate());
+      expect(opts.reportDate!.getDate()).toBe(today.getDate());
     });
 
     it("uses default include types when --include not given", () => {

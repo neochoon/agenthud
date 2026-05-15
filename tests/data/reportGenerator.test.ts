@@ -15,7 +15,7 @@ const { parseSessionHistory } = await import(
 const { statSync } = await import("node:fs");
 const { generateReport } = await import("../../src/data/reportGenerator.js");
 
-const DAY = new Date("2026-05-14T00:00:00.000Z"); // UTC midnight
+const DAY = new Date(2026, 4, 14); // local midnight May 14
 
 function localTime(isoUtc: string): string {
   const d = new Date(isoUtc);
@@ -80,7 +80,9 @@ describe("generateReport", () => {
       include: ["response"],
     });
     expect(result).toContain("## myproject");
-    expect(result).toContain(`[${localTime("2026-05-14T10:23:00Z")}] < Response: Did the thing.`);
+    expect(result).toContain(
+      `[${localTime("2026-05-14T10:23:00Z")}] < Response: Did the thing.`,
+    );
   });
 
   it("excludes activities not on target date", () => {
@@ -227,19 +229,22 @@ describe("generateReport", () => {
   });
 
   it("includes time range in session header", () => {
+    // Use offsets from local midnight so timestamps stay on the same local day in any timezone
+    const ts1 = new Date(DAY.getTime() + 9 * 3600 * 1000); // 09:00 local
+    const ts2 = new Date(DAY.getTime() + 14 * 3600 * 1000); // 14:00 local
     vi.mocked(statSync).mockReturnValue({
-      mtimeMs: new Date("2026-05-14T10:00:00Z").getTime(),
+      mtimeMs: ts1.getTime(),
     } as ReturnType<typeof statSync>);
     vi.mocked(parseSessionHistory).mockReturnValue([
       makeActivity({
-        timestamp: new Date("2026-05-14T09:00:00Z"),
+        timestamp: ts1,
         type: "response",
         icon: "<",
         label: "Response",
         detail: "First.",
       }),
       makeActivity({
-        timestamp: new Date("2026-05-14T17:30:00Z"),
+        timestamp: ts2,
         type: "response",
         icon: "<",
         label: "Response",
@@ -247,11 +252,14 @@ describe("generateReport", () => {
       }),
     ]);
 
+    const fmt = (d: Date) =>
+      `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+
     const result = generateReport([makeSession()], {
       date: DAY,
       include: ["response"],
     });
-    expect(result).toContain(`## myproject (${localTime("2026-05-14T09:00:00Z")} – ${localTime("2026-05-14T17:30:00Z")})`);
+    expect(result).toContain(`## myproject (${fmt(ts1)} – ${fmt(ts2)})`);
   });
 
   it("matches edit label variants for include:edit", () => {

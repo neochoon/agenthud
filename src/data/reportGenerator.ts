@@ -3,7 +3,7 @@ import type { ActivityEntry, SessionNode } from "../types/index.js";
 import { parseSessionHistory } from "./sessionHistory.js";
 
 export interface ReportOptions {
-  date: Date; // UTC midnight of target day
+  date: Date; // local midnight of target day
   include: string[]; // activity types: "response" | "bash" | "edit" | "thinking" | "read" | "glob" | "user"
   format?: "markdown" | "json"; // default: "markdown"
 }
@@ -33,11 +33,11 @@ function activityMatchesInclude(
   return false;
 }
 
-function isSameUTCDay(a: Date, b: Date): boolean {
+function isSameLocalDay(a: Date, b: Date): boolean {
   return (
-    a.getUTCFullYear() === b.getUTCFullYear() &&
-    a.getUTCMonth() === b.getUTCMonth() &&
-    a.getUTCDate() === b.getUTCDate()
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
   );
 }
 
@@ -56,7 +56,7 @@ function formatActivity(activity: ActivityEntry): string {
 }
 
 function formatDateString(date: Date): string {
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 function sessionIsOnDate(
@@ -66,11 +66,11 @@ function sessionIsOnDate(
 ): boolean {
   try {
     const mtime = new Date(statSync(session.filePath).mtimeMs);
-    if (isSameUTCDay(mtime, date)) return true;
+    if (isSameLocalDay(mtime, date)) return true;
   } catch {
     // ignore stat errors
   }
-  return activities.some((a) => isSameUTCDay(a.timestamp, date));
+  return activities.some((a) => isSameLocalDay(a.timestamp, date));
 }
 
 export function generateReport(
@@ -92,7 +92,7 @@ export function generateReport(
     if (!sessionIsOnDate(session, date, allActivities)) continue;
 
     const dayActivities = allActivities
-      .filter((a) => isSameUTCDay(a.timestamp, date))
+      .filter((a) => isSameLocalDay(a.timestamp, date))
       .filter((a) => activityMatchesInclude(a, include));
 
     if (dayActivities.length === 0) continue;

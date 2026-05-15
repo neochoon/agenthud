@@ -15,5 +15,11 @@ if (majorVersion < MIN_NODE_VERSION) {
   process.exit(1);
 }
 
+// Force production mode for React/Ink to disable dev-mode profiling.
+// In dev mode React calls performance.measure() per render which accumulates
+// PerformanceMeasure objects in a global buffer that never gets cleaned —
+// causing the watch-mode TUI to OOM after ~88 minutes (~600KB/s leak).
+if (!process.env.NODE_ENV) process.env.NODE_ENV = "production";
+
 // Version is OK, dynamically import the main application
 import("./main.js");

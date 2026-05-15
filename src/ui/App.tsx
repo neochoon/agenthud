@@ -438,16 +438,17 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
       }
     },
     onScrollTop: () => {
-      setViewerCursorLine(0);
-      setIsLive(false);
-      setScrollOffset(Math.max(0, activities.length - viewerRows));
-    },
-    onScrollBottom: () => {
-      // G = jump to newest (live, scrollOffset 0)
+      // g = live (newest = visual top)
       setViewerCursorLine(0);
       setIsLive(true);
       setScrollOffset(0);
       setNewCount(0);
+    },
+    onScrollBottom: () => {
+      // G = oldest (visual bottom)
+      setViewerCursorLine(0);
+      setIsLive(false);
+      setScrollOffset(Math.max(0, mergedActivities.length - viewerRows));
     },
     onDetailClose: () => {
       setDetailMode(false);

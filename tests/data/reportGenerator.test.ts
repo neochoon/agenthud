@@ -425,4 +425,71 @@ describe("generateReport", () => {
     expect(parsed.date).toBe("2026-05-14");
     expect(parsed.sessions).toHaveLength(0);
   });
+
+  it("nests sub-agents under parent in JSON format", () => {
+    const subAgent = makeSession({
+      id: "child1",
+      hideKey: "myproject/child1",
+      filePath: "/child1.jsonl",
+      projectName: "",
+      agentId: "a1b2c3",
+      taskDescription: "Review the code",
+      subAgents: [],
+    });
+    const parent = makeSession({ subAgents: [subAgent] });
+
+    vi.mocked(statSync).mockReturnValue({
+      mtimeMs: new Date("2026-05-14T10:00:00Z").getTime(),
+    } as ReturnType<typeof statSync>);
+    vi.mocked(parseSessionHistory).mockReturnValue([
+      makeActivity({
+        type: "response",
+        icon: "<",
+        label: "Response",
+        detail: "Done.",
+      }),
+    ]);
+
+    const result = generateReport([parent], {
+      date: DAY,
+      include: ["response"],
+      format: "json",
+    });
+    const parsed = JSON.parse(result);
+    expect(parsed.sessions[0].subAgents).toHaveLength(1);
+    expect(parsed.sessions[0].subAgents[0].agentId).toBe("a1b2c3");
+    expect(parsed.sessions[0].subAgents[0].taskDescription).toBe(
+      "Review the code",
+    );
+    expect(parsed.sessions[0].subAgents[0].activities).toBeDefined();
+  });
+
+  it("omits subAgents key in markdown format", () => {
+    const subAgent = makeSession({
+      id: "child1",
+      hideKey: "myproject/child1",
+      filePath: "/child1.jsonl",
+      projectName: "",
+      subAgents: [],
+    });
+    const parent = makeSession({ subAgents: [subAgent] });
+
+    vi.mocked(statSync).mockReturnValue({
+      mtimeMs: new Date("2026-05-14T10:00:00Z").getTime(),
+    } as ReturnType<typeof statSync>);
+    vi.mocked(parseSessionHistory).mockReturnValue([
+      makeActivity({
+        type: "response",
+        icon: "<",
+        label: "Response",
+        detail: "Done.",
+      }),
+    ]);
+
+    const result = generateReport([parent], {
+      date: DAY,
+      include: ["response"],
+    });
+    expect(result).not.toContain("subAgents");
+  });
 });

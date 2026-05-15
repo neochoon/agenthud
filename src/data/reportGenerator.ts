@@ -117,20 +117,43 @@ export function generateReport(
   blocks.sort((a, b) => a.firstTime - b.firstTime);
 
   if (format === "json") {
-    return JSON.stringify(
-      {
-        date: dateStr,
-        sessions: blocks.map(({ session, activities }) => ({
-          project: session.projectName,
-          start: formatTime(activities[0].timestamp),
-          end: formatTime(activities[activities.length - 1].timestamp),
-          activities: activities.map((a) => ({
+    const buildJsonSession = (session: SessionNode, acts: ActivityEntry[]) => {
+      const subAgentBlocks = session.subAgents.map((sa) => {
+        const saActivities = parseSessionHistory(sa.filePath)
+          .filter((a) => isSameLocalDay(a.timestamp, date))
+          .filter((a) => activityMatchesInclude(a, include));
+        return {
+          agentId: sa.agentId,
+          taskDescription: sa.taskDescription,
+          activities: saActivities.map((a) => ({
             time: formatTime(a.timestamp),
             icon: a.icon,
             label: a.label,
             detail: truncateDetail(a.detail, detailLimit),
           })),
+        };
+      });
+
+      return {
+        project: session.projectName,
+        start: formatTime(acts[0].timestamp),
+        end: formatTime(acts[acts.length - 1].timestamp),
+        activities: acts.map((a) => ({
+          time: formatTime(a.timestamp),
+          icon: a.icon,
+          label: a.label,
+          detail: truncateDetail(a.detail, detailLimit),
         })),
+        subAgents: subAgentBlocks,
+      };
+    };
+
+    return JSON.stringify(
+      {
+        date: dateStr,
+        sessions: blocks.map(({ session, activities }) =>
+          buildJsonSession(session, activities),
+        ),
       },
       null,
       2,

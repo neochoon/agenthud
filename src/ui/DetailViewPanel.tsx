@@ -11,21 +11,27 @@ import { getActivityStyle } from "./ActivityViewerPanel.js";
 
 export function wrapText(text: string, maxWidth: number): string[] {
   if (!text) return ["(empty)"];
-  const words = text.split(" ");
-  const lines: string[] = [];
-  let current = "";
-  for (const word of words) {
-    if (!current) {
-      current = word;
-    } else if (getDisplayWidth(`${current} ${word}`) <= maxWidth) {
-      current += ` ${word}`;
-    } else {
-      lines.push(current);
-      current = word;
+  const result: string[] = [];
+  for (const rawLine of text.split("\n")) {
+    if (!rawLine) {
+      result.push("");
+      continue;
     }
+    const words = rawLine.split(" ");
+    let current = "";
+    for (const word of words) {
+      if (!current) {
+        current = word;
+      } else if (getDisplayWidth(`${current} ${word}`) <= maxWidth) {
+        current += ` ${word}`;
+      } else {
+        result.push(current);
+        current = word;
+      }
+    }
+    if (current) result.push(current);
   }
-  if (current) lines.push(current);
-  return lines.length > 0 ? lines : ["(empty)"];
+  return result.length > 0 ? result : ["(empty)"];
 }
 
 export interface DetailViewPanelProps {
@@ -89,11 +95,12 @@ export function DetailViewPanel({
   return (
     <Box flexDirection="column" width={width}>
       <Text>
-        {BOX.tl}{BOX.h}{" "}
-        <Text color="cyan">{activity.icon}</Text>
-        {" "}
-        <Text color={style.color} dimColor={style.dimColor}>{activity.label}</Text>
-        {" "}{titleRight}
+        {BOX.tl}
+        {BOX.h} <Text color="cyan">{activity.icon}</Text>{" "}
+        <Text color={style.color} dimColor={style.dimColor}>
+          {activity.label}
+        </Text>{" "}
+        {titleRight}
       </Text>
       {contentRows}
       <Text>{createBottomLine(width)}</Text>

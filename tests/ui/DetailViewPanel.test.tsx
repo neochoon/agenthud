@@ -1,14 +1,17 @@
 import { render } from "ink-testing-library";
 import { describe, expect, it } from "vitest";
 import type { ActivityEntry } from "../../src/types/index.js";
-import { DetailViewPanel } from "../../src/ui/DetailViewPanel.js";
+import { DetailViewPanel, wrapText } from "../../src/ui/DetailViewPanel.js";
 
-const makeActivity = (overrides: Partial<ActivityEntry> = {}): ActivityEntry => ({
+const makeActivity = (
+  overrides: Partial<ActivityEntry> = {},
+): ActivityEntry => ({
   timestamp: new Date("2025-01-15T10:23:45.000Z"),
   type: "thinking",
   icon: "…",
   label: "Thinking",
-  detail: "I need to carefully analyze this problem and figure out the best approach.",
+  detail:
+    "I need to carefully analyze this problem and figure out the best approach.",
   ...overrides,
 });
 
@@ -29,7 +32,9 @@ describe("DetailViewPanel", () => {
   it("renders the full detail text", () => {
     const { lastFrame } = render(
       <DetailViewPanel
-        activity={makeActivity({ detail: "This is the full content of the activity." })}
+        activity={makeActivity({
+          detail: "This is the full content of the activity.",
+        })}
         sessionName="myproject"
         width={80}
         visibleRows={10}
@@ -57,7 +62,10 @@ describe("DetailViewPanel", () => {
   });
 
   it("shows scroll indicator when content exceeds visible rows", () => {
-    const longDetail = Array.from({ length: 30 }, (_, i) => `Line number ${i + 1}`).join(" ");
+    const longDetail = Array.from(
+      { length: 30 },
+      (_, i) => `Line number ${i + 1}`,
+    ).join(" ");
     const { lastFrame } = render(
       <DetailViewPanel
         activity={makeActivity({ detail: longDetail })}
@@ -95,5 +103,26 @@ describe("DetailViewPanel", () => {
       />,
     );
     expect(lastFrame()).toContain("(empty)");
+  });
+});
+
+describe("wrapText", () => {
+  it("preserves newlines as line breaks", () => {
+    const text = "line one\nline two\nline three";
+    const result = wrapText(text, 80);
+    expect(result).toEqual(["line one", "line two", "line three"]);
+  });
+
+  it("preserves blank lines", () => {
+    const text = "first\n\nsecond";
+    const result = wrapText(text, 80);
+    expect(result).toEqual(["first", "", "second"]);
+  });
+
+  it("word-wraps long lines independently", () => {
+    const text = "short\n" + "word ".repeat(20).trim();
+    const result = wrapText(text, 30);
+    expect(result[0]).toBe("short");
+    expect(result.length).toBeGreaterThan(2);
   });
 });

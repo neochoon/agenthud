@@ -14,7 +14,7 @@ import {
   hideSubAgent,
   loadGlobalConfig,
 } from "../config/globalConfig.js";
-import { parseGitCommits } from "../data/gitCommits.js";
+import { getCommitDetail, parseGitCommits } from "../data/gitCommits.js";
 import { parseSessionHistory } from "../data/sessionHistory.js";
 import { discoverSessions, getProjectsDir } from "../data/sessions.js";
 import type {
@@ -432,7 +432,15 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
           viewerCursorLine,
         );
         if (act) {
-          setDetailActivity(act);
+          if (act.type === "commit") {
+            const node = allFlatRef.current.find((s) => s.id === selectedId);
+            const detail = node?.projectPath
+              ? (getCommitDetail(node.projectPath, act.label) ?? act.detail)
+              : act.detail;
+            setDetailActivity({ ...act, detail });
+          } else {
+            setDetailActivity(act);
+          }
           setDetailMode(true);
           setDetailScrollOffset(0);
         }

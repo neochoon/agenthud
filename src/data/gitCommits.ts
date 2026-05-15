@@ -6,6 +6,20 @@ function formatDateString(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
+export function getCommitDetail(
+  projectPath: string,
+  hash: string,
+): string | null {
+  try {
+    return execSync(`git show --stat --no-color ${hash}`, {
+      cwd: projectPath,
+      encoding: "utf-8",
+    }).trim();
+  } catch {
+    return null;
+  }
+}
+
 export function parseGitCommits(
   projectPath: string,
   date: Date,

@@ -1,13 +1,17 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("node:child_process", () => ({
   execSync: vi.fn(),
 }));
 
 const { execSync } = await import("node:child_process");
-const { parseGitCommits } = await import("../../src/data/gitCommits.js");
+const { parseGitCommits, getCommitDetail } = await import(
+  "../../src/data/gitCommits.js"
+);
 
 const DAY = new Date(2026, 4, 14); // local midnight May 14
+
+afterEach(() => vi.clearAllMocks());
 
 describe("parseGitCommits", () => {
   it("returns empty array when git log output is empty", () => {
@@ -68,5 +72,32 @@ describe("parseGitCommits", () => {
     const result = parseGitCommits("/some/project", DAY);
     expect(result).toHaveLength(1);
     expect(result[0].label).toBe("abc1234");
+  });
+});
+
+describe("getCommitDetail", () => {
+  it("returns git show --stat output", () => {
+    const statOutput =
+      "feat: add report\n\n src/cli.ts | 8 ++\n 1 file changed, 8 insertions(+)";
+    vi.mocked(execSync).mockReturnValue(statOutput);
+
+    const result = getCommitDetail("/some/project", "abc1234");
+    expect(result).toBe(statOutput);
+    expect(vi.mocked(execSync)).toHaveBeenCalledWith(
+      expect.stringContaining("git show --stat"),
+      expect.objectContaining({ cwd: "/some/project" }),
+    );
+    expect(vi.mocked(execSync)).toHaveBeenCalledWith(
+      expect.stringContaining("abc1234"),
+      expect.anything(),
+    );
+  });
+
+  it("returns null when git fails", () => {
+    vi.mocked(execSync).mockImplementation(() => {
+      throw new Error("not a git repo");
+    });
+    const result = getCommitDetail("/not/a/repo", "abc1234");
+    expect(result).toBeNull();
   });
 });

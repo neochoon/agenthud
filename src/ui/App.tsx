@@ -517,8 +517,16 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
           const next = new Set(prev);
           if (next.has(parentId)) {
             next.delete(parentId);
+            // Collapsing: move selection back to parent session
+            setSelectedId(parentId);
           } else {
             next.add(parentId);
+            // Expanding: move to first newly visible (cool/cold) sub-agent
+            const parent = sessionTree.sessions.find((s) => s.id === parentId);
+            const firstNew = parent?.subAgents.find(
+              (sa) => sa.status === "cool" || sa.status === "cold",
+            );
+            if (firstNew) setSelectedId(firstNew.id);
           }
           return next;
         });

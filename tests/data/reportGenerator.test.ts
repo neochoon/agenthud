@@ -17,6 +17,11 @@ const { generateReport } = await import("../../src/data/reportGenerator.js");
 
 const DAY = new Date("2026-05-14T00:00:00.000Z"); // UTC midnight
 
+function localTime(isoUtc: string): string {
+  const d = new Date(isoUtc);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 function makeSession(overrides: Partial<SessionNode> = {}): SessionNode {
   return {
     id: "abc123",
@@ -75,7 +80,7 @@ describe("generateReport", () => {
       include: ["response"],
     });
     expect(result).toContain("## myproject");
-    expect(result).toContain("[10:23] < Response: Did the thing.");
+    expect(result).toContain(`[${localTime("2026-05-14T10:23:00Z")}] < Response: Did the thing.`);
   });
 
   it("excludes activities not on target date", () => {
@@ -246,7 +251,7 @@ describe("generateReport", () => {
       date: DAY,
       include: ["response"],
     });
-    expect(result).toContain("## myproject (09:00 – 17:30)");
+    expect(result).toContain(`## myproject (${localTime("2026-05-14T09:00:00Z")} – ${localTime("2026-05-14T17:30:00Z")})`);
   });
 
   it("matches edit label variants for include:edit", () => {
@@ -315,8 +320,9 @@ describe("generateReport", () => {
       date: DAY,
       include: ["response"],
     });
-    expect(result).toContain("[10:23] < Response");
-    expect(result).not.toContain("[10:23] < Response:");
+    const t = localTime("2026-05-14T10:23:00Z");
+    expect(result).toContain(`[${t}] < Response`);
+    expect(result).not.toContain(`[${t}] < Response:`);
   });
 
   it("outputs valid JSON when format is json", () => {
@@ -341,9 +347,10 @@ describe("generateReport", () => {
     expect(parsed.date).toBe("2026-05-14");
     expect(parsed.sessions).toHaveLength(1);
     expect(parsed.sessions[0].project).toBe("myproject");
-    expect(parsed.sessions[0].start).toBe("10:23");
+    const t = localTime("2026-05-14T10:23:00Z");
+    expect(parsed.sessions[0].start).toBe(t);
     expect(parsed.sessions[0].activities[0]).toEqual({
-      time: "10:23",
+      time: t,
       icon: "<",
       label: "Response",
       detail: "Done.",

@@ -147,7 +147,7 @@ export async function runSummary(options: SummaryOptions): Promise<number> {
       process.stderr.write(chunk);
     });
 
-    proc.on("exit", (code) => {
+    proc.on("close", (code) => {
       cacheStream?.end();
       if (code !== 0) {
         const lower = stderrBuf.toLowerCase();

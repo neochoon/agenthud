@@ -58,7 +58,7 @@ function mockClaudeProcess(stdout = "OK", exitCode = 0, stderr = "") {
   proc.stdin = new PassThrough();
   proc.stdout = Readable.from([stdout]);
   proc.stderr = Readable.from([stderr]);
-  setImmediate(() => proc.emit("exit", exitCode));
+  setImmediate(() => proc.emit("close", exitCode));
   return proc;
 }
 

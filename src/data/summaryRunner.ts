@@ -32,7 +32,10 @@ function userPromptPath(): string {
 
 function templatePath(): string {
   const here = dirname(fileURLToPath(import.meta.url));
-  return join(here, "..", "templates", "summary-prompt.md");
+  // In the built bundle (dist/main-*.js) import.meta.url points to dist/.
+  // The templates directory is copied to dist/templates/ by tsup, so we
+  // just need join(here, 'templates', ...) — no '..' needed.
+  return join(here, "templates", "summary-prompt.md");
 }
 
 function dateKey(d: Date): string {

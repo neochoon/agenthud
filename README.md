@@ -130,6 +130,23 @@ Output is written to stdout in Markdown format:
 **`--include` types:** `response`, `bash`, `edit`, `thinking`, `read`, `glob`, `user`  
 Default: `response,bash,edit,thinking`
 
+## Summary
+
+Generate an LLM-based summary of a day's activity using the `claude` CLI:
+
+```bash
+agenthud summary                          # today
+agenthud summary --date 2026-05-14        # past date (cached on second run)
+agenthud summary --date 2026-05-14 --force # ignore cache
+agenthud summary --prompt "커밋만 요약해"  # override prompt
+```
+
+Results are saved to `~/.agenthud/summaries/YYYY-MM-DD.md`. Past dates are cached and returned instantly on re-run. Today's date is always regenerated since activity is still growing.
+
+**Prompt customization:** The summary uses `~/.agenthud/summary-prompt.md`, which is auto-created from a built-in template on first run. Edit it freely or override per-call with `--prompt`.
+
+**Requires:** [`@anthropic-ai/claude-code`](https://www.npmjs.com/package/@anthropic-ai/claude-code) installed and authenticated (`npm i -g @anthropic-ai/claude-code`).
+
 ## Configuration
 
 Optional. Create `~/.agenthud/config.yaml`:

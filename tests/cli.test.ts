@@ -156,6 +156,46 @@ describe("parseArgs", () => {
       expect(opts.reportWithGit).toBeFalsy();
     });
   });
+
+  describe("summary subcommand", () => {
+    it("returns summary mode with today by default", () => {
+      const opts = parseArgs(["summary"]);
+      expect(opts.mode).toBe("summary");
+      expect(opts.summaryDate).toBeDefined();
+      const today = new Date();
+      expect(opts.summaryDate!.getFullYear()).toBe(today.getFullYear());
+      expect(opts.summaryDate!.getMonth()).toBe(today.getMonth());
+      expect(opts.summaryDate!.getDate()).toBe(today.getDate());
+      expect(opts.summaryForce).toBe(false);
+    });
+
+    it("parses --date", () => {
+      const opts = parseArgs(["summary", "--date", "2026-05-14"]);
+      expect(opts.summaryDate!.getFullYear()).toBe(2026);
+      expect(opts.summaryDate!.getMonth()).toBe(4);
+      expect(opts.summaryDate!.getDate()).toBe(14);
+    });
+
+    it("parses --prompt", () => {
+      const opts = parseArgs(["summary", "--prompt", "just commits"]);
+      expect(opts.summaryPrompt).toBe("just commits");
+    });
+
+    it("parses --force", () => {
+      const opts = parseArgs(["summary", "--force"]);
+      expect(opts.summaryForce).toBe(true);
+    });
+
+    it("returns error for unknown flag", () => {
+      const opts = parseArgs(["summary", "--bogus"]);
+      expect(opts.summaryError).toContain("Unknown option");
+    });
+
+    it("returns error for invalid date", () => {
+      const opts = parseArgs(["summary", "--date", "not-a-date"]);
+      expect(opts.summaryError).toContain("Invalid date");
+    });
+  });
 });
 
 describe("getHelp", () => {

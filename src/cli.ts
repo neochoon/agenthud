@@ -14,7 +14,7 @@ const ALL_TYPES = [
 const DEFAULT_TYPES = ["response", "bash", "edit", "thinking"];
 
 export interface CliOptions {
-  mode: "watch" | "once" | "report";
+  mode: "watch" | "once" | "report" | "summary";
   command?: "version" | "help";
   error?: string;
   reportDate?: Date;
@@ -23,6 +23,10 @@ export interface CliOptions {
   reportDetailLimit?: number;
   reportWithGit?: boolean;
   reportError?: string;
+  summaryDate?: Date;
+  summaryPrompt?: string;
+  summaryForce?: boolean;
+  summaryError?: string;
 }
 
 const KNOWN_WATCH_FLAGS = new Set([
@@ -41,7 +45,8 @@ const KNOWN_REPORT_FLAGS = new Set([
   "--detail-limit",
   "--with-git",
 ]);
-const KNOWN_SUBCOMMANDS = new Set(["report"]);
+const KNOWN_SUMMARY_FLAGS = new Set(["--date", "--prompt", "--force"]);
+const KNOWN_SUBCOMMANDS = new Set(["report", "summary"]);
 
 export function getHelp(): string {
   return `Usage: agenthud [options]
@@ -55,7 +60,7 @@ Options:
   -h, --help                    Show this help message
 
 Commands:
-  report [--date DATE] [--include TYPES]
+  report [--date DATE] [--include TYPES] [--format FORMAT] [--detail-limit N] [--with-git]
                                 Print activity report for a date (default: today)
     --date YYYY-MM-DD|today     Date to report on
     --include TYPES             Comma-separated types or "all"
@@ -64,6 +69,12 @@ Commands:
     --format FORMAT             Output format: markdown (default) or json
     --detail-limit N            Max chars per activity detail (default: 120, 0 = unlimited)
     --with-git                  Append today's git commits from cwd to report
+
+  summary [--date DATE] [--prompt TEXT] [--force]
+                                Generate LLM summary of daily activity via claude CLI
+    --date YYYY-MM-DD|today     Date to summarize (default: today)
+    --prompt TEXT               Override prompt for this run
+    --force                     Regenerate even if cached (past dates)
 
 Environment:
   CLAUDE_PROJECTS_DIR           Path to Claude projects directory
@@ -192,6 +203,59 @@ export function parseArgs(args: string[]): CliOptions {
       reportDetailLimit,
       reportWithGit,
       reportError,
+    };
+  }
+
+  if (args[0] === "summary") {
+    const rest = args.slice(1);
+    let summaryDate = todayLocalMidnight();
+    let summaryPrompt: string | undefined;
+    let summaryForce = false;
+    let summaryError: string | undefined;
+
+    for (let i = 0; i < rest.length; i++) {
+      const arg = rest[i];
+      if (!arg.startsWith("-")) continue;
+      if (!KNOWN_SUMMARY_FLAGS.has(arg)) {
+        summaryError = `Unknown option: "${arg}". Run agenthud --help for usage.`;
+        break;
+      }
+      if (arg === "--date" || arg === "--prompt") i++;
+    }
+
+    const dateIdx = rest.indexOf("--date");
+    if (dateIdx !== -1) {
+      const dateStr = rest[dateIdx + 1];
+      if (!dateStr) {
+        summaryError = "Invalid date: missing value for --date";
+      } else {
+        const parsed = parseLocalMidnight(dateStr);
+        if (!parsed) {
+          summaryError = `Invalid date: "${dateStr}". Use YYYY-MM-DD or "today".`;
+        } else {
+          summaryDate = parsed;
+        }
+      }
+    }
+
+    const promptIdx = rest.indexOf("--prompt");
+    if (promptIdx !== -1) {
+      const val = rest[promptIdx + 1];
+      if (!val) {
+        summaryError = "Invalid --prompt: missing value";
+      } else {
+        summaryPrompt = val;
+      }
+    }
+
+    if (rest.includes("--force")) summaryForce = true;
+
+    return {
+      mode: "summary",
+      summaryDate,
+      summaryPrompt,
+      summaryForce,
+      summaryError,
     };
   }
 

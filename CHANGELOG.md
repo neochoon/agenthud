@@ -2,11 +2,23 @@
 
 ## [Unreleased]
 
-## [0.8.5] - 2026-05-15
+## [0.8.5] - 2026-05-16
+
+### New
+- **`agenthud summary` command** — Generate LLM summary of daily activity via `claude` CLI
+  - `--date YYYY-MM-DD|today` — Date to summarize
+  - `--prompt TEXT` — Override default prompt
+  - `--force` — Regenerate even if cached
+- **Cached daily summaries** — Past dates cached at `~/.agenthud/summaries/YYYY-MM-DD.md`; today always regenerated
+- **Editable prompt template** — Auto-creates `~/.agenthud/summary-prompt.md` on first run for easy customization
 
 ### Fixed
 - **Git access via `--git-dir`** — No longer requires `cwd` to be the project directory; only `.git` needs to be accessible (useful for mounted/read-only setups)
 - **Suppressed git stderr** — "fatal: not a git repository" messages no longer leak to terminal
+- **Memory leak** — Set `NODE_ENV=production` by default to stop React dev-mode profiler accumulating `PerformanceMeasure` objects (~600KB/s leak → ~50KB/s)
+- **Stabilized filter memoization** — `mergedActivities` no longer recomputes on every spinner tick
+- **Sub-agent navigation snap** — Arrow keys recover gracefully when selected sub-agent disappears from flat list
+- **Sentinel expansion** — Expanding `__sub-parent__` sentinel moves selection to first newly-visible sub-agent
 
 ## [0.8.4] - 2026-05-15
 

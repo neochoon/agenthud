@@ -8,6 +8,7 @@ import React from "react";
 import { clearScreen, getHelp, getVersion, parseArgs } from "./cli.js";
 import { loadGlobalConfig } from "./config/globalConfig.js";
 import { generateReport } from "./data/reportGenerator.js";
+import { runSummary } from "./data/summaryRunner.js";
 import { discoverSessions } from "./data/sessions.js";
 import { App } from "./ui/App.js";
 
@@ -67,6 +68,20 @@ if (options.mode === "report") {
   });
   process.stdout.write(`${markdown}\n`);
   process.exit(0);
+}
+
+if (options.mode === "summary") {
+  if (options.summaryError) {
+    process.stderr.write(`agenthud: ${options.summaryError}\n`);
+    process.exit(1);
+  }
+  const exitCode = await runSummary({
+    date: options.summaryDate!,
+    prompt: options.summaryPrompt,
+    force: options.summaryForce ?? false,
+    today: new Date(),
+  });
+  process.exit(exitCode);
 }
 
 if (options.mode === "watch") {

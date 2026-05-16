@@ -1,14 +1,12 @@
-다음은 오늘 Claude Code로 작업한 활동 로그입니다. 이를 바탕으로 작업 내용을 한국어로 간결하게 정리해주세요.
+The following is an activity log of work done with Claude Code. Summarize it concisely in English using the format below.
 
-다음 형식으로 작성해주세요:
+## Completed Work
+- (What was accomplished — focus on Response entries)
 
-## 완료한 작업
-- (Response 위주로 어떤 일을 해냈는지)
+## Notable Changes
+- (Which files were modified and how — from Edit/Write entries)
 
-## 주요 변경사항
-- (Edit/Write로 어떤 파일을 어떻게 바꿨는지)
+## Commits
+- (Summary of the ◆ commit lines)
 
-## 커밋 내역
-- (◆ commit 줄들 요약)
-
-원본 로그:
+Activity log:

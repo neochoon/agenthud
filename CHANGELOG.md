@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-05-17
+
+### Fixed
+- **Windows path test** — `summaryRunner` test now accepts both `/` and `\` separators
+- **CI gates publish** — Publish workflow waits for the cross-platform CI matrix to pass on the same commit before pushing to npm
+
 ## [0.9.0] - 2026-05-17
 
 ### New

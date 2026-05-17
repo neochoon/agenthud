@@ -58,8 +58,12 @@ if (options.mode === "report") {
   }
   const config = loadGlobalConfig();
   const tree = discoverSessions(config);
+  const flatSessions = [
+    ...tree.projects.flatMap((p) => p.sessions),
+    ...tree.coldProjects.flatMap((p) => p.sessions),
+  ];
 
-  const markdown = generateReport(tree.sessions, {
+  const markdown = generateReport(flatSessions, {
     date: options.reportDate!,
     include: options.reportInclude!,
     format: options.reportFormat,

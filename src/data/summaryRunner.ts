@@ -107,8 +107,12 @@ export async function runSummary(options: SummaryOptions): Promise<number> {
   }
 
   const config = loadGlobalConfig();
-  const sessions = discoverSessions(config);
-  const reportMarkdown = generateReport(sessions.sessions, {
+  const tree = discoverSessions(config);
+  const flatSessions = [
+    ...tree.projects.flatMap((p) => p.sessions),
+    ...tree.coldProjects.flatMap((p) => p.sessions),
+  ];
+  const reportMarkdown = generateReport(flatSessions, {
     date: options.date,
     include: ["response", "bash", "edit", "thinking"],
     format: "markdown",

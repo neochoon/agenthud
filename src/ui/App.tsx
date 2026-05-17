@@ -45,6 +45,7 @@ function subSummarySentinel(parentId: string): SessionNode {
     modelName: null,
     subAgents: [],
     nonInteractive: false,
+    firstUserPrompt: null,
   };
 }
 
@@ -100,6 +101,7 @@ function flattenSessions(
       modelName: null,
       subAgents: [],
       nonInteractive: false,
+      firstUserPrompt: null,
     });
 
     const shouldShowSessions = isCold
@@ -130,6 +132,7 @@ function flattenSessions(
       modelName: null,
       subAgents: [],
       nonInteractive: false,
+      firstUserPrompt: null,
     });
     if (expandedIds.has("__cold__")) {
       for (const project of tree.coldProjects) {
@@ -757,11 +760,12 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     (!!selectedId &&
       selectedId.startsWith("__sub-") &&
       selectedId.endsWith("__"));
-  const sessionDisplayName = isPlaceholderSelected
-    ? "No session selected"
-    : selectedSession.projectPath
-      ? selectedSession.projectName || selectedSession.id.slice(0, 8)
-      : (selectedSession.agentId ?? selectedSession.id.slice(0, 8));
+  const sessionDisplayName =
+    isPlaceholderSelected || !selectedSession
+      ? "No session selected"
+      : selectedSession.projectPath
+        ? selectedSession.projectName || selectedSession.id.slice(0, 8)
+        : (selectedSession.agentId ?? selectedSession.id.slice(0, 8));
 
   return (
     <Box flexDirection="column">

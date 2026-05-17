@@ -15,7 +15,8 @@ vi.mock("node:child_process", () => ({
 }));
 vi.mock("../../src/data/sessions.js", () => ({
   discoverSessions: vi.fn(() => ({
-    sessions: [],
+    projects: [],
+    coldProjects: [],
     totalCount: 0,
     timestamp: "",
   })),

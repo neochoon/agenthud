@@ -1,14 +1,12 @@
 // src/ui/App.tsx
 
 import type { FSWatcher } from "node:fs";
-import { existsSync, watch, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, watch } from "node:fs";
 import { Box, Text, useApp, useInput, useStdout } from "ink";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getVersion } from "../cli.js";
 import {
-  ensureLogDir,
   hasProjectLevelConfig,
   hideProject,
   hideSession,
@@ -410,24 +408,6 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   // statusBar(1) + margin(1) + tree(treeRows+2) + margin(1) + viewer(viewerRows+2) = height
   const viewerRows = Math.max(5, height - 7 - treeRows);
 
-  const saveLog = useCallback(() => {
-    if (!activities.length || !selectedId) return;
-    ensureLogDir(config.logDir);
-    const date = new Date().toISOString().slice(0, 10);
-    const filePath = join(
-      config.logDir,
-      `${date}-${selectedId.slice(0, 8)}.txt`,
-    );
-    const lines = activities.map(
-      (a) => `[${a.timestamp.toISOString()}] ${a.icon} ${a.label} ${a.detail}`,
-    );
-    try {
-      writeFileSync(filePath, `${lines.join("\n")}\n`, "utf-8");
-    } catch {
-      // silently fail — log dir may not be writable
-    }
-  }, [activities, selectedId, config.logDir]);
-
   const spinner = useSpinner(isWatchMode);
   const { handleInput, statusBarItems } = useHotkeys({
     focus,
@@ -728,7 +708,6 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
         }
       }
     },
-    onSaveLog: saveLog,
     onRefresh: refresh,
     onQuit: exit,
     onFilter: () => setFilterIndex((i) => (i + 1) % filterPresets.length),

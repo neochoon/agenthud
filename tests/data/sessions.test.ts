@@ -17,7 +17,6 @@ const NOW = 1_700_000_000_000;
 
 const mockConfig = {
   refreshIntervalMs: 2000,
-  logDir: "/tmp/logs",
   hiddenSessions: [] as string[],
   hiddenSubAgents: [] as string[],
   filterPresets: [[]] as string[][],

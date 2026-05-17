@@ -77,7 +77,6 @@ function makeOptions(overrides = {}) {
     onScrollHalfPageDown: vi.fn(),
     onScrollTop: vi.fn(),
     onScrollBottom: vi.fn(),
-    onSaveLog: vi.fn(),
     onRefresh: vi.fn(),
     onQuit: vi.fn(),
     onEnter: vi.fn(),
@@ -229,14 +228,6 @@ describe("useHotkeys", () => {
       expect(onScrollDown).toHaveBeenCalledTimes(1);
     });
 
-    it("does not call onSaveLog when s is pressed in tree focus", () => {
-      const onSaveLog = vi.fn();
-      const { result } = renderHook(() =>
-        useHotkeys(makeOptions({ focus: "tree", onSaveLog })),
-      );
-      act(() => result.current.handleInput("s", noopKey));
-      expect(onSaveLog).not.toHaveBeenCalled();
-    });
   });
 
   describe("viewer focus", () => {
@@ -276,14 +267,6 @@ describe("useHotkeys", () => {
       expect(onScrollBottom).toHaveBeenCalledTimes(1);
     });
 
-    it("calls onSaveLog when s is pressed", () => {
-      const onSaveLog = vi.fn();
-      const { result } = renderHook(() =>
-        useHotkeys(makeOptions({ focus: "viewer", onSaveLog })),
-      );
-      act(() => result.current.handleInput("s", noopKey));
-      expect(onSaveLog).toHaveBeenCalledTimes(1);
-    });
   });
 
   describe("ctrl key aliases", () => {

@@ -30,7 +30,6 @@ const SECTIONS: HelpSection[] = [
       ["G", "Jump to oldest"],
       ["↵", "Open detail view for selected activity"],
       ["f", "Cycle filter preset (set in config.yaml)"],
-      ["s", "Save activity log to ~/.agenthud/logs/"],
       ["Tab", "Switch focus to session tree"],
     ],
   },

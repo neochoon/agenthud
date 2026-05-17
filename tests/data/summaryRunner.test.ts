@@ -30,7 +30,6 @@ vi.mock("../../src/data/reportGenerator.js", () => ({
 vi.mock("../../src/config/globalConfig.js", () => ({
   loadGlobalConfig: vi.fn(() => ({
     refreshIntervalMs: 2000,
-    logDir: "/tmp/logs",
     hiddenSessions: [],
     hiddenSubAgents: [],
     filterPresets: [[]],

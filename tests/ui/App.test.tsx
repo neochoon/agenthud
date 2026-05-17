@@ -5,12 +5,10 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("../../src/config/globalConfig.js", () => ({
   loadGlobalConfig: () => ({
     refreshIntervalMs: 60000,
-    logDir: "/tmp/logs",
     hiddenSessions: [],
     hiddenSubAgents: [],
     filterPresets: [[], ["response"], ["commit"]],
   }),
-  ensureLogDir: vi.fn(),
   hasProjectLevelConfig: () => false,
 }));
 

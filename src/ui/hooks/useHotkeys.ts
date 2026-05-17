@@ -11,7 +11,6 @@ interface UseHotkeysOptions {
   onScrollHalfPageDown: () => void;
   onScrollTop: () => void;
   onScrollBottom: () => void;
-  onSaveLog: () => void;
   onRefresh: () => void;
   onQuit: () => void;
   onEnter: () => void;
@@ -54,7 +53,6 @@ export function useHotkeys({
   onScrollHalfPageDown,
   onScrollTop,
   onScrollBottom,
-  onSaveLog,
   onRefresh,
   onQuit,
   onEnter,
@@ -187,10 +185,6 @@ export function useHotkeys({
       }
       if (input === "G") {
         onScrollBottom();
-        return;
-      }
-      if (input === "s") {
-        onSaveLog();
         return;
       }
     }

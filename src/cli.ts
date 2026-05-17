@@ -99,7 +99,6 @@ Environment:
                                 (default: ~/.claude/projects)
 
 Config: ~/.agenthud/config.yaml
-Logs:   ~/.agenthud/logs/
 `;
 }
 

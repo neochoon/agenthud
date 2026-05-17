@@ -9,7 +9,6 @@ const STATE_PATH = join(homedir(), ".agenthud", "state.yaml");
 
 export const DEFAULT_GLOBAL_CONFIG: GlobalConfig = {
   refreshIntervalMs: 2000,
-  logDir: join(homedir(), ".agenthud", "logs"),
   hiddenSessions: [],
   hiddenSubAgents: [],
   filterPresets: [[], ["response"], ["commit"]],
@@ -35,9 +34,6 @@ function writeDefaultConfig(): void {
 
 # How often to poll for activity updates
 refreshInterval: 2s
-
-# Where 's' key saves activity logs
-logDir: ~/.agenthud/logs
 
 # Activity filter presets (cycle with 'f' key in viewer)
 # Each list is one preset; [] means "all". First preset is the default.
@@ -107,9 +103,6 @@ export function loadGlobalConfig(): GlobalConfig {
   if (typeof configRaw.refreshInterval === "string") {
     const ms = parseInterval(configRaw.refreshInterval);
     if (ms !== null) config.refreshIntervalMs = ms;
-  }
-  if (typeof configRaw.logDir === "string") {
-    config.logDir = configRaw.logDir.replace(/^~/, homedir());
   }
   if (Array.isArray(configRaw.filterPresets)) {
     const presets = (configRaw.filterPresets as unknown[])
@@ -255,12 +248,6 @@ export function hideProject(name: string): void {
   const config = loadGlobalConfig();
   if (config.hiddenProjects.includes(name)) return;
   updateState({ hiddenProjects: [...config.hiddenProjects, name] });
-}
-
-export function ensureLogDir(logDir: string): void {
-  if (!existsSync(logDir)) {
-    mkdirSync(logDir, { recursive: true });
-  }
 }
 
 export function hasProjectLevelConfig(): boolean {

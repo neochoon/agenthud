@@ -9,12 +9,10 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("../../src/config/globalConfig.js", () => ({
   loadGlobalConfig: () => ({
     refreshIntervalMs: 60000,
-    logDir: "/tmp/logs",
     hiddenSessions: [],
     hiddenSubAgents: [],
     filterPresets: [[], ["response"], ["commit"]],
   }),
-  ensureLogDir: vi.fn(),
   hasProjectLevelConfig: () => false,
 }));
 
@@ -50,9 +48,7 @@ describe("App with config", () => {
         loadGlobalConfig: () => ({
           refreshIntervalMs: 60000,
           sessionTimeoutMs: 30 * 60 * 1000,
-          logDir: "/tmp/logs",
         }),
-        ensureLogDir: vi.fn(),
         hasProjectLevelConfig: () => true,
       }));
       // Note: vi.doMock won't affect the already-imported App module in this test.

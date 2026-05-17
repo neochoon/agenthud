@@ -26,10 +26,9 @@ describe("HelpPanel", () => {
     expect(out).not.toContain("╭");
   });
 
-  it("includes hidden shortcuts (s for save, Ctrl+U/D for half page)", () => {
+  it("includes hidden shortcuts (Ctrl+U/D for half page)", () => {
     const { lastFrame } = render(<HelpPanel width={80} height={50} />);
     const out = lastFrame() ?? "";
-    expect(out).toContain("Save activity log");
     expect(out).toContain("Ctrl+U / Ctrl+D");
   });
 

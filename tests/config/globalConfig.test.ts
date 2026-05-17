@@ -31,7 +31,6 @@ describe("loadGlobalConfig", () => {
     vi.mocked(writeFileSync).mockImplementation(() => {});
     const config = loadGlobalConfig();
     expect(config.refreshIntervalMs).toBe(2000);
-    expect(config.logDir).toBe(join(homedir(), ".agenthud", "logs"));
     expect(config.hiddenSessions).toEqual([]);
     expect(config.hiddenSubAgents).toEqual([]);
     expect(config.hiddenProjects).toEqual([]);

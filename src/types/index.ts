@@ -37,7 +37,6 @@ export interface SessionTree {
 // Global config (~/.agenthud/config.yaml)
 export interface GlobalConfig {
   refreshIntervalMs: number; // default: 2000
-  logDir: string; // default: ~/.agenthud/logs
   hiddenSessions: string[];
   hiddenSubAgents: string[];
   filterPresets: string[][]; // [] = all; default: [[], ["response"], ["commit"]]

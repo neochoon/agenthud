@@ -196,28 +196,32 @@ export function useHotkeys({
     }
   };
 
-  const statusBarItems = detailMode
-    ? ["↑↓/jk: scroll", "↵/Esc: close"]
-    : focus === "tree"
-      ? [
-          "Tab: viewer",
-          "↑↓/jk: select",
-          "PgUp/Dn: page",
-          "↵: expand",
-          "h: hide",
-          "r: refresh",
-          "q: quit",
-        ]
-      : [
-          "Tab: sessions",
-          "↑↓/jk: scroll",
-          "PgUp/Dn: page",
-          "g: live",
-          "G: oldest",
-          "↵: detail",
-          `f: ${filterLabel}`,
-          "q: quit",
-        ];
+  const statusBarItems = helpMode
+    ? ["↵/Esc/q/?: close"]
+    : detailMode
+      ? ["↑↓/jk: scroll", "↵/Esc: close", "?: help"]
+      : focus === "tree"
+        ? [
+            "Tab: viewer",
+            "↑↓/jk: select",
+            "PgUp/Dn: page",
+            "↵: expand",
+            "h: hide",
+            "r: refresh",
+            "?: help",
+            "q: quit",
+          ]
+        : [
+            "Tab: sessions",
+            "↑↓/jk: scroll",
+            "PgUp/Dn: page",
+            "g: live",
+            "G: oldest",
+            "↵: detail",
+            `f: ${filterLabel}`,
+            "?: help",
+            "q: quit",
+          ];
 
   return { handleInput, statusBarItems };
 }

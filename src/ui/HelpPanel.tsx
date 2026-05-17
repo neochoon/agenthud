@@ -1,16 +1,10 @@
 import { Box, Text } from "ink";
 import type React from "react";
-import {
-  BOX,
-  createBottomLine,
-  createTitleLine,
-  getDisplayWidth,
-  getInnerWidth,
-} from "./constants.js";
+import { getDisplayWidth } from "./constants.js";
 
 interface HelpSection {
   title: string;
-  rows: [string, string][]; // [key combo, description]
+  rows: [string, string][];
 }
 
 const SECTIONS: HelpSection[] = [
@@ -75,87 +69,65 @@ const SECTIONS: HelpSection[] = [
 
 export interface HelpPanelProps {
   width: number;
-  visibleRows: number;
+  height: number; // total available height
 }
 
 export function HelpPanel({
   width,
-  visibleRows,
+  height,
 }: HelpPanelProps): React.ReactElement {
-  const innerWidth = getInnerWidth(width);
-  const contentWidth = innerWidth - 1;
-
-  // Build flat lines list
-  const lines: { key: string; desc: string; isTitle: boolean }[] = [];
-  for (let s = 0; s < SECTIONS.length; s++) {
-    if (s > 0) lines.push({ key: "", desc: "", isTitle: false }); // blank between sections
-    lines.push({ key: SECTIONS[s].title, desc: "", isTitle: true });
-    for (const [key, desc] of SECTIONS[s].rows) {
-      lines.push({ key: `  ${key}`, desc, isTitle: false });
-    }
-  }
-  // Footer
-  lines.push({ key: "", desc: "", isTitle: false });
-  lines.push({
-    key: "  ↵ / Esc / q / ? to close",
-    desc: "",
-    isTitle: false,
-  });
-
-  // Align: pick the widest key column (cap at 30 chars)
+  // Compute key column width (cap at 30)
+  const allKeys = SECTIONS.flatMap((s) => s.rows.map((r) => r[0]));
   const keyColumn = Math.min(
     30,
-    Math.max(...lines.map((l) => getDisplayWidth(l.key))),
+    Math.max(...allKeys.map((k) => getDisplayWidth(k))),
   );
 
-  const contentRows: React.ReactElement[] = [];
   const padTo = (s: string, w: number) => {
     const pad = Math.max(0, w - getDisplayWidth(s));
     return s + " ".repeat(pad);
   };
 
-  for (let i = 0; i < Math.min(lines.length, visibleRows); i++) {
-    const { key, desc, isTitle } = lines[i];
-    const text = desc ? `${padTo(key, keyColumn)}  ${desc}` : key;
-    const padding = Math.max(0, contentWidth - getDisplayWidth(text));
-    if (isTitle) {
-      contentRows.push(
-        <Text key={i}>
-          {BOX.v} <Text bold>{text}</Text>
-          {" ".repeat(padding)}
-          {BOX.v}
-        </Text>,
-      );
-    } else if (key && key.trim().startsWith("agenthud")) {
-      contentRows.push(
-        <Text key={i}>
-          {BOX.v} <Text color="cyan">{text}</Text>
-          {" ".repeat(padding)}
-          {BOX.v}
-        </Text>,
-      );
-    } else {
-      contentRows.push(
-        <Text key={i}>
-          {BOX.v} {text}
-          {" ".repeat(padding)}
-          {BOX.v}
+  const lines: React.ReactElement[] = [];
+
+  // Title (single line, bold + bright)
+  lines.push(
+    <Text key="title" bold>
+      AgentHUD Help
+    </Text>,
+  );
+  lines.push(<Text key="title-sp"> </Text>);
+
+  for (let s = 0; s < SECTIONS.length; s++) {
+    if (s > 0) lines.push(<Text key={`sp-${s}`}> </Text>);
+    lines.push(
+      <Text key={`title-${s}`} bold color="cyan">
+        {SECTIONS[s].title}
+      </Text>,
+    );
+    for (let r = 0; r < SECTIONS[s].rows.length; r++) {
+      const [key, desc] = SECTIONS[s].rows[r];
+      const isCli = key.trim().startsWith("agenthud");
+      const isFile = key.includes("~/.agenthud");
+      lines.push(
+        <Text key={`row-${s}-${r}`}>
+          <Text dimColor> </Text>
+          <Text color={isCli ? "cyan" : isFile ? "green" : undefined}>
+            {padTo(key, keyColumn)}
+          </Text>
+          <Text> </Text>
+          <Text dimColor>{desc}</Text>
         </Text>,
       );
     }
   }
 
-  // Pad with empty rows to fill visibleRows so layout is stable
-  const emptyRow = `${BOX.v}${" ".repeat(contentWidth + 1)}${BOX.v}`;
-  while (contentRows.length < visibleRows) {
-    contentRows.push(<Text key={`pad-${contentRows.length}`}>{emptyRow}</Text>);
-  }
+  // Truncate if too tall
+  const visible = lines.slice(0, height);
 
   return (
     <Box flexDirection="column" width={width}>
-      <Text>{createTitleLine("Help", "", width)}</Text>
-      {contentRows}
-      <Text>{createBottomLine(width)}</Text>
+      {visible}
     </Box>
   );
 }

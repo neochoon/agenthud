@@ -336,6 +336,7 @@ describe("useHotkeys", () => {
         "↵: expand",
         "h: hide",
         "r: refresh",
+        "?: help",
         "q: quit",
       ]);
     });
@@ -352,6 +353,7 @@ describe("useHotkeys", () => {
         "G: oldest",
         "↵: detail",
         "f: all",
+        "?: help",
         "q: quit",
       ]);
     });
@@ -363,7 +365,15 @@ describe("useHotkeys", () => {
       expect(result.current.statusBarItems).toEqual([
         "↑↓/jk: scroll",
         "↵/Esc: close",
+        "?: help",
       ]);
+    });
+
+    it("returns minimal status bar when helpMode is true", () => {
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ helpMode: true })),
+      );
+      expect(result.current.statusBarItems).toEqual(["↵/Esc/q/?: close"]);
     });
   });
 

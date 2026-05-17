@@ -765,12 +765,6 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
 
   return (
     <Box flexDirection="column">
-      {migrationWarning && (
-        <Box marginBottom={1}>
-          <Text color="yellow">Config moved to ~/.agenthud/config.yaml</Text>
-        </Box>
-      )}
-
       {isWatchMode && (
         <Box marginBottom={1} justifyContent="space-between" width={width}>
           <Text dimColor>
@@ -780,43 +774,55 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
         </Box>
       )}
 
-      <SessionTreePanel
-        projects={sessionTree.projects ?? []}
-        coldProjects={sessionTree.coldProjects ?? []}
-        selectedId={selectedId}
-        hasFocus={focus === "tree"}
-        width={width}
-        maxRows={treeRows}
-        expandedIds={expandedIds}
-      />
+      {helpMode ? (
+        <HelpPanel width={width} height={height - 2} />
+      ) : (
+        <>
+          {migrationWarning && (
+            <Box marginBottom={1}>
+              <Text color="yellow">
+                Config moved to ~/.agenthud/config.yaml
+              </Text>
+            </Box>
+          )}
 
-      <Box marginTop={1}>
-        {helpMode ? (
-          <HelpPanel width={width} visibleRows={viewerRows} />
-        ) : detailMode && detailActivity ? (
-          <DetailViewPanel
-            activity={detailActivity}
-            sessionName={sessionDisplayName}
-            scrollOffset={detailScrollOffset}
-            visibleRows={viewerRows}
+          <SessionTreePanel
+            projects={sessionTree.projects ?? []}
+            coldProjects={sessionTree.coldProjects ?? []}
+            selectedId={selectedId}
+            hasFocus={focus === "tree"}
             width={width}
+            maxRows={treeRows}
+            expandedIds={expandedIds}
           />
-        ) : (
-          <ActivityViewerPanel
-            activities={mergedActivities}
-            sessionName={sessionDisplayName}
-            scrollOffset={scrollOffset}
-            isLive={isLive}
-            newCount={newCount}
-            visibleRows={viewerRows}
-            width={width}
-            cursorLine={viewerCursorLine}
-            hasFocus={focus === "viewer"}
-            spinner={spinner}
-            filterLabel={filterLabel}
-          />
-        )}
-      </Box>
+
+          <Box marginTop={1}>
+            {detailMode && detailActivity ? (
+              <DetailViewPanel
+                activity={detailActivity}
+                sessionName={sessionDisplayName}
+                scrollOffset={detailScrollOffset}
+                visibleRows={viewerRows}
+                width={width}
+              />
+            ) : (
+              <ActivityViewerPanel
+                activities={mergedActivities}
+                sessionName={sessionDisplayName}
+                scrollOffset={scrollOffset}
+                isLive={isLive}
+                newCount={newCount}
+                visibleRows={viewerRows}
+                width={width}
+                cursorLine={viewerCursorLine}
+                hasFocus={focus === "viewer"}
+                spinner={spinner}
+                filterLabel={filterLabel}
+              />
+            )}
+          </Box>
+        </>
+      )}
     </Box>
   );
 }

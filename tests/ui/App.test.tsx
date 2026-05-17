@@ -38,6 +38,8 @@ describe("App", () => {
 
   it("renders AgentHUD version in watch mode", () => {
     const { lastFrame } = render(<App mode="watch" />);
-    expect(lastFrame()).toContain("AgentHUD v");
+    const out = lastFrame() ?? "";
+    expect(out).toContain("AgentHUD");
+    expect(out).toMatch(/v\d+\.\d+\.\d+/);
   });
 });

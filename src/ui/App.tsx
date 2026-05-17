@@ -23,6 +23,7 @@ import type {
   SessionTree,
 } from "../types/index.js";
 import { ActivityViewerPanel } from "./ActivityViewerPanel.js";
+import { getDisplayWidth } from "./constants.js";
 import { DetailViewPanel } from "./DetailViewPanel.js";
 import { HelpPanel } from "./HelpPanel.js";
 import { useHotkeys } from "./hooks/useHotkeys.js";
@@ -761,14 +762,31 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
 
   return (
     <Box flexDirection="column">
-      {isWatchMode && (
-        <Box marginBottom={1} justifyContent="space-between" width={width}>
-          <Text dimColor>
-            {spinner} AgentHUD v{getVersion()}
-          </Text>
-          <Text dimColor>{statusBarItems.join(" · ")}</Text>
-        </Box>
-      )}
+      {isWatchMode &&
+        (() => {
+          const branding = `${spinner} AgentHUD v${getVersion()}`;
+          const sep = " · ";
+          // Trim shortcut items from the FRONT until they fit. Items at the
+          // end (?: help, q: quit) are kept as long as possible.
+          let items = statusBarItems;
+          let shortcuts = items.join(sep);
+          let showBranding = true;
+          const fits = () =>
+            (showBranding ? getDisplayWidth(branding) + 1 : 0) +
+              getDisplayWidth(shortcuts) <=
+            width;
+          if (!fits()) showBranding = false;
+          while (!fits() && items.length > 1) {
+            items = items.slice(1);
+            shortcuts = items.join(sep);
+          }
+          return (
+            <Box marginBottom={1} justifyContent="space-between" width={width}>
+              <Text dimColor>{showBranding ? branding : ""}</Text>
+              <Text dimColor>{shortcuts}</Text>
+            </Box>
+          );
+        })()}
 
       {helpMode ? (
         <HelpPanel

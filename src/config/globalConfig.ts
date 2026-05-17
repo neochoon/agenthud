@@ -12,6 +12,7 @@ export const DEFAULT_GLOBAL_CONFIG: GlobalConfig = {
   hiddenSessions: [],
   hiddenSubAgents: [],
   filterPresets: [[], ["response"], ["commit"]],
+  hiddenProjects: [],
 };
 
 function parseInterval(value: string): number | null {

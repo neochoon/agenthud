@@ -115,6 +115,16 @@ export function truncate(text: string, maxLength: number): string {
   return `${text.slice(0, maxLength - 3)}...`;
 }
 
-// Use string-width for accurate terminal width calculation
+// Use string-width for accurate terminal width calculation.
+// Cached because stringWidth runs Unicode regex (emoji, wide chars) which is
+// expensive — and we call it with the same icons/labels thousands of times per
+// second during re-renders. CPU profiling showed it at ~17% of total runtime.
 import stringWidth from "string-width";
-export const getDisplayWidth = stringWidth;
+const widthCache = new Map<string, number>();
+export function getDisplayWidth(s: string): number {
+  const cached = widthCache.get(s);
+  if (cached !== undefined) return cached;
+  const w = stringWidth(s);
+  widthCache.set(s, w);
+  return w;
+}

@@ -155,4 +155,28 @@ describe("ActivityViewerPanel", () => {
     );
     expect(lastFrame()).toContain("+3↑");
   });
+
+  it("flattens multi-line detail to a single line in the viewer", () => {
+    const multiLineActivity: ActivityEntry = {
+      timestamp: new Date(1_700_000_000_000),
+      type: "response",
+      icon: "◀",
+      label: "Response",
+      detail: "Paragraph one.\n\nParagraph two.\n\nParagraph three.",
+    };
+    const { lastFrame } = render(
+      <ActivityViewerPanel
+        {...baseProps}
+        activities={[multiLineActivity]}
+        width={120}
+      />,
+    );
+    const frame = lastFrame() ?? "";
+    // All paragraphs should appear on one line (no raw newlines in rendered output)
+    expect(frame).toContain("Paragraph one.");
+    expect(frame).toContain("Paragraph two.");
+    // The rendered frame should not contain a literal newline between the paragraphs
+    // (they're collapsed to spaces)
+    expect(frame).not.toMatch(/Paragraph one\.\s*\n\s*Paragraph two\./);
+  });
 });

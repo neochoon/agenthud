@@ -37,6 +37,12 @@ describe("getToolDetail", () => {
   it("returns empty string when no input", () => {
     expect(getToolDetail("Task", undefined)).toBe("");
   });
+
+  it("preserves newlines in multi-line commands", () => {
+    expect(getToolDetail("Bash", { command: "line1\nline2\nline3" })).toBe(
+      "line1\nline2\nline3",
+    );
+  });
 });
 
 describe("parseActivitiesFromLines", () => {
@@ -130,6 +136,65 @@ describe("parseActivitiesFromLines", () => {
     expect(thinkingActivity?.label).toBe("Thinking");
     expect(thinkingActivity?.detail).toBe(
       "I need to carefully analyze this problem.",
+    );
+  });
+
+  it("preserves newlines in user messages", () => {
+    const multilineLines = [
+      JSON.stringify({
+        type: "user",
+        message: { role: "user", content: "line one\nline two\nline three" },
+        timestamp: "2025-01-15T10:00:00.000Z",
+      }),
+    ];
+    const result = parseActivitiesFromLines(multilineLines);
+    const userActivity = result.activities.find((a) => a.type === "user");
+    expect(userActivity?.detail).toBe("line one\nline two\nline three");
+  });
+
+  it("preserves newlines in thinking blocks", () => {
+    const thinkingLines = [
+      JSON.stringify({
+        type: "assistant",
+        message: {
+          content: [
+            {
+              type: "thinking",
+              thinking: "Step one\nStep two\nStep three",
+            },
+          ],
+        },
+        timestamp: "2025-01-15T10:00:00.000Z",
+      }),
+    ];
+    const result = parseActivitiesFromLines(thinkingLines);
+    const thinkingActivity = result.activities.find(
+      (a) => a.type === "thinking",
+    );
+    expect(thinkingActivity?.detail).toBe("Step one\nStep two\nStep three");
+  });
+
+  it("preserves newlines in response blocks", () => {
+    const responseLines = [
+      JSON.stringify({
+        type: "assistant",
+        message: {
+          content: [
+            {
+              type: "text",
+              text: "Paragraph one.\n\nParagraph two.\n\nParagraph three.",
+            },
+          ],
+        },
+        timestamp: "2025-01-15T10:00:00.000Z",
+      }),
+    ];
+    const result = parseActivitiesFromLines(responseLines);
+    const responseActivity = result.activities.find(
+      (a) => a.type === "response",
+    );
+    expect(responseActivity?.detail).toBe(
+      "Paragraph one.\n\nParagraph two.\n\nParagraph three.",
     );
   });
 });

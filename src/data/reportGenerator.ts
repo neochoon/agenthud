@@ -73,7 +73,17 @@ function sessionIsOnDate(
   return activities.some((a) => isSameLocalDay(a.timestamp, date));
 }
 
+function flattenForOneLine(s: string): string {
+  return s.replace(/[\r\n\t]+/g, " ").trim();
+}
+
 function truncateDetail(detail: string, limit: number): string {
+  const flat = flattenForOneLine(detail);
+  if (limit === 0 || flat.length <= limit) return flat;
+  return flat.slice(0, limit);
+}
+
+function truncateRaw(detail: string, limit: number): string {
   if (limit === 0 || detail.length <= limit) return detail;
   return detail.slice(0, limit);
 }
@@ -141,7 +151,7 @@ export function generateReport(
             time: formatTime(a.timestamp),
             icon: a.icon,
             label: a.label,
-            detail: truncateDetail(a.detail, detailLimit),
+            detail: truncateRaw(a.detail, detailLimit),
           })),
         };
       });
@@ -154,7 +164,7 @@ export function generateReport(
           time: formatTime(a.timestamp),
           icon: a.icon,
           label: a.label,
-          detail: truncateDetail(a.detail, detailLimit),
+          detail: truncateRaw(a.detail, detailLimit),
         })),
         subAgents: subAgentBlocks,
       };

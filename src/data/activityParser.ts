@@ -31,7 +31,7 @@ export function getToolDetail(
   },
 ): string {
   if (!input) return "";
-  if (input.command) return stripAnsi(input.command.replace(/\n/g, " "));
+  if (input.command) return stripAnsi(input.command);
   if (input.file_path) return basename(input.file_path);
   if (input.pattern) return stripAnsi(input.pattern);
   if (input.query) return stripAnsi(input.query);
@@ -116,7 +116,7 @@ export function parseActivitiesFromLines(lines: string[]): ParseResult {
           type: "user",
           icon: ICONS.User,
           label: "User",
-          detail: userText.replace(/\n/g, " "),
+          detail: userText,
         });
       }
     }
@@ -145,7 +145,7 @@ export function parseActivitiesFromLines(lines: string[]): ParseResult {
               type: "thinking",
               icon: ICONS.Thinking,
               label: "Thinking",
-              detail: block.thinking.replace(/\n/g, " "),
+              detail: block.thinking,
             });
           } else if (block.type === "tool_use" && block.name) {
             if (block.name === "TodoWrite") continue;
@@ -180,7 +180,7 @@ export function parseActivitiesFromLines(lines: string[]): ParseResult {
               type: "response",
               icon: ICONS.Response,
               label: "Response",
-              detail: block.text.replace(/\n/g, " "),
+              detail: block.text,
             });
           }
         }

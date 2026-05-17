@@ -104,6 +104,30 @@ describe("DetailViewPanel", () => {
     );
     expect(lastFrame()).toContain("(empty)");
   });
+
+  it("preserves multi-line detail as separate visual lines", () => {
+    const { lastFrame } = render(
+      <DetailViewPanel
+        activity={makeActivity({
+          detail: "Paragraph one.\n\nParagraph two.\n\nParagraph three.",
+        })}
+        sessionName="myproject"
+        width={80}
+        visibleRows={10}
+        scrollOffset={0}
+      />,
+    );
+    const frame = lastFrame() ?? "";
+    expect(frame).toContain("Paragraph one.");
+    expect(frame).toContain("Paragraph two.");
+    expect(frame).toContain("Paragraph three.");
+    // The paragraphs must appear on separate lines in the rendered output
+    const oneIdx = frame.indexOf("Paragraph one.");
+    const twoIdx = frame.indexOf("Paragraph two.");
+    expect(twoIdx).toBeGreaterThan(oneIdx);
+    // There must be a newline between them
+    expect(frame.slice(oneIdx, twoIdx)).toContain("\n");
+  });
 });
 
 describe("wrapText", () => {

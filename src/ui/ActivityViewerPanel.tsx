@@ -67,20 +67,22 @@ function formatActivityTime(date: Date, now: Date): string {
   return `${month}/${day} ${time}`;
 }
 
+function flattenForOneLine(detail: string): string {
+  return detail.replace(/[\r\n\t]+/g, " ").trim();
+}
+
 function truncateDetail(detail: string, maxWidth: number): string {
-  if (getDisplayWidth(detail) <= maxWidth) return detail;
+  const flat = flattenForOneLine(detail);
+  if (getDisplayWidth(flat) <= maxWidth) return flat;
   let truncated = "";
-  let currentWidth = 0;
-  for (const char of detail) {
+  let width = 0;
+  for (const char of flat) {
     const charWidth = getDisplayWidth(char);
-    if (currentWidth + charWidth > maxWidth - 3) {
-      truncated += "...";
-      break;
-    }
+    if (width + charWidth > maxWidth - 1) break;
     truncated += char;
-    currentWidth += charWidth;
+    width += charWidth;
   }
-  return truncated;
+  return `${truncated}…`;
 }
 
 export function ActivityViewerPanel({

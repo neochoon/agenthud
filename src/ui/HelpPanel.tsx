@@ -4,8 +4,10 @@ import { getDisplayWidth } from "./constants.js";
 
 interface HelpSection {
   title: string;
-  rows: [string, string][];
+  rows: HelpRow[];
 }
+
+type HelpRow = [string, string] | [string, string, string];
 
 const SECTIONS: HelpSection[] = [
   {
@@ -41,6 +43,15 @@ const SECTIONS: HelpSection[] = [
     ],
   },
   {
+    title: "Session status (by recent activity)",
+    rows: [
+      ["[hot]", "Updated in the last 30 minutes", "green"],
+      ["[warm]", "Updated in the last hour", "yellow"],
+      ["[cool]", "Updated earlier today", "cyan"],
+      ["[cold]", "Last updated yesterday or earlier (collapsed)", "gray"],
+    ],
+  },
+  {
     title: "Always available",
     rows: [
       ["?", "Toggle this help"],
@@ -60,8 +71,9 @@ const SECTIONS: HelpSection[] = [
     rows: [
       ["~/.agenthud/config.yaml", "User settings (edit freely)"],
       ["~/.agenthud/state.yaml", "Hidden items (app-managed)"],
-      ["~/.agenthud/summary-prompt.md", "LLM prompt template"],
-      ["~/.agenthud/summaries/", "Cached daily summaries"],
+      ["~/.agenthud/summary-prompt.md", "Daily summary prompt template"],
+      ["~/.agenthud/summary-range-prompt.md", "Range summary prompt template"],
+      ["~/.agenthud/summaries/", "Cached daily and range summaries"],
     ],
   },
 ];
@@ -105,15 +117,17 @@ export function HelpPanel({
       </Text>,
     );
     for (let r = 0; r < SECTIONS[s].rows.length; r++) {
-      const [key, desc] = SECTIONS[s].rows[r];
+      const row = SECTIONS[s].rows[r];
+      const [key, desc] = row;
+      const explicitColor = row.length === 3 ? row[2] : undefined;
       const isCli = key.trim().startsWith("agenthud");
       const isFile = key.includes("~/.agenthud");
+      const color =
+        explicitColor ?? (isCli ? "cyan" : isFile ? "green" : undefined);
       lines.push(
         <Text key={`row-${s}-${r}`}>
           <Text dimColor> </Text>
-          <Text color={isCli ? "cyan" : isFile ? "green" : undefined}>
-            {padTo(key, keyColumn)}
-          </Text>
+          <Text color={color}>{padTo(key, keyColumn)}</Text>
           <Text> </Text>
           <Text dimColor>{desc}</Text>
         </Text>,

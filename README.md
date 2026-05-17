@@ -54,6 +54,19 @@ AgentHUD reads Claude Code's session files from `~/.claude/projects/` and displa
 - Press `f` to cycle through filter presets (configurable).
 - Press `↵` on any row to open a scrollable detail view; on a commit row this shows `git show --stat`.
 
+## Session status
+
+Each session row carries a colored badge derived from when its JSONL file was last touched:
+
+| Badge | Color | Meaning |
+|-------|-------|---------|
+| `[hot]` | green | Updated in the last 30 minutes — actively running |
+| `[warm]` | yellow | Updated in the last hour |
+| `[cool]` | cyan | Updated earlier today |
+| `[cold]` | gray | Last updated yesterday or earlier — collapsed under `... N cold projects` at the bottom |
+
+Sub-agents use the same scheme. Projects inherit the hottest status of their sessions; a project is treated as "cold" only when all its sessions are cold.
+
 ## Activity types
 
 | Icon | Type | Description |

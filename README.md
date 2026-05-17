@@ -25,9 +25,12 @@ AgentHUD reads Claude Code's session files from `~/.claude/projects/` and displa
 ```
 ┌─ Sessions ──────────────────────────────────────────────┐
 │ > agenthud                                              │
-│     sub-agent: code-reviewer                            │
+│     #864f [hot] sonnet-4.6                              │
+│       » sub-agent: code-reviewer                        │
+│     (#398c [warm])                                      │
 │   myproject                                             │
-│   dotfiles                                              │
+│     #def4 [hot] sonnet-4.6                              │
+│ ... 12 cold projects                                    │
 └─────────────────────────────────────────────────────────┘
 ┌─ Activity · agenthud ───────────────────────────────────┐
 │ [10:23:45] ○ Read  src/ui/App.tsx                       │
@@ -39,9 +42,11 @@ AgentHUD reads Claude Code's session files from `~/.claude/projects/` and displa
 ```
 
 **Session tree (top pane)**
-- All Claude Code sessions across all projects
-- Sub-agents shown nested under their parent session
-- Live indicator on currently active session
+- Sessions grouped under their project (the project name is the row in bold).
+- Non-interactive sessions (from `claude -p`, SDK, `agenthud summary`, etc.) appear in parens and dimmed.
+- Projects with only cold sessions collapse under `... N cold projects` at the bottom.
+- Sub-agents nest under their parent session.
+- Live indicator on currently active session.
 
 **Activity viewer (bottom pane)**
 - Real-time activity feed for the selected session
@@ -160,6 +165,10 @@ hiddenSessions:
   - old-project
 hiddenSubAgents:
   - code-reviewer
+
+# Hide entire projects from the tree
+hiddenProjects:
+  - old-project
 ```
 
 ## Environment Variables

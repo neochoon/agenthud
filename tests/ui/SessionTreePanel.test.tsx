@@ -662,4 +662,40 @@ describe("SessionTreePanel", () => {
     expect(out).toContain("cold");
     expect(out).not.toContain("> stale");
   });
+
+  it("shows cold projects collapsed by default when __cold__ is expanded", () => {
+    const session = makeSession({ status: "cold" });
+    const project = makeProject("stale", [session], { hotness: "cold" });
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[]}
+        coldProjects={[project]}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+        expandedIds={new Set(["__cold__"])}
+      />,
+    );
+    const out = lastFrame() ?? "";
+    expect(out).toContain("> stale"); // project header visible
+    expect(out).not.toContain(session.id.slice(0, 4)); // no session row
+  });
+
+  it("expands cold project sessions when its __expanded- key is set", () => {
+    const session = makeSession({ status: "cold", id: "coldsess" });
+    const project = makeProject("stale", [session], { hotness: "cold" });
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[]}
+        coldProjects={[project]}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+        expandedIds={new Set(["__cold__", "__expanded-__proj-stale__"])}
+      />,
+    );
+    const out = lastFrame() ?? "";
+    expect(out).toContain("> stale");
+    expect(out).toContain("#cold"); // session visible
+  });
 });

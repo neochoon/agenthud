@@ -236,8 +236,9 @@ function flattenSessions(
       for (const project of coldProjects) {
         const sentinelId = `__proj-${project.name}__`;
         result.push({ kind: "project", project, sentinelId });
-        const collapsed = expandedIds.has(`__collapsed-${sentinelId}`);
-        if (!collapsed) {
+        // Cold projects default COLLAPSED — show sessions only when explicitly expanded
+        const expanded = expandedIds.has(`__expanded-${sentinelId}`);
+        if (expanded) {
           for (const session of project.sessions) {
             result.push({ kind: "session", session, prefix: "    " });
             appendSessionRows(result, session, expandedIds);

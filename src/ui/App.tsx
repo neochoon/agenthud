@@ -76,10 +76,11 @@ function flattenSessions(
 ): SessionNode[] {
   const result: SessionNode[] = [];
 
-  const projectToFlat = (project: ProjectNode) => {
+  const projectToFlat = (project: ProjectNode, isCold: boolean) => {
     // Synthesize a sentinel SessionNode for the project header.
+    const sentinelId = `__proj-${project.name}__`;
     result.push({
-      id: `__proj-${project.name}__`,
+      id: sentinelId,
       hideKey: "",
       filePath: "",
       projectPath: project.projectPath,
@@ -91,8 +92,11 @@ function flattenSessions(
       nonInteractive: false,
     });
 
-    const collapsedKey = `__collapsed-__proj-${project.name}__`;
-    if (!expandedIds.has(collapsedKey)) {
+    const shouldShowSessions = isCold
+      ? expandedIds.has(`__expanded-${sentinelId}`)
+      : !expandedIds.has(`__collapsed-${sentinelId}`);
+
+    if (shouldShowSessions) {
       for (const session of project.sessions) {
         result.push(session);
         appendSubAgentRows(result, session, expandedIds);
@@ -101,7 +105,7 @@ function flattenSessions(
   };
 
   for (const project of tree.projects) {
-    projectToFlat(project);
+    projectToFlat(project, false);
   }
 
   if (tree.coldProjects.length > 0) {
@@ -119,7 +123,7 @@ function flattenSessions(
     });
     if (expandedIds.has("__cold__")) {
       for (const project of tree.coldProjects) {
-        projectToFlat(project);
+        projectToFlat(project, true);
       }
     }
   }
@@ -555,13 +559,19 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
 
       // Project sentinel: __proj-{projectName}__
       if (selectedId.startsWith("__proj-") && selectedId.endsWith("__")) {
+        const projectName = selectedId.slice(7, -2);
+        const isCold = sessionTree.coldProjects.some(
+          (p) => p.name === projectName,
+        );
+        const toggleKey = isCold
+          ? `__expanded-${selectedId}`
+          : `__collapsed-${selectedId}`;
         setExpandedIds((prev) => {
-          const collapsedKey = `__collapsed-${selectedId}`;
           const next = new Set(prev);
-          if (next.has(collapsedKey)) {
-            next.delete(collapsedKey);
+          if (next.has(toggleKey)) {
+            next.delete(toggleKey);
           } else {
-            next.add(collapsedKey);
+            next.add(toggleKey);
           }
           return next;
         });

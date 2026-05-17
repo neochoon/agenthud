@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import type {
   GlobalConfig,
+  ProjectNode,
   SessionNode,
   SessionStatus,
   SessionTree,
@@ -166,7 +167,12 @@ export function discoverSessions(config: GlobalConfig): SessionTree {
   const projectsDir = getProjectsDir();
 
   if (!existsSync(projectsDir)) {
-    return { sessions: [], totalCount: 0, timestamp: new Date().toISOString() };
+    return {
+      projects: [],
+      coldProjects: [],
+      totalCount: 0,
+      timestamp: new Date().toISOString(),
+    };
   }
 
   let projectDirs: string[];
@@ -179,7 +185,12 @@ export function discoverSessions(config: GlobalConfig): SessionTree {
       }
     });
   } catch {
-    return { sessions: [], totalCount: 0, timestamp: new Date().toISOString() };
+    return {
+      projects: [],
+      coldProjects: [],
+      totalCount: 0,
+      timestamp: new Date().toISOString(),
+    };
   }
 
   const allSessions: SessionNode[] = [];
@@ -221,26 +232,69 @@ export function discoverSessions(config: GlobalConfig): SessionTree {
     }
   }
 
-  allSessions.sort((a, b) => {
-    const statusOrder: Record<SessionStatus, number> = {
-      hot: 0,
-      warm: 1,
-      cool: 2,
-      cold: 3,
-    };
-    const statusDiff = statusOrder[a.status] - statusOrder[b.status];
+  // Group by projectPath
+  const byProject = new Map<string, SessionNode[]>();
+  for (const s of allSessions) {
+    if (config.hiddenSessions.includes(s.hideKey)) continue;
+    const arr = byProject.get(s.projectPath) ?? [];
+    arr.push(s);
+    byProject.set(s.projectPath, arr);
+  }
+
+  const statusOrder: Record<SessionStatus, number> = {
+    hot: 0,
+    warm: 1,
+    cool: 2,
+    cold: 3,
+  };
+
+  const allProjects: ProjectNode[] = [];
+  for (const [projectPath, sessions] of byProject) {
+    if (sessions.length === 0) continue;
+    const projectName = sessions[0].projectName;
+    if (config.hiddenProjects.includes(projectName)) continue;
+
+    // Sort: interactive first, then by status, then by mtime desc
+    sessions.sort((a, b) => {
+      if (a.nonInteractive !== b.nonInteractive) {
+        return a.nonInteractive ? 1 : -1;
+      }
+      const statusDiff = statusOrder[a.status] - statusOrder[b.status];
+      if (statusDiff !== 0) return statusDiff;
+      return b.lastModifiedMs - a.lastModifiedMs;
+    });
+
+    const hotness = sessions[0].status; // hottest = first after sort
+
+    allProjects.push({ name: projectName, projectPath, sessions, hotness });
+  }
+
+  // Partition cold vs active
+  const activeProjects = allProjects.filter((p) => p.hotness !== "cold");
+  const coldProjects = allProjects.filter((p) => p.hotness === "cold");
+
+  // Sort active projects by hottest session's status, then mtime of hottest session
+  activeProjects.sort((a, b) => {
+    const statusDiff = statusOrder[a.hotness] - statusOrder[b.hotness];
     if (statusDiff !== 0) return statusDiff;
-    return b.lastModifiedMs - a.lastModifiedMs;
+    return b.sessions[0].lastModifiedMs - a.sessions[0].lastModifiedMs;
   });
 
-  const visible = allSessions.filter(
-    (s) => !config.hiddenSessions.includes(s.hideKey),
-  );
+  const countSessions = (projects: ProjectNode[]) =>
+    projects.reduce(
+      (sum, p) =>
+        sum +
+        p.sessions.length +
+        p.sessions.reduce((s, sn) => s + sn.subAgents.length, 0),
+      0,
+    );
+
   const totalCount =
-    visible.length + visible.reduce((sum, s) => sum + s.subAgents.length, 0);
+    countSessions(activeProjects) + countSessions(coldProjects);
 
   return {
-    sessions: visible,
+    projects: activeProjects,
+    coldProjects,
     totalCount,
     timestamp: new Date().toISOString(),
   };

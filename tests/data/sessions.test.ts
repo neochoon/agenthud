@@ -20,6 +20,8 @@ const mockConfig = {
   logDir: "/tmp/logs",
   hiddenSessions: [] as string[],
   hiddenSubAgents: [] as string[],
+  filterPresets: [[]] as string[][],
+  hiddenProjects: [] as string[],
 };
 
 afterEach(() => {
@@ -31,7 +33,8 @@ describe("discoverSessions", () => {
   it("returns empty tree when ~/.claude/projects does not exist", () => {
     vi.mocked(existsSync).mockReturnValue(false);
     const tree = discoverSessions(mockConfig);
-    expect(tree.sessions).toHaveLength(0);
+    expect(tree.projects).toHaveLength(0);
+    expect(tree.coldProjects).toHaveLength(0);
     expect(tree.totalCount).toBe(0);
   });
 
@@ -85,11 +88,12 @@ describe("discoverSessions", () => {
     vi.spyOn(Date, "now").mockReturnValue(NOW);
 
     const tree = discoverSessions(mockConfig);
-    expect(tree.sessions).toHaveLength(1);
-    expect(tree.sessions[0].id).toBe("abc123");
-    expect(tree.sessions[0].hideKey).toBe("myproject/abc123");
-    expect(tree.sessions[0].subAgents).toHaveLength(0);
-    expect(tree.sessions[0].modelName).toBe("sonnet-4");
+    expect(tree.projects).toHaveLength(1);
+    expect(tree.projects[0].sessions).toHaveLength(1);
+    expect(tree.projects[0].sessions[0].id).toBe("abc123");
+    expect(tree.projects[0].sessions[0].hideKey).toBe("myproject/abc123");
+    expect(tree.projects[0].sessions[0].subAgents).toHaveLength(0);
+    expect(tree.projects[0].sessions[0].modelName).toBe("sonnet-4");
   });
 
   it("marks session as hot when mtime is within 30m", () => {
@@ -127,7 +131,7 @@ describe("discoverSessions", () => {
     vi.spyOn(Date, "now").mockReturnValue(NOW);
 
     const tree = discoverSessions(mockConfig);
-    expect(tree.sessions[0].status).toBe("hot");
+    expect(tree.projects[0].sessions[0].status).toBe("hot");
   });
 
   it("marks session as warm when mtime is between 30m and 1h ago", () => {
@@ -165,7 +169,7 @@ describe("discoverSessions", () => {
     vi.spyOn(Date, "now").mockReturnValue(NOW);
 
     const tree = discoverSessions(mockConfig);
-    expect(tree.sessions[0].status).toBe("warm");
+    expect(tree.projects[0].sessions[0].status).toBe("warm");
   });
 
   it("nests sub-agents under their parent", () => {
@@ -210,12 +214,15 @@ describe("discoverSessions", () => {
     vi.spyOn(Date, "now").mockReturnValue(NOW);
 
     const tree = discoverSessions(mockConfig);
-    expect(tree.sessions).toHaveLength(1);
-    expect(tree.sessions[0].id).toBe("parent-id");
-    expect(tree.sessions[0].hideKey).toBe("proj/parent-id");
-    expect(tree.sessions[0].subAgents).toHaveLength(1);
-    expect(tree.sessions[0].subAgents[0].id).toBe("child-id");
-    expect(tree.sessions[0].subAgents[0].hideKey).toBe("proj/child-id");
+    expect(tree.projects).toHaveLength(1);
+    expect(tree.projects[0].sessions).toHaveLength(1);
+    expect(tree.projects[0].sessions[0].id).toBe("parent-id");
+    expect(tree.projects[0].sessions[0].hideKey).toBe("proj/parent-id");
+    expect(tree.projects[0].sessions[0].subAgents).toHaveLength(1);
+    expect(tree.projects[0].sessions[0].subAgents[0].id).toBe("child-id");
+    expect(tree.projects[0].sessions[0].subAgents[0].hideKey).toBe(
+      "proj/child-id",
+    );
     expect(tree.totalCount).toBe(2);
   });
 
@@ -254,9 +261,10 @@ describe("discoverSessions", () => {
     vi.spyOn(Date, "now").mockReturnValue(NOW);
 
     const tree = discoverSessions(mockConfig);
-    expect(tree.sessions).toHaveLength(1);
+    expect(tree.projects).toHaveLength(1);
+    expect(tree.projects[0].sessions).toHaveLength(1);
     // NOW-2h is same UTC day as NOW, so status is cool (calendar-based).
-    expect(tree.sessions[0].status).toBe("cool");
+    expect(tree.projects[0].sessions[0].status).toBe("cool");
   });
 
   it("excludes sessions in hiddenSessions config", () => {
@@ -298,7 +306,8 @@ describe("discoverSessions", () => {
     };
 
     const tree = discoverSessions(configWithHidden);
-    expect(tree.sessions).toHaveLength(0);
+    expect(tree.projects).toHaveLength(0);
+    expect(tree.coldProjects).toHaveLength(0);
     expect(tree.totalCount).toBe(0);
   });
 
@@ -313,11 +322,7 @@ describe("discoverSessions", () => {
 
     vi.mocked(existsSync).mockImplementation((p) => {
       const path = String(p);
-      if (
-        path === projectsDir ||
-        path === projectDir ||
-        path === sessionFile
-      )
+      if (path === projectsDir || path === projectDir || path === sessionFile)
         return true;
       if (path.includes("subagents")) return false;
       return false;
@@ -351,10 +356,7 @@ describe("discoverSessions", () => {
     vi.spyOn(Date, "now").mockReturnValue(NOW);
 
     const tree = discoverSessions(mockConfig);
-    // TODO: assert nonInteractive in Task 3 after SessionTree shape is updated
-    // tree.sessions is the pre-Task-3 shape; nonInteractive is set on the node
-    const sessions = (tree as unknown as { sessions: { nonInteractive: boolean }[] }).sessions;
-    expect(sessions[0].nonInteractive).toBe(true);
+    expect(tree.projects[0].sessions[0].nonInteractive).toBe(true);
   });
 
   it("uses CLAUDE_PROJECTS_DIR env var when set", () => {
@@ -365,7 +367,8 @@ describe("discoverSessions", () => {
 
     const tree = discoverSessions(mockConfig);
     expect(vi.mocked(existsSync)).toHaveBeenCalledWith(customDir);
-    expect(tree.sessions).toHaveLength(0);
+    expect(tree.projects).toHaveLength(0);
+    expect(tree.coldProjects).toHaveLength(0);
   });
 
   describe("session status calendar logic", () => {
@@ -404,7 +407,7 @@ describe("discoverSessions", () => {
       vi.spyOn(Date, "now").mockReturnValue(NOW);
 
       const tree = discoverSessions(mockConfig);
-      expect(tree.sessions[0].status).toBe("cool");
+      expect(tree.projects[0].sessions[0].status).toBe("cool");
     });
 
     it("marks session as cold when mtime is a previous UTC day", () => {
@@ -442,7 +445,170 @@ describe("discoverSessions", () => {
       vi.spyOn(Date, "now").mockReturnValue(NOW);
 
       const tree = discoverSessions(mockConfig);
-      expect(tree.sessions[0].status).toBe("cold");
+      expect(tree.projects).toHaveLength(0);
+      expect(tree.coldProjects).toHaveLength(1);
+      expect(tree.coldProjects[0].sessions[0].status).toBe("cold");
     });
+  });
+
+  it("groups multiple sessions of the same project under one ProjectNode", () => {
+    const projectsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".claude",
+      "projects",
+    );
+    const projectDir = join(projectsDir, "-Users-neo-proj");
+
+    vi.mocked(existsSync).mockImplementation((p) => {
+      const path = String(p);
+      return path === projectsDir || path.includes("-neo-proj");
+    });
+    vi.mocked(readdirSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === projectsDir)
+        return ["-Users-neo-proj"] as unknown as ReturnType<typeof readdirSync>;
+      if (path === projectDir)
+        return ["s1.jsonl", "s2.jsonl"] as unknown as ReturnType<
+          typeof readdirSync
+        >;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(statSync).mockImplementation(
+      (p) =>
+        ({
+          isDirectory: () => !String(p).endsWith(".jsonl"),
+          mtimeMs: NOW - 10_000,
+          size: 100,
+        }) as ReturnType<typeof statSync>,
+    );
+    vi.mocked(readFileSync).mockReturnValue("");
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const tree = discoverSessions(mockConfig);
+    expect(tree.projects).toHaveLength(1);
+    expect(tree.projects[0].name).toBe("proj");
+    expect(tree.projects[0].sessions).toHaveLength(2);
+  });
+
+  it("places projects where all sessions are cold into coldProjects", () => {
+    const projectsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".claude",
+      "projects",
+    );
+    const projectDir = join(projectsDir, "-Users-neo-old");
+
+    vi.mocked(existsSync).mockImplementation((p) => {
+      const path = String(p);
+      return path === projectsDir || path.includes("-neo-old");
+    });
+    vi.mocked(readdirSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === projectsDir)
+        return ["-Users-neo-old"] as unknown as ReturnType<typeof readdirSync>;
+      if (path === projectDir)
+        return ["o1.jsonl"] as unknown as ReturnType<typeof readdirSync>;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(statSync).mockImplementation(
+      (p) =>
+        ({
+          isDirectory: () => !String(p).endsWith(".jsonl"),
+          mtimeMs: NOW - 72 * 60 * 60 * 1000,
+          size: 100,
+        }) as ReturnType<typeof statSync>,
+    );
+    vi.mocked(readFileSync).mockReturnValue("");
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const tree = discoverSessions(mockConfig);
+    expect(tree.projects).toHaveLength(0);
+    expect(tree.coldProjects).toHaveLength(1);
+    expect(tree.coldProjects[0].sessions).toHaveLength(1);
+  });
+
+  it("filters out hidden projects entirely", () => {
+    const projectsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".claude",
+      "projects",
+    );
+    const projectDir = join(projectsDir, "-Users-neo-secret");
+
+    vi.mocked(existsSync).mockImplementation((p) => {
+      const path = String(p);
+      return path === projectsDir || path.includes("-neo-secret");
+    });
+    vi.mocked(readdirSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === projectsDir)
+        return ["-Users-neo-secret"] as unknown as ReturnType<
+          typeof readdirSync
+        >;
+      if (path === projectDir)
+        return ["a.jsonl"] as unknown as ReturnType<typeof readdirSync>;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(statSync).mockImplementation(
+      (p) =>
+        ({
+          isDirectory: () => !String(p).endsWith(".jsonl"),
+          mtimeMs: NOW - 10_000,
+          size: 100,
+        }) as ReturnType<typeof statSync>,
+    );
+    vi.mocked(readFileSync).mockReturnValue("");
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const configWithHidden = { ...mockConfig, hiddenProjects: ["secret"] };
+    const tree = discoverSessions(configWithHidden);
+    expect(tree.projects).toHaveLength(0);
+    expect(tree.coldProjects).toHaveLength(0);
+  });
+
+  it("sorts sessions within a project: interactive before non-interactive", () => {
+    const projectsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".claude",
+      "projects",
+    );
+    const projectDir = join(projectsDir, "-Users-neo-mix");
+
+    vi.mocked(existsSync).mockImplementation((p) => {
+      const path = String(p);
+      return path === projectsDir || path.includes("-neo-mix");
+    });
+    vi.mocked(readdirSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === projectsDir)
+        return ["-Users-neo-mix"] as unknown as ReturnType<typeof readdirSync>;
+      if (path === projectDir)
+        return ["sdk.jsonl", "cli.jsonl"] as unknown as ReturnType<
+          typeof readdirSync
+        >;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(statSync).mockImplementation(
+      (p) =>
+        ({
+          isDirectory: () => !String(p).endsWith(".jsonl"),
+          mtimeMs: NOW - 10_000,
+          size: 100,
+        }) as ReturnType<typeof statSync>,
+    );
+    vi.mocked(readFileSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path.endsWith("sdk.jsonl")) {
+        return `${JSON.stringify({ entrypoint: "sdk-cli", type: "assistant", message: { model: "<synthetic>", content: [] }, timestamp: new Date(NOW - 10_000).toISOString() })}\n`;
+      }
+      return `${JSON.stringify({ entrypoint: "cli", type: "assistant", message: { model: "claude-sonnet-4-6", content: [] }, timestamp: new Date(NOW - 10_000).toISOString() })}\n`;
+    });
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const tree = discoverSessions(mockConfig);
+    expect(tree.projects).toHaveLength(1);
+    const sessions = tree.projects[0].sessions;
+    expect(sessions[0].nonInteractive).toBe(false);
+    expect(sessions[1].nonInteractive).toBe(true);
   });
 });

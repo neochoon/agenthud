@@ -302,6 +302,61 @@ describe("discoverSessions", () => {
     expect(tree.totalCount).toBe(0);
   });
 
+  it("marks session non-interactive when entrypoint is sdk-cli", () => {
+    const projectsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".claude",
+      "projects",
+    );
+    const projectDir = join(projectsDir, "-Users-neo-myproject");
+    const sessionFile = join(projectDir, "ndi123.jsonl");
+
+    vi.mocked(existsSync).mockImplementation((p) => {
+      const path = String(p);
+      if (
+        path === projectsDir ||
+        path === projectDir ||
+        path === sessionFile
+      )
+        return true;
+      if (path.includes("subagents")) return false;
+      return false;
+    });
+    vi.mocked(readdirSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === projectsDir)
+        return ["-Users-neo-myproject"] as unknown as ReturnType<
+          typeof readdirSync
+        >;
+      if (path === projectDir)
+        return ["ndi123.jsonl"] as unknown as ReturnType<typeof readdirSync>;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(statSync).mockImplementation(
+      (p) =>
+        ({
+          isDirectory: () => String(p) === projectDir,
+          mtimeMs: NOW - 10_000,
+          size: 1000,
+        }) as ReturnType<typeof statSync>,
+    );
+    vi.mocked(readFileSync).mockReturnValue(
+      `${JSON.stringify({
+        entrypoint: "sdk-cli",
+        type: "assistant",
+        message: { model: "<synthetic>", content: [] },
+        timestamp: new Date(NOW - 10_000).toISOString(),
+      })}\n`,
+    );
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const tree = discoverSessions(mockConfig);
+    // TODO: assert nonInteractive in Task 3 after SessionTree shape is updated
+    // tree.sessions is the pre-Task-3 shape; nonInteractive is set on the node
+    const sessions = (tree as unknown as { sessions: { nonInteractive: boolean }[] }).sessions;
+    expect(sessions[0].nonInteractive).toBe(true);
+  });
+
   it("uses CLAUDE_PROJECTS_DIR env var when set", () => {
     const customDir = "/custom/projects";
     process.env.CLAUDE_PROJECTS_DIR = customDir;

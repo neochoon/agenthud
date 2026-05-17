@@ -99,6 +99,18 @@ function readModelName(filePath: string): string | null {
   return null;
 }
 
+function readEntrypoint(filePath: string): string | null {
+  if (!existsSync(filePath)) return null;
+  try {
+    const firstLine = readFileSync(filePath, "utf-8").split("\n")[0];
+    if (!firstLine) return null;
+    const entry = JSON.parse(firstLine);
+    return typeof entry.entrypoint === "string" ? entry.entrypoint : null;
+  } catch {
+    return null;
+  }
+}
+
 function buildSubAgents(
   parentId: string,
   projectDir: string,
@@ -137,6 +149,7 @@ function buildSubAgents(
           subAgents: [],
           agentId: agentId ?? undefined,
           taskDescription: taskDescription ?? undefined,
+          nonInteractive: false,
         };
       } catch {
         return null;
@@ -202,6 +215,7 @@ export function discoverSessions(config: GlobalConfig): SessionTree {
           status: getSessionStatus(stat.mtimeMs),
           modelName: readModelName(filePath),
           subAgents,
+          nonInteractive: readEntrypoint(filePath) === "sdk-cli",
         });
       } catch {}
     }

@@ -170,7 +170,14 @@ function spawnClaude(opts: SpawnClaudeOpts): Promise<SpawnClaudeResult> {
   return new Promise((resolve) => {
     const proc = spawn(
       "claude",
-      ["-p", "--output-format", "stream-json", "--verbose", opts.prompt],
+      [
+        "-p",
+        "--no-session-persistence",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        opts.prompt,
+      ],
       {
         stdio: ["pipe", "pipe", "pipe"],
         cwd: agenthudHomeDir(),

@@ -20,8 +20,14 @@ export interface SummaryOptions {
   today: Date;
 }
 
+function agenthudHomeDir(): string {
+  const dir = join(homedir(), ".agenthud");
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
 function summariesDir(): string {
-  const dir = join(homedir(), ".agenthud", "summaries");
+  const dir = join(agenthudHomeDir(), "summaries");
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -115,6 +121,7 @@ export async function runSummary(options: SummaryOptions): Promise<number> {
   return new Promise<number>((resolve) => {
     const proc = spawn("claude", ["-p", prompt], {
       stdio: ["pipe", "pipe", "pipe"],
+      cwd: agenthudHomeDir(),
     });
 
     let cacheStream: ReturnType<typeof createWriteStream> | null = null;

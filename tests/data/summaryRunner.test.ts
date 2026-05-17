@@ -218,6 +218,34 @@ describe("runSummary prompt resolution", () => {
   });
 });
 
+describe("runSummary spawn options", () => {
+  it("spawns claude with ~/.agenthud as cwd", async () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+    const mockStream = {
+      write: vi.fn(),
+      end: vi.fn(),
+      on: vi.fn().mockReturnThis(),
+    };
+    vi.mocked(createWriteStream).mockReturnValue(
+      mockStream as unknown as ReturnType<typeof createWriteStream>,
+    );
+    vi.mocked(spawn).mockReturnValue(
+      mockClaudeProcess() as unknown as ReturnType<typeof spawn>,
+    );
+
+    await runSummary({
+      date: new Date(2026, 4, 15),
+      force: false,
+      today: new Date(2026, 4, 15),
+    });
+
+    const callArgs = vi.mocked(spawn).mock.calls[0];
+    const opts = callArgs[2] as { cwd: string };
+    expect(opts).toBeDefined();
+    expect(opts.cwd).toContain(".agenthud");
+  });
+});
+
 describe("runSummary cache write error", () => {
   it("emits warning to stderr and continues when cache stream errors", async () => {
     vi.mocked(existsSync).mockReturnValue(false);

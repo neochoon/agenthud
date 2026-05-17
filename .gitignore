@@ -49,3 +49,8 @@ vitest.config.ts.timestamp-*
 
 # Git worktrees
 .worktrees/
+
+# Profiling artifacts (Node --prof / clinic / Chrome DevTools exports)
+CPU.*.cpuprofile
+*.heapsnapshot
+*.heapprofile

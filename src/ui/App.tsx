@@ -26,6 +26,7 @@ import type {
 } from "../types/index.js";
 import { ActivityViewerPanel } from "./ActivityViewerPanel.js";
 import { DetailViewPanel } from "./DetailViewPanel.js";
+import { HelpPanel } from "./HelpPanel.js";
 import { useHotkeys } from "./hooks/useHotkeys.js";
 import { useSpinner } from "./hooks/useSpinner.js";
 import { SessionTreePanel } from "./SessionTreePanel.js";
@@ -191,6 +192,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   );
   const [detailScrollOffset, setDetailScrollOffset] = useState(0);
   const [filterIndex, setFilterIndex] = useState(0);
+  const [helpMode, setHelpMode] = useState(false);
 
   const allFlat = useMemo(
     () => flattenSessions(sessionTree, expandedIds),
@@ -427,6 +429,8 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   const { handleInput, statusBarItems } = useHotkeys({
     focus,
     detailMode,
+    helpMode,
+    onHelp: () => setHelpMode((m) => !m),
     onSwitchFocus: () => setFocus((f) => (f === "tree" ? "viewer" : "tree")),
     onScrollUp: () => {
       if (focus === "tree") {
@@ -787,7 +791,9 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
       />
 
       <Box marginTop={1}>
-        {detailMode && detailActivity ? (
+        {helpMode ? (
+          <HelpPanel width={width} visibleRows={viewerRows} />
+        ) : detailMode && detailActivity ? (
           <DetailViewPanel
             activity={detailActivity}
             sessionName={sessionDisplayName}

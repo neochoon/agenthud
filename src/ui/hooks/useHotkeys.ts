@@ -1,6 +1,7 @@
 interface UseHotkeysOptions {
   focus: "tree" | "viewer";
   detailMode: boolean;
+  helpMode: boolean;
   onSwitchFocus: () => void;
   onScrollUp: () => void;
   onScrollDown: () => void;
@@ -19,6 +20,7 @@ interface UseHotkeysOptions {
   onDetailScrollUp: () => void;
   onDetailScrollDown: () => void;
   onFilter: () => void;
+  onHelp: () => void;
   filterLabel: string; // e.g. "all", "response", "commit"
 }
 
@@ -42,6 +44,7 @@ export interface UseHotkeysResult {
 export function useHotkeys({
   focus,
   detailMode,
+  helpMode,
   onSwitchFocus,
   onScrollUp,
   onScrollDown,
@@ -60,6 +63,7 @@ export function useHotkeys({
   onDetailScrollUp,
   onDetailScrollDown,
   onFilter,
+  onHelp,
   filterLabel,
 }: UseHotkeysOptions): UseHotkeysResult {
   const handleInput = (
@@ -75,6 +79,19 @@ export function useHotkeys({
       escape?: boolean;
     },
   ) => {
+    if (helpMode) {
+      if (key.return || key.escape || input === "q" || input === "?") {
+        onHelp(); // toggle = close
+        return;
+      }
+      return; // swallow everything else
+    }
+
+    if (input === "?") {
+      onHelp();
+      return;
+    }
+
     if (detailMode) {
       if (key.upArrow || input === "k") {
         onDetailScrollUp();

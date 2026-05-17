@@ -67,6 +67,7 @@ function makeOptions(overrides = {}) {
   return {
     focus: "tree" as const,
     detailMode: false,
+    helpMode: false,
     onSwitchFocus: vi.fn(),
     onScrollUp: vi.fn(),
     onScrollDown: vi.fn(),
@@ -85,6 +86,7 @@ function makeOptions(overrides = {}) {
     onDetailScrollUp: vi.fn(),
     onDetailScrollDown: vi.fn(),
     onFilter: vi.fn(),
+    onHelp: vi.fn(),
     filterLabel: "all",
     ...overrides,
   };
@@ -362,6 +364,73 @@ describe("useHotkeys", () => {
         "↑↓/jk: scroll",
         "↵/Esc: close",
       ]);
+    });
+  });
+
+  describe("help mode", () => {
+    it("calls onHelp when ? pressed", () => {
+      const onHelp = vi.fn();
+      const { result } = renderHook(() => useHotkeys(makeOptions({ onHelp })));
+      act(() => result.current.handleInput("?", noopKey));
+      expect(onHelp).toHaveBeenCalledTimes(1);
+    });
+
+    it("toggles help off when ? pressed while help is open", () => {
+      const onHelp = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ helpMode: true, onHelp })),
+      );
+      act(() => result.current.handleInput("?", noopKey));
+      expect(onHelp).toHaveBeenCalledTimes(1);
+    });
+
+    it("closes help on Esc", () => {
+      const onHelp = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ helpMode: true, onHelp })),
+      );
+      act(() => result.current.handleInput("", { ...noopKey, escape: true }));
+      expect(onHelp).toHaveBeenCalledTimes(1);
+    });
+
+    it("closes help on Enter", () => {
+      const onHelp = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ helpMode: true, onHelp })),
+      );
+      act(() => result.current.handleInput("", returnKey));
+      expect(onHelp).toHaveBeenCalledTimes(1);
+    });
+
+    it("closes help on q", () => {
+      const onHelp = vi.fn();
+      const onQuit = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ helpMode: true, onHelp, onQuit })),
+      );
+      act(() => result.current.handleInput("q", noopKey));
+      expect(onHelp).toHaveBeenCalledTimes(1);
+      expect(onQuit).not.toHaveBeenCalled();
+    });
+
+    it("swallows other keys when help is open", () => {
+      const onScrollUp = vi.fn();
+      const onHelp = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ helpMode: true, onScrollUp, onHelp })),
+      );
+      act(() => result.current.handleInput("", { ...noopKey, upArrow: true }));
+      expect(onScrollUp).not.toHaveBeenCalled();
+      expect(onHelp).not.toHaveBeenCalled();
+    });
+
+    it("opens help even from detail mode (? in detailMode)", () => {
+      const onHelp = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ detailMode: true, onHelp })),
+      );
+      act(() => result.current.handleInput("?", noopKey));
+      expect(onHelp).toHaveBeenCalledTimes(1);
     });
   });
 

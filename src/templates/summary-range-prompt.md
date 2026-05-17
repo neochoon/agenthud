@@ -6,6 +6,7 @@ Aim for roughly 400-700 words total — the value of a range summary is cross-da
 
 Do NOT concatenate or restate the daily summaries.
 Do NOT produce a per-day timeline ("On Monday X, on Tuesday Y...").
+Do NOT report a day's cache/auth/load status (e.g. "cached", "not logged in", "no activity") as if it were the day's content. Such phrases reflect tooling state, not engineering work — exclude them entirely. If a day has no substantive content, just don't mention it.
 Omit any section that has no substantive content.
 
 The point of a range summary is to surface what only becomes visible by looking across days:

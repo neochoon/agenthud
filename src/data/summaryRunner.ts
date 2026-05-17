@@ -137,13 +137,18 @@ interface UsageSummary {
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens: number;
+  cacheCreationTokens: number;
   costUsd: number | null;
 }
 
 function formatUsage(u: UsageSummary): string {
   const fmt = (n: number) => n.toLocaleString("en-US");
   const parts = [`${fmt(u.inputTokens)} in / ${fmt(u.outputTokens)} out`];
-  if (u.cacheReadTokens > 0) parts.push(`cache: ${fmt(u.cacheReadTokens)} read`);
+  const cacheParts: string[] = [];
+  if (u.cacheReadTokens > 0) cacheParts.push(`${fmt(u.cacheReadTokens)} read`);
+  if (u.cacheCreationTokens > 0)
+    cacheParts.push(`${fmt(u.cacheCreationTokens)} written`);
+  if (cacheParts.length > 0) parts.push(`cache: ${cacheParts.join(", ")}`);
   if (u.costUsd != null) parts.push(`$${u.costUsd.toFixed(4)}`);
   return parts.join("  ·  ");
 }
@@ -224,6 +229,7 @@ function spawnClaude(opts: SpawnClaudeOpts): Promise<SpawnClaudeResult> {
               input_tokens?: number;
               output_tokens?: number;
               cache_read_input_tokens?: number;
+              cache_creation_input_tokens?: number;
             }
           | undefined;
         const cost = event.total_cost_usd as number | undefined;
@@ -232,6 +238,7 @@ function spawnClaude(opts: SpawnClaudeOpts): Promise<SpawnClaudeResult> {
             inputTokens: u.input_tokens ?? 0,
             outputTokens: u.output_tokens ?? 0,
             cacheReadTokens: u.cache_read_input_tokens ?? 0,
+            cacheCreationTokens: u.cache_creation_input_tokens ?? 0,
             costUsd: cost ?? null,
           };
         }

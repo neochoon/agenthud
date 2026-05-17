@@ -101,7 +101,6 @@ Full reference is also available inside the app — press `?`.
 | `G` | Jump to oldest |
 | `↵` | Open detail view |
 | `f` | Cycle filter preset |
-| `s` | Save log to `~/.agenthud/logs/` |
 | `Tab` | Switch focus to session tree |
 | `?` | Help |
 | `q` | Quit |
@@ -153,18 +152,31 @@ Output:
 
 ## Summary
 
-Generate an LLM-based summary of a day's activity using the `claude` CLI:
+Generate an LLM-based summary of one day or a date range using the `claude` CLI:
 
 ```bash
+# Single day
 agenthud summary                            # today (always regenerated)
+agenthud summary --date yesterday           # natural-language date
 agenthud summary --date 2026-05-14          # past date (cached on second run)
 agenthud summary --date 2026-05-14 --force  # ignore cache
 agenthud summary --prompt "Only commits"    # override prompt
+
+# Date range — daily summaries are re-summarized into a meta-summary
+agenthud summary --last 7d                          # last 7 days, ending today
+agenthud summary --from 2026-05-10 --to 2026-05-16  # explicit range
+agenthud summary --last 7d -y                       # skip per-day confirmations
 ```
 
-Results are saved to `~/.agenthud/summaries/YYYY-MM-DD.md`. Past dates are cached and returned instantly on re-run. Today is always regenerated (activity still growing).
+**Daily summaries** are saved to `~/.agenthud/summaries/YYYY-MM-DD.md`. Past dates are cached and returned instantly; today is always regenerated (activity still growing).
 
-**Prompt customization:** The summary uses `~/.agenthud/summary-prompt.md`, auto-created from a built-in template on first run. Edit it freely or override per-call with `--prompt`.
+**Range summaries** generate any missing daily summaries first, then feed those into a second `claude` call that produces a cross-day synthesis (themes, multi-day workstreams, recurring patterns). Output is cached to `~/.agenthud/summaries/range-FROM_TO.md`. Cached dailies cost nothing to reuse, so weekly summaries are cheap after the first run.
+
+Each missing daily prompts for confirmation just before generation, so you see concrete context (session/activity/commit counts and report size) before deciding. Pass `-y` / `--yes` to skip all prompts. Press Enter to accept the default (`[Y/n]`).
+
+**Prompt customization:** The daily template lives at `~/.agenthud/summary-prompt.md` and the range template at `~/.agenthud/summary-range-prompt.md`. Both are auto-created from built-in templates on first run. Edit them freely.
+
+**`--date` formats:** `YYYY-MM-DD`, `today`, `yesterday`, or `-Nd` (N days ago).
 
 **Requires:** [`@anthropic-ai/claude-code`](https://www.npmjs.com/package/@anthropic-ai/claude-code) installed and authenticated.
 
@@ -175,9 +187,6 @@ Results are saved to `~/.agenthud/summaries/YYYY-MM-DD.md`. Past dates are cache
 ```yaml
 # How often to poll for activity updates (Linux fallback when fs.watch isn't used)
 refreshInterval: 2s
-
-# Where 's' key saves activity logs
-logDir: ~/.agenthud/logs
 
 # Activity filter presets (cycle with 'f' key in viewer)
 # Each list is one preset; [] means "all". First preset is the default.
@@ -195,9 +204,10 @@ App-managed state (hidden items) lives separately in `~/.agenthud/state.yaml` so
 |------|---------|
 | `~/.agenthud/config.yaml` | User settings (edit freely) |
 | `~/.agenthud/state.yaml` | Hidden projects/sessions/sub-agents (app-managed) |
-| `~/.agenthud/summary-prompt.md` | LLM prompt template for `summary` |
-| `~/.agenthud/summaries/` | Cached daily summaries |
-| `~/.agenthud/logs/` | Saved activity logs (`s` key) |
+| `~/.agenthud/summary-prompt.md` | LLM prompt template for daily `summary` |
+| `~/.agenthud/summary-range-prompt.md` | LLM prompt template for range `summary --last/--from/--to` |
+| `~/.agenthud/summaries/YYYY-MM-DD.md` | Cached daily summaries |
+| `~/.agenthud/summaries/range-FROM_TO.md` | Cached range summaries |
 
 ## Environment Variables
 

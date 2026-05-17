@@ -52,6 +52,15 @@ function appendSubAgentRows(
   session: SessionNode,
   expandedIds: Set<string>,
 ): void {
+  const isCold = session.status === "cold";
+  const sessionCollapsedKey = `__collapsed-session-${session.id}`;
+  const sessionExpandedKey = `__expanded-session-${session.id}`;
+  const sessionHidden = isCold
+    ? !expandedIds.has(sessionExpandedKey) // cold default: hidden
+    : expandedIds.has(sessionCollapsedKey); // alive default: visible
+
+  if (sessionHidden) return;
+
   if (expandedIds.has(session.id)) {
     result.push(...session.subAgents);
   } else {
@@ -616,25 +625,36 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
         return;
       }
 
-      const allSessions3 =
-        sessionTree.projects?.flatMap((p) => p.sessions) ?? [];
-      const parentSession = allSessions3.find((s) => s.id === selectedId);
-      if (
-        !parentSession ||
-        !parentSession.subAgents.some(
-          (s) => s.status === "cool" || s.status === "cold",
-        )
-      )
+      // Parent session: toggle whole-session collapse (alive) or expand (cold)
+      const allSessions3 = [
+        ...sessionTree.projects.flatMap((p) => p.sessions),
+        ...sessionTree.coldProjects.flatMap((p) => p.sessions),
+      ];
+      const selectedSessionObj = allSessions3.find((s) => s.id === selectedId);
+
+      if (selectedSessionObj && selectedSessionObj.subAgents.length > 0) {
+        const isCold = selectedSessionObj.status === "cold";
+        const toggleKey = isCold
+          ? `__expanded-session-${selectedId}`
+          : `__collapsed-session-${selectedId}`;
+        setExpandedIds((prev) => {
+          const next = new Set(prev);
+          if (next.has(toggleKey)) {
+            next.delete(toggleKey);
+            // Collapsing alive session: move selection to parent session
+            if (!isCold) setSelectedId(selectedId);
+          } else {
+            next.add(toggleKey);
+            // Expanding cold session: move to first sub-agent
+            if (isCold) {
+              const firstSub = selectedSessionObj.subAgents[0];
+              if (firstSub) setSelectedId(firstSub.id);
+            }
+          }
+          return next;
+        });
         return;
-      setExpandedIds((prev) => {
-        const next = new Set(prev);
-        if (next.has(selectedId)) {
-          next.delete(selectedId);
-        } else {
-          next.add(selectedId);
-        }
-        return next;
-      });
+      }
     },
     onHide: () => {
       if (focus !== "tree" || !selectedId) return;

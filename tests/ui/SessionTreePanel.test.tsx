@@ -698,4 +698,87 @@ describe("SessionTreePanel", () => {
     expect(out).toContain("> stale");
     expect(out).toContain("#cold"); // session visible
   });
+
+  it("hides sub-agents of an alive session when __collapsed-session-{id} is set", () => {
+    const subagent = makeSession({
+      id: "child",
+      status: "hot",
+      projectName: "",
+    });
+    const session = makeSession({
+      id: "sess1",
+      status: "hot",
+      subAgents: [subagent],
+    });
+    const project = makeProject("myproject", [session]);
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[project]}
+        coldProjects={[]}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+        expandedIds={new Set(["__collapsed-session-sess1"])}
+      />,
+    );
+    expect(lastFrame() ?? "").not.toContain("»"); // sub-agent marker absent
+  });
+
+  it("hides sub-agents of a cold session by default", () => {
+    const subagent = makeSession({
+      id: "child",
+      status: "cold",
+      projectName: "",
+    });
+    const session = makeSession({
+      id: "deadSess",
+      status: "cold",
+      subAgents: [subagent],
+    });
+    // Cold session must live in a cold project to be cold-tree visible
+    const project = makeProject("stale", [session], { hotness: "cold" });
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[]}
+        coldProjects={[project]}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+        expandedIds={new Set(["__cold__", "__expanded-__proj-stale__"])}
+      />,
+    );
+    // Cold project expanded, session visible, but its sub-agents hidden
+    expect(lastFrame() ?? "").not.toContain("»");
+  });
+
+  it("expands sub-agents of a cold session when __expanded-session-{id} is set", () => {
+    const subagent = makeSession({
+      id: "child",
+      status: "cold",
+      projectName: "",
+    });
+    const session = makeSession({
+      id: "deadSess",
+      status: "cold",
+      subAgents: [subagent],
+    });
+    const project = makeProject("stale", [session], { hotness: "cold" });
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[]}
+        coldProjects={[project]}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+        expandedIds={
+          new Set([
+            "__cold__",
+            "__expanded-__proj-stale__",
+            "__expanded-session-deadSess",
+          ])
+        }
+      />,
+    );
+    expect(lastFrame() ?? "").toContain("»");
+  });
 });

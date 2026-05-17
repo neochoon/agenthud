@@ -172,14 +172,29 @@ function appendSessionRows(
   session: SessionNode,
   expandedIds: Set<string>,
 ): void {
-  const isExpanded = expandedIds.has(session.id);
+  const isCold = session.status === "cold";
+
+  // Session-level collapse/expand state
+  const sessionCollapsedKey = `__collapsed-session-${session.id}`;
+  const sessionExpandedKey = `__expanded-session-${session.id}`;
+  const sessionHidden = isCold
+    ? !expandedIds.has(sessionExpandedKey) // cold default: hidden
+    : expandedIds.has(sessionCollapsedKey); // alive default: visible
+
+  if (sessionHidden) return;
+
+  // Sub-agent display: existing summary-row logic.
+  // A cold session that was explicitly expanded also shows all sub-agents inline.
+  const subAgentsFullyExpanded =
+    expandedIds.has(session.id) ||
+    (isCold && expandedIds.has(sessionExpandedKey));
   const hotWarm = session.subAgents.filter(
     (s) => s.status === "hot" || s.status === "warm",
   );
   const cool = session.subAgents.filter((s) => s.status === "cool");
   const cold = session.subAgents.filter((s) => s.status === "cold");
 
-  if (isExpanded) {
+  if (subAgentsFullyExpanded) {
     const all = [...hotWarm, ...cool, ...cold];
     for (let i = 0; i < all.length; i++) {
       const isLast = i === all.length - 1;

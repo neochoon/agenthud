@@ -106,6 +106,23 @@ function resolvePrompt(kind: PromptKind, override?: string): string {
   }
 }
 
+/**
+ * Range cache is only valid when today is NOT in the range. Today's activity
+ * grows throughout the day, so any cached range that includes today is stale
+ * the moment the day continues.
+ */
+export function shouldUseRangeCache(
+  force: boolean,
+  dates: Date[],
+  today: Date,
+  cacheExists: boolean,
+): boolean {
+  if (force) return false;
+  if (!cacheExists) return false;
+  if (dates.some((d) => isSameLocalDay(d, today))) return false;
+  return true;
+}
+
 function enumerateDates(from: Date, to: Date): Date[] {
   const dates: Date[] = [];
   const cursor = new Date(from);
@@ -464,7 +481,14 @@ export async function runRangeSummary(
   const toLabel = dateKey(options.to);
   const rangeCache = rangeCachePath(options.from, options.to);
 
-  if (!options.force && existsSync(rangeCache)) {
+  if (
+    shouldUseRangeCache(
+      options.force,
+      dates,
+      options.today,
+      existsSync(rangeCache),
+    )
+  ) {
     try {
       const content = readFileSync(rangeCache, "utf-8");
       process.stderr.write(

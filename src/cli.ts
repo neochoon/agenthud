@@ -24,6 +24,9 @@ export interface CliOptions {
   reportWithGit?: boolean;
   reportError?: string;
   summaryDate?: Date;
+  summaryFrom?: Date;
+  summaryTo?: Date;
+  summaryAssumeYes?: boolean;
   summaryPrompt?: string;
   summaryForce?: boolean;
   summaryError?: string;
@@ -45,7 +48,16 @@ const KNOWN_REPORT_FLAGS = new Set([
   "--detail-limit",
   "--with-git",
 ]);
-const KNOWN_SUMMARY_FLAGS = new Set(["--date", "--prompt", "--force"]);
+const KNOWN_SUMMARY_FLAGS = new Set([
+  "--date",
+  "--last",
+  "--from",
+  "--to",
+  "--prompt",
+  "--force",
+  "-y",
+  "--yes",
+]);
 const KNOWN_SUBCOMMANDS = new Set(["report", "summary"]);
 
 export function getHelp(): string {
@@ -70,11 +82,17 @@ Commands:
     --detail-limit N            Max chars per activity detail (default: 120, 0 = unlimited)
     --with-git                  Append today's git commits from cwd to report
 
-  summary [--date DATE] [--prompt TEXT] [--force]
-                                Generate LLM summary of daily activity via claude CLI
+  summary [--date DATE | --last Nd | --from DATE --to DATE] [--prompt TEXT] [--force] [-y]
+                                Generate LLM summary via claude CLI.
+                                Single day produces a daily summary;
+                                a date range produces a meta-summary built from daily summaries.
     --date YYYY-MM-DD|today|yesterday|-Nd     Date to summarize (default: today)
-    --prompt TEXT               Override prompt for this run
-    --force                     Regenerate even if cached (past dates)
+    --last Nd                   Date range: last N days, ending today (e.g. --last 7d)
+    --from YYYY-MM-DD           Date range: start date (use with --to)
+    --to YYYY-MM-DD             Date range: end date (use with --from)
+    --prompt TEXT               Override prompt for this run (daily only)
+    --force                     Regenerate even if cached
+    -y, --yes                   Skip confirmation prompts for new daily summaries
 
 Environment:
   CLAUDE_PROJECTS_DIR           Path to Claude projects directory
@@ -219,10 +237,21 @@ export function parseArgs(args: string[]): CliOptions {
 
   if (args[0] === "summary") {
     const rest = args.slice(1);
-    let summaryDate = todayLocalMidnight();
+    let summaryDate: Date | undefined;
+    let summaryFrom: Date | undefined;
+    let summaryTo: Date | undefined;
     let summaryPrompt: string | undefined;
     let summaryForce = false;
+    let summaryAssumeYes = false;
     let summaryError: string | undefined;
+
+    const FLAGS_WITH_VALUE = new Set([
+      "--date",
+      "--last",
+      "--from",
+      "--to",
+      "--prompt",
+    ]);
 
     for (let i = 0; i < rest.length; i++) {
       const arg = rest[i];
@@ -231,7 +260,7 @@ export function parseArgs(args: string[]): CliOptions {
         summaryError = `Unknown option: "${arg}". Run agenthud --help for usage.`;
         break;
       }
-      if (arg === "--date" || arg === "--prompt") i++;
+      if (FLAGS_WITH_VALUE.has(arg)) i++;
     }
 
     const dateIdx = rest.indexOf("--date");
@@ -249,6 +278,73 @@ export function parseArgs(args: string[]): CliOptions {
       }
     }
 
+    const lastIdx = rest.indexOf("--last");
+    if (lastIdx !== -1 && !summaryError) {
+      const val = rest[lastIdx + 1];
+      if (!val) {
+        summaryError = "Invalid --last: missing value (e.g. --last 7d).";
+      } else {
+        const m = val.match(/^(\d+)d$/);
+        if (!m) {
+          summaryError = `Invalid --last: "${val}". Use form like "7d".`;
+        } else {
+          const days = Number(m[1]);
+          if (days < 1) {
+            summaryError = `Invalid --last: "${val}". Must be at least 1 day.`;
+          } else {
+            const today = todayLocalMidnight();
+            const from = new Date(today);
+            from.setDate(today.getDate() - (days - 1));
+            summaryFrom = from;
+            summaryTo = today;
+          }
+        }
+      }
+    }
+
+    const fromIdx = rest.indexOf("--from");
+    const toIdx = rest.indexOf("--to");
+    if ((fromIdx !== -1 || toIdx !== -1) && !summaryError) {
+      if (fromIdx === -1 || toIdx === -1) {
+        summaryError = "--from and --to must be used together.";
+      } else {
+        const fromStr = rest[fromIdx + 1];
+        const toStr = rest[toIdx + 1];
+        const from = fromStr ? parseLocalMidnight(fromStr) : null;
+        const to = toStr ? parseLocalMidnight(toStr) : null;
+        if (!from) {
+          summaryError = `Invalid --from: "${fromStr}".`;
+        } else if (!to) {
+          summaryError = `Invalid --to: "${toStr}".`;
+        } else if (from.getTime() > to.getTime()) {
+          summaryError = `--from (${fromStr}) must be on or before --to (${toStr}).`;
+        } else {
+          summaryFrom = from;
+          summaryTo = to;
+        }
+      }
+    }
+
+    if (!summaryError) {
+      const modesUsed = [
+        summaryDate !== undefined,
+        lastIdx !== -1,
+        fromIdx !== -1 || toIdx !== -1,
+      ].filter(Boolean).length;
+      if (modesUsed > 1) {
+        summaryError =
+          "--date, --last, and --from/--to are mutually exclusive.";
+      }
+    }
+
+    if (
+      !summaryError &&
+      summaryDate === undefined &&
+      summaryFrom === undefined
+    ) {
+      summaryDate = todayLocalMidnight();
+    }
+
     const promptIdx = rest.indexOf("--prompt");
     if (promptIdx !== -1) {
       const val = rest[promptIdx + 1];
@@ -260,12 +356,16 @@ export function parseArgs(args: string[]): CliOptions {
     }
 
     if (rest.includes("--force")) summaryForce = true;
+    if (rest.includes("-y") || rest.includes("--yes")) summaryAssumeYes = true;
 
     return {
       mode: "summary",
       summaryDate,
+      summaryFrom,
+      summaryTo,
       summaryPrompt,
       summaryForce,
+      summaryAssumeYes,
       summaryError,
     };
   }

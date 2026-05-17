@@ -195,6 +195,100 @@ describe("parseArgs", () => {
       const opts = parseArgs(["summary", "--date", "not-a-date"]);
       expect(opts.summaryError).toContain("Invalid date");
     });
+
+    it("parses --last 7d into a 7-day range ending today", () => {
+      const opts = parseArgs(["summary", "--last", "7d"]);
+      expect(opts.summaryError).toBeUndefined();
+      expect(opts.summaryFrom).toBeDefined();
+      expect(opts.summaryTo).toBeDefined();
+      const days =
+        (opts.summaryTo!.getTime() - opts.summaryFrom!.getTime()) /
+          (1000 * 60 * 60 * 24) +
+        1;
+      expect(days).toBe(7);
+      const today = new Date();
+      expect(opts.summaryTo!.getDate()).toBe(today.getDate());
+      // summaryDate should be undefined in range mode
+      expect(opts.summaryDate).toBeUndefined();
+    });
+
+    it("returns error for malformed --last", () => {
+      const opts = parseArgs(["summary", "--last", "7"]);
+      expect(opts.summaryError).toContain("Invalid --last");
+    });
+
+    it("returns error for --last 0d", () => {
+      const opts = parseArgs(["summary", "--last", "0d"]);
+      expect(opts.summaryError).toContain("at least 1");
+    });
+
+    it("parses --from --to into a range", () => {
+      const opts = parseArgs([
+        "summary",
+        "--from",
+        "2026-05-10",
+        "--to",
+        "2026-05-16",
+      ]);
+      expect(opts.summaryError).toBeUndefined();
+      expect(opts.summaryFrom!.getDate()).toBe(10);
+      expect(opts.summaryTo!.getDate()).toBe(16);
+    });
+
+    it("requires both --from and --to", () => {
+      const opts = parseArgs(["summary", "--from", "2026-05-10"]);
+      expect(opts.summaryError).toContain("must be used together");
+    });
+
+    it("rejects --from after --to", () => {
+      const opts = parseArgs([
+        "summary",
+        "--from",
+        "2026-05-20",
+        "--to",
+        "2026-05-10",
+      ]);
+      expect(opts.summaryError).toContain("must be on or before");
+    });
+
+    it("rejects mixing --date with --last", () => {
+      const opts = parseArgs([
+        "summary",
+        "--date",
+        "2026-05-14",
+        "--last",
+        "3d",
+      ]);
+      expect(opts.summaryError).toContain("mutually exclusive");
+    });
+
+    it("rejects mixing --last with --from/--to", () => {
+      const opts = parseArgs([
+        "summary",
+        "--last",
+        "3d",
+        "--from",
+        "2026-05-10",
+        "--to",
+        "2026-05-16",
+      ]);
+      expect(opts.summaryError).toContain("mutually exclusive");
+    });
+
+    it("parses -y as assume-yes", () => {
+      const opts = parseArgs(["summary", "--last", "3d", "-y"]);
+      expect(opts.summaryAssumeYes).toBe(true);
+    });
+
+    it("parses --yes as assume-yes", () => {
+      const opts = parseArgs(["summary", "--last", "3d", "--yes"]);
+      expect(opts.summaryAssumeYes).toBe(true);
+    });
+
+    it("defaults assume-yes to false", () => {
+      const opts = parseArgs(["summary"]);
+      expect(opts.summaryAssumeYes).toBe(false);
+    });
   });
 });
 

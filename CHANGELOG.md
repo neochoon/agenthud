@@ -20,6 +20,7 @@
 
 ### Fixed
 - **CI also runs `tsc --noEmit`** — Catches type errors that tsup transpilation alone would ship (e.g., the `tree.sessions` regression in v0.9.0).
+- **Running from home directory** — `agenthud` launched from `~` no longer offers to delete `~/.agenthud/config.yaml` as a "legacy project config" (or show the related migration banner). The legacy-detection now skips paths that resolve to the global config.
 
 ## [0.9.1] - 2026-05-17
 

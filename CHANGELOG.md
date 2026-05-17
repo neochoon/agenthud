@@ -2,6 +2,36 @@
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-05-17
+
+### New
+- **Project-grouped session tree** — Sessions are now grouped under their project (project name + path at the top). Session rows show short ID + first user prompt instead of redundant project name.
+- **`agenthud summary` command** — Generate LLM summary of daily activity via `claude -p`. Cached at `~/.agenthud/summaries/YYYY-MM-DD.md`. Options: `--date`, `--prompt`, `--force`. Editable prompt template at `~/.agenthud/summary-prompt.md`.
+- **In-app help (`?` key)** — Full-screen help overlay listing all shortcuts, CLI commands, and file locations.
+- **Activity filter (`f` key)** — Cycle through filter presets (configurable in `config.yaml`).
+- **Git commits in viewer + report** — `◆` commit entries appear in the activity timeline. `--with-git` flag for `report`. Press `↵` on a commit to see `git show --stat`.
+- **`agenthud report` formats** — `--format json` for machine-readable output, `--detail-limit N` for truncation control.
+- **`hiddenProjects` config** — Hide entire projects from the tree via `h` key.
+- **Cold projects collapse** — Projects where all sessions are cold collapse into a single `... N cold projects` row at the bottom.
+- **Non-interactive sessions visualized** — Sessions from `claude -p` / SDK shown in parens and dimmed.
+- **`CLAUDE_PROJECTS_DIR` env var** — Override the Claude projects directory.
+
+### Changed
+- **Config / state split** — `~/.agenthud/config.yaml` holds user settings; `~/.agenthud/state.yaml` holds app-managed hidden items. Auto-migrates on first run.
+- **Cold sessions and projects default collapsed** — Inverse expansion: alive items default expanded (Enter collapses), cold items default collapsed (Enter expands).
+- **`agenthud summary` runs from `~/.agenthud/`** — Avoids polluting user's working project with summary session files.
+- **Newlines preserved in detail view** — Multi-line responses/thinking/prompts display with proper line breaks (previously flattened to single line).
+- **Viewer cursor/scroll preserved on refresh** — fs.watch updates no longer reset the viewer position.
+- **g/G keys swapped** — `g` = live (newest, top), `G` = oldest (bottom) — matches vim visual convention.
+- **`getDisplayWidth` cached** — ~17% CPU reduction by memoizing repeated stringWidth calls.
+
+### Fixed
+- **Memory leak** — `NODE_ENV=production` by default to stop React dev-mode profiler accumulating PerformanceMeasure objects (~600KB/s leak → ~50KB/s).
+- **Git access via `--git-dir`** — Only `.git` needs to be accessible (works with mounted backups).
+- **Sub-agent navigation snap** — Arrow keys recover gracefully when sub-agent disappears from flat list.
+- **Time displayed in local timezone** — Report and viewer use local time instead of UTC.
+- **Ctrl+F no longer triggers filter** — `f` key only fires without Ctrl modifier.
+
 ## [0.8.5] - 2026-05-16
 
 ### New

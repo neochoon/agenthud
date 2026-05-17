@@ -213,7 +213,7 @@ describe("runSummary prompt resolution", () => {
 
     expect(vi.mocked(copyFileSync)).toHaveBeenCalledWith(
       expect.stringContaining("summary-prompt.md"),
-      expect.stringContaining(".agenthud/summary-prompt.md"),
+      expect.stringMatching(/\.agenthud[/\\]summary-prompt\.md$/),
     );
   });
 });

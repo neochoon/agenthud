@@ -700,13 +700,26 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
 
   useInput((input, key) => handleInput(input, key), { isActive: isWatchMode });
 
-  const selectedSession = allFlat.find((s) => s.id === selectedId);
+  const rawSelected = allFlat.find((s) => s.id === selectedId);
+  // For project sentinels, resolve to the project's hottest session so the
+  // viewer title matches what's actually being displayed.
+  const isProjectSentinel =
+    !!selectedId &&
+    selectedId.startsWith("__proj-") &&
+    selectedId.endsWith("__");
+  let selectedSession = rawSelected;
+  if (isProjectSentinel && selectedId) {
+    const projectName = selectedId.slice(7, -2);
+    const project =
+      sessionTree.projects.find((p) => p.name === projectName) ??
+      sessionTree.coldProjects.find((p) => p.name === projectName);
+    if (project && project.sessions.length > 0) {
+      selectedSession = project.sessions[0];
+    }
+  }
   const isPlaceholderSelected =
     !selectedSession ||
     selectedId === "__cold__" ||
-    (!!selectedId &&
-      selectedId.startsWith("__proj-") &&
-      selectedId.endsWith("__")) ||
     (!!selectedId &&
       selectedId.startsWith("__sub-") &&
       selectedId.endsWith("__"));

@@ -86,21 +86,15 @@ function SessionRow({
   const model = session.modelName ?? "";
   const isNonInteractive = session.nonInteractive;
 
-  // Name: parent uses projectName or short ID, sub-agent uses agentId or short ID
+  // Name: parent uses short ID (project name is shown on the project header), sub-agent uses agentId or short ID
   const rawName = isParent
-    ? session.projectName || session.id.slice(0, 8)
+    ? isNonInteractive
+      ? `(#${session.id.slice(0, 4)})`
+      : `#${session.id.slice(0, 4)}`
     : (session.agentId ?? session.id.slice(0, 8));
 
-  // Short ID suffix for parent sessions only (to distinguish same-named sessions)
-  const shortIdRaw =
-    isParent && session.projectName ? session.id.slice(0, 4) : "";
-  const shortIdDisplay = isNonInteractive
-    ? shortIdRaw
-      ? `(#${shortIdRaw})`
-      : ""
-    : shortIdRaw
-      ? ` #${shortIdRaw}`
-      : "";
+  // Short ID is now the name itself for parent sessions; no separate suffix needed
+  const shortIdDisplay = "";
 
   const rightParts: string[] = [elapsed];
   if (model) rightParts.push(model);
@@ -113,13 +107,11 @@ function SessionRow({
   // Middle text sits right after badge; reserve 1 space prefix + 1 min gap
   const middleAvailable = contentWidth - leftCoreWidth - 1 - rightWidth - 1;
 
-  // Middle text: project path for parents, task description for sub-agents
+  // Middle text: first user prompt for parents, task description for sub-agents
   let middleText = "";
   if (middleAvailable > 3) {
     const raw = isParent
-      ? session.projectPath
-        ? formatProjectPath(session.projectPath)
-        : ""
+      ? (session.firstUserPrompt ?? "")
       : (session.taskDescription ?? "");
     if (raw) {
       const truncated = truncatePath(raw, middleAvailable);
@@ -269,18 +261,28 @@ function ProjectRow({
   hasFocus: boolean;
   contentWidth: number;
 }): React.ReactElement {
-  const text = `> ${project.name}`;
-  const padding = Math.max(0, contentWidth - getDisplayWidth(text));
+  const nameText = `> ${project.name}`;
+  const pathText = project.projectPath
+    ? formatProjectPath(project.projectPath)
+    : "";
+  const nameWidth = getDisplayWidth(nameText);
+  const pathWidth = pathText ? getDisplayWidth(pathText) : 0;
+  // 2 spaces between name and path
+  const gapWidth = pathText ? 2 : 0;
+  const totalWidth = nameWidth + gapWidth + pathWidth;
+  const padding = Math.max(0, contentWidth - totalWidth);
   const highlight = isSelected && hasFocus;
   return (
     <Text>
       {BOX.v}{" "}
-      <Text
-        backgroundColor={highlight ? "blue" : undefined}
-        bold={!highlight}
-        dimColor={false}
-      >
-        {text}
+      <Text backgroundColor={highlight ? "blue" : undefined} bold={!highlight}>
+        {nameText}
+        {pathText ? (
+          <>
+            {"  "}
+            <Text dimColor>{pathText}</Text>
+          </>
+        ) : null}
         {" ".repeat(padding)}
       </Text>
       {BOX.v}

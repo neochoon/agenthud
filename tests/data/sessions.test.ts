@@ -566,6 +566,103 @@ describe("discoverSessions", () => {
     expect(tree.coldProjects).toHaveLength(0);
   });
 
+  it("extracts first natural-language user message as firstUserPrompt", () => {
+    const projectsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".claude",
+      "projects",
+    );
+    const projectDir = join(projectsDir, "-Users-neo-fp");
+    const sessionFile = join(projectDir, "fp1.jsonl");
+
+    vi.mocked(existsSync).mockImplementation((p) => {
+      const path = String(p);
+      return (
+        path === projectsDir || path === projectDir || path === sessionFile
+      );
+    });
+    vi.mocked(readdirSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === projectsDir)
+        return ["-Users-neo-fp"] as unknown as ReturnType<typeof readdirSync>;
+      if (path === projectDir)
+        return ["fp1.jsonl"] as unknown as ReturnType<typeof readdirSync>;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(statSync).mockImplementation(
+      (p) =>
+        ({
+          isDirectory: () => !String(p).endsWith(".jsonl"),
+          mtimeMs: NOW - 10_000,
+          size: 100,
+        }) as ReturnType<typeof statSync>,
+    );
+
+    // First user entry is a system reminder (should be skipped); second is the real prompt
+    const lines = [
+      JSON.stringify({
+        type: "user",
+        message: {
+          content: "<system-reminder>some reminder</system-reminder>",
+        },
+      }),
+      JSON.stringify({
+        type: "assistant",
+        message: { model: "claude-sonnet-4-6", content: [] },
+      }),
+      JSON.stringify({
+        type: "user",
+        message: { content: "Fix the auth bug in login flow" },
+      }),
+    ].join("\n");
+    vi.mocked(readFileSync).mockReturnValue(lines);
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const tree = discoverSessions(mockConfig);
+    expect(tree.projects[0].sessions[0].firstUserPrompt).toBe(
+      "Fix the auth bug in login flow",
+    );
+  });
+
+  it("returns null firstUserPrompt for sessions with no real user message", () => {
+    const projectsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".claude",
+      "projects",
+    );
+    const projectDir = join(projectsDir, "-Users-neo-empty");
+
+    vi.mocked(existsSync).mockImplementation((p) => {
+      const path = String(p);
+      return path === projectsDir || path.includes("-neo-empty");
+    });
+    vi.mocked(readdirSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === projectsDir)
+        return ["-Users-neo-empty"] as unknown as ReturnType<
+          typeof readdirSync
+        >;
+      if (path === projectDir)
+        return ["e1.jsonl"] as unknown as ReturnType<typeof readdirSync>;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(statSync).mockImplementation(
+      (p) =>
+        ({
+          isDirectory: () => !String(p).endsWith(".jsonl"),
+          mtimeMs: NOW - 10_000,
+          size: 100,
+        }) as ReturnType<typeof statSync>,
+    );
+    vi.mocked(readFileSync).mockReturnValue(
+      `${JSON.stringify({ type: "user", message: { content: "<system-reminder>only system</system-reminder>" } })}\n`,
+    );
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const tree = discoverSessions(mockConfig);
+    expect(tree.projects[0].sessions[0].firstUserPrompt).toBeNull();
+  });
+
   it("sorts sessions within a project: interactive before non-interactive", () => {
     const projectsDir = join(
       process.env.HOME ?? "/home/user",

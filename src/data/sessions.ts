@@ -100,6 +100,73 @@ function readModelName(filePath: string): string | null {
   return null;
 }
 
+const SYSTEM_PREFIXES = [
+  "<command-name>",
+  "<command-message>",
+  "<command-args>",
+  "<local-command-stdout>",
+  "<local-command-caveat>",
+  "<system-reminder>",
+  "<bash-input>",
+  "<bash-stdout>",
+  "<bash-stderr>",
+  "<user-prompt-submit-hook>",
+];
+
+function isSystemNoise(text: string): boolean {
+  const trimmed = text.trimStart();
+  return SYSTEM_PREFIXES.some((p) => trimmed.startsWith(p));
+}
+
+function readFirstUserPrompt(filePath: string): string | null {
+  if (!existsSync(filePath)) return null;
+  let content: string;
+  try {
+    content = readFileSync(filePath, "utf-8");
+  } catch {
+    return null;
+  }
+
+  for (const line of content.split("\n")) {
+    if (!line.trim()) continue;
+    let entry: {
+      type?: string;
+      message?: { content?: unknown };
+      toolUseResult?: unknown;
+    };
+    try {
+      entry = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (entry.type !== "user") continue;
+    if (entry.toolUseResult !== undefined) continue; // tool result, not real user input
+
+    const raw = entry.message?.content;
+    let text: string;
+    if (typeof raw === "string") {
+      text = raw;
+    } else if (Array.isArray(raw)) {
+      // content can be an array of blocks; find first text block
+      const textBlock = raw.find(
+        (b: { type?: string; text?: string }) =>
+          b && b.type === "text" && typeof b.text === "string",
+      ) as { text?: string } | undefined;
+      text = textBlock?.text ?? "";
+    } else {
+      continue;
+    }
+
+    if (!text || isSystemNoise(text)) continue;
+
+    const firstLine = text.split("\n").find((l) => l.trim()) ?? "";
+    if (!firstLine || isSystemNoise(firstLine)) continue;
+    const trimmed = firstLine.trim();
+    return trimmed.length > 80 ? trimmed.slice(0, 80) : trimmed;
+  }
+  return null;
+}
+
 function readEntrypoint(filePath: string): string | null {
   if (!existsSync(filePath)) return null;
   try {
@@ -151,6 +218,7 @@ function buildSubAgents(
           agentId: agentId ?? undefined,
           taskDescription: taskDescription ?? undefined,
           nonInteractive: false,
+          firstUserPrompt: null,
         };
       } catch {
         return null;
@@ -227,6 +295,7 @@ export function discoverSessions(config: GlobalConfig): SessionTree {
           modelName: readModelName(filePath),
           subAgents,
           nonInteractive: readEntrypoint(filePath) === "sdk-cli",
+          firstUserPrompt: readFirstUserPrompt(filePath),
         });
       } catch {}
     }

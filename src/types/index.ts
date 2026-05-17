@@ -15,22 +15,23 @@ export interface SessionNode {
   agentId?: string; // short agent ID from JSONL (sub-agents only)
   taskDescription?: string; // extracted task summary from first message (sub-agents only)
   nonInteractive: boolean; // true when entrypoint === "sdk-cli"
+  firstUserPrompt: string | null; // First natural-language user message (system messages skipped)
 }
 
 // Project node grouping sessions
 export interface ProjectNode {
-  name: string;          // basename of projectPath
-  projectPath: string;   // decoded full path
+  name: string; // basename of projectPath
+  projectPath: string; // decoded full path
   sessions: SessionNode[]; // sorted: interactive→non-interactive, then status→mtime
-  hotness: SessionStatus;  // hottest session's status
+  hotness: SessionStatus; // hottest session's status
 }
 
 // Full session tree returned by discoverSessions()
 export interface SessionTree {
-  projects: ProjectNode[];      // active projects (hotness !== "cold")
-  coldProjects: ProjectNode[];  // projects where all sessions are cold
-  totalCount: number;           // total sessions across both arrays + sub-agents
-  timestamp: string;            // ISO timestamp of discovery
+  projects: ProjectNode[]; // active projects (hotness !== "cold")
+  coldProjects: ProjectNode[]; // projects where all sessions are cold
+  totalCount: number; // total sessions across both arrays + sub-agents
+  timestamp: string; // ISO timestamp of discovery
 }
 
 // Global config (~/.agenthud/config.yaml)

@@ -14,6 +14,7 @@ const makeSession = (overrides: Partial<SessionNode> = {}): SessionNode => ({
   modelName: "sonnet-4.6",
   subAgents: [],
   nonInteractive: false,
+  firstUserPrompt: null,
   ...overrides,
 });
 
@@ -175,19 +176,24 @@ describe("SessionTreePanel", () => {
     expect(lastFrame()).toContain("#abc1");
   });
 
-  it("shows project path for parent sessions", () => {
+  it("shows project path on the project header row (not the session row)", () => {
     const session = makeSession({ projectPath: "/test/path/myproject" });
-    const project = makeProject("myproject", [session]);
+    const project = makeProject("myproject", [session], {
+      projectPath: "/test/path/myproject",
+    });
     const { lastFrame } = render(
       <SessionTreePanel
         projects={[project]}
         coldProjects={[]}
         selectedId={null}
         hasFocus={false}
-        width={80}
+        width={120}
       />,
     );
-    expect(lastFrame()).toContain("/test/path/myproject");
+    const out = lastFrame() ?? "";
+    // Path appears on the project header
+    expect(out).toContain("> myproject");
+    expect(out).toContain("/test/path/myproject");
   });
 
   it("does not show short ID for sub-agents", () => {
@@ -459,6 +465,69 @@ describe("SessionTreePanel", () => {
       />,
     );
     expect(lastFrame()).toContain("No Claude sessions");
+  });
+
+  it("shows project path on project header row", async () => {
+    const { homedir } = await import("node:os");
+    const home = homedir();
+    const projectPath = `${home}/myproject`;
+    const session = makeSession({ projectPath });
+    const project = makeProject("myproject", [session], { projectPath });
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[project]}
+        coldProjects={[]}
+        selectedId={null}
+        hasFocus={false}
+        width={120}
+      />,
+    );
+    const out = lastFrame() ?? "";
+    expect(out).toContain("> myproject");
+    expect(out).toContain("~/myproject"); // formatProjectPath replaces home with ~
+  });
+
+  it("shows first user prompt as session row middle text", () => {
+    const session = makeSession({
+      id: "abc1234",
+      firstUserPrompt: "Implement the login flow",
+    });
+    const project = makeProject("myproject", [session]);
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[project]}
+        coldProjects={[]}
+        selectedId={null}
+        hasFocus={false}
+        width={120}
+      />,
+    );
+    expect(lastFrame() ?? "").toContain("Implement the login flow");
+  });
+
+  it("does not show project name on session row (it is on the project header)", () => {
+    const session = makeSession({ id: "abc1234", projectName: "uniqueproj" });
+    const project = makeProject("uniqueproj", [session], {
+      projectPath: "/no-home-match/uniqueproj",
+    });
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[project]}
+        coldProjects={[]}
+        selectedId={null}
+        hasFocus={false}
+        width={120}
+      />,
+    );
+    const out = lastFrame() ?? "";
+    const lines = out.split("\n");
+    // The project header line should contain "> uniqueproj"
+    const headerLine = lines.find((l) => l.includes("> uniqueproj")) ?? "";
+    expect(headerLine).toBeTruthy();
+    // The session row should contain #abc1 but NOT "uniqueproj"
+    const sessionLine = lines.find((l) => l.includes("#abc1")) ?? "";
+    expect(sessionLine).toBeTruthy();
+    expect(sessionLine).not.toContain("uniqueproj");
   });
 
   it("renders cold-projects-summary row when cold projects exist", () => {

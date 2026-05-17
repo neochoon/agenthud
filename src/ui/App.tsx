@@ -194,6 +194,8 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   const [detailScrollOffset, setDetailScrollOffset] = useState(0);
   const [filterIndex, setFilterIndex] = useState(0);
   const [helpMode, setHelpMode] = useState(false);
+  const [helpScroll, setHelpScroll] = useState(0);
+  const helpTotalLinesRef = useRef(0);
 
   const allFlat = useMemo(
     () => flattenSessions(sessionTree, expandedIds),
@@ -409,11 +411,22 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   const viewerRows = Math.max(5, height - 7 - treeRows);
 
   const spinner = useSpinner(isWatchMode);
+  const helpViewportRows = Math.max(1, height - 3); // status bar + indicator
+  const helpScrollStep = (delta: number) => {
+    const max = Math.max(0, helpTotalLinesRef.current - helpViewportRows);
+    setHelpScroll((s) => Math.max(0, Math.min(max, s + delta)));
+  };
+
   const { handleInput, statusBarItems } = useHotkeys({
     focus,
     detailMode,
     helpMode,
-    onHelp: () => setHelpMode((m) => !m),
+    onHelp: () => {
+      setHelpScroll(0);
+      setHelpMode((m) => !m);
+    },
+    onHelpScroll: helpScrollStep,
+    onHelpScrollToTop: () => setHelpScroll(0),
     onSwitchFocus: () => setFocus((f) => (f === "tree" ? "viewer" : "tree")),
     onScrollUp: () => {
       if (focus === "tree") {
@@ -758,7 +771,14 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
       )}
 
       {helpMode ? (
-        <HelpPanel width={width} height={height - 2} />
+        <HelpPanel
+          width={width}
+          height={height - 2}
+          scrollOffset={helpScroll}
+          onTotalLinesChange={(n) => {
+            helpTotalLinesRef.current = n;
+          }}
+        />
       ) : (
         <>
           {migrationWarning && (

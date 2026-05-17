@@ -352,11 +352,15 @@ describe("useHotkeys", () => {
       ]);
     });
 
-    it("returns minimal status bar when helpMode is true", () => {
+    it("returns scroll + close hints when helpMode is true", () => {
       const { result } = renderHook(() =>
         useHotkeys(makeOptions({ helpMode: true })),
       );
-      expect(result.current.statusBarItems).toEqual(["↵/Esc/q/?: close"]);
+      expect(result.current.statusBarItems).toEqual([
+        "↑↓/jk: scroll",
+        "PgDn/Space: page",
+        "↵/Esc/q/?: close",
+      ]);
     });
   });
 
@@ -415,6 +419,61 @@ describe("useHotkeys", () => {
       act(() => result.current.handleInput("", { ...noopKey, upArrow: true }));
       expect(onScrollUp).not.toHaveBeenCalled();
       expect(onHelp).not.toHaveBeenCalled();
+    });
+
+    it("scrolls help down on j / downArrow when onHelpScroll provided", () => {
+      const onHelpScroll = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ helpMode: true, onHelpScroll })),
+      );
+      act(() => result.current.handleInput("j", noopKey));
+      expect(onHelpScroll).toHaveBeenCalledWith(1);
+      act(() =>
+        result.current.handleInput("", { ...noopKey, downArrow: true }),
+      );
+      expect(onHelpScroll).toHaveBeenCalledTimes(2);
+    });
+
+    it("scrolls help up on k / upArrow when onHelpScroll provided", () => {
+      const onHelpScroll = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ helpMode: true, onHelpScroll })),
+      );
+      act(() => result.current.handleInput("k", noopKey));
+      expect(onHelpScroll).toHaveBeenCalledWith(-1);
+    });
+
+    it("pages help on PgDn/Space and Ctrl+F", () => {
+      const onHelpScroll = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ helpMode: true, onHelpScroll })),
+      );
+      act(() =>
+        result.current.handleInput("", { ...noopKey, pageDown: true }),
+      );
+      expect(onHelpScroll).toHaveBeenLastCalledWith(10);
+      act(() => result.current.handleInput(" ", noopKey));
+      expect(onHelpScroll).toHaveBeenLastCalledWith(1);
+      act(() => result.current.handleInput("f", { ...noopKey, ctrl: true }));
+      expect(onHelpScroll).toHaveBeenLastCalledWith(10);
+    });
+
+    it("jumps help to top on g, bottom on G", () => {
+      const onHelpScroll = vi.fn();
+      const onHelpScrollToTop = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(
+          makeOptions({
+            helpMode: true,
+            onHelpScroll,
+            onHelpScrollToTop,
+          }),
+        ),
+      );
+      act(() => result.current.handleInput("g", noopKey));
+      expect(onHelpScrollToTop).toHaveBeenCalledTimes(1);
+      act(() => result.current.handleInput("G", noopKey));
+      expect(onHelpScroll).toHaveBeenLastCalledWith(Number.MAX_SAFE_INTEGER);
     });
 
     it("opens help even from detail mode (? in detailMode)", () => {

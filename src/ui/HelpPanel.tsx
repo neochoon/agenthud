@@ -81,11 +81,15 @@ const SECTIONS: HelpSection[] = [
 export interface HelpPanelProps {
   width: number;
   height: number; // total available height
+  scrollOffset?: number; // line offset into the rendered help (default 0)
+  onTotalLinesChange?: (total: number) => void;
 }
 
 export function HelpPanel({
   width,
   height,
+  scrollOffset = 0,
+  onTotalLinesChange,
 }: HelpPanelProps): React.ReactElement {
   // Compute key column width (cap at 30)
   const allKeys = SECTIONS.flatMap((s) => s.rows.map((r) => r[0]));
@@ -135,12 +139,31 @@ export function HelpPanel({
     }
   }
 
-  // Truncate if too tall
-  const visible = lines.slice(0, height);
+  // Reserve one line at the bottom for the scroll indicator when content
+  // overflows. Always render the indicator slot (blank if not needed) so
+  // layout doesn't shift as the user scrolls.
+  const indicatorReserved = lines.length > height ? 1 : 0;
+  const viewport = Math.max(1, height - indicatorReserved);
+
+  const maxOffset = Math.max(0, lines.length - viewport);
+  const offset = Math.max(0, Math.min(scrollOffset, maxOffset));
+
+  // Surface total line count so the caller can clamp its scroll offset.
+  if (onTotalLinesChange) onTotalLinesChange(lines.length);
+
+  const visible = lines.slice(offset, offset + viewport);
 
   return (
     <Box flexDirection="column" width={width}>
       {visible}
+      {indicatorReserved > 0 && (
+        <Text dimColor>
+          {`-- ${offset + viewport} / ${lines.length} `}
+          {offset < maxOffset
+            ? "(↓ / j / PgDn / Space for more) --"
+            : "(top: g · ↑ / k to scroll back) --"}
+        </Text>
+      )}
     </Box>
   );
 }

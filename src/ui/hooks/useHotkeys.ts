@@ -20,6 +20,8 @@ interface UseHotkeysOptions {
   onDetailScrollDown: () => void;
   onFilter: () => void;
   onHelp: () => void;
+  onHelpScroll?: (delta: number) => void;
+  onHelpScrollToTop?: () => void;
   filterLabel: string; // e.g. "all", "response", "commit"
 }
 
@@ -62,6 +64,8 @@ export function useHotkeys({
   onDetailScrollDown,
   onFilter,
   onHelp,
+  onHelpScroll,
+  onHelpScrollToTop,
   filterLabel,
 }: UseHotkeysOptions): UseHotkeysResult {
   const handleInput = (
@@ -80,6 +84,32 @@ export function useHotkeys({
     if (helpMode) {
       if (key.return || key.escape || input === "q" || input === "?") {
         onHelp(); // toggle = close
+        return;
+      }
+      if (onHelpScroll) {
+        if (key.downArrow || input === "j" || input === " ") {
+          onHelpScroll(1);
+          return;
+        }
+        if (key.upArrow || input === "k") {
+          onHelpScroll(-1);
+          return;
+        }
+        if (key.pageDown || (key.ctrl && input === "f")) {
+          onHelpScroll(10);
+          return;
+        }
+        if (key.pageUp || (key.ctrl && input === "b")) {
+          onHelpScroll(-10);
+          return;
+        }
+        if (input === "G") {
+          onHelpScroll(Number.MAX_SAFE_INTEGER);
+          return;
+        }
+      }
+      if (input === "g" && onHelpScrollToTop) {
+        onHelpScrollToTop();
         return;
       }
       return; // swallow everything else
@@ -191,7 +221,7 @@ export function useHotkeys({
   };
 
   const statusBarItems = helpMode
-    ? ["↵/Esc/q/?: close"]
+    ? ["↑↓/jk: scroll", "PgDn/Space: page", "↵/Esc/q/?: close"]
     : detailMode
       ? ["↑↓/jk: scroll", "↵/Esc: close", "?: help"]
       : focus === "tree"

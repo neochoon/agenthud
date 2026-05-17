@@ -6,11 +6,7 @@ on:
       - 'v*'
 
 jobs:
-  test:
-    uses: ./.github/workflows/test.yml
-
   publish:
-    needs: test
     runs-on: ubuntu-latest
 
     permissions:
@@ -19,6 +15,40 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      # The tag is expected to point at a commit on main that already passed CI.
+      # Poll the API for that commit's CI run instead of re-running tests here.
+      - name: Wait for CI on this commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          echo "Waiting for CI workflow on commit $SHA..."
+          for i in $(seq 1 60); do
+            json=$(gh api "repos/$REPO/actions/runs?head_sha=$SHA" --jq \
+              '[.workflow_runs[] | select(.name=="CI")] | sort_by(.run_started_at) | last')
+            if [ -z "$json" ] || [ "$json" = "null" ]; then
+              echo "[$i/60] No CI run found yet for $SHA"
+            else
+              status=$(echo "$json" | jq -r '.status')
+              conclusion=$(echo "$json" | jq -r '.conclusion')
+              url=$(echo "$json" | jq -r '.html_url')
+              echo "[$i/60] CI status=$status conclusion=$conclusion"
+              if [ "$status" = "completed" ]; then
+                if [ "$conclusion" = "success" ]; then
+                  echo "CI passed: $url"
+                  exit 0
+                else
+                  echo "CI did not pass ($conclusion). See $url"
+                  exit 1
+                fi
+              fi
+            fi
+            sleep 30
+          done
+          echo "Timed out waiting for CI."
+          exit 1
 
       - name: Use Node.js 24
         uses: actions/setup-node@v4

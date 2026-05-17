@@ -760,6 +760,23 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
         ? selectedSession.projectName || selectedSession.id.slice(0, 8)
         : (selectedSession.agentId ?? selectedSession.id.slice(0, 8));
 
+  const MIN_WIDTH = 80;
+  const MIN_HEIGHT = 20;
+  if (isWatchMode && (width < MIN_WIDTH || height + 1 < MIN_HEIGHT)) {
+    return (
+      <Box flexDirection="column" width={width}>
+        <Text bold>AgentHUD needs a larger terminal.</Text>
+        <Text dimColor>{`Minimum: ${MIN_WIDTH} cols × ${MIN_HEIGHT} rows`}</Text>
+        <Text dimColor>{`Current: ${width} cols × ${height + 1} rows`}</Text>
+        <Text> </Text>
+        <Text dimColor>
+          Resize the window and AgentHUD will redraw automatically.
+        </Text>
+        <Text dimColor>Press q to quit.</Text>
+      </Box>
+    );
+  }
+
   return (
     <Box flexDirection="column">
       {isWatchMode &&

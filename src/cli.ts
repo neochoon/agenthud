@@ -80,7 +80,7 @@ Commands:
                                 Default: response,bash,edit,thinking
     --format FORMAT             Output format: markdown (default) or json
     --detail-limit N            Max chars per activity detail (default: 120, 0 = unlimited)
-    --with-git                  Append today's git commits from cwd to report
+    --with-git                  Merge git commits from each session's project into the timeline
 
   summary [--date DATE | --last Nd | --from DATE --to DATE] [--prompt TEXT] [--force] [-y]
                                 Generate LLM summary via claude CLI.

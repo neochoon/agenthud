@@ -1,7 +1,11 @@
 import { homedir } from "node:os";
 import { Box, Text } from "ink";
 import type React from "react";
-import type { SessionNode, SessionStatus } from "../types/index.js";
+import type {
+  ProjectNode,
+  SessionNode,
+  SessionStatus,
+} from "../types/index.js";
 import {
   BOX,
   createBottomLine,
@@ -11,8 +15,9 @@ import {
   getInnerWidth,
 } from "./constants.js";
 
-interface SessionTreePanelProps {
-  sessions: SessionNode[];
+export interface SessionTreePanelProps {
+  projects: ProjectNode[];
+  coldProjects: ProjectNode[];
   selectedId: string | null;
   hasFocus: boolean;
   width?: number;
@@ -74,27 +79,35 @@ function SessionRow({
   prefix,
   contentWidth,
 }: SessionRowProps): React.ReactElement {
-  const isParent = prefix === "";
+  const isParent = prefix === "    ";
   const statusColor = getStatusColor(session.status);
   const badge = `[${session.status}]`;
   const elapsed = formatElapsed(session.lastModifiedMs);
   const model = session.modelName ?? "";
+  const isNonInteractive = session.nonInteractive;
 
-  // Name: parent uses projectName, sub-agent uses agentId
-  const name = isParent
+  // Name: parent uses projectName or short ID, sub-agent uses agentId or short ID
+  const rawName = isParent
     ? session.projectName || session.id.slice(0, 8)
     : (session.agentId ?? session.id.slice(0, 8));
 
   // Short ID suffix for parent sessions only (to distinguish same-named sessions)
-  const shortId =
-    isParent && session.projectName ? ` #${session.id.slice(0, 4)}` : "";
+  const shortIdRaw =
+    isParent && session.projectName ? session.id.slice(0, 4) : "";
+  const shortIdDisplay = isNonInteractive
+    ? shortIdRaw
+      ? `(#${shortIdRaw})`
+      : ""
+    : shortIdRaw
+      ? ` #${shortIdRaw}`
+      : "";
 
   const rightParts: string[] = [elapsed];
   if (model) rightParts.push(model);
   const rightSide = rightParts.join(" ");
 
-  const leftCore = `${prefix}${name}${shortId} ${badge}`;
-  const leftCoreWidth = getDisplayWidth(leftCore);
+  const leftCoreBase = `${prefix}${rawName}${shortIdDisplay} ${badge}`;
+  const leftCoreWidth = getDisplayWidth(leftCoreBase);
   const rightWidth = getDisplayWidth(rightSide);
 
   // Middle text sits right after badge; reserve 1 space prefix + 1 min gap
@@ -121,18 +134,23 @@ function SessionRow({
   );
   const gap = " ".repeat(gapWidth);
 
-  const fullLine = leftCore + middleSection + gap + rightSide;
+  const fullLine = leftCoreBase + middleSection + gap + rightSide;
   const linePadding = Math.max(0, contentWidth - getDisplayWidth(fullLine));
 
   const highlight = isSelected && hasFocus;
+  const shouldDim = isNonInteractive;
 
   return (
     <Text>
       {BOX.v}{" "}
-      <Text backgroundColor={highlight ? "blue" : undefined} bold={highlight}>
-        <Text>{prefix}</Text>
-        <Text bold>{name}</Text>
-        {shortId ? <Text dimColor>{shortId}</Text> : null}
+      <Text
+        backgroundColor={highlight ? "blue" : undefined}
+        bold={highlight}
+        dimColor={shouldDim && !highlight}
+      >
+        <Text dimColor={shouldDim && !highlight}>{prefix}</Text>
+        <Text bold={!shouldDim}>{rawName}</Text>
+        {shortIdDisplay ? <Text dimColor>{shortIdDisplay}</Text> : null}
         <Text> </Text>
         <Text color={statusColor}>{badge}</Text>
         {middleText ? <Text dimColor>{middleSection}</Text> : null}
@@ -147,6 +165,7 @@ function SessionRow({
 }
 
 type FlatRow =
+  | { kind: "project"; project: ProjectNode; sentinelId: string }
   | { kind: "session"; session: SessionNode; prefix: string }
   | {
       kind: "subagent-summary";
@@ -154,7 +173,7 @@ type FlatRow =
       coolCount: number;
       coldCount: number;
     }
-  | { kind: "cold-sessions-summary"; count: number };
+  | { kind: "cold-projects-summary"; count: number };
 
 function appendSessionRows(
   result: FlatRow[],
@@ -175,7 +194,7 @@ function appendSessionRows(
       result.push({
         kind: "session",
         session: all[i],
-        prefix: `${isLast ? "└─ " : "├─ "}» `,
+        prefix: `        ${isLast ? "└─ " : "├─ "}» `,
       });
     }
   } else {
@@ -185,7 +204,7 @@ function appendSessionRows(
       result.push({
         kind: "session",
         session: hotWarm[i],
-        prefix: `${isLast ? "└─ " : "├─ "}» `,
+        prefix: `        ${isLast ? "└─ " : "├─ "}» `,
       });
     }
     if (hasSummary) {
@@ -200,31 +219,73 @@ function appendSessionRows(
 }
 
 function flattenSessions(
-  sessions: SessionNode[],
+  projects: ProjectNode[],
+  coldProjects: ProjectNode[],
   expandedIds: Set<string>,
 ): FlatRow[] {
   const result: FlatRow[] = [];
 
-  const visibleSessions = sessions.filter((s) => s.status !== "cold");
-  const coldSessions = sessions.filter((s) => s.status === "cold");
-
-  for (const session of visibleSessions) {
-    result.push({ kind: "session", session, prefix: "" });
-    appendSessionRows(result, session, expandedIds);
-  }
-
-  if (coldSessions.length > 0) {
-    result.push({ kind: "cold-sessions-summary", count: coldSessions.length });
-
-    if (expandedIds.has("__cold__")) {
-      for (const session of coldSessions) {
-        result.push({ kind: "session", session, prefix: "" });
+  for (const project of projects) {
+    const sentinelId = `__proj-${project.name}__`;
+    result.push({ kind: "project", project, sentinelId });
+    // Projects default EXPANDED. Collapse only when explicitly collapsed.
+    const collapsed = expandedIds.has(`__collapsed-${sentinelId}`);
+    if (!collapsed) {
+      for (const session of project.sessions) {
+        result.push({ kind: "session", session, prefix: "    " });
         appendSessionRows(result, session, expandedIds);
       }
     }
   }
 
+  if (coldProjects.length > 0) {
+    result.push({ kind: "cold-projects-summary", count: coldProjects.length });
+    if (expandedIds.has("__cold__")) {
+      for (const project of coldProjects) {
+        const sentinelId = `__proj-${project.name}__`;
+        result.push({ kind: "project", project, sentinelId });
+        const collapsed = expandedIds.has(`__collapsed-${sentinelId}`);
+        if (!collapsed) {
+          for (const session of project.sessions) {
+            result.push({ kind: "session", session, prefix: "    " });
+            appendSessionRows(result, session, expandedIds);
+          }
+        }
+      }
+    }
+  }
+
   return result;
+}
+
+function ProjectRow({
+  project,
+  isSelected,
+  hasFocus,
+  contentWidth,
+}: {
+  project: ProjectNode;
+  isSelected: boolean;
+  hasFocus: boolean;
+  contentWidth: number;
+}): React.ReactElement {
+  const text = `> ${project.name}`;
+  const padding = Math.max(0, contentWidth - getDisplayWidth(text));
+  const highlight = isSelected && hasFocus;
+  return (
+    <Text>
+      {BOX.v}{" "}
+      <Text
+        backgroundColor={highlight ? "blue" : undefined}
+        bold={!highlight}
+        dimColor={false}
+      >
+        {text}
+        {" ".repeat(padding)}
+      </Text>
+      {BOX.v}
+    </Text>
+  );
 }
 
 function SubagentSummaryRow({
@@ -244,7 +305,7 @@ function SubagentSummaryRow({
   if (coolCount > 0) parts.push(`${coolCount} cool`);
   if (coldCount > 0) parts.push(`${coldCount} cold`);
   const hint = " +";
-  const text = `└─ ... ${parts.join("  ")}`;
+  const text = `        └─ ... ${parts.join("  ")}`;
   const padding = Math.max(
     0,
     contentWidth - getDisplayWidth(text) - getDisplayWidth(hint),
@@ -263,7 +324,7 @@ function SubagentSummaryRow({
   );
 }
 
-function ColdSessionsSummaryRow({
+function ColdProjectsSummaryRow({
   count,
   isSelected,
   hasFocus,
@@ -295,7 +356,8 @@ function ColdSessionsSummaryRow({
 }
 
 export function SessionTreePanel({
-  sessions,
+  projects,
+  coldProjects,
   selectedId,
   hasFocus,
   width = DEFAULT_PANEL_WIDTH,
@@ -308,7 +370,9 @@ export function SessionTreePanel({
   const titleLine = createTitleLine("Sessions", "", width);
   const bottomLine = createBottomLine(width);
 
-  if (sessions.length === 0) {
+  const totalProjectCount = projects.length + coldProjects.length;
+
+  if (totalProjectCount === 0) {
     const emptyText = "No Claude sessions";
     const emptyPadding = Math.max(0, contentWidth - emptyText.length);
     return (
@@ -324,15 +388,16 @@ export function SessionTreePanel({
     );
   }
 
-  const flatRows = flattenSessions(sessions, expandedIds);
+  const flatRows = flattenSessions(projects, coldProjects, expandedIds);
   const totalRows = flatRows.length;
 
   // Find the index of the currently selected row
   const selectedFlatIndex = flatRows.findIndex((row) => {
+    if (row.kind === "project") return selectedId === row.sentinelId;
     if (row.kind === "session") return row.session.id === selectedId;
     if (row.kind === "subagent-summary")
       return selectedId === `__sub-${row.parentId}__`;
-    if (row.kind === "cold-sessions-summary") return selectedId === "__cold__";
+    if (row.kind === "cold-projects-summary") return selectedId === "__cold__";
     return false;
   });
 
@@ -352,7 +417,15 @@ export function SessionTreePanel({
     <Box flexDirection="column" width={width}>
       <Text>{titleLine}</Text>
       {displayRows.map((row, idx) =>
-        row.kind === "session" ? (
+        row.kind === "project" ? (
+          <ProjectRow
+            key={`project-${row.project.name}-${idx}`}
+            project={row.project}
+            isSelected={selectedId === row.sentinelId}
+            hasFocus={hasFocus}
+            contentWidth={contentWidth}
+          />
+        ) : row.kind === "session" ? (
           <SessionRow
             key={`${row.session.id}-${idx}`}
             session={row.session}
@@ -371,7 +444,7 @@ export function SessionTreePanel({
             hasFocus={hasFocus}
           />
         ) : (
-          <ColdSessionsSummaryRow
+          <ColdProjectsSummaryRow
             key="cold-summary"
             count={row.count}
             isSelected={selectedId === "__cold__"}

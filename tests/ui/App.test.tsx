@@ -16,7 +16,8 @@ vi.mock("../../src/config/globalConfig.js", () => ({
 
 vi.mock("../../src/data/sessions.js", () => ({
   discoverSessions: () => ({
-    sessions: [],
+    projects: [],
+    coldProjects: [],
     totalCount: 0,
     timestamp: new Date().toISOString(),
   }),

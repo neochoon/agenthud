@@ -1,6 +1,6 @@
 import { render } from "ink-testing-library";
 import { describe, expect, it } from "vitest";
-import type { SessionNode } from "../../src/types/index.js";
+import type { ProjectNode, SessionNode } from "../../src/types/index.js";
 import { SessionTreePanel } from "../../src/ui/SessionTreePanel.js";
 
 const makeSession = (overrides: Partial<SessionNode> = {}): SessionNode => ({
@@ -13,14 +13,30 @@ const makeSession = (overrides: Partial<SessionNode> = {}): SessionNode => ({
   status: "hot",
   modelName: "sonnet-4.6",
   subAgents: [],
+  nonInteractive: false,
+  ...overrides,
+});
+
+const makeProject = (
+  name: string,
+  sessions: SessionNode[],
+  overrides: Partial<ProjectNode> = {},
+): ProjectNode => ({
+  name,
+  projectPath: `/Users/neo/${name}`,
+  sessions,
+  hotness: sessions[0]?.status ?? "cold",
   ...overrides,
 });
 
 describe("SessionTreePanel", () => {
   it("renders session project name", () => {
+    const session = makeSession();
+    const project = makeProject("myproject", [session]);
     const { lastFrame } = render(
       <SessionTreePanel
-        sessions={[makeSession()]}
+        projects={[project]}
+        coldProjects={[]}
         selectedId="abc123"
         hasFocus={true}
         width={80}
@@ -30,9 +46,12 @@ describe("SessionTreePanel", () => {
   });
 
   it("renders status badge for hot session", () => {
+    const session = makeSession({ status: "hot" });
+    const project = makeProject("myproject", [session]);
     const { lastFrame } = render(
       <SessionTreePanel
-        sessions={[makeSession({ status: "hot" })]}
+        projects={[project]}
+        coldProjects={[]}
         selectedId={null}
         hasFocus={false}
         width={80}
@@ -52,9 +71,11 @@ describe("SessionTreePanel", () => {
         }),
       ],
     });
+    const project = makeProject("myproject", [session]);
     const { lastFrame } = render(
       <SessionTreePanel
-        sessions={[session]}
+        projects={[project]}
+        coldProjects={[]}
         selectedId={null}
         hasFocus={false}
         width={80}
@@ -86,9 +107,11 @@ describe("SessionTreePanel", () => {
         }),
       ],
     });
+    const project = makeProject("myproject", [session]);
     const { lastFrame } = render(
       <SessionTreePanel
-        sessions={[session]}
+        projects={[project]}
+        coldProjects={[]}
         selectedId={null}
         hasFocus={false}
         width={80}
@@ -122,9 +145,11 @@ describe("SessionTreePanel", () => {
         }),
       ],
     });
+    const project = makeProject("myproject", [session]);
     const { lastFrame } = render(
       <SessionTreePanel
-        sessions={[session]}
+        projects={[project]}
+        coldProjects={[]}
         selectedId={null}
         hasFocus={false}
         width={80}
@@ -136,9 +161,12 @@ describe("SessionTreePanel", () => {
   });
 
   it("shows short session ID for parent sessions with a project name", () => {
+    const session = makeSession({ id: "abc12345", projectName: "myproject" });
+    const project = makeProject("myproject", [session]);
     const { lastFrame } = render(
       <SessionTreePanel
-        sessions={[makeSession({ id: "abc12345", projectName: "myproject" })]}
+        projects={[project]}
+        coldProjects={[]}
         selectedId={null}
         hasFocus={false}
         width={80}
@@ -148,9 +176,12 @@ describe("SessionTreePanel", () => {
   });
 
   it("shows project path for parent sessions", () => {
+    const session = makeSession({ projectPath: "/test/path/myproject" });
+    const project = makeProject("myproject", [session]);
     const { lastFrame } = render(
       <SessionTreePanel
-        sessions={[makeSession({ projectPath: "/test/path/myproject" })]}
+        projects={[project]}
+        coldProjects={[]}
         selectedId={null}
         hasFocus={false}
         width={80}
@@ -170,9 +201,11 @@ describe("SessionTreePanel", () => {
         }),
       ],
     });
+    const project = makeProject("myproject", [session]);
     const { lastFrame } = render(
       <SessionTreePanel
-        sessions={[session]}
+        projects={[project]}
+        coldProjects={[]}
         selectedId={null}
         hasFocus={false}
         width={80}
@@ -194,9 +227,11 @@ describe("SessionTreePanel", () => {
         }),
       ],
     });
+    const project = makeProject("myproject", [session]);
     const { lastFrame } = render(
       <SessionTreePanel
-        sessions={[session]}
+        projects={[project]}
+        coldProjects={[]}
         selectedId={null}
         hasFocus={false}
         width={80}
@@ -208,9 +243,12 @@ describe("SessionTreePanel", () => {
   });
 
   it("renders model name when present", () => {
+    const session = makeSession({ modelName: "sonnet-4.6" });
+    const project = makeProject("myproject", [session]);
     const { lastFrame } = render(
       <SessionTreePanel
-        sessions={[makeSession({ modelName: "sonnet-4.6" })]}
+        projects={[project]}
+        coldProjects={[]}
         selectedId={null}
         hasFocus={false}
         width={80}
@@ -220,12 +258,18 @@ describe("SessionTreePanel", () => {
   });
 
   it("truncates sessions and shows overflow indicator when maxRows is set", () => {
-    const sessions = Array.from({ length: 5 }, (_, i) =>
-      makeSession({ id: `sess${i}`, projectName: `proj${i}`, subAgents: [] }),
-    );
+    const projects = Array.from({ length: 5 }, (_, i) => {
+      const session = makeSession({
+        id: `sess${i}`,
+        projectName: `proj${i}`,
+        subAgents: [],
+      });
+      return makeProject(`proj${i}`, [session]);
+    });
     const { lastFrame } = render(
       <SessionTreePanel
-        sessions={sessions}
+        projects={projects}
+        coldProjects={[]}
         selectedId={null}
         hasFocus={false}
         width={80}
@@ -234,7 +278,6 @@ describe("SessionTreePanel", () => {
     );
     const frame = lastFrame() ?? "";
     expect(frame).toContain("proj0");
-    expect(frame).toContain("proj1");
     expect(frame).not.toContain("proj2");
     expect(frame).toContain("more");
   });
@@ -256,9 +299,11 @@ describe("SessionTreePanel", () => {
         }),
       ],
     });
+    const project = makeProject("myproject", [session]);
     const { lastFrame } = render(
       <SessionTreePanel
-        sessions={[session]}
+        projects={[project]}
+        coldProjects={[]}
         selectedId={null}
         hasFocus={false}
         width={80}
@@ -287,9 +332,11 @@ describe("SessionTreePanel", () => {
         }),
       ],
     });
+    const project = makeProject("myproject", [session]);
     const { lastFrame } = render(
       <SessionTreePanel
-        sessions={[session]}
+        projects={[project]}
+        coldProjects={[]}
         selectedId={null}
         hasFocus={false}
         width={80}
@@ -315,9 +362,11 @@ describe("SessionTreePanel", () => {
         }),
       ],
     });
+    const project = makeProject("myproject", [session]);
     const { lastFrame } = render(
       <SessionTreePanel
-        sessions={[session]}
+        projects={[project]}
+        coldProjects={[]}
         selectedId={null}
         hasFocus={false}
         width={80}
@@ -345,9 +394,11 @@ describe("SessionTreePanel", () => {
         }),
       ],
     });
+    const project = makeProject("myproject", [session]);
     const { lastFrame } = render(
       <SessionTreePanel
-        sessions={[session]}
+        projects={[project]}
+        coldProjects={[]}
         selectedId={null}
         hasFocus={false}
         width={80}
@@ -381,9 +432,11 @@ describe("SessionTreePanel", () => {
         }),
       ],
     });
+    const project = makeProject("myproject", [session]);
     const { lastFrame } = render(
       <SessionTreePanel
-        sessions={[session]}
+        projects={[project]}
+        coldProjects={[]}
         selectedId={null}
         hasFocus={false}
         width={80}
@@ -398,7 +451,8 @@ describe("SessionTreePanel", () => {
   it("renders empty message when no sessions", () => {
     const { lastFrame } = render(
       <SessionTreePanel
-        sessions={[]}
+        projects={[]}
+        coldProjects={[]}
         selectedId={null}
         hasFocus={false}
         width={80}
@@ -407,16 +461,20 @@ describe("SessionTreePanel", () => {
     expect(lastFrame()).toContain("No Claude sessions");
   });
 
-  it("renders cold-sessions-summary row when cold sessions exist", () => {
+  it("renders cold-projects-summary row when cold projects exist", () => {
     const coldSession = makeSession({
       id: "cold1",
       projectName: "oldproj",
       status: "cold",
       subAgents: [],
     });
+    const coldProject = makeProject("oldproj", [coldSession], {
+      hotness: "cold",
+    });
     const { lastFrame } = render(
       <SessionTreePanel
-        sessions={[coldSession]}
+        projects={[]}
+        coldProjects={[coldProject]}
         selectedId={null}
         hasFocus={false}
         width={80}
@@ -426,16 +484,20 @@ describe("SessionTreePanel", () => {
     expect(lastFrame()).not.toContain("oldproj");
   });
 
-  it("shows cold sessions when __cold__ is in expandedIds", () => {
+  it("shows cold projects when __cold__ is in expandedIds", () => {
     const coldSession = makeSession({
       id: "cold1",
       projectName: "oldproj",
       status: "cold",
       subAgents: [],
     });
+    const coldProject = makeProject("oldproj", [coldSession], {
+      hotness: "cold",
+    });
     const { lastFrame } = render(
       <SessionTreePanel
-        sessions={[coldSession]}
+        projects={[]}
+        coldProjects={[coldProject]}
         selectedId={null}
         hasFocus={false}
         width={80}
@@ -445,20 +507,90 @@ describe("SessionTreePanel", () => {
     expect(lastFrame()).toContain("oldproj");
   });
 
-  it("highlights cold-sessions-summary row when selectedId is __cold__", () => {
+  it("highlights cold-projects-summary row when selectedId is __cold__", () => {
     const coldSession = makeSession({
       id: "cold1",
       status: "cold",
       subAgents: [],
     });
+    const coldProject = makeProject("myproject", [coldSession], {
+      hotness: "cold",
+    });
     const { lastFrame } = render(
       <SessionTreePanel
-        sessions={[coldSession]}
+        projects={[]}
+        coldProjects={[coldProject]}
         selectedId="__cold__"
         hasFocus={true}
         width={80}
       />,
     );
     expect(lastFrame()).toContain("+");
+  });
+
+  // New tests for project-grouped tree
+
+  it("renders project header with sessions nested below", () => {
+    const session = makeSession({ id: "abc123", projectName: "myproject" });
+    const project: ProjectNode = {
+      name: "myproject",
+      projectPath: "/Users/neo/myproject",
+      sessions: [session],
+      hotness: "hot",
+    };
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[project]}
+        coldProjects={[]}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+      />,
+    );
+    const out = lastFrame() ?? "";
+    expect(out).toContain("> myproject");
+    // Session row uses short ID (#abc1 = first 4 chars of "abc123")
+    expect(out).toContain("#abc1");
+  });
+
+  it("dims and parenthesizes non-interactive sessions", () => {
+    const session = makeSession({ id: "ndi", nonInteractive: true });
+    const project: ProjectNode = {
+      name: "myproject",
+      projectPath: "/Users/neo/myproject",
+      sessions: [session],
+      hotness: "hot",
+    };
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[project]}
+        coldProjects={[]}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+      />,
+    );
+    expect(lastFrame() ?? "").toContain("(#ndi");
+  });
+
+  it("collapses cold projects under a summary row", () => {
+    const project: ProjectNode = {
+      name: "stale",
+      projectPath: "/Users/neo/stale",
+      sessions: [makeSession({ status: "cold" })],
+      hotness: "cold",
+    };
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[]}
+        coldProjects={[project]}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+      />,
+    );
+    const out = lastFrame() ?? "";
+    expect(out).toContain("cold");
+    expect(out).not.toContain("> stale");
   });
 });

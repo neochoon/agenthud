@@ -33,6 +33,7 @@ const VIEWER_HEIGHT_FRACTION = 0.55;
 function subSummarySentinel(parentId: string): SessionNode {
   return {
     id: `__sub-${parentId}__`,
+    hideKey: "",
     filePath: "",
     projectPath: "",
     projectName: "",
@@ -40,6 +41,7 @@ function subSummarySentinel(parentId: string): SessionNode {
     status: "cold",
     modelName: null,
     subAgents: [],
+    nonInteractive: false,
   };
 }
 
@@ -72,28 +74,31 @@ function flattenSessions(
 ): SessionNode[] {
   const result: SessionNode[] = [];
 
-  const visible = tree.sessions.filter((s) => s.status !== "cold");
-  const cold = tree.sessions.filter((s) => s.status === "cold");
+  // TODO(Task6): replace with project-aware flattening
+  const allSessions = tree.projects?.flatMap((p) => p.sessions) ?? [];
+  const coldSessions = tree.coldProjects?.flatMap((p) => p.sessions) ?? [];
 
-  for (const s of visible) {
+  for (const s of allSessions) {
     result.push(s);
     appendSubAgentRows(result, s, expandedIds);
   }
 
-  if (cold.length > 0) {
+  if (coldSessions.length > 0) {
     // Sentinel node — makes the cold summary row keyboard-navigable.
     result.push({
       id: "__cold__",
+      hideKey: "",
       filePath: "",
       projectPath: "",
-      projectName: `${cold.length} cold`,
+      projectName: `${coldSessions.length} cold`,
       lastModifiedMs: 0,
       status: "cold",
       modelName: null,
       subAgents: [],
+      nonInteractive: false,
     });
     if (expandedIds.has("__cold__")) {
-      for (const s of cold) {
+      for (const s of coldSessions) {
         result.push(s);
         appendSubAgentRows(result, s, expandedIds);
       }
@@ -135,7 +140,10 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     discoverSessions(config),
   );
   const [selectedId, setSelectedId] = useState<string | null>(() => {
-    const first = sessionTree.sessions[0];
+    // TODO(Task6): replace with project-aware selection once App is fully updated
+    const sessions: SessionNode[] =
+      sessionTree.projects?.flatMap((p) => p.sessions) ?? [];
+    const first = sessions[0];
     return first?.id ?? null;
   });
   const [focus, setFocus] = useState<"tree" | "viewer">("tree");
@@ -245,7 +253,8 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     // its parent session so navigation doesn't snap to index 0.
     const node = updatedFlat.find((s) => s.id === selectedId);
     if (!node) {
-      const parentSession = tree.sessions.find((s) =>
+      const allSessions = tree.projects?.flatMap((p) => p.sessions) ?? [];
+      const parentSession = allSessions.find((s) =>
         s.subAgents.some((sa) => sa.id === selectedId),
       );
       if (parentSession) setSelectedId(parentSession.id);
@@ -533,7 +542,9 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
           } else {
             next.add(parentId);
             // Expanding: move to first newly visible (cool/cold) sub-agent
-            const parent = sessionTree.sessions.find((s) => s.id === parentId);
+            const allSessions2 =
+              sessionTree.projects?.flatMap((p) => p.sessions) ?? [];
+            const parent = allSessions2.find((s) => s.id === parentId);
             const firstNew = parent?.subAgents.find(
               (sa) => sa.status === "cool" || sa.status === "cold",
             );
@@ -544,9 +555,9 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
         return;
       }
 
-      const parentSession = sessionTree.sessions.find(
-        (s) => s.id === selectedId,
-      );
+      const allSessions3 =
+        sessionTree.projects?.flatMap((p) => p.sessions) ?? [];
+      const parentSession = allSessions3.find((s) => s.id === selectedId);
       if (
         !parentSession ||
         !parentSession.subAgents.some(
@@ -568,9 +579,8 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
       if (focus !== "tree" || !selectedId) return;
 
       if (selectedId === "__cold__") {
-        const coldSessions = sessionTree.sessions.filter(
-          (s) => s.status === "cold",
-        );
+        const coldSessions =
+          sessionTree.coldProjects?.flatMap((p) => p.sessions) ?? [];
         for (const s of coldSessions) hideSession(s.hideKey);
         // __cold__ and everything below it disappears — move up
         const nextId = allFlat[selectedIndex - 1]?.id ?? null;
@@ -579,9 +589,9 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
         return;
       }
 
-      const selectedSession = sessionTree.sessions.find(
-        (s) => s.id === selectedId,
-      );
+      const allSessions4 =
+        sessionTree.projects?.flatMap((p) => p.sessions) ?? [];
+      const selectedSession = allSessions4.find((s) => s.id === selectedId);
       if (selectedSession) {
         hideSession(selectedSession.hideKey);
         const nextId =
@@ -593,7 +603,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
         return;
       }
 
-      for (const s of sessionTree.sessions) {
+      for (const s of allSessions4) {
         const selectedSubAgent = s.subAgents.find((sa) => sa.id === selectedId);
         if (selectedSubAgent) {
           hideSubAgent(selectedSubAgent.hideKey);
@@ -647,7 +657,8 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
       )}
 
       <SessionTreePanel
-        sessions={sessionTree.sessions}
+        projects={sessionTree.projects ?? []}
+        coldProjects={sessionTree.coldProjects ?? []}
         selectedId={selectedId}
         hasFocus={focus === "tree"}
         width={width}

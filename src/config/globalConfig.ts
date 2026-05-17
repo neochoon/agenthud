@@ -251,5 +251,9 @@ export function hideProject(name: string): void {
 }
 
 export function hasProjectLevelConfig(): boolean {
-  return existsSync(join(process.cwd(), ".agenthud", "config.yaml"));
+  const candidate = join(process.cwd(), ".agenthud", "config.yaml");
+  // When cwd is the user's home directory, candidate resolves to the global
+  // config — that's not a "project-level" file at all.
+  if (candidate === join(homedir(), ".agenthud", "config.yaml")) return false;
+  return existsSync(candidate);
 }

@@ -16,6 +16,7 @@ const {
   hideSession,
   hideSubAgent,
   hideProject,
+  hasProjectLevelConfig,
 } = await import("../../src/config/globalConfig.js");
 
 const STATE_PATH = join(homedir(), ".agenthud", "state.yaml");
@@ -254,6 +255,32 @@ describe("hideProject", () => {
       .mocked(writeFileSync)
       .mock.calls.find(([p]) => String(p).endsWith("state.yaml"));
     expect(stateWrite).toBeUndefined();
+  });
+});
+
+describe("hasProjectLevelConfig", () => {
+  it("returns true when cwd has a .agenthud/config.yaml and cwd is not home", () => {
+    const cwdSpy = vi
+      .spyOn(process, "cwd")
+      .mockReturnValue("/Users/me/work/proj");
+    vi.mocked(existsSync).mockReturnValue(true);
+    try {
+      expect(hasProjectLevelConfig()).toBe(true);
+    } finally {
+      cwdSpy.mockRestore();
+    }
+  });
+
+  it("returns false when cwd is the user's home directory", () => {
+    // Regression: ~/.agenthud/config.yaml is the GLOBAL config; should never
+    // be treated as a project-level migration target.
+    const cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(homedir());
+    vi.mocked(existsSync).mockReturnValue(true);
+    try {
+      expect(hasProjectLevelConfig()).toBe(false);
+    } finally {
+      cwdSpy.mockRestore();
+    }
   });
 });
 

@@ -1,6 +1,8 @@
 import { existsSync, rmSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
+import { isLegacyProjectConfig } from "./utils/legacyConfig.js";
 
 import { render } from "ink";
 import React from "react";
@@ -30,7 +32,7 @@ if (options.command === "version") {
 }
 
 const legacyConfig = join(process.cwd(), ".agenthud", "config.yaml");
-if (existsSync(legacyConfig)) {
+if (isLegacyProjectConfig(process.cwd(), homedir()) && existsSync(legacyConfig)) {
   console.log(
     "The project-level config file (.agenthud/config.yaml) is no longer supported.",
   );

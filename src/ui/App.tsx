@@ -10,6 +10,7 @@ import { getVersion } from "../cli.js";
 import {
   ensureLogDir,
   hasProjectLevelConfig,
+  hideProject,
   hideSession,
   hideSubAgent,
   loadGlobalConfig,
@@ -19,6 +20,7 @@ import { parseSessionHistory } from "../data/sessionHistory.js";
 import { discoverSessions, getProjectsDir } from "../data/sessions.js";
 import type {
   ActivityEntry,
+  ProjectNode,
   SessionNode,
   SessionTree,
 } from "../types/index.js";
@@ -74,23 +76,41 @@ function flattenSessions(
 ): SessionNode[] {
   const result: SessionNode[] = [];
 
-  // TODO(Task6): replace with project-aware flattening
-  const allSessions = tree.projects?.flatMap((p) => p.sessions) ?? [];
-  const coldSessions = tree.coldProjects?.flatMap((p) => p.sessions) ?? [];
+  const projectToFlat = (project: ProjectNode) => {
+    // Synthesize a sentinel SessionNode for the project header.
+    result.push({
+      id: `__proj-${project.name}__`,
+      hideKey: "",
+      filePath: "",
+      projectPath: project.projectPath,
+      projectName: project.name,
+      lastModifiedMs: 0,
+      status: project.hotness,
+      modelName: null,
+      subAgents: [],
+      nonInteractive: false,
+    });
 
-  for (const s of allSessions) {
-    result.push(s);
-    appendSubAgentRows(result, s, expandedIds);
+    const collapsedKey = `__collapsed-__proj-${project.name}__`;
+    if (!expandedIds.has(collapsedKey)) {
+      for (const session of project.sessions) {
+        result.push(session);
+        appendSubAgentRows(result, session, expandedIds);
+      }
+    }
+  };
+
+  for (const project of tree.projects) {
+    projectToFlat(project);
   }
 
-  if (coldSessions.length > 0) {
-    // Sentinel node — makes the cold summary row keyboard-navigable.
+  if (tree.coldProjects.length > 0) {
     result.push({
       id: "__cold__",
       hideKey: "",
       filePath: "",
       projectPath: "",
-      projectName: `${coldSessions.length} cold`,
+      projectName: `${tree.coldProjects.length} cold`,
       lastModifiedMs: 0,
       status: "cold",
       modelName: null,
@@ -98,9 +118,8 @@ function flattenSessions(
       nonInteractive: false,
     });
     if (expandedIds.has("__cold__")) {
-      for (const s of coldSessions) {
-        result.push(s);
-        appendSubAgentRows(result, s, expandedIds);
+      for (const project of tree.coldProjects) {
+        projectToFlat(project);
       }
     }
   }
@@ -140,11 +159,10 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     discoverSessions(config),
   );
   const [selectedId, setSelectedId] = useState<string | null>(() => {
-    // TODO(Task6): replace with project-aware selection once App is fully updated
-    const sessions: SessionNode[] =
-      sessionTree.projects?.flatMap((p) => p.sessions) ?? [];
-    const first = sessions[0];
-    return first?.id ?? null;
+    // Select the first project sentinel if projects exist, otherwise null.
+    const firstProject = sessionTree.projects[0];
+    if (firstProject) return `__proj-${firstProject.name}__`;
+    return null;
   });
   const [focus, setFocus] = useState<"tree" | "viewer">("tree");
   const [scrollOffset, setScrollOffset] = useState(0);
@@ -180,7 +198,25 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
 
   // Load activities whenever selected session changes
   useEffect(() => {
-    const node = allFlatRef.current.find((s) => s.id === selectedId);
+    let node = allFlatRef.current.find((s) => s.id === selectedId);
+
+    // If selected is a project sentinel, use its hottest session
+    if (
+      node &&
+      selectedId?.startsWith("__proj-") &&
+      selectedId.endsWith("__")
+    ) {
+      const projectName = selectedId.slice(7, -2);
+      const project =
+        sessionTree.projects.find((p) => p.name === projectName) ??
+        sessionTree.coldProjects.find((p) => p.name === projectName);
+      if (project && project.sessions.length > 0) {
+        node = project.sessions[0]; // hottest
+      } else {
+        node = undefined;
+      }
+    }
+
     if (node?.filePath) {
       setActivities(parseSessionHistory(node.filePath));
       setScrollOffset(0);
@@ -191,7 +227,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
       setActivities([]);
     }
     setGitActivities([]);
-  }, [selectedId]);
+  }, [selectedId, sessionTree]);
 
   // Reset scroll when filter changes
   useEffect(() => {
@@ -517,6 +553,21 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
       }
       if (focus !== "tree" || !selectedId) return;
 
+      // Project sentinel: __proj-{projectName}__
+      if (selectedId.startsWith("__proj-") && selectedId.endsWith("__")) {
+        setExpandedIds((prev) => {
+          const collapsedKey = `__collapsed-${selectedId}`;
+          const next = new Set(prev);
+          if (next.has(collapsedKey)) {
+            next.delete(collapsedKey);
+          } else {
+            next.add(collapsedKey);
+          }
+          return next;
+        });
+        return;
+      }
+
       if (selectedId === "__cold__") {
         setExpandedIds((prev) => {
           const next = new Set(prev);
@@ -578,6 +629,19 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     onHide: () => {
       if (focus !== "tree" || !selectedId) return;
 
+      // Project sentinel: hide entire project
+      if (selectedId.startsWith("__proj-") && selectedId.endsWith("__")) {
+        const projectName = selectedId.slice(7, -2); // strip __proj- and trailing __
+        hideProject(projectName);
+        refresh();
+        const nextId =
+          allFlat[selectedIndex + 1]?.id ??
+          allFlat[selectedIndex - 1]?.id ??
+          null;
+        setSelectedId(nextId);
+        return;
+      }
+
       if (selectedId === "__cold__") {
         const coldSessions =
           sessionTree.coldProjects?.flatMap((p) => p.sessions) ?? [];
@@ -630,6 +694,9 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   const isPlaceholderSelected =
     !selectedSession ||
     selectedId === "__cold__" ||
+    (!!selectedId &&
+      selectedId.startsWith("__proj-") &&
+      selectedId.endsWith("__")) ||
     (!!selectedId &&
       selectedId.startsWith("__sub-") &&
       selectedId.endsWith("__"));

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-05-18
+
 ### New
 - **Multi-day range summary** — `agenthud summary --last 7d`, `agenthud summary --from X --to Y`. Daily summaries are cached and re-summarized into a cross-day synthesis (themes, multi-day workstreams, recurring patterns). Range output cached at `~/.agenthud/summaries/range-FROM_TO.md`. `-y/--yes` skips per-day confirmation prompts.
 - **Just-in-time confirmation prompts** — Each missing daily prompts only after its scan stats are shown (sessions/activities/commits/KB), so you decide with concrete context. Enter accepts the default (`[Y/n]`).
@@ -9,18 +11,26 @@
 - **Token usage display** — Each summary call ends with `N in / M out · cache: A read, B written · $X.XXXX` extracted from claude's `result` event.
 - **Range prompt template** — `~/.agenthud/summary-range-prompt.md` auto-created on first range run; guards against per-day timeline recap and surfacing tooling state (`cached`, `not logged in`) as content.
 - **Improved daily prompt template** — Tighter section structure (Context / Key Accomplishments / Technical Insights / Major Code Changes / Open Questions), length guidance, omit-empty rule, and a hallucination guard for "Open Questions".
+- **Scrollable help overlay** — `?` overlay now scrolls (`j/k`, `↑/↓`, `PgUp/PgDn`, `Ctrl+B/F`, Space, `g/G`) instead of silently truncating on shorter terminals. Bottom indicator shows current / total and a scroll hint.
+- **Session status documentation** — README and HelpPanel now document the `[hot]`/`[warm]`/`[cool]`/`[cold]` badges (30 min / 1 hour / same day / older) with their colors and the cold-collapse rule.
 
 ### Changed
 - **`claude -p` called with `--no-session-persistence`** — Summary calls no longer create JSONL session files under `~/.claude/projects/`, so they don't pollute agenthud's own session tree.
 - **`--date` accepts `yesterday` and `-Nd`** — In addition to `YYYY-MM-DD` and `today`.
 - **Cache invalidated on failure** — A failed `claude -p` run now deletes the partial cache file so the next run doesn't replay error output.
+- **Top-panel title renamed `Sessions` → `Projects`** — The tree groups sessions under projects at the top level; the title now matches the structure. Tab hint and HelpPanel section also updated.
+- **Status bar collapses on narrow terminals** — When `AgentHUD vX.Y.Z` branding + shortcuts exceed width, branding is dropped first, then shortcut items are trimmed from the front (keeping `?: help` and `q: quit`).
+- **`--with-git` help text corrected** — Previously said "from cwd"; the implementation actually pulls commits from each session's projectPath.
 
 ### Removed
 - **`s` save-log hotkey** — Superseded by `agenthud report` which produces the same activity dump as a one-shot CLI invocation. `logDir` config field and `~/.agenthud/logs/` directory references removed alongside.
+- **Stale `src/templates/config.yaml`** — Leftover v0.7.x panel-based config (no longer read by the current loader, no code references). Removed from the bundle.
 
 ### Fixed
 - **CI also runs `tsc --noEmit`** — Catches type errors that tsup transpilation alone would ship (e.g., the `tree.sessions` regression in v0.9.0).
 - **Running from home directory** — `agenthud` launched from `~` no longer offers to delete `~/.agenthud/config.yaml` as a "legacy project config" (or show the related migration banner). The legacy-detection now skips paths that resolve to the global config.
+- **Stale range cache when today is in range** — `agenthud summary --last 7d` on the same day previously returned the cached range output even though today's daily had since grown. Range cache is now treated as valid only for past-only ranges.
+- **Watch mode below 80×20** — Refuses to render the split-view UI on terminals smaller than 80 cols × 20 rows and shows a clear "needs larger terminal" panel instead. Resizing the window auto-redraws.
 
 ## [0.9.1] - 2026-05-17
 
@@ -296,7 +306,16 @@
 - **Test Panel** - Test results at a glance
 - Watch mode for live updates
 
-[Unreleased]: https://github.com/neochoon/agenthud/compare/v0.7.4...HEAD
+[Unreleased]: https://github.com/neochoon/agenthud/compare/v0.9.2...HEAD
+[0.9.2]: https://github.com/neochoon/agenthud/compare/v0.9.1...v0.9.2
+[0.9.1]: https://github.com/neochoon/agenthud/compare/v0.9.0...v0.9.1
+[0.9.0]: https://github.com/neochoon/agenthud/compare/v0.8.5...v0.9.0
+[0.8.5]: https://github.com/neochoon/agenthud/compare/v0.8.4...v0.8.5
+[0.8.4]: https://github.com/neochoon/agenthud/compare/v0.8.3...v0.8.4
+[0.8.3]: https://github.com/neochoon/agenthud/compare/v0.8.2...v0.8.3
+[0.8.2]: https://github.com/neochoon/agenthud/compare/v0.8.1...v0.8.2
+[0.8.1]: https://github.com/neochoon/agenthud/compare/v0.8.0...v0.8.1
+[0.8.0]: https://github.com/neochoon/agenthud/compare/v0.7.4...v0.8.0
 [0.7.4]: https://github.com/neochoon/agenthud/compare/v0.7.3...v0.7.4
 [0.7.3]: https://github.com/neochoon/agenthud/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/neochoon/agenthud/compare/v0.7.1...v0.7.2

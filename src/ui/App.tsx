@@ -209,7 +209,10 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     activitiesRef.current = activities;
   }, [activities]);
 
-  // Load activities whenever selected session changes
+  // Load activities whenever selected session changes.
+  // Only resets cursor/scroll when the loaded FILE changes (selection moved or
+  // hottest-session-of-project changed), not on every sessionTree refresh.
+  const lastLoadedFileRef = useRef<string | null>(null);
   useEffect(() => {
     let node = allFlatRef.current.find((s) => s.id === selectedId);
 
@@ -230,16 +233,23 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
       }
     }
 
+    const newFile = node?.filePath ?? null;
+    const fileChanged = lastLoadedFileRef.current !== newFile;
+    lastLoadedFileRef.current = newFile;
+
     if (node?.filePath) {
       setActivities(parseSessionHistory(node.filePath));
-      setScrollOffset(0);
-      setIsLive(true);
-      setNewCount(0);
-      setViewerCursorLine(0);
+      if (fileChanged) {
+        setScrollOffset(0);
+        setIsLive(true);
+        setNewCount(0);
+        setViewerCursorLine(0);
+        setGitActivities([]);
+      }
     } else {
       setActivities([]);
+      if (fileChanged) setGitActivities([]);
     }
-    setGitActivities([]);
   }, [selectedId, sessionTree]);
 
   // Reset scroll when filter changes

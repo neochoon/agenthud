@@ -62,7 +62,7 @@ Options:
 Commands:
   report [--date DATE] [--include TYPES] [--format FORMAT] [--detail-limit N] [--with-git]
                                 Print activity report for a date (default: today)
-    --date YYYY-MM-DD|today|yesterday     Date to report on
+    --date YYYY-MM-DD|today|yesterday|-Nd     Date to report on
     --include TYPES             Comma-separated types or "all"
                                 Types: response,bash,edit,thinking,read,glob,user
                                 Default: response,bash,edit,thinking
@@ -72,7 +72,7 @@ Commands:
 
   summary [--date DATE] [--prompt TEXT] [--force]
                                 Generate LLM summary of daily activity via claude CLI
-    --date YYYY-MM-DD|today|yesterday     Date to summarize (default: today)
+    --date YYYY-MM-DD|today|yesterday|-Nd     Date to summarize (default: today)
     --prompt TEXT               Override prompt for this run
     --force                     Regenerate even if cached (past dates)
 
@@ -105,6 +105,13 @@ function parseLocalMidnight(dateStr: string): Date | null {
   if (dateStr === "yesterday") {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  }
+  // Relative: -Nd (N days ago)
+  const relMatch = dateStr.match(/^-(\d+)d$/);
+  if (relMatch) {
+    const days = Number(relMatch[1]);
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate() - days);
   }
   const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return null;
@@ -152,7 +159,7 @@ export function parseArgs(args: string[]): CliOptions {
       } else {
         const parsed = parseLocalMidnight(dateStr);
         if (!parsed) {
-          reportError = `Invalid date: "${dateStr}". Use YYYY-MM-DD, "today", or "yesterday".`;
+          reportError = `Invalid date: "${dateStr}". Use YYYY-MM-DD, "today", "yesterday", or "-Nd" (N days ago).`;
         } else {
           reportDate = parsed;
         }
@@ -235,7 +242,7 @@ export function parseArgs(args: string[]): CliOptions {
       } else {
         const parsed = parseLocalMidnight(dateStr);
         if (!parsed) {
-          summaryError = `Invalid date: "${dateStr}". Use YYYY-MM-DD, "today", or "yesterday".`;
+          summaryError = `Invalid date: "${dateStr}". Use YYYY-MM-DD, "today", "yesterday", or "-Nd" (N days ago).`;
         } else {
           summaryDate = parsed;
         }

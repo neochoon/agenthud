@@ -10,8 +10,13 @@ vi.mock("node:fs", () => ({
 }));
 
 const { existsSync, readFileSync, writeFileSync } = await import("node:fs");
-const { loadGlobalConfig, DEFAULT_GLOBAL_CONFIG, hideSession, hideSubAgent } =
-  await import("../../src/config/globalConfig.js");
+const {
+  loadGlobalConfig,
+  DEFAULT_GLOBAL_CONFIG,
+  hideSession,
+  hideSubAgent,
+  hideProject,
+} = await import("../../src/config/globalConfig.js");
 
 afterEach(() => {
   vi.resetAllMocks();
@@ -25,6 +30,7 @@ describe("loadGlobalConfig", () => {
     expect(config.logDir).toBe(join(homedir(), ".agenthud", "logs"));
     expect(config.hiddenSessions).toEqual([]);
     expect(config.hiddenSubAgents).toEqual([]);
+    expect(config.hiddenProjects).toEqual([]);
   });
 
   it("overrides refreshInterval from config file", () => {
@@ -50,6 +56,21 @@ describe("loadGlobalConfig", () => {
     );
     const config = loadGlobalConfig();
     expect(config.hiddenSubAgents).toEqual(["agent-xyz"]);
+  });
+
+  it("parses hiddenProjects array from config file", () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(
+      "hiddenProjects:\n  - old-project\n  - secret-stuff\n",
+    );
+    const config = loadGlobalConfig();
+    expect(config.hiddenProjects).toEqual(["old-project", "secret-stuff"]);
+  });
+
+  it("defaults hiddenProjects to empty array", () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+    const config = loadGlobalConfig();
+    expect(config.hiddenProjects).toEqual([]);
   });
 
   it("ignores unknown keys", () => {
@@ -93,5 +114,30 @@ describe("hideSubAgent", () => {
     expect(writeFileSync).toHaveBeenCalledTimes(1);
     const written = String(vi.mocked(writeFileSync).mock.calls[0][1]);
     expect(written).toContain("agent-xyz");
+  });
+});
+
+describe("hideProject", () => {
+  it("writes project name to hiddenProjects in config", () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(writeFileSync).mockImplementation(() => {});
+
+    hideProject("old-project");
+
+    expect(writeFileSync).toHaveBeenCalledTimes(1);
+    const written = String(vi.mocked(writeFileSync).mock.calls[0][1]);
+    expect(written).toContain("old-project");
+  });
+
+  it("does not add duplicate project name", () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(
+      "hiddenProjects:\n  - old-project\n",
+    );
+    vi.mocked(writeFileSync).mockImplementation(() => {});
+
+    hideProject("old-project");
+
+    expect(writeFileSync).not.toHaveBeenCalled();
   });
 });

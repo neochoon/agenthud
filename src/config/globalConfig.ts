@@ -60,6 +60,11 @@ export function loadGlobalConfig(): GlobalConfig {
       (s): s is string => typeof s === "string",
     );
   }
+  if (Array.isArray(parsed.hiddenProjects)) {
+    config.hiddenProjects = (parsed.hiddenProjects as unknown[]).filter(
+      (s): s is string => typeof s === "string",
+    );
+  }
   if (Array.isArray(parsed.filterPresets)) {
     const presets = (parsed.filterPresets as unknown[])
       .filter(Array.isArray)
@@ -73,7 +78,9 @@ export function loadGlobalConfig(): GlobalConfig {
 }
 
 function writeConfig(
-  updates: Partial<Pick<GlobalConfig, "hiddenSessions" | "hiddenSubAgents">>,
+  updates: Partial<
+    Pick<GlobalConfig, "hiddenSessions" | "hiddenSubAgents" | "hiddenProjects">
+  >,
 ): void {
   const configDir = join(homedir(), ".agenthud");
   if (!existsSync(configDir)) {
@@ -95,6 +102,8 @@ function writeConfig(
     raw.hiddenSessions = updates.hiddenSessions;
   if (updates.hiddenSubAgents !== undefined)
     raw.hiddenSubAgents = updates.hiddenSubAgents;
+  if (updates.hiddenProjects !== undefined)
+    raw.hiddenProjects = updates.hiddenProjects;
   writeFileSync(CONFIG_PATH, stringifyYaml(raw), "utf-8");
 }
 
@@ -108,6 +117,12 @@ export function hideSubAgent(id: string): void {
   const config = loadGlobalConfig();
   if (config.hiddenSubAgents.includes(id)) return;
   writeConfig({ hiddenSubAgents: [...config.hiddenSubAgents, id] });
+}
+
+export function hideProject(name: string): void {
+  const config = loadGlobalConfig();
+  if (config.hiddenProjects.includes(name)) return;
+  writeConfig({ hiddenProjects: [...config.hiddenProjects, name] });
 }
 
 export function ensureLogDir(logDir: string): void {

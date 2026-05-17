@@ -6,7 +6,7 @@ describe("HelpPanel", () => {
   it("renders all section titles", () => {
     const { lastFrame } = render(<HelpPanel width={80} height={50} />);
     const out = lastFrame() ?? "";
-    expect(out).toContain("Session tree");
+    expect(out).toContain("Project tree");
     expect(out).toContain("Activity viewer");
     expect(out).toContain("Detail view");
     expect(out).toContain("CLI commands");

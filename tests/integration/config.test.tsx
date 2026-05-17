@@ -38,7 +38,7 @@ describe("App with config", () => {
       // New App always shows SessionTreePanel and ActivityViewerPanel.
       // There is no panel-level disable concept in the new design.
       const { lastFrame } = render(<App mode="once" />);
-      expect(lastFrame()).toContain("Sessions");
+      expect(lastFrame()).toContain("Projects");
     });
   });
 
@@ -58,13 +58,13 @@ describe("App with config", () => {
   });
 
   describe("panel order", () => {
-    it("renders sessions panel above activity viewer", () => {
+    it("renders projects panel above activity viewer", () => {
       const { lastFrame } = render(<App mode="once" />);
       const output = lastFrame() || "";
-      const sessionsPos = output.indexOf("Sessions");
+      const projectsPos = output.indexOf("Projects");
       const noSessionSelectedPos = output.indexOf("No session selected");
-      expect(sessionsPos).toBeGreaterThanOrEqual(0);
-      expect(noSessionSelectedPos).toBeGreaterThan(sessionsPos);
+      expect(projectsPos).toBeGreaterThanOrEqual(0);
+      expect(noSessionSelectedPos).toBeGreaterThan(projectsPos);
     });
 
     it("places custom panel between built-in panels", () => {

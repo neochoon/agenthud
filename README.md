@@ -23,7 +23,7 @@ Run this in a separate terminal while using Claude Code. Press `?` inside the TU
 AgentHUD reads Claude Code's session files from `~/.claude/projects/` and displays them in a split view:
 
 ```
-┌─ Sessions ──────────────────────────────────────────────┐
+┌─ Projects ──────────────────────────────────────────────┐
 │ > agenthud  ~/WestbrookAI/agenthud                      │
 │     #864f [hot] Fix the auth bug in login flow          │
 │         ├─ » code-reviewer                              │
@@ -41,7 +41,7 @@ AgentHUD reads Claude Code's session files from `~/.claude/projects/` and displa
 └─────────────────────────────────────────────────────────┘
 ```
 
-**Session tree (top pane)**
+**Project tree (top pane)**
 - Sessions grouped under their project (project name + path at the top).
 - Session rows show short ID + first user prompt (the session's "topic").
 - Non-interactive sessions (from `claude -p`, SDK, `agenthud summary`) appear in parens and dimmed.
@@ -86,7 +86,7 @@ Sub-agents use the same scheme. Projects inherit the hottest status of their ses
 
 Full reference is also available inside the app — press `?`.
 
-### Session tree focus
+### Project tree focus
 
 | Key | Action |
 |-----|--------|
@@ -114,7 +114,7 @@ Full reference is also available inside the app — press `?`.
 | `G` | Jump to oldest |
 | `↵` | Open detail view |
 | `f` | Cycle filter preset |
-| `Tab` | Switch focus to session tree |
+| `Tab` | Switch focus to project tree |
 | `?` | Help |
 | `q` | Quit |
 

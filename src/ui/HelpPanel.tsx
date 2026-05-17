@@ -11,7 +11,7 @@ type HelpRow = [string, string] | [string, string, string];
 
 const SECTIONS: HelpSection[] = [
   {
-    title: "Session tree",
+    title: "Project tree",
     rows: [
       ["↑ ↓ / k j", "Move selection"],
       ["PgUp / Ctrl+B", "Page up"],
@@ -32,7 +32,7 @@ const SECTIONS: HelpSection[] = [
       ["G", "Jump to oldest"],
       ["↵", "Open detail view for selected activity"],
       ["f", "Cycle filter preset (set in config.yaml)"],
-      ["Tab", "Switch focus to session tree"],
+      ["Tab", "Switch focus to project tree"],
     ],
   },
   {

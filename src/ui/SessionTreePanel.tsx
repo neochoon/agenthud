@@ -385,7 +385,7 @@ export function SessionTreePanel({
   const innerWidth = getInnerWidth(width);
   const contentWidth = innerWidth - 1; // account for space after │
 
-  const titleLine = createTitleLine("Sessions", "", width);
+  const titleLine = createTitleLine("Projects", "", width);
   const bottomLine = createBottomLine(width);
 
   const totalProjectCount = projects.length + coldProjects.length;

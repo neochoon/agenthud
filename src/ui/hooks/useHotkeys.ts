@@ -236,7 +236,7 @@ export function useHotkeys({
             "q: quit",
           ]
         : [
-            "Tab: sessions",
+            "Tab: projects",
             "↑↓/jk: scroll",
             "PgUp/Dn: page",
             "g: live",

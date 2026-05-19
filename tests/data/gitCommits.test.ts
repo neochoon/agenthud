@@ -84,15 +84,26 @@ describe("parseGitCommits", () => {
 });
 
 describe("getCommitDetail", () => {
-  it("returns git show --stat output", () => {
-    const statOutput =
-      "feat: add report\n\n src/cli.ts | 8 ++\n 1 file changed, 8 insertions(+)";
-    vi.mocked(execSync).mockReturnValue(statOutput);
+  it("returns git show --stat --patch output", () => {
+    const showOutput = [
+      "commit abc1234",
+      "feat: add report",
+      "",
+      " src/cli.ts | 8 ++",
+      " 1 file changed, 8 insertions(+)",
+      "",
+      "diff --git a/src/cli.ts b/src/cli.ts",
+      "@@ -1,2 +1,3 @@",
+      " context",
+      "+new line",
+    ].join("\n");
+    vi.mocked(execSync).mockReturnValue(showOutput);
 
     const result = getCommitDetail("/some/project", "abc1234");
-    expect(result).toBe(statOutput);
+    expect(result).toBe(showOutput);
+    // Both --stat and --patch should appear so we get summary + diff hunks.
     expect(vi.mocked(execSync)).toHaveBeenCalledWith(
-      expect.stringContaining('git --git-dir="/some/project/.git" show --stat'),
+      expect.stringMatching(/show .*--stat.*--patch|show .*--patch.*--stat/),
       expect.anything(),
     );
     expect(vi.mocked(execSync)).toHaveBeenCalledWith(

@@ -13,7 +13,7 @@ export function getCommitDetail(
   if (!projectPath) return null;
   try {
     return execSync(
-      `git --git-dir="${projectPath}/.git" show --stat --no-color ${hash}`,
+      `git --git-dir="${projectPath}/.git" show --stat --patch --no-color ${hash}`,
       { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] },
     ).trim();
   } catch {

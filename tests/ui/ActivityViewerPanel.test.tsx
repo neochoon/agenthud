@@ -73,7 +73,7 @@ describe("ActivityViewerPanel", () => {
     expect(lastFrame()).toContain("No activity");
   });
 
-  it("shows newest activity first (at top of rendered output)", () => {
+  it("shows newest activity at the bottom (tail-style)", () => {
     const activities = [
       makeActivity("OldestAction", 0),
       makeActivity("MiddleAction", 1),
@@ -87,7 +87,33 @@ describe("ActivityViewerPanel", () => {
     const oldestIdx = frame.indexOf("OldestAction");
     expect(newestIdx).toBeGreaterThanOrEqual(0);
     expect(oldestIdx).toBeGreaterThanOrEqual(0);
-    expect(newestIdx).toBeLessThan(oldestIdx);
+    // newest must appear AFTER oldest in the rendered frame (bottom-feed)
+    expect(newestIdx).toBeGreaterThan(oldestIdx);
+  });
+
+  it("pads empty rows at the top when activities are sparse", () => {
+    // Few activities + tall viewport → content sits at the bottom,
+    // empty rows above. Verify the last content row is the newest.
+    const activities = [
+      makeActivity("First", 0),
+      makeActivity("Last", 1),
+    ];
+    const { lastFrame } = render(
+      <ActivityViewerPanel
+        {...baseProps}
+        activities={activities}
+        visibleRows={10}
+      />,
+    );
+    const lines = (lastFrame() ?? "").split("\n");
+    // Strip box borders to find content lines
+    const contentLines = lines
+      .map((l) => l.trim())
+      .filter((l) => l.includes("│") || l.includes("|"));
+    const firstIdx = lines.findIndex((l) => l.includes("First"));
+    const lastIdx = lines.findIndex((l) => l.includes("Last"));
+    expect(lastIdx).toBeGreaterThan(firstIdx);
+    expect(contentLines.length).toBeGreaterThan(0);
   });
 
   it("shows PAUSED title with scroll position indicator", () => {
@@ -103,7 +129,8 @@ describe("ActivityViewerPanel", () => {
       />,
     );
     expect(lastFrame()).toContain("PAUSED");
-    expect(lastFrame()).toContain("↓5");
+    // ↑N = scrolled up N entries from the live edge (newer entries hidden below)
+    expect(lastFrame()).toContain("↑5");
   });
 
   it("shows MM/DD prefix for activities from a different day", () => {
@@ -153,7 +180,8 @@ describe("ActivityViewerPanel", () => {
         newCount={3}
       />,
     );
-    expect(lastFrame()).toContain("+3↑");
+    // +N↓ = N new entries arrived below the current view
+    expect(lastFrame()).toContain("+3↓");
   });
 
   it("flattens multi-line detail to a single line in the viewer", () => {

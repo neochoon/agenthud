@@ -107,20 +107,23 @@ export function ActivityViewerPanel({
   if (isLive) {
     titleSuffix = `[LIVE ${spinner || "▼"}${filterSuffix}]`;
   } else {
-    const badge = newCount > 0 ? ` +${newCount}↑` : "";
-    titleSuffix = `[PAUSED ↓${scrollOffset}${badge}${filterSuffix}]`;
+    // ↑N = scrolled N entries up from the live edge.
+    // +N↓ = N new entries arrived below the current view.
+    const badge = newCount > 0 ? ` +${newCount}↓` : "";
+    titleSuffix = `[PAUSED ↑${scrollOffset}${badge}${filterSuffix}]`;
   }
 
-  // Determine which slice to show, then reverse so newest is at top
+  // Take a chronological slice (oldest -> newest within the slice). The slice
+  // ends `scrollOffset` entries from the newest; live = scrollOffset 0.
   let visibleActivities: ActivityEntry[];
   if (activities.length === 0) {
     visibleActivities = [];
   } else if (isLive) {
-    visibleActivities = activities.slice(-visibleRows).reverse();
+    visibleActivities = activities.slice(-visibleRows);
   } else {
     const end = Math.max(0, activities.length - scrollOffset);
     const start = Math.max(0, end - visibleRows);
-    visibleActivities = activities.slice(start, end).reverse();
+    visibleActivities = activities.slice(start, end);
   }
 
   const now = new Date();
@@ -137,11 +140,15 @@ export function ActivityViewerPanel({
       </Text>,
     );
   } else {
+    // cursorLine = "entries back from newest visible" (0 = newest = bottom row).
+    // The cursor highlights the activity that's `cursorLine` steps from the
+    // newest, capped at the number of currently visible activities.
     const effectiveCursor = Math.min(cursorLine, visibleActivities.length - 1);
+    const cursorIndexInSlice = visibleActivities.length - 1 - effectiveCursor;
     for (let i = 0; i < visibleActivities.length; i++) {
       const activity = visibleActivities[i];
       const style = getActivityStyle(activity);
-      const isCursor = hasFocus && i === effectiveCursor;
+      const isCursor = hasFocus && i === cursorIndexInSlice;
 
       const time = formatActivityTime(activity.timestamp, now);
       const timestamp = `[${time}] `;
@@ -217,17 +224,21 @@ export function ActivityViewerPanel({
     }
   }
 
+  // Bottom-aligned: pad at the TOP so newest sits on the last row (terminal-tail style).
   const emptyRow = `${BOX.v}${" ".repeat(contentWidth + 1)}${BOX.v}`;
-  while (lines.length < visibleRows) {
-    lines.push(<Text key={`pad-${lines.length}`}>{emptyRow}</Text>);
+  const padCount = Math.max(0, visibleRows - lines.length);
+  const padded: React.ReactElement[] = [];
+  for (let i = 0; i < padCount; i++) {
+    padded.push(<Text key={`pad-${i}`}>{emptyRow}</Text>);
   }
+  const finalLines = [...padded, ...lines];
 
   return (
     <Box flexDirection="column" width={width}>
       <Text color={isLive ? undefined : "yellow"}>
         {createTitleLine(sessionName, titleSuffix, width)}
       </Text>
-      {lines}
+      {finalLines}
       <Text>{createBottomLine(width)}</Text>
     </Box>
   );

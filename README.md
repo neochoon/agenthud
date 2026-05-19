@@ -50,9 +50,9 @@ AgentHUD reads Claude Code's session files from `~/.claude/projects/` and displa
 - Press `h` to hide a project, session, or sub-agent (saved to `~/.agenthud/state.yaml`).
 
 **Activity viewer (bottom pane)**
-- Real-time feed for the selected session: file reads, edits, bash, responses, thinking, git commits.
+- Real-time feed for the selected session: file reads, edits, bash, responses, thinking, git commits. Newest at the bottom, like `tail -f`.
 - Press `f` to cycle through filter presets (configurable).
-- Press `↵` on any row to open a scrollable detail view; on a commit row this shows `git show --stat`.
+- Press `↵` on any row to open a scrollable detail view; on a commit row this shows `git show --stat --patch`.
 
 ## Session status
 
@@ -110,8 +110,8 @@ Full reference is also available inside the app — press `?`.
 | `PgUp` / `Ctrl+B` | Page up |
 | `PgDn` / `Ctrl+F` | Page down |
 | `Ctrl+U` / `Ctrl+D` | Half page up / down |
-| `g` | Jump to live (newest) |
-| `G` | Jump to oldest |
+| `g` | Jump to top (oldest) |
+| `G` | Jump to live (newest, bottom) |
 | `↵` | Open detail view |
 | `f` | Cycle filter preset |
 | `Tab` | Switch focus to project tree |

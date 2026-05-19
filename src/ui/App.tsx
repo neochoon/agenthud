@@ -151,16 +151,18 @@ function getSelectedActivity(
   cursorLine: number,
 ): ActivityEntry | null {
   if (acts.length === 0) return null;
+  // Chronological slice (newest is the LAST entry). Mirror the panel: the
+  // cursor is "entries back from the newest", so look up from the tail.
   let visible: ActivityEntry[];
   if (live) {
-    visible = acts.slice(-rows).reverse();
+    visible = acts.slice(-rows);
   } else {
     const end = Math.max(0, acts.length - scrollOff);
     const start = Math.max(0, end - rows);
-    visible = acts.slice(start, end).reverse();
+    visible = acts.slice(start, end);
   }
   const effectiveCursor = Math.min(cursorLine, visible.length - 1);
-  return visible[effectiveCursor] ?? null;
+  return visible[visible.length - 1 - effectiveCursor] ?? null;
 }
 
 export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
@@ -429,16 +431,36 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     onHelpScroll: helpScrollStep,
     onHelpScrollToTop: () => setHelpScroll(0),
     onSwitchFocus: () => setFocus((f) => (f === "tree" ? "viewer" : "tree")),
+    // cursorLine = "entries back from the newest" (0 = newest = bottom row).
+    // Up arrow moves visually upward = older direction = cursorLine++.
+    // Down arrow moves visually downward = newer direction = cursorLine--.
     onScrollUp: () => {
       if (focus === "tree") {
         if (selectedIndex === -1) return;
         const prev = Math.max(0, selectedIndex - 1);
         setSelectedId(allFlat[prev]?.id ?? selectedId);
       } else {
+        if (viewerCursorLine < viewerRows - 1) {
+          setViewerCursorLine((c) => c + 1);
+        } else {
+          // cursor at top of viewport — scroll viewport toward older
+          setIsLive(false);
+          setScrollOffset((o) =>
+            Math.min(o + 1, Math.max(0, activities.length - viewerRows)),
+          );
+        }
+      }
+    },
+    onScrollDown: () => {
+      if (focus === "tree") {
+        if (selectedIndex === -1) return;
+        const next = Math.min(allFlat.length - 1, selectedIndex + 1);
+        setSelectedId(allFlat[next]?.id ?? selectedId);
+      } else {
         if (viewerCursorLine > 0) {
           setViewerCursorLine((c) => c - 1);
         } else {
-          // cursor at top — scroll viewport toward newer
+          // cursor at bottom (newest visible) — scroll viewport toward newer
           setScrollOffset((o) => {
             const newOffset = Math.max(0, o - 1);
             if (newOffset === 0) {
@@ -450,27 +472,25 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
         }
       }
     },
-    onScrollDown: () => {
-      if (focus === "tree") {
-        if (selectedIndex === -1) return;
-        const next = Math.min(allFlat.length - 1, selectedIndex + 1);
-        setSelectedId(allFlat[next]?.id ?? selectedId);
-      } else {
-        if (viewerCursorLine < viewerRows - 1) {
-          setViewerCursorLine((c) => c + 1);
-        } else {
-          // cursor at bottom — scroll viewport toward older
-          setIsLive(false);
-          setScrollOffset((o) =>
-            Math.min(o + 1, Math.max(0, activities.length - viewerRows)),
-          );
-        }
-      }
-    },
+    // PgUp/PgDn semantics flip to match the bottom-feed layout:
+    // PgUp = visually up = older direction = scrollOffset++
+    // PgDn = visually down = newer direction = scrollOffset--
     onScrollPageUp: () => {
       if (focus === "tree") {
         const prev = Math.max(0, selectedIndex - 5);
         setSelectedId(allFlat[prev]?.id ?? selectedId);
+      } else {
+        setViewerCursorLine(0);
+        setIsLive(false);
+        setScrollOffset((o) =>
+          Math.min(o + viewerRows, Math.max(0, activities.length - viewerRows)),
+        );
+      }
+    },
+    onScrollPageDown: () => {
+      if (focus === "tree") {
+        const next = Math.min(allFlat.length - 1, selectedIndex + 5);
+        setSelectedId(allFlat[next]?.id ?? selectedId);
       } else {
         setViewerCursorLine(0);
         setScrollOffset((o) => {
@@ -483,22 +503,28 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
         });
       }
     },
-    onScrollPageDown: () => {
-      if (focus === "tree") {
-        const next = Math.min(allFlat.length - 1, selectedIndex + 5);
-        setSelectedId(allFlat[next]?.id ?? selectedId);
-      } else {
-        setViewerCursorLine(0);
-        setIsLive(false);
-        setScrollOffset((o) =>
-          Math.min(o + viewerRows, Math.max(0, activities.length - viewerRows)),
-        );
-      }
-    },
     onScrollHalfPageUp: () => {
       if (focus === "tree") {
         const prev = Math.max(0, selectedIndex - Math.ceil(5 / 2));
         setSelectedId(allFlat[prev]?.id ?? selectedId);
+      } else {
+        setViewerCursorLine(0);
+        setIsLive(false);
+        setScrollOffset((o) =>
+          Math.min(
+            o + Math.floor(viewerRows / 2),
+            Math.max(0, activities.length - viewerRows),
+          ),
+        );
+      }
+    },
+    onScrollHalfPageDown: () => {
+      if (focus === "tree") {
+        const next = Math.min(
+          allFlat.length - 1,
+          selectedIndex + Math.ceil(5 / 2),
+        );
+        setSelectedId(allFlat[next]?.id ?? selectedId);
       } else {
         setViewerCursorLine(0);
         setScrollOffset((o) => {
@@ -511,36 +537,20 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
         });
       }
     },
-    onScrollHalfPageDown: () => {
-      if (focus === "tree") {
-        const next = Math.min(
-          allFlat.length - 1,
-          selectedIndex + Math.ceil(5 / 2),
-        );
-        setSelectedId(allFlat[next]?.id ?? selectedId);
-      } else {
-        setViewerCursorLine(0);
-        setIsLive(false);
-        setScrollOffset((o) =>
-          Math.min(
-            o + Math.floor(viewerRows / 2),
-            Math.max(0, activities.length - viewerRows),
-          ),
-        );
-      }
-    },
     onScrollTop: () => {
-      // g = live (newest = visual top)
+      // g = top of viewport = oldest visible; cursor lands on the top row
+      // (which is the oldest visible — `viewerRows - 1` entries back from
+      // the newest in the slice).
+      setViewerCursorLine(Math.max(0, viewerRows - 1));
+      setIsLive(false);
+      setScrollOffset(Math.max(0, mergedActivities.length - viewerRows));
+    },
+    onScrollBottom: () => {
+      // G = bottom of viewport = newest = live; cursor on the live edge.
       setViewerCursorLine(0);
       setIsLive(true);
       setScrollOffset(0);
       setNewCount(0);
-    },
-    onScrollBottom: () => {
-      // G = oldest (visual bottom)
-      setViewerCursorLine(0);
-      setIsLive(false);
-      setScrollOffset(Math.max(0, mergedActivities.length - viewerRows));
     },
     onDetailClose: () => {
       setDetailMode(false);

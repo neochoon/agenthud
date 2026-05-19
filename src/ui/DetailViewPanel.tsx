@@ -8,6 +8,12 @@ import {
   getInnerWidth,
 } from "./constants.js";
 import { getActivityStyle } from "./ActivityViewerPanel.js";
+import {
+  classifyCodeFences,
+  classifyDiffLines,
+  getLineStyle,
+  type LineCategory,
+} from "./lineColoring.js";
 
 export function wrapText(text: string, maxWidth: number): string[] {
   if (!text) return ["(empty)"];
@@ -34,6 +40,44 @@ export function wrapText(text: string, maxWidth: number): string[] {
   return result.length > 0 ? result : ["(empty)"];
 }
 
+/**
+ * Wrap each source line and propagate its line category to every wrapped
+ * piece. Classification happens on raw source lines (before wrapping) so
+ * fence/diff heuristics see the original prefixes intact.
+ */
+export function wrapClassified(
+  text: string,
+  maxWidth: number,
+  classifier: (lines: string[]) => LineCategory[],
+): Array<{ text: string; category: LineCategory }> {
+  if (!text) return [{ text: "(empty)", category: "prose" }];
+  const sourceLines = text.split("\n");
+  const categories = classifier(sourceLines);
+  const out: Array<{ text: string; category: LineCategory }> = [];
+  for (let i = 0; i < sourceLines.length; i++) {
+    const line = sourceLines[i];
+    const cat = categories[i] ?? "prose";
+    if (!line) {
+      out.push({ text: "", category: cat });
+      continue;
+    }
+    const words = line.split(" ");
+    let current = "";
+    for (const word of words) {
+      if (!current) {
+        current = word;
+      } else if (getDisplayWidth(`${current} ${word}`) <= maxWidth) {
+        current += ` ${word}`;
+      } else {
+        out.push({ text: current, category: cat });
+        current = word;
+      }
+    }
+    if (current) out.push({ text: current, category: cat });
+  }
+  return out.length > 0 ? out : [{ text: "(empty)", category: "prose" }];
+}
+
 export interface DetailViewPanelProps {
   activity: ActivityEntry;
   sessionName: string;
@@ -51,7 +95,9 @@ export function DetailViewPanel({
   const innerWidth = getInnerWidth(width);
   const contentWidth = innerWidth - 1;
 
-  const allLines = wrapText(activity.detail, contentWidth);
+  const classifier =
+    activity.type === "commit" ? classifyDiffLines : classifyCodeFences;
+  const allLines = wrapClassified(activity.detail, contentWidth, classifier);
   const totalLines = allLines.length;
   const clampedOffset = Math.min(
     scrollOffset,
@@ -81,11 +127,15 @@ export function DetailViewPanel({
 
   const contentRows: React.ReactElement[] = [];
   for (let i = 0; i < visibleRows; i++) {
-    const line = visibleSlice[i] ?? "";
-    const padding = Math.max(0, contentWidth - getDisplayWidth(line));
+    const entry = visibleSlice[i] ?? { text: "", category: "prose" as const };
+    const padding = Math.max(0, contentWidth - getDisplayWidth(entry.text));
+    const lineStyle = getLineStyle(entry.category);
     contentRows.push(
       <Text key={i}>
-        {BOX.v} {line}
+        {BOX.v}{" "}
+        <Text color={lineStyle.color} dimColor={lineStyle.dimColor}>
+          {entry.text}
+        </Text>
         {" ".repeat(padding)}
         {BOX.v}
       </Text>,

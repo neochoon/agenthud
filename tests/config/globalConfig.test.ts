@@ -46,6 +46,46 @@ describe("loadGlobalConfig", () => {
     expect(config.refreshIntervalMs).toBe(5000);
   });
 
+  it("default filterPresets includes user in the conversation preset", () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(writeFileSync).mockImplementation(() => {});
+    const config = loadGlobalConfig();
+    // [] means "all"; one preset must include user; one is commits-only.
+    expect(config.filterPresets).toEqual([
+      [],
+      ["response", "user"],
+      ["commit"],
+    ]);
+  });
+
+  it.each([
+    ["all", []],
+    ["*", []],
+    ["any", []],
+    ["ALL", []],
+  ])(
+    'normalizes "%s" preset keyword to empty array (= no filter)',
+    (keyword, expected) => {
+      vi.mocked(existsSync).mockImplementation((p) =>
+        String(p).endsWith("config.yaml"),
+      );
+      vi.mocked(readFileSync).mockReturnValue(
+        `filterPresets:\n  - ["${keyword}"]\n`,
+      );
+      const config = loadGlobalConfig();
+      expect(config.filterPresets[0]).toEqual(expected);
+    },
+  );
+
+  it("still treats [] preset as 'show all'", () => {
+    vi.mocked(existsSync).mockImplementation((p) =>
+      String(p).endsWith("config.yaml"),
+    );
+    vi.mocked(readFileSync).mockReturnValue("filterPresets:\n  - []\n");
+    const config = loadGlobalConfig();
+    expect(config.filterPresets[0]).toEqual([]);
+  });
+
   it("ignores unknown keys", () => {
     vi.mocked(existsSync).mockImplementation((p) =>
       String(p).endsWith("config.yaml"),

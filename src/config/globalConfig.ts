@@ -11,9 +11,18 @@ export const DEFAULT_GLOBAL_CONFIG: GlobalConfig = {
   refreshIntervalMs: 2000,
   hiddenSessions: [],
   hiddenSubAgents: [],
-  filterPresets: [[], ["response"], ["commit"]],
+  // [] means "show all"; conversation preset bundles assistant + user;
+  // commits-only preset filters down to git activity.
+  filterPresets: [[], ["response", "user"], ["commit"]],
   hiddenProjects: [],
 };
+
+const ALL_PRESET_KEYWORDS = new Set(["all", "*", "any"]);
+
+function normalizePreset(tokens: string[]): string[] {
+  if (tokens.some((t) => ALL_PRESET_KEYWORDS.has(t.toLowerCase()))) return [];
+  return tokens;
+}
 
 function parseInterval(value: string): number | null {
   const match = value.match(/^(\d+)(s|m)$/);
@@ -36,10 +45,11 @@ function writeDefaultConfig(): void {
 refreshInterval: 2s
 
 # Activity filter presets (cycle with 'f' key in viewer)
-# Each list is one preset; [] means "all". First preset is the default.
+# Each list is one preset. Use "all" (or "*") to show everything.
+# Types: response, user, bash, edit, thinking, read, glob, commit
 filterPresets:
-  - []
-  - ["response"]
+  - ["all"]
+  - ["response", "user"]
   - ["commit"]
 `;
   try {
@@ -107,9 +117,12 @@ export function loadGlobalConfig(): GlobalConfig {
   if (Array.isArray(configRaw.filterPresets)) {
     const presets = (configRaw.filterPresets as unknown[])
       .filter(Array.isArray)
-      .map((p) =>
-        (p as unknown[]).filter((t): t is string => typeof t === "string"),
-      );
+      .map((p) => {
+        const tokens = (p as unknown[]).filter(
+          (t): t is string => typeof t === "string",
+        );
+        return normalizePreset(tokens);
+      });
     if (presets.length > 0) config.filterPresets = presets;
   }
 

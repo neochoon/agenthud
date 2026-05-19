@@ -202,10 +202,11 @@ Each missing daily prompts for confirmation just before generation, so you see c
 refreshInterval: 2s
 
 # Activity filter presets (cycle with 'f' key in viewer)
-# Each list is one preset; [] means "all". First preset is the default.
+# Each list is one preset. Use "all" (or "*") to show everything.
+# Types: response, user, bash, edit, thinking, read, glob, commit
 filterPresets:
-  - []
-  - ["response"]
+  - ["all"]
+  - ["response", "user"]
   - ["commit"]
 ```
 

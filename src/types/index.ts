@@ -39,7 +39,7 @@ export interface GlobalConfig {
   refreshIntervalMs: number; // default: 2000
   hiddenSessions: string[];
   hiddenSubAgents: string[];
-  filterPresets: string[][]; // [] = all; default: [[], ["response"], ["commit"]]
+  filterPresets: string[][]; // [] = all; default: [[], ["response", "user"], ["commit"]]
   hiddenProjects: string[]; // by projectName
 }
 

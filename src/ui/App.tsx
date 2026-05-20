@@ -422,13 +422,14 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   );
 
   const spinner = useSpinner(isWatchMode);
-  // Slide a small arrow across the viewer's live-edge slot every 180ms.
+  // Slide a small arrow across the viewer's live-edge slot every 180ms,
+  // edge-to-edge of the content area (panel inner width minus borders/pad).
   // The animation only ticks in watch mode; the panel additionally hides
   // it when the viewer is PAUSED.
-  const VIEWER_INDICATOR_WIDTH = 8;
+  const viewerIndicatorWidth = Math.max(1, width - 3);
   const liveIndicatorPosition = useSlide(
     isWatchMode,
-    VIEWER_INDICATOR_WIDTH,
+    viewerIndicatorWidth,
     180,
   );
   const helpViewportRows = Math.max(1, height - 3); // status bar + indicator

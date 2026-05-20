@@ -193,7 +193,7 @@ describe("ActivityViewerPanel", () => {
         liveIndicatorPosition={2}
       />,
     );
-    expect(lastFrame()).toContain("▸");
+    expect(lastFrame()).toContain("›");
   });
 
   it("hides the arrow when paused (isLive false)", () => {
@@ -209,7 +209,7 @@ describe("ActivityViewerPanel", () => {
     );
     // The motion indicator must not appear over stale content when the
     // viewer is scrolled away from the live edge.
-    expect(lastFrame()).not.toContain("▸");
+    expect(lastFrame()).not.toContain("›");
   });
 
   it("places the arrow at the requested column offset", () => {
@@ -225,10 +225,10 @@ describe("ActivityViewerPanel", () => {
     // Find the line containing the arrow (only the trailing slot has it).
     const arrowLine = frame
       .split("\n")
-      .find((line) => line.includes("▸")) ?? "";
+      .find((line) => line.includes("›")) ?? "";
     // Strip leading "│ " box border, then count spaces before the arrow.
     const stripped = arrowLine.replace(/^.*?│\s/, "");
-    const spacesBeforeArrow = stripped.indexOf("▸");
+    const spacesBeforeArrow = stripped.indexOf("›");
     expect(spacesBeforeArrow).toBe(5);
   });
 

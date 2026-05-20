@@ -260,7 +260,7 @@ export function ActivityViewerPanel({
   for (let i = 0; i < trailingBlankRows; i++) {
     if (i === 0 && isLive && liveIndicatorPosition != null) {
       const pos = Math.max(0, liveIndicatorPosition);
-      const arrow = "▸";
+      const arrow = "›";
       // Cap the arrow position to whatever fits inside the content area.
       const safePos = Math.min(pos, Math.max(0, contentWidth - 1));
       const padAfter = Math.max(0, contentWidth - safePos - 1);

@@ -129,18 +129,20 @@ function SessionRow({
   const fullLine = leftCoreBase + middleSection + gap + rightSide;
   const linePadding = Math.max(0, contentWidth - getDisplayWidth(fullLine));
 
-  const highlight = isSelected && hasFocus;
-  const shouldDim = isNonInteractive;
+  const focused = isSelected && hasFocus;
+  const muted = isSelected && !hasFocus;
+  const showBg = focused || muted;
+  const shouldDim = isNonInteractive || muted;
 
   return (
     <Text>
       {BOX.v}{" "}
       <Text
-        backgroundColor={highlight ? "blue" : undefined}
-        bold={highlight}
-        dimColor={shouldDim && !highlight}
+        backgroundColor={showBg ? "blue" : undefined}
+        bold={focused}
+        dimColor={shouldDim && !focused}
       >
-        <Text dimColor={shouldDim && !highlight}>{prefix}</Text>
+        <Text dimColor={shouldDim && !focused}>{prefix}</Text>
         <Text bold={!shouldDim}>{rawName}</Text>
         {shortIdDisplay ? <Text dimColor>{shortIdDisplay}</Text> : null}
         <Text> </Text>
@@ -287,11 +289,17 @@ function ProjectRow({
   const gapWidth = pathText ? 2 : 0;
   const totalWidth = nameWidth + gapWidth + pathWidth;
   const padding = Math.max(0, contentWidth - totalWidth);
-  const highlight = isSelected && hasFocus;
+  const focused = isSelected && hasFocus;
+  const muted = isSelected && !hasFocus;
+  const showBg = focused || muted;
   return (
     <Text>
       {BOX.v}{" "}
-      <Text backgroundColor={highlight ? "blue" : undefined} bold={!highlight}>
+      <Text
+        backgroundColor={showBg ? "blue" : undefined}
+        bold={!showBg}
+        dimColor={muted}
+      >
         {nameText}
         {pathText ? (
           <>
@@ -328,11 +336,12 @@ function SubagentSummaryRow({
     0,
     contentWidth - getDisplayWidth(text) - getDisplayWidth(hint),
   );
-  const active = isSelected && hasFocus;
+  const focused = isSelected && hasFocus;
+  const muted = isSelected && !hasFocus;
   return (
     <Text>
       {BOX.v}{" "}
-      <Text dimColor={!active} inverse={active}>
+      <Text dimColor={!focused} inverse={focused || muted}>
         {text}
         {" ".repeat(padding)}
         {hint}
@@ -361,12 +370,13 @@ function ColdProjectsSummaryRow({
   const dashCount = Math.max(0, innerWidth - 1 - labelWidth - hintWidth);
   const dashes = BOX.h.repeat(dashCount);
   const line = `${BOX.ml}${BOX.h}${label}${dashes}${hint}${BOX.mr}`;
-  const highlight = isSelected && hasFocus;
+  const focused = isSelected && hasFocus;
+  const muted = isSelected && !hasFocus;
   return (
     <Text
-      backgroundColor={highlight ? "blue" : undefined}
-      bold={highlight}
-      dimColor={!highlight}
+      backgroundColor={focused || muted ? "blue" : undefined}
+      bold={focused}
+      dimColor={!focused}
     >
       {line}
     </Text>

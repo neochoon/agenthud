@@ -4,9 +4,15 @@
 [![CI](https://github.com/neochoon/agenthud/actions/workflows/ci.yml/badge.svg)](https://github.com/neochoon/agenthud/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/neochoon/agenthud/branch/main/graph/badge.svg)](https://codecov.io/gh/neochoon/agenthud)
 
-When working with AI coding agents like Claude Code, you lose visibility into what's happening across sessions. **AgentHUD** gives you a live session browser in a separate terminal — see every session, sub-agent, and activity as it happens.
+An observability layer for [Claude Code](https://github.com/anthropics/claude-code). **See** your live sessions, **export** structured activity logs, and **summarize** a day or a week into an LLM digest — all from one CLI.
 
 ![demo](./output960.gif)
+
+AgentHUD reads Claude Code's session files from `~/.claude/projects/` and gives you three things:
+
+- **Live monitor** ([`agenthud`](#live-monitor)) — a split-view TUI showing every project, session, sub-agent, and activity as it happens.
+- **Structured export** ([`agenthud report`](#report)) — print activity for any date as Markdown or JSON for piping to scripts, dashboards, or other LLMs.
+- **LLM digest** ([`agenthud summary`](#summary)) — synthesize a day or a date range into an engineering summary via the `claude` CLI, with caching so weekly digests are cheap to regenerate.
 
 ## Install
 
@@ -18,9 +24,9 @@ npx agenthud
 
 Run this in a separate terminal while using Claude Code. Press `?` inside the TUI any time for in-app help.
 
-## What it shows
+## Live monitor
 
-AgentHUD reads Claude Code's session files from `~/.claude/projects/` and displays them in a split view:
+AgentHUD's TUI splits the screen into a project tree and an activity viewer:
 
 ```
 ┌─ Projects ───────────────────────────────────────────────┐
@@ -57,7 +63,7 @@ AgentHUD reads Claude Code's session files from `~/.claude/projects/` and displa
 - Press `f` to cycle through filter presets (configurable).
 - Press `↵` on any row to open a scrollable detail view; on a commit row this shows `git show --stat --patch`.
 
-## Session status
+### Session status
 
 Each session row carries a colored badge derived from when its JSONL file was last touched:
 
@@ -70,7 +76,7 @@ Each session row carries a colored badge derived from when its JSONL file was la
 
 Sub-agents use the same scheme. Projects inherit the hottest status of their sessions; a project is treated as "cold" only when all its sessions are cold.
 
-## Activity types
+### Activity types
 
 | Icon | Type | Description |
 |------|------|-------------|
@@ -85,11 +91,11 @@ Sub-agents use the same scheme. Projects inherit the hottest status of their ses
 | `…` | Thinking | Claude's thinking (requires `showThinkingSummaries: true`) |
 | `◆` | Commit | Git commit in the project (when `--with-git` or in viewer) |
 
-## Keyboard shortcuts
+### Keyboard shortcuts
 
 Full reference is also available inside the app — press `?`.
 
-### Project tree focus
+#### Project tree focus
 
 | Key | Action |
 |-----|--------|
@@ -104,7 +110,7 @@ Full reference is also available inside the app — press `?`.
 | `?` | Help |
 | `q` | Quit |
 
-### Activity viewer focus
+#### Activity viewer focus
 
 | Key | Action |
 |-----|--------|
@@ -122,7 +128,7 @@ Full reference is also available inside the app — press `?`.
 | `?` | Help |
 | `q` | Quit |
 
-### Detail view
+#### Detail view
 
 | Key | Action |
 |-----|--------|
@@ -134,7 +140,7 @@ Detail view colors the content based on activity type:
 - **Git commit detail** (`git show --stat --patch`): added lines green (`+`), removed lines red (`-`), hunk headers cyan (`@@ ... @@`), `commit/Author/Date/diff` metadata dimmed.
 - **Response / thinking / prompt**: text inside triple-backtick code fences renders in cyan so the boundary between prose and code is obvious. No language-specific syntax highlighting — just code-vs-prose separation.
 
-## Behavior
+### Behavior
 
 - **Alternate screen buffer.** Watch mode uses the alt-screen (like `vim`, `htop`, `btop`), so quitting (`q`) restores the pre-launch shell completely. No TUI residue, no "is it still running?" confusion.
 - **Minimum terminal size.** 80 cols × 20 rows. Smaller terminals show a one-line hint and redraw automatically when you resize.

@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-05-20
+
+### New
+- **`agenthud summary --model <name>`** forwards `--model` to `claude -p`. Summarization is a low-reasoning task, so cheaper models almost always suffice — `sonnet` (~40% cheaper than Opus, 1M context) or `haiku` (~80% cheaper, 200K context). Accepts a short alias or a full model id. Default unchanged (claude's own default model).
+- **Oversize report warning.** The input stats line now includes an estimated token count. Reports above ~300K tokens print a loud warning and, in interactive mode, prompt one more time before sending. Range mode with `-y` only prints the warning and proceeds.
+
+### Fixed
+- **`report --include` validates unknown types.** A typo like `--include response,bas` used to be silently accepted (no match, no error). Now unknown tokens trigger an error listing the offending values and the full list of valid types. Missing value after `--include` also errors.
+
 ## [0.9.3] - 2026-05-20
 
 ### Changed
@@ -340,7 +349,8 @@
 - **Test Panel** - Test results at a glance
 - Watch mode for live updates
 
-[Unreleased]: https://github.com/neochoon/agenthud/compare/v0.9.3...HEAD
+[Unreleased]: https://github.com/neochoon/agenthud/compare/v0.9.4...HEAD
+[0.9.4]: https://github.com/neochoon/agenthud/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/neochoon/agenthud/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/neochoon/agenthud/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/neochoon/agenthud/compare/v0.9.0...v0.9.1

@@ -410,8 +410,15 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   const maxTreeRows = Math.floor(height * (1 - VIEWER_HEIGHT_FRACTION));
   const naturalTreeRows = allFlat.length;
   const treeRows = Math.max(1, Math.min(naturalTreeRows, maxTreeRows));
-  // statusBar(1) + margin(1) + tree(treeRows+2) + margin(1) + viewer(viewerRows+2) = height
-  const viewerRows = Math.max(5, height - 7 - treeRows);
+  // Breathing room: keep one blank row at the bottom of the viewer box so
+  // newest activity isn't flush against the border — gives a "next will
+  // appear here" feel, like a terminal cursor below tail -f output.
+  const VIEWER_BREATHING_ROWS = 1;
+  // statusBar(1) + margin(1) + tree(treeRows+2) + margin(1) + viewer(viewerRows+2+breathing) = height
+  const viewerRows = Math.max(
+    5,
+    height - 7 - treeRows - VIEWER_BREATHING_ROWS,
+  );
 
   const spinner = useSpinner(isWatchMode);
   const helpViewportRows = Math.max(1, height - 3); // status bar + indicator
@@ -861,6 +868,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
                 isLive={isLive}
                 newCount={newCount}
                 visibleRows={viewerRows}
+                trailingBlankRows={VIEWER_BREATHING_ROWS}
                 width={width}
                 cursorLine={viewerCursorLine}
                 hasFocus={focus === "viewer"}

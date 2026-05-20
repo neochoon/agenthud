@@ -43,6 +43,13 @@ export interface ActivityViewerPanelProps {
   isLive: boolean;
   newCount: number;
   visibleRows: number;
+  /**
+   * Extra blank rows to render after the activity content. Gives the
+   * viewer a "next will arrive here" feel, like the empty space below
+   * `tail -f` output. Layout owner (App) accounts for these in its
+   * height math so the box still fits the screen.
+   */
+  trailingBlankRows?: number;
   width: number;
   cursorLine: number;
   hasFocus: boolean;
@@ -92,6 +99,7 @@ export function ActivityViewerPanel({
   isLive,
   newCount,
   visibleRows,
+  trailingBlankRows = 0,
   width,
   cursorLine,
   hasFocus,
@@ -224,14 +232,19 @@ export function ActivityViewerPanel({
     }
   }
 
-  // Bottom-aligned: pad at the TOP so newest sits on the last row (terminal-tail style).
+  // Bottom-aligned: pad at the TOP so newest sits on the last content row.
+  // Then add `trailingBlankRows` empty rows below for breathing room.
   const emptyRow = `${BOX.v}${" ".repeat(contentWidth + 1)}${BOX.v}`;
   const padCount = Math.max(0, visibleRows - lines.length);
   const padded: React.ReactElement[] = [];
   for (let i = 0; i < padCount; i++) {
     padded.push(<Text key={`pad-${i}`}>{emptyRow}</Text>);
   }
-  const finalLines = [...padded, ...lines];
+  const trailing: React.ReactElement[] = [];
+  for (let i = 0; i < trailingBlankRows; i++) {
+    trailing.push(<Text key={`trail-${i}`}>{emptyRow}</Text>);
+  }
+  const finalLines = [...padded, ...lines, ...trailing];
 
   return (
     <Box flexDirection="column" width={width}>

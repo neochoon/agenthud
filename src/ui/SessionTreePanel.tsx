@@ -296,11 +296,24 @@ function ProjectRow({
   const pathText = project.projectPath
     ? formatProjectPath(project.projectPath)
     : "";
+  // Project "elapsed" = how long since any of its sessions last moved.
+  // Use the max mtime so a fresh non-interactive session can still mark
+  // the project as recent, even when the sort puts it after an older
+  // interactive one.
+  const latestMtime = project.sessions.reduce(
+    (acc, s) => Math.max(acc, s.lastModifiedMs),
+    0,
+  );
+  const elapsed = latestMtime > 0 ? formatElapsed(latestMtime) : "";
+
   const nameWidth = getDisplayWidth(nameText);
   const pathWidth = pathText ? getDisplayWidth(pathText) : 0;
-  // 2 spaces between name and path
-  const gapWidth = pathText ? 2 : 0;
-  const totalWidth = nameWidth + gapWidth + pathWidth;
+  const elapsedWidth = elapsed ? getDisplayWidth(elapsed) : 0;
+  // 2 spaces between name and path; gap pushes elapsed to the right edge.
+  const middleGap = pathText ? 2 : 0;
+  const leftWidth = nameWidth + middleGap + pathWidth;
+  const rightGap = Math.max(1, contentWidth - leftWidth - elapsedWidth);
+  const totalWidth = leftWidth + rightGap + elapsedWidth;
   const padding = Math.max(0, contentWidth - totalWidth);
   const focused = isSelected && hasFocus;
   const muted = isSelected && !hasFocus;
@@ -320,6 +333,8 @@ function ProjectRow({
             <Text dimColor>{pathText}</Text>
           </>
         ) : null}
+        {" ".repeat(rightGap)}
+        {elapsed ? <Text dimColor>{elapsed}</Text> : null}
         {" ".repeat(padding)}
       </Text>
       {BOX.v}

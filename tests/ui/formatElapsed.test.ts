@@ -21,8 +21,9 @@ describe("formatElapsed", () => {
     expect(formatElapsed(NOW - 7 * MIN, NOW)).toBe("7m");
   });
 
-  it("returns NhMm under a day", () => {
-    expect(formatElapsed(NOW - (2 * HOUR + 30 * MIN), NOW)).toBe("2h30m");
+  it("returns Nh (no minutes) under a day", () => {
+    expect(formatElapsed(NOW - (2 * HOUR + 30 * MIN), NOW)).toBe("2h");
+    expect(formatElapsed(NOW - (17 * HOUR + 6 * MIN), NOW)).toBe("17h");
   });
 
   it("returns Nd at the 24h+ mark instead of NhMm", () => {

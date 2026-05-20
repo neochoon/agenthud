@@ -44,7 +44,7 @@ export function formatElapsed(lastModifiedMs: number, now = Date.now()): string 
   if (months >= 1) return `${months}mo`;
   if (weeks >= 1) return `${weeks}w`;
   if (days >= 1) return `${days}d`;
-  if (hours > 0) return `${hours}h${minutes % 60}m`;
+  if (hours > 0) return `${hours}h`;
   if (minutes > 0) return `${minutes}m`;
   if (seconds > 0) return `${seconds}s`;
   return "<1s";

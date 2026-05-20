@@ -2,6 +2,40 @@
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-05-20
+
+### Changed
+- **Activity viewer is now tail-feed.** Newest activity sits at the bottom, like `tail -f` / terminal logs / chat apps. Empty padding moved to the top. `g` jumps to the oldest (top), `G` to the live edge (bottom) — vim convention restored. PgUp/PgDn directions swap accordingly. The status bar's `PAUSED` indicator now shows `↑N` (scrolled up from live) and `+N↓` (new entries below the current view).
+- **Top-panel renamed "Projects"** (was "Sessions"). The tree groups sessions under projects at the top level, so the title now matches the structure. Updated Tab hint, HelpPanel section, and README.
+- **Elapsed labels coarsen past one hour.** Replaced `27h35m` style with single-unit `s/m/h/d/w/mo/y`. Cold sessions become readable at a glance ("1d", "3w", "2mo").
+- **Project rows show elapsed time too.** Right edge of each project row uses the most recently modified session's mtime as the project's "last activity".
+- **Width-aware title truncation.** Session and sub-agent titles now truncate by terminal display cells (CJK-aware) and append a single-cell `…` when clipped. Upstream task-description / first-prompt caps lifted from 60/80 → 300 chars, so wide terminals show more.
+- **Filter presets accept "all" / "*" / "any" keyword.** Same semantic as the bare `[]` (no filter), but legible to non-coders. Default `filterPresets` updated to `[["all"], ["response", "user"], ["commit"]]` — the middle preset now includes user prompts so the conversation flow is one cycle away.
+- **Commit detail uses `git show --stat --patch`** so actual diff hunks appear (the colorizer can do something with them).
+
+### New
+- **Sliding `›` live indicator** at the viewer's bottom edge. Animates left → right (180ms per cell, full content width) while the viewer is in LIVE mode and the app is in watch mode. Hidden when paused, empty, or non-watch. Resets to position 0 whenever the viewer's subject changes.
+- **Detail view syntax coloring.** Diff lines color green (`+`), red (`-`), cyan (`@@` hunks), dim metadata (`commit/Author/Date/diff/index`). Outside commits, fenced code blocks (` ```...``` `) render in cyan to separate prose from code. No language-specific syntax highlighting — just structural cues.
+- **Alternate screen buffer in watch mode.** Like `vim` / `htop` / `btop`: launching switches to a fresh buffer, quitting (`q`, Ctrl+C, SIGTERM, or an uncaught error) restores the pre-launch shell verbatim. No TUI residue.
+- **Minimum terminal size guard.** Watch mode below 80 cols × 20 rows refuses to render the split UI and shows a clear "needs larger terminal" panel that redraws automatically when you resize.
+- **Scrollable help overlay.** The `?` overlay now scrolls (`j/k`, `↑/↓`, `PgUp/PgDn`, `Ctrl+B/F`, `Space`, `g/G`) with a bottom indicator (`-- current / total --`) so the full content is reachable on shorter terminals.
+- **Tree cursor stays visible when focus is on the viewer.** Selected row keeps a dim version of its highlight; Tab back to the tree restores the bright state. Avoids losing project/session context while reading sub-agent activity in the viewer.
+- **Right gap on tree rows.** A 3-cell padding is reserved on the right side of session and project rows so the title doesn't run flush against the elapsed/model column.
+- **Breathing-room blank slot at the viewer bottom.** Reserves one row below the newest activity (no real activity sits flush against the box border).
+- **Session-status documentation.** README and HelpPanel now document the `[hot]/[warm]/[cool]/[cold]` badges (30 min / 1 hour / same day / older) with their colors and the cold-collapse rule.
+
+### Removed
+- **`s` save-log hotkey** — superseded by `agenthud report`. The `logDir` config field and `~/.agenthud/logs/` references are gone too.
+- **Stale `src/templates/config.yaml`** — leftover v0.7.x panel-based template no longer read by the loader.
+
+### Fixed
+- **Running from `~`** no longer treats the global `~/.agenthud/config.yaml` as a "legacy project config" and offers to delete it. Regression guard added.
+- **Range summary cache stale-when-today.** `agenthud summary --last 7d` on the same day previously returned the cached output even though today's daily had grown. Range cache now treated as valid only for past-only ranges.
+- **Cold sub-agents re-expand on session collapse.** Once toggled visible, the cold sub-agent group used to stay expanded across the parent session's collapse/reopen cycle. Closing the parent session now resets the per-session expansion flag, so reopening returns to the default (cold subs grouped under the sub-summary sentinel).
+- **Status bar overflow on narrow terminals.** When `AgentHUD vX.Y.Z` branding + shortcuts exceeded the width, the two halves overlapped. Now the branding is dropped first, then shortcut items trim from the front, keeping `?: help` and `q: quit` as the safety net.
+- **`agenthud summary` polluting its own tree.** `claude -p` is now invoked with `--no-session-persistence`, so the summary call no longer creates a JSONL session file under `~/.claude/projects/`.
+- **`--with-git` help text** corrected — previously said "from cwd"; the implementation actually pulls commits from each session's projectPath.
+
 ## [0.9.2] - 2026-05-18
 
 ### New
@@ -306,7 +340,8 @@
 - **Test Panel** - Test results at a glance
 - Watch mode for live updates
 
-[Unreleased]: https://github.com/neochoon/agenthud/compare/v0.9.2...HEAD
+[Unreleased]: https://github.com/neochoon/agenthud/compare/v0.9.3...HEAD
+[0.9.3]: https://github.com/neochoon/agenthud/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/neochoon/agenthud/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/neochoon/agenthud/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/neochoon/agenthud/compare/v0.8.5...v0.9.0

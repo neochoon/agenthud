@@ -8,6 +8,10 @@ import { render } from "ink";
 import React from "react";
 
 import { clearScreen, getHelp, getVersion, parseArgs } from "./cli.js";
+import {
+  enterAltScreen,
+  installAltScreenCleanup,
+} from "./utils/altScreen.js";
 import { loadGlobalConfig } from "./config/globalConfig.js";
 import { generateReport } from "./data/reportGenerator.js";
 import { runRangeSummary, runSummary } from "./data/summaryRunner.js";
@@ -102,7 +106,16 @@ if (options.mode === "summary") {
 }
 
 if (options.mode === "watch") {
-  clearScreen();
+  // Switch to the alternate screen buffer so quitting restores the user's
+  // pre-launch shell instead of leaving the rendered tree behind. The
+  // cleanup hooks ensure we exit alt-screen on q, Ctrl+C, SIGTERM, and
+  // uncaught errors.
+  installAltScreenCleanup();
+  enterAltScreen();
+} else {
+  // Non-watch modes (--once, report, summary) keep their output on the
+  // user's normal terminal, just like any CLI utility.
+  if (options.mode === "once") clearScreen();
 }
 
 render(React.createElement(App, { mode: options.mode }));

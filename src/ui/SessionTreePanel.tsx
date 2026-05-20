@@ -118,8 +118,12 @@ function SessionRow({
   const leftCoreWidth = getDisplayWidth(leftCoreBase);
   const rightWidth = getDisplayWidth(rightSide);
 
-  // Middle text sits right after badge; reserve 1 space prefix + 1 min gap
-  const middleAvailable = contentWidth - leftCoreWidth - 1 - rightWidth - 1;
+  // Reserve a small fixed gap on the right so the title doesn't run flush
+  // against the elapsed/model column — improves scan-ability across a row.
+  const RIGHT_GAP = 3;
+  // Middle text sits right after badge; reserve 1 space prefix + RIGHT_GAP.
+  const middleAvailable =
+    contentWidth - leftCoreWidth - 1 - rightWidth - RIGHT_GAP;
 
   // Middle text: first user prompt for parents, task description for sub-agents.
   // Use width-aware truncation that keeps the beginning and appends "…" so the
@@ -139,7 +143,7 @@ function SessionRow({
 
   const middleSection = middleText ? ` ${middleText}` : "";
   const gapWidth = Math.max(
-    1,
+    RIGHT_GAP,
     contentWidth - leftCoreWidth - getDisplayWidth(middleSection) - rightWidth,
   );
   const gap = " ".repeat(gapWidth);
@@ -317,7 +321,13 @@ function ProjectRow({
   // 2 spaces between name and path; gap pushes elapsed to the right edge.
   const middleGap = pathText ? 2 : 0;
   const leftWidth = nameWidth + middleGap + pathWidth;
-  const rightGap = Math.max(1, contentWidth - leftWidth - elapsedWidth);
+  // Min right gap mirrors SessionRow so the layout's right column has the
+  // same breathing room across the tree.
+  const PROJECT_RIGHT_GAP = 3;
+  const rightGap = Math.max(
+    PROJECT_RIGHT_GAP,
+    contentWidth - leftWidth - elapsedWidth,
+  );
   const totalWidth = leftWidth + rightGap + elapsedWidth;
   const padding = Math.max(0, contentWidth - totalWidth);
   const focused = isSelected && hasFocus;

@@ -184,19 +184,19 @@ describe("ActivityViewerPanel", () => {
     expect(lastFrame()).toContain("+3↓");
   });
 
-  it("renders liveTimeLabel in the trailing slot when live", () => {
+  it("renders the sliding arrow in the trailing slot when live", () => {
     const { lastFrame } = render(
       <ActivityViewerPanel
         {...baseProps}
         activities={[makeActivity("Read", 0)]}
         trailingBlankRows={1}
-        liveTimeLabel="[10:23:45]"
+        liveIndicatorPosition={2}
       />,
     );
-    expect(lastFrame()).toContain("[10:23:45]");
+    expect(lastFrame()).toContain("▸");
   });
 
-  it("does not render liveTimeLabel when paused (isLive false)", () => {
+  it("hides the arrow when paused (isLive false)", () => {
     const { lastFrame } = render(
       <ActivityViewerPanel
         {...baseProps}
@@ -204,12 +204,32 @@ describe("ActivityViewerPanel", () => {
         isLive={false}
         scrollOffset={3}
         trailingBlankRows={1}
-        liveTimeLabel="[10:23:45]"
+        liveIndicatorPosition={2}
       />,
     );
-    // The label must be hidden when scrolled away from live so it doesn't
-    // misleadingly appear above old content.
-    expect(lastFrame()).not.toContain("[10:23:45]");
+    // The motion indicator must not appear over stale content when the
+    // viewer is scrolled away from the live edge.
+    expect(lastFrame()).not.toContain("▸");
+  });
+
+  it("places the arrow at the requested column offset", () => {
+    const { lastFrame } = render(
+      <ActivityViewerPanel
+        {...baseProps}
+        activities={[makeActivity("Read", 0)]}
+        trailingBlankRows={1}
+        liveIndicatorPosition={5}
+      />,
+    );
+    const frame = lastFrame() ?? "";
+    // Find the line containing the arrow (only the trailing slot has it).
+    const arrowLine = frame
+      .split("\n")
+      .find((line) => line.includes("▸")) ?? "";
+    // Strip leading "│ " box border, then count spaces before the arrow.
+    const stripped = arrowLine.replace(/^.*?│\s/, "");
+    const spacesBeforeArrow = stripped.indexOf("▸");
+    expect(spacesBeforeArrow).toBe(5);
   });
 
   it("flattens multi-line detail to a single line in the viewer", () => {

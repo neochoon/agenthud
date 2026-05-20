@@ -26,8 +26,8 @@ import { ActivityViewerPanel } from "./ActivityViewerPanel.js";
 import { getDisplayWidth } from "./constants.js";
 import { DetailViewPanel } from "./DetailViewPanel.js";
 import { HelpPanel } from "./HelpPanel.js";
-import { useClock } from "./hooks/useClock.js";
 import { useHotkeys } from "./hooks/useHotkeys.js";
+import { useSlide } from "./hooks/useSlide.js";
 import { useSpinner } from "./hooks/useSpinner.js";
 import { SessionTreePanel } from "./SessionTreePanel.js";
 
@@ -422,11 +422,15 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   );
 
   const spinner = useSpinner(isWatchMode);
-  const liveNow = useClock(1000);
-  const liveTimeLabel = (() => {
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `[${pad(liveNow.getHours())}:${pad(liveNow.getMinutes())}:${pad(liveNow.getSeconds())}]`;
-  })();
+  // Slide a small arrow across the viewer's live-edge slot every 180ms.
+  // The animation only ticks in watch mode; the panel additionally hides
+  // it when the viewer is PAUSED.
+  const VIEWER_INDICATOR_WIDTH = 8;
+  const liveIndicatorPosition = useSlide(
+    isWatchMode,
+    VIEWER_INDICATOR_WIDTH,
+    180,
+  );
   const helpViewportRows = Math.max(1, height - 3); // status bar + indicator
   const helpScrollStep = (delta: number) => {
     const max = Math.max(0, helpTotalLinesRef.current - helpViewportRows);
@@ -875,7 +879,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
                 newCount={newCount}
                 visibleRows={viewerRows}
                 trailingBlankRows={VIEWER_BREATHING_ROWS}
-                liveTimeLabel={liveTimeLabel}
+                liveIndicatorPosition={liveIndicatorPosition}
                 width={width}
                 cursorLine={viewerCursorLine}
                 hasFocus={focus === "viewer"}

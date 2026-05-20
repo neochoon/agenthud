@@ -51,13 +51,15 @@ export interface ActivityViewerPanelProps {
    */
   trailingBlankRows?: number;
   /**
-   * When set AND isLive is true, this label (e.g. "[10:23:45]") renders
-   * in the first trailing slot in bright white — a live clock anchor
-   * showing "the next activity will land here at this time".
-   * Hidden whenever isLive is false so it doesn't appear above stale
-   * content while the user is scrolled into history.
+   * Column offset (0-based) for the live-edge motion indicator inside the
+   * first trailing slot. When set AND `isLive` is true, an arrow (`▸`)
+   * renders that many cells from the left, painted dim cyan. The animation
+   * comes from `useSlide` ticking the offset on a fixed interval, so the
+   * arrow appears to slide left → right and wrap. Hidden whenever `isLive`
+   * is false so the motion doesn't mislead the user while they're reading
+   * history.
    */
-  liveTimeLabel?: string | null;
+  liveIndicatorPosition?: number | null;
   width: number;
   cursorLine: number;
   hasFocus: boolean;
@@ -108,7 +110,7 @@ export function ActivityViewerPanel({
   newCount,
   visibleRows,
   trailingBlankRows = 0,
-  liveTimeLabel = null,
+  liveIndicatorPosition = null,
   width,
   cursorLine,
   hasFocus,
@@ -249,19 +251,26 @@ export function ActivityViewerPanel({
   for (let i = 0; i < padCount; i++) {
     padded.push(<Text key={`pad-${i}`}>{emptyRow}</Text>);
   }
-  // Trailing slot: if live and we have a clock label, render it in the
-  // FIRST trailing row (bright white, no icon, prefixed like activity
-  // timestamps). The remaining trailing rows stay empty. When paused,
-  // every trailing row is empty.
+  // Trailing slot: when live, draw a small arrow at the position dictated
+  // by `liveIndicatorPosition` so it appears to slide left → right across
+  // the row. Only the FIRST trailing row carries the indicator; any
+  // remaining trailing rows stay empty. When paused, every trailing row
+  // is empty (no motion over stale content).
   const trailing: React.ReactElement[] = [];
   for (let i = 0; i < trailingBlankRows; i++) {
-    if (i === 0 && isLive && liveTimeLabel) {
-      const prefix = `${liveTimeLabel} `;
-      const padLen = Math.max(0, contentWidth - prefix.length);
+    if (i === 0 && isLive && liveIndicatorPosition != null) {
+      const pos = Math.max(0, liveIndicatorPosition);
+      const arrow = "▸";
+      // Cap the arrow position to whatever fits inside the content area.
+      const safePos = Math.min(pos, Math.max(0, contentWidth - 1));
+      const padAfter = Math.max(0, contentWidth - safePos - 1);
       trailing.push(
         <Text key={`trail-${i}`}>
-          {BOX.v} <Text color="white">{prefix}</Text>
-          {" ".repeat(padLen)}
+          {BOX.v} {" ".repeat(safePos)}
+          <Text color="cyan" dimColor>
+            {arrow}
+          </Text>
+          {" ".repeat(padAfter)}
           {BOX.v}
         </Text>,
       );

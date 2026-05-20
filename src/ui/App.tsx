@@ -431,6 +431,9 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     isWatchMode,
     viewerIndicatorWidth,
     180,
+    // Reset to 0 whenever the viewer's subject changes so each new
+    // session/sub-agent restarts the arrow from the left.
+    selectedId,
   );
   const helpViewportRows = Math.max(1, height - 3); // status bar + indicator
   const helpScrollStep = (delta: number) => {

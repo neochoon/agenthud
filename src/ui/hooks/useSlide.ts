@@ -14,8 +14,16 @@ export function useSlide(
   active: boolean,
   positions: number,
   intervalMs = 180,
+  resetKey?: unknown,
 ): number {
   const [index, setIndex] = useState(0);
+
+  // Reset to 0 whenever the caller-provided identity changes (e.g. the
+  // viewer's selected session). Without this the arrow would keep its
+  // mid-cycle position when the user moves to a different target.
+  useEffect(() => {
+    setIndex(0);
+  }, [resetKey]);
 
   useEffect(() => {
     if (!active) return;

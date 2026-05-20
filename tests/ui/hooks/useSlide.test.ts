@@ -40,6 +40,20 @@ describe("useSlide", () => {
     expect(result.current).toBe(0);
   });
 
+  it("resets to 0 when resetKey changes", () => {
+    const { result, rerender } = renderHook(
+      ({ k }: { k: string }) => useSlide(true, 8, 100, k),
+      { initialProps: { k: "session-a" } },
+    );
+    act(() => {
+      vi.advanceTimersByTime(300); // index = 3
+    });
+    expect(result.current).toBe(3);
+    rerender({ k: "session-b" });
+    // The reset effect runs synchronously after the rerender.
+    expect(result.current).toBe(0);
+  });
+
   it("stops advancing when active flips to false", () => {
     const { result, rerender } = renderHook(
       ({ active }: { active: boolean }) => useSlide(active, 8, 100),

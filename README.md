@@ -23,27 +23,29 @@ Run this in a separate terminal while using Claude Code. Press `?` inside the TU
 AgentHUD reads Claude Code's session files from `~/.claude/projects/` and displays them in a split view:
 
 ```
-┌─ Projects ──────────────────────────────────────────────┐
-│ > agenthud  ~/WestbrookAI/agenthud                      │
-│     #864f [hot] Fix the auth bug in login flow          │
-│         ├─ » code-reviewer                              │
-│     (#398c [warm])                                      │
-│   myproject  ~/work/myproject                           │
-│     #def4 [hot] Add OAuth support                       │
-│ ... 12 cold projects                                    │
-└─────────────────────────────────────────────────────────┘
-┌─ Activity · agenthud ───────────────────────────────────┐
-│ [10:23] ○ Read  src/ui/App.tsx                          │
-│ [10:23] ~ Edit  src/ui/App.tsx                          │
-│ [10:23] $ Bash  npm test                                │
-│ [10:23] < Response  Tests passed successfully           │
-│ [10:25] ◆ abc1234  feat: fix auth callback              │
-└─────────────────────────────────────────────────────────┘
+┌─ Projects ───────────────────────────────────────────────┐
+│ > agenthud  ~/WestbrookAI/agenthud                   13m │
+│     #864f [hot] Fix the auth bug in login flow           │
+│         ├─ » code-reviewer                               │
+│     (#398c [warm])                                       │
+│   myproject  ~/work/myproject                         2d │
+│     #def4 [hot] Add OAuth support                        │
+│ ... 12 cold projects                                     │
+└──────────────────────────────────────────────────────────┘
+┌─ Activity · agenthud ────────────────────────────────────┐
+│ [10:23] ○ Read  src/ui/App.tsx                           │
+│ [10:23] ~ Edit  src/ui/App.tsx                           │
+│ [10:23] $ Bash  npm test                                 │
+│ [10:23] < Response  Tests passed successfully            │
+│ [10:25] ◆ abc1234  feat: fix auth callback               │
+│ ›                                                        │
+└──────────────────────────────────────────────────────────┘
 ```
 
 **Project tree (top pane)**
 - Sessions grouped under their project (project name + path at the top).
-- Session rows show short ID + first user prompt (the session's "topic").
+- Session rows show short ID + first user prompt (the session's "topic"). Long titles truncate with a `…` suffix.
+- Right edge of each row shows how long ago it was last touched: `42m`, `17h`, `3d`, `2w`, `1mo`, `1y`. Project rows use the most recent session's mtime.
 - Non-interactive sessions (from `claude -p`, SDK, `agenthud summary`) appear in parens and dimmed.
 - Sub-agents nest one level deeper under their parent session.
 - Cold projects collapse under `... N cold projects` at the bottom (press Enter on the line to expand).
@@ -51,6 +53,7 @@ AgentHUD reads Claude Code's session files from `~/.claude/projects/` and displa
 
 **Activity viewer (bottom pane)**
 - Real-time feed for the selected session: file reads, edits, bash, responses, thinking, git commits. Newest at the bottom, like `tail -f`.
+- A `›` slides left → right along the bottom row while the viewer is in LIVE mode — visible proof the feed is alive. Hidden when paused (scrolled into history) or when the session has no activity yet.
 - Press `f` to cycle through filter presets (configurable).
 - Press `↵` on any row to open a scrollable detail view; on a commit row this shows `git show --stat --patch`.
 
@@ -114,6 +117,7 @@ Full reference is also available inside the app — press `?`.
 | `G` | Jump to live (newest, bottom) |
 | `↵` | Open detail view |
 | `f` | Cycle filter preset |
+| `r` | Refresh now |
 | `Tab` | Switch focus to project tree |
 | `?` | Help |
 | `q` | Quit |
@@ -124,6 +128,17 @@ Full reference is also available inside the app — press `?`.
 |-----|--------|
 | `↑` / `k` / `↓` / `j` | Scroll |
 | `↵` / `Esc` / `q` | Close |
+
+Detail view colors the content based on activity type:
+
+- **Git commit detail** (`git show --stat --patch`): added lines green (`+`), removed lines red (`-`), hunk headers cyan (`@@ ... @@`), `commit/Author/Date/diff` metadata dimmed.
+- **Response / thinking / prompt**: text inside triple-backtick code fences renders in cyan so the boundary between prose and code is obvious. No language-specific syntax highlighting — just code-vs-prose separation.
+
+## Behavior
+
+- **Alternate screen buffer.** Watch mode uses the alt-screen (like `vim`, `htop`, `btop`), so quitting (`q`) restores the pre-launch shell completely. No TUI residue, no "is it still running?" confusion.
+- **Minimum terminal size.** 80 cols × 20 rows. Smaller terminals show a one-line hint and redraw automatically when you resize.
+- **Help overlay scrolls.** Press `?` for an in-app reference. The overlay scrolls (`j/k`, `PgUp/PgDn`, `Ctrl+B/F`, `Space`, `g/G`) so the full content is reachable on shorter terminals.
 
 ## Report
 
@@ -155,7 +170,7 @@ Output:
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--date` | today | `YYYY-MM-DD` or `today` (local date) |
+| `--date` | today | `YYYY-MM-DD`, `today`, `yesterday`, or `-Nd` (N days ago, local date) |
 | `--include` | `response,bash,edit,thinking` | Comma-separated types or `all` |
 | `--format` | `markdown` | `markdown` or `json` |
 | `--detail-limit` | `120` | Max chars per detail field; `0` = unlimited |

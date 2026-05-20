@@ -1,0 +1,60 @@
+# AgentHUD live monitor demo.
+# Generates: demo/live.gif
+#
+# To regenerate:
+#   vhs demo/live.tape
+#
+# Shows: launching the TUI, navigating the project tree, toggling the
+# help overlay, focusing the activity viewer, jumping to live edge,
+# and quitting (which restores the pre-launch shell via alt-screen).
+
+Output demo/live.gif
+
+Set FontSize 16
+Set Width 1400
+Set Height 800
+Set Theme "Catppuccin Mocha"
+Set TypingSpeed 60ms
+
+# Pre-launch shell prompt visible
+Sleep 800ms
+
+Type "agenthud"
+Enter
+Sleep 2500ms
+
+# Browse the project tree
+Type "j"
+Sleep 700ms
+Type "j"
+Sleep 700ms
+Type "j"
+Sleep 800ms
+
+# Show the in-app help, then close it
+Type "?"
+Sleep 2500ms
+Type "?"
+Sleep 800ms
+
+# Switch focus to the activity viewer
+Tab
+Sleep 1200ms
+
+# Scroll backward through history
+Type "k"
+Sleep 400ms
+Type "k"
+Sleep 400ms
+Type "k"
+Sleep 400ms
+Type "k"
+Sleep 600ms
+
+# Jump back to the live edge (newest at bottom; the sliding "›" reappears)
+Type "G"
+Sleep 1500ms
+
+# Quit. Alt-screen exits cleanly — viewers see the pre-launch shell return.
+Type "q"
+Sleep 1500ms

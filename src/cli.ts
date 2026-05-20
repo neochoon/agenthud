@@ -186,13 +186,21 @@ export function parseArgs(args: string[]): CliOptions {
     const includeIdx = rest.indexOf("--include");
     if (includeIdx !== -1) {
       const includeStr = rest[includeIdx + 1];
-      if (includeStr === "all") {
+      if (!includeStr) {
+        reportError = "Invalid --include: missing value.";
+      } else if (includeStr === "all") {
         reportInclude = ALL_TYPES;
-      } else if (includeStr) {
-        reportInclude = includeStr
+      } else {
+        const tokens = includeStr
           .split(",")
           .map((s) => s.trim())
           .filter(Boolean);
+        const unknown = tokens.filter((t) => !ALL_TYPES.includes(t));
+        if (unknown.length > 0) {
+          reportError = `Unknown --include type${unknown.length > 1 ? "s" : ""}: ${unknown.map((u) => `"${u}"`).join(", ")}. Valid types: ${ALL_TYPES.join(", ")} (or "all").`;
+        } else {
+          reportInclude = tokens;
+        }
       }
     }
 

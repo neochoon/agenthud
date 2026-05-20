@@ -104,6 +104,25 @@ describe("parseArgs", () => {
       expect(opts.reportInclude).toEqual(["response", "edit"]);
     });
 
+    it("returns error for an unknown --include type (typo)", () => {
+      const opts = parseArgs(["report", "--include", "response,bas"]);
+      expect(opts.reportError).toBeDefined();
+      expect(opts.reportError).toContain('"bas"');
+      expect(opts.reportError).toContain("Valid types");
+    });
+
+    it("lists multiple unknown --include types in the error", () => {
+      const opts = parseArgs(["report", "--include", "response,bas,foo"]);
+      expect(opts.reportError).toBeDefined();
+      expect(opts.reportError).toContain('"bas"');
+      expect(opts.reportError).toContain('"foo"');
+    });
+
+    it("returns error when --include has no value", () => {
+      const opts = parseArgs(["report", "--include"]);
+      expect(opts.reportError).toContain("missing value");
+    });
+
     it("returns error for invalid date", () => {
       const opts = parseArgs(["report", "--date", "not-a-date"]);
       expect(opts.mode).toBe("report");

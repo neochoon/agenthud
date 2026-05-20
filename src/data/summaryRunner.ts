@@ -338,7 +338,18 @@ interface DailyGenOpts {
   streamToStdout: boolean;
   announce: boolean; // emit scan/sending/saved/tokens stderr messages
   confirmBeforeSpawn?: () => Promise<boolean>;
+  /** When true, skip the interactive size-warning confirmation. */
+  assumeYes?: boolean;
 }
+
+/**
+ * Pre-flight size warning. Reports larger than this estimate (in tokens,
+ * computed as bytes/4) trigger a stderr warning and — if interactive —
+ * an extra confirmation. The threshold is conservative: the 1M-token
+ * Opus/Sonnet contexts could swallow more, but 300K input tokens is
+ * already ~$1.50 on Opus and worth flagging.
+ */
+const REPORT_TOKEN_WARN_THRESHOLD = 300_000;
 
 interface DailyGenResult {
   code: number;
@@ -397,6 +408,9 @@ async function generateDailySummary(
     withGit: true,
   });
 
+  const reportBytes = Buffer.byteLength(reportMarkdown, "utf-8");
+  const estimatedTokens = Math.ceil(reportBytes / 4);
+
   if (opts.announce) {
     const reportLines = reportMarkdown.split("\n");
     const sessionCount = reportLines.filter((l) => l.startsWith("## ")).length;
@@ -406,11 +420,9 @@ async function generateDailySummary(
     const commitCount = reportLines.filter((l) =>
       /^\[\d{2}:\d{2}\] ◆/.test(l),
     ).length;
-    const sizeKb = (Buffer.byteLength(reportMarkdown, "utf-8") / 1024).toFixed(
-      1,
-    );
+    const sizeKb = (reportBytes / 1024).toFixed(1);
     process.stderr.write(
-      `agenthud: input: ${sessionCount} sessions, ${activityCount} activities, ${commitCount} commits (${reportLines.length} lines, ${sizeKb}KB)\n`,
+      `agenthud: input: ${sessionCount} sessions, ${activityCount} activities, ${commitCount} commits (${reportLines.length} lines, ${sizeKb}KB ≈ ${estimatedTokens.toLocaleString()} tokens)\n`,
     );
   }
 
@@ -424,6 +436,30 @@ async function generateDailySummary(
         skipped: true,
         usage: null,
       };
+    }
+  }
+
+  // Oversize guard. Print a loud warning and, in interactive mode, give
+  // the user one more chance to abort before sending an expensive request.
+  if (estimatedTokens > REPORT_TOKEN_WARN_THRESHOLD) {
+    const sizeMb = (reportBytes / (1024 * 1024)).toFixed(1);
+    process.stderr.write(
+      `agenthud: ⚠ report is large (~${estimatedTokens.toLocaleString()} tokens, ${sizeMb}MB). Cost will be high; very long reports may exceed context.\n`,
+    );
+    if (!opts.assumeYes) {
+      const proceed = await ask("Send anyway? [Y/n] ", true);
+      if (!proceed) {
+        process.stderr.write(
+          `agenthud: ${dateLabel} — aborted (report too large).\n`,
+        );
+        return {
+          code: 0,
+          markdown: "",
+          fromCache: false,
+          skipped: true,
+          usage: null,
+        };
+      }
     }
   }
 
@@ -544,6 +580,7 @@ export async function runRangeSummary(
       streamToStdout: false,
       announce: true,
       confirmBeforeSpawn: confirmer,
+      assumeYes: options.assumeYes,
     });
 
     if (res.skipped) {

@@ -681,16 +681,30 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
           : `__collapsed-session-${selectedId}`;
         setExpandedIds((prev) => {
           const next = new Set(prev);
-          if (next.has(toggleKey)) {
-            next.delete(toggleKey);
-            // Collapsing alive session: move selection to parent session
-            if (!isCold) setSelectedId(selectedId);
-          } else {
-            next.add(toggleKey);
-            // Expanding cold session: move to first sub-agent
-            if (isCold) {
+          // Going TO collapsed state for an alive session = adding toggleKey;
+          // for a cold session = removing toggleKey. In either case we also
+          // reset the per-session "show cool/cold sub-agents" flag so the
+          // next re-expansion returns to the default (hot/warm visible, the
+          // rest grouped under the sub-summary sentinel).
+          if (isCold) {
+            if (next.has(toggleKey)) {
+              // currently expanded (cold case) → collapsing
+              next.delete(toggleKey);
+              next.delete(selectedId); // reset cold sub-agent expansion
+            } else {
+              next.add(toggleKey);
               const firstSub = selectedSessionObj.subAgents[0];
               if (firstSub) setSelectedId(firstSub.id);
+            }
+          } else {
+            if (next.has(toggleKey)) {
+              // currently collapsed (alive case) → expanding
+              next.delete(toggleKey);
+            } else {
+              // currently expanded → collapsing
+              next.add(toggleKey);
+              next.delete(selectedId); // reset cold sub-agent expansion
+              setSelectedId(selectedId);
             }
           }
           return next;

@@ -29,6 +29,7 @@ export interface CliOptions {
   summaryAssumeYes?: boolean;
   summaryPrompt?: string;
   summaryForce?: boolean;
+  summaryModel?: string;
   summaryError?: string;
 }
 
@@ -55,6 +56,7 @@ const KNOWN_SUMMARY_FLAGS = new Set([
   "--to",
   "--prompt",
   "--force",
+  "--model",
   "-y",
   "--yes",
 ]);
@@ -92,6 +94,7 @@ Commands:
     --to YYYY-MM-DD             Date range: end date (use with --from)
     --prompt TEXT               Override prompt for this run (daily only)
     --force                     Regenerate even if cached
+    --model NAME                Pass --model to claude (e.g. "sonnet", "haiku", or a full model ID)
     -y, --yes                   Skip confirmation prompts for new daily summaries
 
 Environment:
@@ -250,6 +253,7 @@ export function parseArgs(args: string[]): CliOptions {
     let summaryPrompt: string | undefined;
     let summaryForce = false;
     let summaryAssumeYes = false;
+    let summaryModel: string | undefined;
     let summaryError: string | undefined;
 
     const FLAGS_WITH_VALUE = new Set([
@@ -258,6 +262,7 @@ export function parseArgs(args: string[]): CliOptions {
       "--from",
       "--to",
       "--prompt",
+      "--model",
     ]);
 
     for (let i = 0; i < rest.length; i++) {
@@ -362,6 +367,16 @@ export function parseArgs(args: string[]): CliOptions {
       }
     }
 
+    const modelIdx = rest.indexOf("--model");
+    if (modelIdx !== -1) {
+      const val = rest[modelIdx + 1];
+      if (!val) {
+        summaryError = "Invalid --model: missing value (e.g. --model sonnet).";
+      } else {
+        summaryModel = val;
+      }
+    }
+
     if (rest.includes("--force")) summaryForce = true;
     if (rest.includes("-y") || rest.includes("--yes")) summaryAssumeYes = true;
 
@@ -373,6 +388,7 @@ export function parseArgs(args: string[]): CliOptions {
       summaryPrompt,
       summaryForce,
       summaryAssumeYes,
+      summaryModel,
       summaryError,
     };
   }

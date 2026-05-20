@@ -20,6 +20,8 @@ export interface SummaryOptions {
   force: boolean;
   prompt?: string;
   today: Date;
+  /** Forwarded to `claude --model` (e.g. "sonnet", "haiku", or full model ID). */
+  model?: string;
 }
 
 export interface RangeSummaryOptions {
@@ -28,6 +30,7 @@ export interface RangeSummaryOptions {
   today: Date;
   force: boolean;
   assumeYes: boolean;
+  model?: string;
 }
 
 type PromptKind = "daily" | "range";
@@ -175,6 +178,8 @@ interface SpawnClaudeOpts {
   stdin: string;
   cachePath?: string;
   streamToStdout: boolean;
+  /** Forwarded to `claude --model` if set. */
+  model?: string;
 }
 
 interface SpawnClaudeResult {
@@ -185,16 +190,18 @@ interface SpawnClaudeResult {
 
 function spawnClaude(opts: SpawnClaudeOpts): Promise<SpawnClaudeResult> {
   return new Promise((resolve) => {
+    const args = [
+      "-p",
+      "--no-session-persistence",
+      "--output-format",
+      "stream-json",
+      "--verbose",
+    ];
+    if (opts.model) args.push("--model", opts.model);
+    args.push(opts.prompt);
     const proc = spawn(
       "claude",
-      [
-        "-p",
-        "--no-session-persistence",
-        "--output-format",
-        "stream-json",
-        "--verbose",
-        opts.prompt,
-      ],
+      args,
       {
         stdio: ["pipe", "pipe", "pipe"],
         cwd: agenthudHomeDir(),
@@ -340,6 +347,8 @@ interface DailyGenOpts {
   confirmBeforeSpawn?: () => Promise<boolean>;
   /** When true, skip the interactive size-warning confirmation. */
   assumeYes?: boolean;
+  /** Forwarded to `claude --model`. */
+  model?: string;
 }
 
 /**
@@ -475,6 +484,7 @@ async function generateDailySummary(
     stdin: reportMarkdown,
     cachePath: cached,
     streamToStdout: opts.streamToStdout,
+    model: opts.model,
   });
 
   if (opts.announce && result.code === 0) {
@@ -502,6 +512,7 @@ export async function runSummary(options: SummaryOptions): Promise<number> {
     promptOverride: options.prompt,
     streamToStdout: true,
     announce: true,
+    model: options.model,
   });
   return res.code;
 }
@@ -581,6 +592,7 @@ export async function runRangeSummary(
       announce: true,
       confirmBeforeSpawn: confirmer,
       assumeYes: options.assumeYes,
+      model: options.model,
     });
 
     if (res.skipped) {
@@ -625,6 +637,7 @@ export async function runRangeSummary(
     stdin: metaInput,
     cachePath: rangeCache,
     streamToStdout: true,
+    model: options.model,
   });
 
   if (metaResult.code !== 0) {

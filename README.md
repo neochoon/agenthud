@@ -200,6 +200,10 @@ agenthud summary --prompt "Only commits"    # override prompt
 agenthud summary --last 7d                          # last 7 days, ending today
 agenthud summary --from 2026-05-10 --to 2026-05-16  # explicit range
 agenthud summary --last 7d -y                       # skip per-day confirmations
+
+# Cheaper model — summarization doesn't need Opus-tier reasoning
+agenthud summary --date today --model sonnet        # ~40% cheaper than Opus
+agenthud summary --last 7d --model haiku            # ~80% cheaper, 200K context
 ```
 
 **Daily summaries** are saved to `~/.agenthud/summaries/YYYY-MM-DD.md`. Past dates are cached and returned instantly; today is always regenerated (activity still growing).
@@ -211,6 +215,10 @@ Each missing daily prompts for confirmation just before generation, so you see c
 **Prompt customization:** The daily template lives at `~/.agenthud/summary-prompt.md` and the range template at `~/.agenthud/summary-range-prompt.md`. Both are auto-created from built-in templates on first run. Edit them freely.
 
 **`--date` formats:** `YYYY-MM-DD`, `today`, `yesterday`, or `-Nd` (N days ago).
+
+**Model selection:** Summarization is a low-reasoning task (structured input → structured markdown) — Sonnet or Haiku usually beats Opus on cost-per-summary with no quality loss. Pass `--model sonnet`, `--model haiku`, or a full model id (`--model claude-sonnet-4-6`). With no flag, `claude` uses its default model.
+
+**Cost warning:** If the day's activity log is large (~300K tokens or more), AgentHUD prints a warning before sending and asks for one more confirmation in interactive mode. `-y` skips the prompt but still prints the warning.
 
 **Requires:** [`@anthropic-ai/claude-code`](https://www.npmjs.com/package/@anthropic-ai/claude-code) installed and authenticated.
 

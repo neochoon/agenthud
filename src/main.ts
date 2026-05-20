@@ -93,6 +93,7 @@ if (options.mode === "summary") {
       today,
       force: options.summaryForce ?? false,
       assumeYes: options.summaryAssumeYes ?? false,
+      model: options.summaryModel,
     });
     process.exit(exitCode);
   }
@@ -101,6 +102,7 @@ if (options.mode === "summary") {
     prompt: options.summaryPrompt,
     force: options.summaryForce ?? false,
     today,
+    model: options.summaryModel,
   });
   process.exit(exitCode);
 }

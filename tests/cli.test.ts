@@ -308,6 +308,27 @@ describe("parseArgs", () => {
       const opts = parseArgs(["summary"]);
       expect(opts.summaryAssumeYes).toBe(false);
     });
+
+    it("parses --model and forwards the alias", () => {
+      const opts = parseArgs(["summary", "--model", "sonnet"]);
+      expect(opts.summaryError).toBeUndefined();
+      expect(opts.summaryModel).toBe("sonnet");
+    });
+
+    it("parses --model with a full model id", () => {
+      const opts = parseArgs(["summary", "--model", "claude-sonnet-4-6"]);
+      expect(opts.summaryModel).toBe("claude-sonnet-4-6");
+    });
+
+    it("errors when --model has no value", () => {
+      const opts = parseArgs(["summary", "--model"]);
+      expect(opts.summaryError).toContain("missing value");
+    });
+
+    it("leaves summaryModel undefined when --model is not passed", () => {
+      const opts = parseArgs(["summary"]);
+      expect(opts.summaryModel).toBeUndefined();
+    });
   });
 });
 

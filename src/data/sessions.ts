@@ -46,18 +46,29 @@ function getSessionStatus(mtimeMs: number): SessionStatus {
   return "cold";
 }
 
+// Generous safety cap to keep arbitrarily long sub-agent task headers or
+// user prompts out of memory while leaving the actual display-width
+// truncation to the panel (which knows the terminal width and adds "…").
+const MAX_TITLE_LEN = 300;
+
+function capWithEllipsis(s: string, max = MAX_TITLE_LEN): string {
+  const trimmed = s.trim();
+  if (trimmed.length <= max) return trimmed;
+  return `${trimmed.slice(0, max - 1)}…`;
+}
+
 function extractTaskDescription(content: string): string {
   // "## Task N: Title" markdown header
   const headerMatch = content.match(/##\s*(Task\s+\d+[:\s].+)/m);
-  if (headerMatch) return headerMatch[1].trim().slice(0, 60);
+  if (headerMatch) return capWithEllipsis(headerMatch[1]);
 
   // "**This Task (Task N of M):** Title"
   const thisTaskMatch = content.match(/\*\*This Task[^:]+:\*\*\s*(.+)/);
-  if (thisTaskMatch) return thisTaskMatch[1].trim().slice(0, 60);
+  if (thisTaskMatch) return capWithEllipsis(thisTaskMatch[1]);
 
   // Fall back to first non-empty line
   const firstLine = content.split("\n").find((l) => l.trim());
-  return (firstLine ?? "").trim().slice(0, 60);
+  return capWithEllipsis(firstLine ?? "");
 }
 
 function readSubAgentInfo(filePath: string): {
@@ -161,8 +172,7 @@ function readFirstUserPrompt(filePath: string): string | null {
 
     const firstLine = text.split("\n").find((l) => l.trim()) ?? "";
     if (!firstLine || isSystemNoise(firstLine)) continue;
-    const trimmed = firstLine.trim();
-    return trimmed.length > 80 ? trimmed.slice(0, 80) : trimmed;
+    return capWithEllipsis(firstLine);
   }
   return null;
 }

@@ -26,6 +26,7 @@ import { ActivityViewerPanel } from "./ActivityViewerPanel.js";
 import { getDisplayWidth } from "./constants.js";
 import { DetailViewPanel } from "./DetailViewPanel.js";
 import { HelpPanel } from "./HelpPanel.js";
+import { useClock } from "./hooks/useClock.js";
 import { useHotkeys } from "./hooks/useHotkeys.js";
 import { useSpinner } from "./hooks/useSpinner.js";
 import { SessionTreePanel } from "./SessionTreePanel.js";
@@ -421,6 +422,11 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   );
 
   const spinner = useSpinner(isWatchMode);
+  const liveNow = useClock(1000);
+  const liveTimeLabel = (() => {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `[${pad(liveNow.getHours())}:${pad(liveNow.getMinutes())}:${pad(liveNow.getSeconds())}]`;
+  })();
   const helpViewportRows = Math.max(1, height - 3); // status bar + indicator
   const helpScrollStep = (delta: number) => {
     const max = Math.max(0, helpTotalLinesRef.current - helpViewportRows);
@@ -869,6 +875,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
                 newCount={newCount}
                 visibleRows={viewerRows}
                 trailingBlankRows={VIEWER_BREATHING_ROWS}
+                liveTimeLabel={liveTimeLabel}
                 width={width}
                 cursorLine={viewerCursorLine}
                 hasFocus={focus === "viewer"}

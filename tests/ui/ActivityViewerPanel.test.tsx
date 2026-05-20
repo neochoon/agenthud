@@ -184,6 +184,34 @@ describe("ActivityViewerPanel", () => {
     expect(lastFrame()).toContain("+3↓");
   });
 
+  it("renders liveTimeLabel in the trailing slot when live", () => {
+    const { lastFrame } = render(
+      <ActivityViewerPanel
+        {...baseProps}
+        activities={[makeActivity("Read", 0)]}
+        trailingBlankRows={1}
+        liveTimeLabel="[10:23:45]"
+      />,
+    );
+    expect(lastFrame()).toContain("[10:23:45]");
+  });
+
+  it("does not render liveTimeLabel when paused (isLive false)", () => {
+    const { lastFrame } = render(
+      <ActivityViewerPanel
+        {...baseProps}
+        activities={[makeActivity("Read", 0)]}
+        isLive={false}
+        scrollOffset={3}
+        trailingBlankRows={1}
+        liveTimeLabel="[10:23:45]"
+      />,
+    );
+    // The label must be hidden when scrolled away from live so it doesn't
+    // misleadingly appear above old content.
+    expect(lastFrame()).not.toContain("[10:23:45]");
+  });
+
   it("flattens multi-line detail to a single line in the viewer", () => {
     const multiLineActivity: ActivityEntry = {
       timestamp: new Date(1_700_000_000_000),

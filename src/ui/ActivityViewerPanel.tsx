@@ -50,6 +50,14 @@ export interface ActivityViewerPanelProps {
    * height math so the box still fits the screen.
    */
   trailingBlankRows?: number;
+  /**
+   * When set AND isLive is true, this label (e.g. "[10:23:45]") renders
+   * in the first trailing slot in bright white — a live clock anchor
+   * showing "the next activity will land here at this time".
+   * Hidden whenever isLive is false so it doesn't appear above stale
+   * content while the user is scrolled into history.
+   */
+  liveTimeLabel?: string | null;
   width: number;
   cursorLine: number;
   hasFocus: boolean;
@@ -100,6 +108,7 @@ export function ActivityViewerPanel({
   newCount,
   visibleRows,
   trailingBlankRows = 0,
+  liveTimeLabel = null,
   width,
   cursorLine,
   hasFocus,
@@ -240,9 +249,25 @@ export function ActivityViewerPanel({
   for (let i = 0; i < padCount; i++) {
     padded.push(<Text key={`pad-${i}`}>{emptyRow}</Text>);
   }
+  // Trailing slot: if live and we have a clock label, render it in the
+  // FIRST trailing row (bright white, no icon, prefixed like activity
+  // timestamps). The remaining trailing rows stay empty. When paused,
+  // every trailing row is empty.
   const trailing: React.ReactElement[] = [];
   for (let i = 0; i < trailingBlankRows; i++) {
-    trailing.push(<Text key={`trail-${i}`}>{emptyRow}</Text>);
+    if (i === 0 && isLive && liveTimeLabel) {
+      const prefix = `${liveTimeLabel} `;
+      const padLen = Math.max(0, contentWidth - prefix.length);
+      trailing.push(
+        <Text key={`trail-${i}`}>
+          {BOX.v} <Text color="white">{prefix}</Text>
+          {" ".repeat(padLen)}
+          {BOX.v}
+        </Text>,
+      );
+    } else {
+      trailing.push(<Text key={`trail-${i}`}>{emptyRow}</Text>);
+    }
   }
   const finalLines = [...padded, ...lines, ...trailing];
 

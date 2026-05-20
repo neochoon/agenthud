@@ -196,6 +196,20 @@ describe("ActivityViewerPanel", () => {
     expect(lastFrame()).toContain("›");
   });
 
+  it("hides the arrow when there are no activities", () => {
+    const { lastFrame } = render(
+      <ActivityViewerPanel
+        {...baseProps}
+        activities={[]}
+        trailingBlankRows={1}
+        liveIndicatorPosition={2}
+      />,
+    );
+    // Empty placeholder ("No activity yet") shouldn't sit under a sliding
+    // arrow — there's nothing alive to anchor to.
+    expect(lastFrame()).not.toContain("›");
+  });
+
   it("hides the arrow when paused (isLive false)", () => {
     const { lastFrame } = render(
       <ActivityViewerPanel

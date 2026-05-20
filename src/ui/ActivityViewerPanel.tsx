@@ -256,9 +256,10 @@ export function ActivityViewerPanel({
   // the row. Only the FIRST trailing row carries the indicator; any
   // remaining trailing rows stay empty. When paused, every trailing row
   // is empty (no motion over stale content).
+  const hasContent = visibleActivities.length > 0;
   const trailing: React.ReactElement[] = [];
   for (let i = 0; i < trailingBlankRows; i++) {
-    if (i === 0 && isLive && liveIndicatorPosition != null) {
+    if (i === 0 && isLive && liveIndicatorPosition != null && hasContent) {
       const pos = Math.max(0, liveIndicatorPosition);
       const arrow = "›";
       // Cap the arrow position to whatever fits inside the content area.

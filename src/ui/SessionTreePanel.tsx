@@ -13,6 +13,7 @@ import {
   DEFAULT_PANEL_WIDTH,
   getDisplayWidth,
   getInnerWidth,
+  truncateByWidth,
 } from "./constants.js";
 
 export interface SessionTreePanelProps {
@@ -120,14 +121,18 @@ function SessionRow({
   // Middle text sits right after badge; reserve 1 space prefix + 1 min gap
   const middleAvailable = contentWidth - leftCoreWidth - 1 - rightWidth - 1;
 
-  // Middle text: first user prompt for parents, task description for sub-agents
+  // Middle text: first user prompt for parents, task description for sub-agents.
+  // Use width-aware truncation that keeps the beginning and appends "…" so the
+  // most informative part of a long prompt / description stays visible.
   let middleText = "";
-  if (middleAvailable > 3) {
+  if (middleAvailable > 1) {
     const raw = isParent
       ? (session.firstUserPrompt ?? "")
       : (session.taskDescription ?? "");
     if (raw) {
-      const truncated = truncatePath(raw, middleAvailable);
+      // Collapse internal newlines/tabs so the title is single-line.
+      const flat = raw.replace(/[\r\n\t]+/g, " ").trim();
+      const truncated = truncateByWidth(flat, middleAvailable);
       if (truncated) middleText = truncated;
     }
   }

@@ -115,6 +115,32 @@ export function truncate(text: string, maxLength: number): string {
   return `${text.slice(0, maxLength - 3)}...`;
 }
 
+/**
+ * Truncate `text` so its terminal display width fits in `maxWidth` cells,
+ * keeping the *beginning* and appending a single-cell ellipsis ("…") when
+ * trimmed. Iterates code points (not UTF-16 units) and measures each one
+ * with `getDisplayWidth` so CJK / emoji boundaries are respected.
+ *
+ * Use this for prose-shaped content (task descriptions, prompts, etc.).
+ * For path-shaped content where the tail is the important part, use a
+ * path-aware truncator instead.
+ */
+export function truncateByWidth(text: string, maxWidth: number): string {
+  if (maxWidth <= 0) return "";
+  if (getDisplayWidth(text) <= maxWidth) return text;
+  if (maxWidth === 1) return "…";
+  const ellipsisWidth = 1;
+  let acc = "";
+  let used = 0;
+  for (const ch of text) {
+    const w = getDisplayWidth(ch);
+    if (used + w + ellipsisWidth > maxWidth) break;
+    acc += ch;
+    used += w;
+  }
+  return `${acc}…`;
+}
+
 // Use string-width for accurate terminal width calculation.
 // Cached because stringWidth runs Unicode regex (emoji, wide chars) which is
 // expensive — and we call it with the same icons/labels thousands of times per

@@ -27,7 +27,6 @@ import { getDisplayWidth } from "./constants.js";
 import { DetailViewPanel } from "./DetailViewPanel.js";
 import { HelpPanel } from "./HelpPanel.js";
 import { useHotkeys } from "./hooks/useHotkeys.js";
-import { useSlide } from "./hooks/useSlide.js";
 import { useSpinner } from "./hooks/useSpinner.js";
 import { SessionTreePanel } from "./SessionTreePanel.js";
 
@@ -411,30 +410,10 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   const maxTreeRows = Math.floor(height * (1 - VIEWER_HEIGHT_FRACTION));
   const naturalTreeRows = allFlat.length;
   const treeRows = Math.max(1, Math.min(naturalTreeRows, maxTreeRows));
-  // Breathing room: keep one blank row at the bottom of the viewer box so
-  // newest activity isn't flush against the border — gives a "next will
-  // appear here" feel, like a terminal cursor below tail -f output.
-  const VIEWER_BREATHING_ROWS = 1;
-  // statusBar(1) + margin(1) + tree(treeRows+2) + margin(1) + viewer(viewerRows+2+breathing) = height
-  const viewerRows = Math.max(
-    5,
-    height - 7 - treeRows - VIEWER_BREATHING_ROWS,
-  );
+  // statusBar(1) + margin(1) + tree(treeRows+2) + margin(1) + viewer(viewerRows+2) = height
+  const viewerRows = Math.max(5, height - 7 - treeRows);
 
   const spinner = useSpinner(isWatchMode);
-  // Slide a small arrow across the viewer's live-edge slot every 180ms,
-  // edge-to-edge of the content area (panel inner width minus borders/pad).
-  // The animation only ticks in watch mode; the panel additionally hides
-  // it when the viewer is PAUSED.
-  const viewerIndicatorWidth = Math.max(1, width - 3);
-  const liveIndicatorPosition = useSlide(
-    isWatchMode,
-    viewerIndicatorWidth,
-    180,
-    // Reset to 0 whenever the viewer's subject changes so each new
-    // session/sub-agent restarts the arrow from the left.
-    selectedId,
-  );
   const helpViewportRows = Math.max(1, height - 3); // status bar + indicator
   const helpScrollStep = (delta: number) => {
     const max = Math.max(0, helpTotalLinesRef.current - helpViewportRows);
@@ -896,8 +875,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
                 isLive={isLive}
                 newCount={newCount}
                 visibleRows={viewerRows}
-                trailingBlankRows={VIEWER_BREATHING_ROWS}
-                liveIndicatorPosition={liveIndicatorPosition}
+                liveSpinnerFrame={spinner}
                 width={width}
                 cursorLine={viewerCursorLine}
                 hasFocus={focus === "viewer"}

@@ -44,22 +44,13 @@ export interface ActivityViewerPanelProps {
   newCount: number;
   visibleRows: number;
   /**
-   * Extra blank rows to render after the activity content. Gives the
-   * viewer a "next will arrive here" feel, like the empty space below
-   * `tail -f` output. Layout owner (App) accounts for these in its
-   * height math so the box still fits the screen.
+   * Spinner frame (one character) painted in place of the newest visible
+   * activity's icon when set AND `isLive` is true AND the viewer has
+   * content. Gives the live-edge row a moving glyph + bright text so the
+   * "this row is alive" cue lands on the row itself, not on a separate
+   * marker below. Pass null/undefined to disable the treatment.
    */
-  trailingBlankRows?: number;
-  /**
-   * Column offset (0-based) for the live-edge motion indicator inside the
-   * first trailing slot. When set AND `isLive` is true, an arrow (`▸`)
-   * renders that many cells from the left, painted dim cyan. The animation
-   * comes from `useSlide` ticking the offset on a fixed interval, so the
-   * arrow appears to slide left → right and wrap. Hidden whenever `isLive`
-   * is false so the motion doesn't mislead the user while they're reading
-   * history.
-   */
-  liveIndicatorPosition?: number | null;
+  liveSpinnerFrame?: string | null;
   width: number;
   cursorLine: number;
   hasFocus: boolean;
@@ -109,8 +100,7 @@ export function ActivityViewerPanel({
   isLive,
   newCount,
   visibleRows,
-  trailingBlankRows = 0,
-  liveIndicatorPosition = null,
+  liveSpinnerFrame = null,
   width,
   cursorLine,
   hasFocus,
@@ -164,15 +154,20 @@ export function ActivityViewerPanel({
     // newest, capped at the number of currently visible activities.
     const effectiveCursor = Math.min(cursorLine, visibleActivities.length - 1);
     const cursorIndexInSlice = visibleActivities.length - 1 - effectiveCursor;
+    // The newest visible activity sits at the last index; in LIVE mode with
+    // a spinner frame supplied, this row gets the "alive" treatment.
+    const liveRowIndex = visibleActivities.length - 1;
+    const liveTreatment = isLive && !!liveSpinnerFrame;
     for (let i = 0; i < visibleActivities.length; i++) {
       const activity = visibleActivities[i];
       const style = getActivityStyle(activity);
       const isCursor = hasFocus && i === cursorIndexInSlice;
+      const isLiveRow = liveTreatment && i === liveRowIndex;
 
       const time = formatActivityTime(activity.timestamp, now);
       const timestamp = `[${time}] `;
       const timestampWidth = timestamp.length;
-      const icon = activity.icon;
+      const icon = isLiveRow ? (liveSpinnerFrame as string) : activity.icon;
       const iconWidth = getDisplayWidth(icon);
       const label = activity.label;
       const detail = activity.detail;
@@ -227,11 +222,14 @@ export function ActivityViewerPanel({
         <Text key={`activity-${i}`}>
           {BOX.v}{" "}
           <Text backgroundColor={isCursor ? "blue" : undefined}>
-            <Text dimColor={!isCursor}>{timestamp}</Text>
-            <Text color="cyan">{icon}</Text>{" "}
+            <Text dimColor={!isCursor && !isLiveRow}>{timestamp}</Text>
+            <Text color="cyan" bold={isLiveRow}>
+              {icon}
+            </Text>{" "}
             <Text
               color={isCursor ? undefined : style.color}
-              dimColor={!isCursor && style.dimColor}
+              dimColor={!isCursor && !isLiveRow && style.dimColor}
+              bold={isLiveRow && !isCursor}
             >
               {labelContent}
             </Text>
@@ -244,42 +242,15 @@ export function ActivityViewerPanel({
   }
 
   // Bottom-aligned: pad at the TOP so newest sits on the last content row.
-  // Then add `trailingBlankRows` empty rows below for breathing room.
+  // The live-edge cue now lives ON the newest activity row (spinner + bold)
+  // rather than in a separate slot below.
   const emptyRow = `${BOX.v}${" ".repeat(contentWidth + 1)}${BOX.v}`;
   const padCount = Math.max(0, visibleRows - lines.length);
   const padded: React.ReactElement[] = [];
   for (let i = 0; i < padCount; i++) {
     padded.push(<Text key={`pad-${i}`}>{emptyRow}</Text>);
   }
-  // Trailing slot: when live, draw a small arrow at the position dictated
-  // by `liveIndicatorPosition` so it appears to slide left → right across
-  // the row. Only the FIRST trailing row carries the indicator; any
-  // remaining trailing rows stay empty. When paused, every trailing row
-  // is empty (no motion over stale content).
-  const hasContent = visibleActivities.length > 0;
-  const trailing: React.ReactElement[] = [];
-  for (let i = 0; i < trailingBlankRows; i++) {
-    if (i === 0 && isLive && liveIndicatorPosition != null && hasContent) {
-      const pos = Math.max(0, liveIndicatorPosition);
-      const arrow = "›";
-      // Cap the arrow position to whatever fits inside the content area.
-      const safePos = Math.min(pos, Math.max(0, contentWidth - 1));
-      const padAfter = Math.max(0, contentWidth - safePos - 1);
-      trailing.push(
-        <Text key={`trail-${i}`}>
-          {BOX.v} {" ".repeat(safePos)}
-          <Text color="cyan" dimColor>
-            {arrow}
-          </Text>
-          {" ".repeat(padAfter)}
-          {BOX.v}
-        </Text>,
-      );
-    } else {
-      trailing.push(<Text key={`trail-${i}`}>{emptyRow}</Text>);
-    }
-  }
-  const finalLines = [...padded, ...lines, ...trailing];
+  const finalLines = [...padded, ...lines];
 
   return (
     <Box flexDirection="column" width={width}>

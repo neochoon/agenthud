@@ -105,9 +105,12 @@ Full reference is also available inside the app — press `?`.
 | `Tab` | Switch focus to activity viewer |
 | `PgUp` / `Ctrl+B` | Page up |
 | `PgDn` / `Ctrl+F` | Page down |
+| `t` | Track — auto-follow the newest live sub-agent (any nav key turns it off) |
 | `r` | Refresh now |
 | `?` | Help |
 | `q` | Quit |
+
+When tracking is on, the tree panel's title shows `[LIVE ⠧]` and the status bar replaces `t: track` with `TRK ●`. Any explicit selection-changing key (`↑/k`, `↓/j`, `PgUp/PgDn`, `↵`, `h`, or `t` again) turns tracking off.
 
 #### Activity viewer focus
 

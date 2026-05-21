@@ -24,6 +24,14 @@ export interface SessionTreePanelProps {
   width?: number;
   maxRows?: number;
   expandedIds?: Set<string>;
+  /**
+   * When true the panel renders a `[LIVE …]` indicator (with spinner) in
+   * its title bar — same affordance as the activity viewer. Set by App
+   * while tracking mode is on so the user knows the tree is auto-following.
+   */
+  trackingOn?: boolean;
+  /** One-character spinner frame shown next to LIVE when trackingOn. */
+  spinner?: string;
 }
 
 /**
@@ -434,11 +442,17 @@ export function SessionTreePanel({
   width = DEFAULT_PANEL_WIDTH,
   maxRows,
   expandedIds = new Set(),
+  trackingOn = false,
+  spinner = "",
 }: SessionTreePanelProps): React.ReactElement {
   const innerWidth = getInnerWidth(width);
   const contentWidth = innerWidth - 1; // account for space after │
 
-  const titleLine = createTitleLine("Projects", "", width);
+  // Same affordance the activity viewer uses for LIVE: when tracking is on
+  // the tree's title shows `[LIVE ⠧]` so the user knows the selection is
+  // moving on its own.
+  const titleSuffix = trackingOn ? `[LIVE ${spinner || "▼"}]` : "";
+  const titleLine = createTitleLine("Projects", titleSuffix, width);
   const bottomLine = createBottomLine(width);
 
   const totalProjectCount = projects.length + coldProjects.length;

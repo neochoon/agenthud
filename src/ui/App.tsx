@@ -166,6 +166,35 @@ function getSelectedActivity(
   return visible[visible.length - 1 - effectiveCursor] ?? null;
 }
 
+/**
+ * For tracking mode: find the most recently active hot/warm sub-agent
+ * across the whole tree. Falls back to the most recent hot/warm parent
+ * session if no sub-agent is currently alive. Returns null when nothing
+ * qualifies (everything is cool/cold or the tree is empty).
+ */
+function findLiveTarget(tree: SessionTree): string | null {
+  type Candidate = { id: string; mtime: number };
+  const subs: Candidate[] = [];
+  const parents: Candidate[] = [];
+  for (const p of tree.projects) {
+    for (const s of p.sessions) {
+      if (s.status === "hot" || s.status === "warm") {
+        parents.push({ id: s.id, mtime: s.lastModifiedMs });
+      }
+      for (const sa of s.subAgents) {
+        if (sa.status === "hot" || sa.status === "warm") {
+          subs.push({ id: sa.id, mtime: sa.lastModifiedMs });
+        }
+      }
+    }
+  }
+  const newest = (xs: Candidate[]) =>
+    xs.length === 0
+      ? null
+      : xs.reduce((a, b) => (a.mtime > b.mtime ? a : b)).id;
+  return newest(subs) ?? newest(parents);
+}
+
 export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   const { exit } = useApp();
   const { stdout } = useStdout();
@@ -200,6 +229,10 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   const [helpMode, setHelpMode] = useState(false);
   const [helpScroll, setHelpScroll] = useState(0);
   const helpTotalLinesRef = useRef(0);
+  // Tracking mode: when on, the tree selection follows the newest live
+  // sub-agent (or session, if no hot/warm sub-agent exists) across the
+  // whole tree. Any explicit navigation key turns it off again.
+  const [tracking, setTracking] = useState(false);
 
   const allFlat = useMemo(
     () => flattenSessions(sessionTree, expandedIds),
@@ -317,13 +350,25 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     const tree = discoverSessions(freshConfig);
     const updatedFlat = flattenSessions(tree, expandedIds);
 
+    // Tracking mode: hop to the newest hot/warm sub-agent (or parent session
+    // if there's no live sub-agent) across the entire tree. Runs on every
+    // refresh so the user can ambient-monitor without touching the keyboard.
+    let nextSelected: string | null = selectedId;
+    if (tracking) {
+      const target = findLiveTarget(tree);
+      if (target && target !== selectedId) {
+        setSelectedId(target);
+        nextSelected = target;
+      }
+    }
+
     // If selected item disappeared (e.g. sub-agent went cold), fall back to
     // its parent session so navigation doesn't snap to index 0.
-    const node = updatedFlat.find((s) => s.id === selectedId);
+    const node = updatedFlat.find((s) => s.id === nextSelected);
     if (!node) {
       const allSessions = tree.projects?.flatMap((p) => p.sessions) ?? [];
       const parentSession = allSessions.find((s) =>
-        s.subAgents.some((sa) => sa.id === selectedId),
+        s.subAgents.some((sa) => sa.id === nextSelected),
       );
       if (parentSession) setSelectedId(parentSession.id);
     }
@@ -337,7 +382,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
       setScrollOffset((o) => o + delta);
       setNewCount((n) => n + delta);
     }
-  }, [selectedId, isLive, expandedIds]);
+  }, [selectedId, isLive, expandedIds, tracking]);
 
   // Keep a stable ref so the watcher callback always calls the latest refresh
   const refreshRef = useRef(refresh);
@@ -424,6 +469,13 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     setHelpScroll((s) => Math.max(0, Math.min(max, s + delta)));
   };
 
+  // Tracking turns off any time the user takes manual control of the
+  // tree selection — j/k, PgUp/PgDn, h, Enter into a row, etc. Wrapping
+  // the disable in a small helper makes the intent obvious at the call site.
+  const stopTracking = () => {
+    if (tracking) setTracking(false);
+  };
+
   const { handleInput, statusBarItems } = useHotkeys({
     focus,
     detailMode,
@@ -434,12 +486,26 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     },
     onHelpScroll: helpScrollStep,
     onHelpScrollToTop: () => setHelpScroll(0),
+    onToggleTracking: () => {
+      setTracking((on) => {
+        const next = !on;
+        if (next) {
+          // Snap to the current live target immediately so the user sees
+          // tracking take effect instead of waiting for the next refresh.
+          const target = findLiveTarget(sessionTree);
+          if (target) setSelectedId(target);
+        }
+        return next;
+      });
+    },
+    trackingOn: tracking,
     onSwitchFocus: () => setFocus((f) => (f === "tree" ? "viewer" : "tree")),
     // cursorLine = "entries back from the newest" (0 = newest = bottom row).
     // Up arrow moves visually upward = older direction = cursorLine++.
     // Down arrow moves visually downward = newer direction = cursorLine--.
     onScrollUp: () => {
       if (focus === "tree") {
+        stopTracking();
         if (selectedIndex === -1) return;
         const prev = Math.max(0, selectedIndex - 1);
         setSelectedId(allFlat[prev]?.id ?? selectedId);
@@ -457,6 +523,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     },
     onScrollDown: () => {
       if (focus === "tree") {
+        stopTracking();
         if (selectedIndex === -1) return;
         const next = Math.min(allFlat.length - 1, selectedIndex + 1);
         setSelectedId(allFlat[next]?.id ?? selectedId);
@@ -481,6 +548,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     // PgDn = visually down = newer direction = scrollOffset--
     onScrollPageUp: () => {
       if (focus === "tree") {
+        stopTracking();
         const prev = Math.max(0, selectedIndex - 5);
         setSelectedId(allFlat[prev]?.id ?? selectedId);
       } else {
@@ -493,6 +561,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     },
     onScrollPageDown: () => {
       if (focus === "tree") {
+        stopTracking();
         const next = Math.min(allFlat.length - 1, selectedIndex + 5);
         setSelectedId(allFlat[next]?.id ?? selectedId);
       } else {
@@ -509,6 +578,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     },
     onScrollHalfPageUp: () => {
       if (focus === "tree") {
+        stopTracking();
         const prev = Math.max(0, selectedIndex - Math.ceil(5 / 2));
         setSelectedId(allFlat[prev]?.id ?? selectedId);
       } else {
@@ -524,6 +594,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     },
     onScrollHalfPageDown: () => {
       if (focus === "tree") {
+        stopTracking();
         const next = Math.min(
           allFlat.length - 1,
           selectedIndex + Math.ceil(5 / 2),
@@ -590,6 +661,9 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
         return;
       }
       if (focus !== "tree" || !selectedId) return;
+      // Any explicit Enter in the tree is a deliberate action; stop tracking
+      // so the user's chosen target doesn't get overwritten by the next refresh.
+      stopTracking();
 
       // Project sentinel: __proj-{projectName}__
       if (selectedId.startsWith("__proj-") && selectedId.endsWith("__")) {
@@ -697,6 +771,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     },
     onHide: () => {
       if (focus !== "tree" || !selectedId) return;
+      stopTracking();
 
       // Project sentinel: hide entire project
       if (selectedId.startsWith("__proj-") && selectedId.endsWith("__")) {
@@ -860,6 +935,8 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
             width={width}
             maxRows={treeRows}
             expandedIds={expandedIds}
+            trackingOn={tracking}
+            spinner={spinner}
           />
 
           <Box marginTop={1}>

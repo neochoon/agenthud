@@ -427,6 +427,17 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     };
   }, [isWatchMode, config.refreshIntervalMs]);
 
+  // Tracking adds a 1-second polling timer on top of fs.watch. On macOS
+  // recursive fs.watch can quietly drop events for files inside other
+  // project directories — the polling guarantees the auto-follow finds
+  // the new live target within a second regardless of how the OS event
+  // delivery behaves.
+  useEffect(() => {
+    if (!isWatchMode || !tracking) return;
+    const timer = setInterval(() => refreshRef.current(), 1000);
+    return () => clearInterval(timer);
+  }, [isWatchMode, tracking]);
+
   const filterPresets = config.filterPresets;
   const activePreset = useMemo(
     () => filterPresets[filterIndex % filterPresets.length] ?? [],

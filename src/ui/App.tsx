@@ -166,33 +166,92 @@ function getSelectedActivity(
   return visible[visible.length - 1 - effectiveCursor] ?? null;
 }
 
+type LiveCandidate = { id: string; mtime: number; isNew: boolean };
+
 /**
- * For tracking mode: find the most recently active hot/warm sub-agent
- * across the whole tree. Falls back to the most recent hot/warm parent
- * session if no sub-agent is currently alive. Returns null when nothing
- * qualifies (everything is cool/cold or the tree is empty).
+ * For tracking mode: pick the next jump target.
+ *
+ * 1. If any *new* hot/warm sub-agent (id not in `seen`) exists, jump to
+ *    the newest of those — this is the "B just started" case.
+ * 2. Else if no new sub-agent but a new parent session appeared, jump
+ *    to the newest of those.
+ * 3. Else if the currently selected id is still hot/warm, stay put —
+ *    avoids the oscillation between two equally-active sub-agents.
+ * 4. Else (current target died) jump to the newest live thing,
+ *    sub-agent preferred over parent.
+ *
+ * Also returns the full set of ids observed in this tree so the caller
+ * can update its "seen" snapshot.
  */
-function findLiveTarget(tree: SessionTree): string | null {
-  type Candidate = { id: string; mtime: number };
-  const subs: Candidate[] = [];
-  const parents: Candidate[] = [];
+function pickTrackingTarget(
+  tree: SessionTree,
+  selectedId: string | null,
+  seen: Set<string>,
+): { target: string | null; ids: Set<string> } {
+  const ids = new Set<string>();
+  const liveSubs: LiveCandidate[] = [];
+  const liveParents: LiveCandidate[] = [];
+
   for (const p of tree.projects) {
     for (const s of p.sessions) {
+      ids.add(s.id);
       if (s.status === "hot" || s.status === "warm") {
-        parents.push({ id: s.id, mtime: s.lastModifiedMs });
+        liveParents.push({
+          id: s.id,
+          mtime: s.lastModifiedMs,
+          isNew: !seen.has(s.id),
+        });
       }
       for (const sa of s.subAgents) {
+        ids.add(sa.id);
         if (sa.status === "hot" || sa.status === "warm") {
-          subs.push({ id: sa.id, mtime: sa.lastModifiedMs });
+          liveSubs.push({
+            id: sa.id,
+            mtime: sa.lastModifiedMs,
+            isNew: !seen.has(sa.id),
+          });
         }
       }
     }
   }
-  const newest = (xs: Candidate[]) =>
+
+  const newest = (xs: LiveCandidate[]): string | null =>
     xs.length === 0
       ? null
       : xs.reduce((a, b) => (a.mtime > b.mtime ? a : b)).id;
-  return newest(subs) ?? newest(parents);
+
+  // 1. New live sub-agent wins.
+  const newSubTarget = newest(liveSubs.filter((s) => s.isNew));
+  if (newSubTarget) return { target: newSubTarget, ids };
+  // 2. New live parent session.
+  const newParentTarget = newest(liveParents.filter((p) => p.isNew));
+  if (newParentTarget) return { target: newParentTarget, ids };
+
+  // 3. Current selection still live → stay put.
+  const currentIsLive =
+    selectedId != null &&
+    (liveSubs.some((s) => s.id === selectedId) ||
+      liveParents.some((p) => p.id === selectedId));
+  if (currentIsLive) return { target: null, ids };
+
+  // 4. Current died (or never had one). Pick newest live thing,
+  //    sub-agents preferred over parents.
+  return {
+    target: newest(liveSubs) ?? newest(liveParents),
+    ids,
+  };
+}
+
+/** Walk a tree and collect every session + sub-agent id. */
+function collectAllIds(tree: SessionTree): Set<string> {
+  const ids = new Set<string>();
+  for (const p of tree.projects) {
+    for (const s of p.sessions) {
+      ids.add(s.id);
+      for (const sa of s.subAgents) ids.add(sa.id);
+    }
+  }
+  return ids;
 }
 
 export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
@@ -233,6 +292,11 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   // sub-agent (or session, if no hot/warm sub-agent exists) across the
   // whole tree. Any explicit navigation key turns it off again.
   const [tracking, setTracking] = useState(false);
+  // Snapshot of all session/sub-agent ids observed since tracking was
+  // enabled. Used by pickTrackingTarget to distinguish "brand new" from
+  // "already existed when we started watching" so we don't oscillate
+  // between two equally-active sub-agents.
+  const seenIdsRef = useRef<Set<string>>(new Set());
 
   const allFlat = useMemo(
     () => flattenSessions(sessionTree, expandedIds),
@@ -350,16 +414,22 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     const tree = discoverSessions(freshConfig);
     const updatedFlat = flattenSessions(tree, expandedIds);
 
-    // Tracking mode: hop to the newest hot/warm sub-agent (or parent session
-    // if there's no live sub-agent) across the entire tree. Runs on every
-    // refresh so the user can ambient-monitor without touching the keyboard.
+    // Tracking mode: pick the next jump target with the new-id-aware
+    // algorithm so we don't oscillate between two equally-active sub-agents.
     let nextSelected: string | null = selectedId;
     if (tracking) {
-      const target = findLiveTarget(tree);
+      const { target, ids } = pickTrackingTarget(
+        tree,
+        selectedId,
+        seenIdsRef.current,
+      );
       if (target && target !== selectedId) {
         setSelectedId(target);
         nextSelected = target;
       }
+      // Update the seen snapshot every refresh so the next round can
+      // distinguish "new since last tick" from "existed already".
+      seenIdsRef.current = ids;
     }
 
     // If selected item disappeared (e.g. sub-agent went cold), fall back to
@@ -501,9 +571,16 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
       setTracking((on) => {
         const next = !on;
         if (next) {
-          // Snap to the current live target immediately so the user sees
-          // tracking take effect instead of waiting for the next refresh.
-          const target = findLiveTarget(sessionTree);
+          // Seed the "seen" snapshot with everything currently in the tree
+          // so the next refresh only treats genuinely-new sessions/sub-agents
+          // as triggers. Then snap to the current newest live target so the
+          // user sees tracking take effect immediately.
+          seenIdsRef.current = collectAllIds(sessionTree);
+          const { target } = pickTrackingTarget(
+            sessionTree,
+            selectedId,
+            seenIdsRef.current,
+          );
           if (target) setSelectedId(target);
         }
         return next;

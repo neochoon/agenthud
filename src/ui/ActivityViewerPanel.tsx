@@ -51,6 +51,12 @@ export interface ActivityViewerPanelProps {
    * marker below. Pass null/undefined to disable the treatment.
    */
   liveSpinnerFrame?: string | null;
+  /**
+   * Monotonic counter (e.g. from `useTick`) that drives the moving
+   * flashlight sweep across the live row's label. Each tick advances the
+   * highlight window by one cell. When omitted, no sweep effect.
+   */
+  liveTick?: number | null;
   width: number;
   cursorLine: number;
   hasFocus: boolean;
@@ -101,6 +107,7 @@ export function ActivityViewerPanel({
   newCount,
   visibleRows,
   liveSpinnerFrame = null,
+  liveTick = null,
   width,
   cursorLine,
   hasFocus,
@@ -218,6 +225,35 @@ export function ActivityViewerPanel({
         1;
       const padding = Math.max(0, width - usedWidth);
 
+      // On the live row, render the label as three segments so a moving
+      // "flashlight" band can sweep across it. The band uses `inverse`
+      // (swap fg/bg) so the affected characters appear distinctly
+      // brighter without needing per-cell color shifts.
+      const SWEEP_WIDTH = 10;
+      let labelNode: React.ReactNode = labelContent;
+      if (
+        isLiveRow &&
+        !isCursor &&
+        liveTick != null &&
+        labelContent.length > 0
+      ) {
+        const period = labelContent.length + SWEEP_WIDTH;
+        const offset = (liveTick % period) - SWEEP_WIDTH; // -W .. len-1
+        const litStart = Math.max(0, offset);
+        const litEnd = Math.min(labelContent.length, offset + SWEEP_WIDTH);
+        if (litEnd > litStart) {
+          const pre = labelContent.slice(0, litStart);
+          const lit = labelContent.slice(litStart, litEnd);
+          const post = labelContent.slice(litEnd);
+          labelNode = (
+            <>
+              {pre}
+              <Text inverse>{lit}</Text>
+              {post}
+            </>
+          );
+        }
+      }
       lines.push(
         <Text key={`activity-${i}`}>
           {BOX.v}{" "}
@@ -231,7 +267,7 @@ export function ActivityViewerPanel({
               dimColor={!isCursor && !isLiveRow && style.dimColor}
               bold={isLiveRow && !isCursor}
             >
-              {labelContent}
+              {labelNode}
             </Text>
             {" ".repeat(padding)}
           </Text>

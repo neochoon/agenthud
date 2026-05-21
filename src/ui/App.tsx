@@ -27,6 +27,7 @@ import { getDisplayWidth } from "./constants.js";
 import { DetailViewPanel } from "./DetailViewPanel.js";
 import { HelpPanel } from "./HelpPanel.js";
 import { useHotkeys } from "./hooks/useHotkeys.js";
+import { useTick } from "./hooks/useTick.js";
 import { useSpinner } from "./hooks/useSpinner.js";
 import { SessionTreePanel } from "./SessionTreePanel.js";
 
@@ -414,6 +415,9 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   const viewerRows = Math.max(5, height - 7 - treeRows);
 
   const spinner = useSpinner(isWatchMode);
+  // Tick drives the moving-flashlight sweep on the live row inside the
+  // activity viewer. Same cadence as the spinner so both feel synced.
+  const liveTick = useTick(isWatchMode, 100);
   const helpViewportRows = Math.max(1, height - 3); // status bar + indicator
   const helpScrollStep = (delta: number) => {
     const max = Math.max(0, helpTotalLinesRef.current - helpViewportRows);
@@ -876,6 +880,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
                 newCount={newCount}
                 visibleRows={viewerRows}
                 liveSpinnerFrame={spinner}
+                liveTick={liveTick}
                 width={width}
                 cursorLine={viewerCursorLine}
                 hasFocus={focus === "viewer"}

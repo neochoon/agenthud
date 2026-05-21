@@ -14,6 +14,38 @@ export interface ActivityStyle {
   dimColor: boolean;
 }
 
+/**
+ * Map a normal-intensity color name to its high-intensity variant so the
+ * "flashlight" sweep brightens the actual character color instead of
+ * inverting the background. Colors with no defined bright variant fall
+ * through unchanged.
+ */
+function brighten(color: string | undefined): string {
+  switch (color) {
+    case undefined:
+    case "gray":
+      return "white";
+    case "white":
+      return "whiteBright";
+    case "green":
+      return "greenBright";
+    case "yellow":
+      return "yellowBright";
+    case "magenta":
+      return "magentaBright";
+    case "cyan":
+      return "cyanBright";
+    case "red":
+      return "redBright";
+    case "blue":
+      return "blueBright";
+    case "black":
+      return "blackBright";
+    default:
+      return color;
+  }
+}
+
 export function getActivityStyle(activity: ActivityEntry): ActivityStyle {
   if (activity.type === "user") {
     return { color: "white", dimColor: false };
@@ -226,9 +258,10 @@ export function ActivityViewerPanel({
       const padding = Math.max(0, width - usedWidth);
 
       // On the live row, render the label as three segments so a moving
-      // "flashlight" band can sweep across it. The band uses `inverse`
-      // (swap fg/bg) so the affected characters appear distinctly
-      // brighter without needing per-cell color shifts.
+      // "flashlight" band can sweep across it. The band brightens the
+      // existing character color (e.g. green → greenBright) and turns on
+      // bold within the window — the rest of the label stays in the
+      // normal color so only the lit segment visually pops.
       const SWEEP_WIDTH = 10;
       let labelNode: React.ReactNode = labelContent;
       if (
@@ -248,7 +281,9 @@ export function ActivityViewerPanel({
           labelNode = (
             <>
               {pre}
-              <Text inverse>{lit}</Text>
+              <Text color={brighten(style.color)} bold>
+                {lit}
+              </Text>
               {post}
             </>
           );
@@ -265,7 +300,6 @@ export function ActivityViewerPanel({
             <Text
               color={isCursor ? undefined : style.color}
               dimColor={!isCursor && !isLiveRow && style.dimColor}
-              bold={isLiveRow && !isCursor}
             >
               {labelNode}
             </Text>

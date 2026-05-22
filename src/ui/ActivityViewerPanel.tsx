@@ -1,5 +1,6 @@
 import { Box, Text } from "ink";
 import type React from "react";
+import { memo } from "react";
 import type { ActivityEntry } from "../types/index.js";
 import {
   BOX,
@@ -131,6 +132,121 @@ function truncateDetail(detail: string, maxWidth: number): string {
   return `${truncated}…`;
 }
 
+interface ActivityRowProps {
+  activity: ActivityEntry;
+  timestamp: string;
+  width: number;
+  contentWidth: number;
+  isCursor: boolean;
+  isLiveRow: boolean;
+  /** Set on the live row only; undefined elsewhere so memo equality holds. */
+  liveSpinnerFrame?: string;
+  /** Set on the live row only; undefined elsewhere so memo equality holds. */
+  liveTick?: number;
+}
+
+/**
+ * One row of the activity viewer. Wrapped in React.memo so non-live rows
+ * skip re-render on every spinner / flashlight tick — only the live row
+ * (whose liveSpinnerFrame/liveTick props actually change) re-runs.
+ */
+const ActivityRow = memo(function ActivityRow({
+  activity,
+  timestamp,
+  width,
+  contentWidth,
+  isCursor,
+  isLiveRow,
+  liveSpinnerFrame,
+  liveTick,
+}: ActivityRowProps): React.ReactElement {
+  const style = getActivityStyle(activity);
+  const timestampWidth = timestamp.length;
+  const icon = isLiveRow && liveSpinnerFrame ? liveSpinnerFrame : activity.icon;
+  const iconWidth = getDisplayWidth(icon);
+  const label = activity.label;
+  const detail = activity.detail;
+  const count = activity.count;
+
+  const countSuffix = count && count > 1 ? ` (×${count})` : "";
+  const countSuffixWidth = countSuffix.length;
+
+  const prefixWidth = 2 + timestampWidth + iconWidth + 1;
+  const labelPart = detail ? `${label}: ` : label;
+  const labelWidth = labelPart.length;
+  const detailMaxWidth =
+    width -
+    2 -
+    timestampWidth -
+    iconWidth -
+    1 -
+    labelWidth -
+    countSuffixWidth -
+    1;
+
+  let labelContent: string;
+  if (detail) {
+    const truncated = truncateDetail(detail, Math.max(0, detailMaxWidth));
+    labelContent = `${labelPart}${truncated}${countSuffix}`;
+  } else {
+    labelContent = label + countSuffix;
+  }
+
+  const usedWidth =
+    1 + 1 + timestampWidth + iconWidth + 1 + getDisplayWidth(labelContent) + 1;
+  const padding = Math.max(0, width - usedWidth);
+
+  // Live-row flashlight: split the label into pre/lit/post so the lit
+  // segment can render in the brightened variant of style.color.
+  const SWEEP_WIDTH = 10;
+  let labelNode: React.ReactNode = labelContent;
+  if (
+    isLiveRow &&
+    !isCursor &&
+    liveTick != null &&
+    labelContent.length > 0
+  ) {
+    const period = labelContent.length + SWEEP_WIDTH;
+    const offset = (liveTick % period) - SWEEP_WIDTH; // -W .. len-1
+    const litStart = Math.max(0, offset);
+    const litEnd = Math.min(labelContent.length, offset + SWEEP_WIDTH);
+    if (litEnd > litStart) {
+      const pre = labelContent.slice(0, litStart);
+      const lit = labelContent.slice(litStart, litEnd);
+      const post = labelContent.slice(litEnd);
+      labelNode = (
+        <>
+          {pre}
+          <Text color={brighten(style.color)} bold>
+            {lit}
+          </Text>
+          {post}
+        </>
+      );
+    }
+  }
+
+  return (
+    <Text>
+      {BOX.v}{" "}
+      <Text backgroundColor={isCursor ? "blue" : undefined}>
+        <Text dimColor={!isCursor && !isLiveRow}>{timestamp}</Text>
+        <Text color="cyan" bold={isLiveRow}>
+          {icon}
+        </Text>{" "}
+        <Text
+          color={isCursor ? undefined : style.color}
+          dimColor={!isCursor && !isLiveRow && style.dimColor}
+        >
+          {labelNode}
+        </Text>
+        {" ".repeat(padding)}
+      </Text>
+      {BOX.v}
+    </Text>
+  );
+});
+
 export function ActivityViewerPanel({
   activities,
   sessionName,
@@ -199,114 +315,25 @@ export function ActivityViewerPanel({
     const liveTreatment = isLive && !!liveSpinnerFrame;
     for (let i = 0; i < visibleActivities.length; i++) {
       const activity = visibleActivities[i];
-      const style = getActivityStyle(activity);
       const isCursor = hasFocus && i === cursorIndexInSlice;
       const isLiveRow = liveTreatment && i === liveRowIndex;
-
-      const time = formatActivityTime(activity.timestamp, now);
-      const timestamp = `[${time}] `;
-      const timestampWidth = timestamp.length;
-      const icon = isLiveRow ? (liveSpinnerFrame as string) : activity.icon;
-      const iconWidth = getDisplayWidth(icon);
-      const label = activity.label;
-      const detail = activity.detail;
-      const count = activity.count;
-
-      const countSuffix = count && count > 1 ? ` (×${count})` : "";
-      const countSuffixWidth = countSuffix.length;
-
-      const prefixWidth = 2 + timestampWidth + iconWidth + 1;
-      const labelPart = detail ? `${label}: ` : label;
-      const labelWidth = labelPart.length;
-      const _availableForDetail =
-        contentWidth - prefixWidth - labelWidth - countSuffixWidth + 1;
-      const detailMaxWidth =
-        width -
-        2 -
-        timestampWidth -
-        iconWidth -
-        1 -
-        labelWidth -
-        countSuffixWidth -
-        1;
-
-      let labelContent: string;
-      let _displayWidth: number;
-
-      if (detail) {
-        const truncated = truncateDetail(detail, Math.max(0, detailMaxWidth));
-        labelContent = `${labelPart}${truncated}${countSuffix}`;
-        _displayWidth =
-          prefixWidth -
-          1 +
-          labelWidth +
-          getDisplayWidth(truncated) +
-          countSuffixWidth;
-      } else {
-        labelContent = label + countSuffix;
-        _displayWidth = prefixWidth - 1 + label.length + countSuffixWidth;
-      }
-
-      const usedWidth =
-        1 +
-        1 +
-        timestampWidth +
-        iconWidth +
-        1 +
-        getDisplayWidth(labelContent) +
-        1;
-      const padding = Math.max(0, width - usedWidth);
-
-      // On the live row, render the label as three segments so a moving
-      // "flashlight" band can sweep across it. The band brightens the
-      // existing character color (e.g. green → greenBright) and turns on
-      // bold within the window — the rest of the label stays in the
-      // normal color so only the lit segment visually pops.
-      const SWEEP_WIDTH = 10;
-      let labelNode: React.ReactNode = labelContent;
-      if (
-        isLiveRow &&
-        !isCursor &&
-        liveTick != null &&
-        labelContent.length > 0
-      ) {
-        const period = labelContent.length + SWEEP_WIDTH;
-        const offset = (liveTick % period) - SWEEP_WIDTH; // -W .. len-1
-        const litStart = Math.max(0, offset);
-        const litEnd = Math.min(labelContent.length, offset + SWEEP_WIDTH);
-        if (litEnd > litStart) {
-          const pre = labelContent.slice(0, litStart);
-          const lit = labelContent.slice(litStart, litEnd);
-          const post = labelContent.slice(litEnd);
-          labelNode = (
-            <>
-              {pre}
-              <Text color={brighten(style.color)} bold>
-                {lit}
-              </Text>
-              {post}
-            </>
-          );
-        }
-      }
+      const timestamp = `[${formatActivityTime(activity.timestamp, now)}] `;
       lines.push(
-        <Text key={`activity-${i}`}>
-          {BOX.v}{" "}
-          <Text backgroundColor={isCursor ? "blue" : undefined}>
-            <Text dimColor={!isCursor && !isLiveRow}>{timestamp}</Text>
-            <Text color="cyan" bold={isLiveRow}>
-              {icon}
-            </Text>{" "}
-            <Text
-              color={isCursor ? undefined : style.color}
-              dimColor={!isCursor && !isLiveRow && style.dimColor}
-            >
-              {labelNode}
-            </Text>
-            {" ".repeat(padding)}
-          </Text>
-          {BOX.v}
-        </Text>,
+        <ActivityRow
+          key={`activity-${i}`}
+          activity={activity}
+          timestamp={timestamp}
+          width={width}
+          contentWidth={contentWidth}
+          isCursor={isCursor}
+          isLiveRow={isLiveRow}
+          // Spinner / tick only flow to the live row so non-live rows keep
+          // identical prop refs across ticks and React.memo skips them.
+          liveSpinnerFrame={
+            isLiveRow ? (liveSpinnerFrame ?? undefined) : undefined
+          }
+          liveTick={isLiveRow ? (liveTick ?? undefined) : undefined}
+        />,
       );
     }
   }

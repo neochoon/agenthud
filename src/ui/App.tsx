@@ -540,7 +540,11 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   // statusBar(1) + margin(1) + tree(treeRows+2) + margin(1) + viewer(viewerRows+2) = height
   const viewerRows = Math.max(5, height - 7 - treeRows);
 
-  const spinner = useSpinner(isWatchMode);
+  // Spinner and flashlight tick on the same cadence (150ms) so the entire
+  // App re-renders ~6.7 times per second instead of 10 — measurably less
+  // work for the terminal to repaint, and the two animations end up in
+  // sync (a single React render advances both).
+  const spinner = useSpinner(isWatchMode, 150);
   // Tick drives the moving-flashlight sweep on the live row. Gated tightly
   // — only ticks when the viewer is actually showing live activity AND the
   // user isn't in help / detail overlay. Without this gate the 100ms-per-

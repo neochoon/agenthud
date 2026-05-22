@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+## [0.9.5] - 2026-05-21
+
+### New
+- **Live-row treatment in the activity viewer.** The newest visible row gets a spinning icon, brighter color, and a "flashlight" highlight band that sweeps left → right across its label. Replaces the standalone sliding-arrow row from v0.9.3 — the alive cue now lives on the actual row, gaining the breathing slot back as real activity space.
+- **Tracking mode (`t`)** — auto-follow the newest live sub-agent (or session if no live sub-agent) across the entire tree. Status bar swaps `t: track` for `TRK ●`; Projects panel header shows `[LIVE ⠧]`. Designed for ambient monitoring on a second monitor while long Claude skills churn through many sub-agents. Any explicit nav key turns it off.
+
+### Changed
+- **Tracking picks "new" sub-agents, not "newest mtime".** The first version kept whichever sub-agent had the most recent file write — in practice the already-busy sub-agent always won, so newly started ones never got selected. Now tracking keeps a snapshot of all known ids when enabled and jumps only when a *new* id appears, or when the current selection cools off.
+- **1-second polling while tracking is on.** macOS `fs.watch` recursive can silently drop events for files inside sibling project directories; the poll guarantees cross-project jumps land within a second.
+
+### Fixed
+- **Smoother spinner + flashlight.** Three perf passes after the v0.9.4 baseline:
+  1. The flashlight tick is now gated on `isLive && !helpMode && !detailMode && activities.length > 0` — no more 100ms App re-renders while paused or while reading help.
+  2. Spinner and flashlight share one 150ms cadence (was 100ms) so both animations advance on the same React render.
+  3. `ActivityRow` extracted into a `React.memo`'d component; non-live rows skip re-render on every tick, so even tall viewers stay smooth.
+
 ## [0.9.4] - 2026-05-20
 
 ### New
@@ -349,7 +365,8 @@
 - **Test Panel** - Test results at a glance
 - Watch mode for live updates
 
-[Unreleased]: https://github.com/neochoon/agenthud/compare/v0.9.4...HEAD
+[Unreleased]: https://github.com/neochoon/agenthud/compare/v0.9.5...HEAD
+[0.9.5]: https://github.com/neochoon/agenthud/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/neochoon/agenthud/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/neochoon/agenthud/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/neochoon/agenthud/compare/v0.9.1...v0.9.2

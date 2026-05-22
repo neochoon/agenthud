@@ -541,9 +541,14 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   const viewerRows = Math.max(5, height - 7 - treeRows);
 
   const spinner = useSpinner(isWatchMode);
-  // Tick drives the moving-flashlight sweep on the live row inside the
-  // activity viewer. Same cadence as the spinner so both feel synced.
-  const liveTick = useTick(isWatchMode, 100);
+  // Tick drives the moving-flashlight sweep on the live row. Gated tightly
+  // — only ticks when the viewer is actually showing live activity AND the
+  // user isn't in help / detail overlay. Without this gate the 100ms-per-
+  // tick App re-render runs even when the sweep isn't visible, and the
+  // accumulated work makes the sweep itself feel choppy.
+  const tickActive =
+    isWatchMode && isLive && !helpMode && !detailMode && activities.length > 0;
+  const liveTick = useTick(tickActive, 150);
   const helpViewportRows = Math.max(1, height - 3); // status bar + indicator
   const helpScrollStep = (delta: number) => {
     const max = Math.max(0, helpTotalLinesRef.current - helpViewportRows);

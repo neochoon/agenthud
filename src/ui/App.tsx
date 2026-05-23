@@ -46,6 +46,7 @@ function subSummarySentinel(parentId: string): SessionNode {
     subAgents: [],
     nonInteractive: false,
     firstUserPrompt: null,
+    liveState: null,
   };
 }
 
@@ -102,6 +103,7 @@ function flattenSessions(
       subAgents: [],
       nonInteractive: false,
       firstUserPrompt: null,
+      liveState: null,
     });
 
     const shouldShowSessions = isCold
@@ -133,6 +135,7 @@ function flattenSessions(
       subAgents: [],
       nonInteractive: false,
       firstUserPrompt: null,
+      liveState: null,
     });
     if (expandedIds.has("__cold__")) {
       for (const project of tree.coldProjects) {
@@ -966,7 +969,9 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     return (
       <Box flexDirection="column" width={width}>
         <Text bold>AgentHUD needs a larger terminal.</Text>
-        <Text dimColor>{`Minimum: ${MIN_WIDTH} cols × ${MIN_HEIGHT} rows`}</Text>
+        <Text
+          dimColor
+        >{`Minimum: ${MIN_WIDTH} cols × ${MIN_HEIGHT} rows`}</Text>
         <Text dimColor>{`Current: ${width} cols × ${height + 1} rows`}</Text>
         <Text> </Text>
         <Text dimColor>

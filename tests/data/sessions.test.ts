@@ -707,4 +707,112 @@ describe("discoverSessions", () => {
     expect(sessions[0].nonInteractive).toBe(false);
     expect(sessions[1].nonInteractive).toBe(true);
   });
+
+  it("populates liveState 'working' when the tail ends in a pending tool_use", () => {
+    const projectsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".claude",
+      "projects",
+    );
+    const projectDir = join(projectsDir, "-Users-neo-myproject");
+    const sessionFile = join(projectDir, "work123.jsonl");
+
+    vi.mocked(existsSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === projectsDir || path === projectDir || path === sessionFile)
+        return true;
+      return false;
+    });
+    vi.mocked(readdirSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === projectsDir)
+        return ["-Users-neo-myproject"] as unknown as ReturnType<
+          typeof readdirSync
+        >;
+      if (path === projectDir)
+        return ["work123.jsonl"] as unknown as ReturnType<typeof readdirSync>;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(statSync).mockImplementation((p) => {
+      const path = String(p);
+      return {
+        isDirectory: () => path === projectDir,
+        mtimeMs: NOW - 10_000,
+        size: 1000,
+      } as ReturnType<typeof statSync>;
+    });
+    vi.mocked(readFileSync).mockReturnValue(
+      `${JSON.stringify({
+        type: "assistant",
+        message: {
+          model: "claude-sonnet-4-20250514",
+          content: [
+            { type: "tool_use", name: "Bash", input: { command: "npm test" } },
+          ],
+        },
+        timestamp: new Date(NOW - 10_000).toISOString(),
+      })}\n`,
+    );
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const tree = discoverSessions(mockConfig);
+    expect(tree.projects[0].sessions[0].liveState).toBe("working");
+  });
+
+  it("suppresses liveState (null) for non-interactive sessions", () => {
+    const projectsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".claude",
+      "projects",
+    );
+    const projectDir = join(projectsDir, "-Users-neo-myproject");
+    const sessionFile = join(projectDir, "sdk123.jsonl");
+
+    vi.mocked(existsSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === projectsDir || path === projectDir || path === sessionFile)
+        return true;
+      return false;
+    });
+    vi.mocked(readdirSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === projectsDir)
+        return ["-Users-neo-myproject"] as unknown as ReturnType<
+          typeof readdirSync
+        >;
+      if (path === projectDir)
+        return ["sdk123.jsonl"] as unknown as ReturnType<typeof readdirSync>;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(statSync).mockImplementation((p) => {
+      const path = String(p);
+      return {
+        isDirectory: () => path === projectDir,
+        mtimeMs: NOW - 10_000,
+        size: 1000,
+      } as ReturnType<typeof statSync>;
+    });
+    // First line carries entrypoint "sdk-cli" → non-interactive; tail looks "working".
+    vi.mocked(readFileSync).mockReturnValue(
+      `${JSON.stringify({
+        type: "assistant",
+        entrypoint: "sdk-cli",
+        message: {
+          model: "claude-sonnet-4-20250514",
+          content: [
+            { type: "tool_use", name: "Bash", input: { command: "npm test" } },
+          ],
+        },
+        timestamp: new Date(NOW - 10_000).toISOString(),
+      })}\n`,
+    );
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const tree = discoverSessions(mockConfig);
+    const all = [...tree.projects, ...tree.coldProjects].flatMap(
+      (p) => p.sessions,
+    );
+    expect(all[0].nonInteractive).toBe(true);
+    expect(all[0].liveState).toBeNull();
+  });
 });

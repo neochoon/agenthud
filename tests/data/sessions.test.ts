@@ -759,6 +759,80 @@ describe("discoverSessions", () => {
     expect(tree.projects[0].sessions[0].liveState).toBe("working");
   });
 
+  it("populates liveState on sub-agent nodes", () => {
+    const projectsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".claude",
+      "projects",
+    );
+    const projectDir = join(projectsDir, "-Users-neo-liveproj");
+    const subagentsDir = join(projectDir, "parent-live", "subagents");
+    const parentFile = join(projectDir, "parent-live.jsonl");
+    const childFile = join(subagentsDir, "child-live.jsonl");
+
+    vi.mocked(existsSync).mockImplementation((p) => {
+      const path = String(p);
+      return [
+        projectsDir,
+        projectDir,
+        subagentsDir,
+        parentFile,
+        childFile,
+      ].includes(path);
+    });
+    vi.mocked(readdirSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === projectsDir)
+        return ["-Users-neo-liveproj"] as unknown as ReturnType<
+          typeof readdirSync
+        >;
+      if (path === projectDir)
+        return ["parent-live.jsonl", "parent-live"] as unknown as ReturnType<
+          typeof readdirSync
+        >;
+      if (path === subagentsDir)
+        return ["child-live.jsonl"] as unknown as ReturnType<
+          typeof readdirSync
+        >;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(statSync).mockImplementation((p) => {
+      const path = String(p);
+      const isDir = !path.endsWith(".jsonl");
+      return {
+        isDirectory: () => isDir,
+        mtimeMs: NOW - 10_000,
+        size: 500,
+      } as ReturnType<typeof statSync>;
+    });
+
+    const workingTail = `${JSON.stringify({
+      type: "assistant",
+      message: {
+        model: "claude-sonnet-4-20250514",
+        content: [
+          { type: "tool_use", name: "Bash", input: { command: "npm test" } },
+        ],
+      },
+      timestamp: new Date(NOW - 10_000).toISOString(),
+    })}\n`;
+
+    vi.mocked(readFileSync).mockImplementation((p) => {
+      // Both parent and child get the same working-tail content; what matters
+      // is that the child's liveState is populated.
+      const path = String(p);
+      if (path === parentFile || path === childFile) return workingTail;
+      return "";
+    });
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const tree = discoverSessions(mockConfig);
+    expect(tree.projects).toHaveLength(1);
+    expect(tree.projects[0].sessions[0].subAgents).toHaveLength(1);
+    expect(tree.projects[0].sessions[0].subAgents[0].id).toBe("child-live");
+    expect(tree.projects[0].sessions[0].subAgents[0].liveState).toBe("working");
+  });
+
   it("suppresses liveState (null) for non-interactive sessions", () => {
     const projectsDir = join(
       process.env.HOME ?? "/home/user",

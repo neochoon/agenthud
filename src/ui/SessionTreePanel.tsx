@@ -39,7 +39,10 @@ export interface SessionTreePanelProps {
  * elapsed time grows so cold sessions stop showing "27h35m" and become
  * "1d", "1w", "1mo", "1y". `now` is injectable so tests can pin time.
  */
-export function formatElapsed(lastModifiedMs: number, now = Date.now()): string {
+export function formatElapsed(
+  lastModifiedMs: number,
+  now = Date.now(),
+): string {
   const elapsed = Math.max(0, now - lastModifiedMs);
   const seconds = Math.floor(elapsed / 1000);
   const minutes = Math.floor(seconds / 60);
@@ -72,6 +75,17 @@ function getStatusColor(status: SessionStatus): string {
   }
 }
 
+export function getBadge(session: SessionNode): {
+  text: string;
+  color: string;
+} {
+  if (session.liveState === "working")
+    return { text: "[working]", color: "green" };
+  if (session.liveState === "waiting")
+    return { text: "[waiting]", color: "magenta" };
+  return { text: `[${session.status}]`, color: getStatusColor(session.status) };
+}
+
 interface SessionRowProps {
   session: SessionNode;
   isSelected: boolean;
@@ -102,8 +116,7 @@ function SessionRow({
   contentWidth,
 }: SessionRowProps): React.ReactElement {
   const isParent = prefix === "    ";
-  const statusColor = getStatusColor(session.status);
-  const badge = `[${session.status}]`;
+  const { text: badge, color: badgeColor } = getBadge(session);
   const elapsed = formatElapsed(session.lastModifiedMs);
   const model = session.modelName ?? "";
   const isNonInteractive = session.nonInteractive;
@@ -176,7 +189,7 @@ function SessionRow({
         <Text bold={!shouldDim}>{rawName}</Text>
         {shortIdDisplay ? <Text dimColor>{shortIdDisplay}</Text> : null}
         <Text> </Text>
-        <Text color={statusColor}>{badge}</Text>
+        <Text color={badgeColor}>{badge}</Text>
         {middleText ? <Text dimColor>{middleSection}</Text> : null}
         <Text>{gap}</Text>
         <Text dimColor>{elapsed}</Text>

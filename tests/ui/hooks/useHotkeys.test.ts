@@ -84,6 +84,8 @@ function makeOptions(overrides = {}) {
     onDetailClose: vi.fn(),
     onDetailScrollUp: vi.fn(),
     onDetailScrollDown: vi.fn(),
+    onDetailScrollHalfPageUp: vi.fn(),
+    onDetailScrollHalfPageDown: vi.fn(),
     onFilter: vi.fn(),
     onHelp: vi.fn(),
     filterLabel: "all",
@@ -357,6 +359,7 @@ describe("useHotkeys", () => {
       );
       expect(result.current.statusBarItems).toEqual([
         "↑↓/jk: scroll",
+        "C-u/d: ½page",
         "↵/Esc: close",
         "?: help",
       ]);
@@ -555,6 +558,26 @@ describe("useHotkeys", () => {
       );
       act(() => result.current.handleInput("q", noopKey));
       expect(onQuit).not.toHaveBeenCalled();
+    });
+
+    it("calls onDetailScrollHalfPageUp on Ctrl+U in detail mode", () => {
+      const onDetailScrollHalfPageUp = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ detailMode: true, onDetailScrollHalfPageUp })),
+      );
+      act(() => result.current.handleInput("u", { ...noopKey, ctrl: true }));
+      expect(onDetailScrollHalfPageUp).toHaveBeenCalledTimes(1);
+    });
+
+    it("calls onDetailScrollHalfPageDown on Ctrl+D in detail mode", () => {
+      const onDetailScrollHalfPageDown = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(
+          makeOptions({ detailMode: true, onDetailScrollHalfPageDown }),
+        ),
+      );
+      act(() => result.current.handleInput("d", { ...noopKey, ctrl: true }));
+      expect(onDetailScrollHalfPageDown).toHaveBeenCalledTimes(1);
     });
   });
 });

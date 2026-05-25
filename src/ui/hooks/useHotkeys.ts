@@ -18,6 +18,8 @@ interface UseHotkeysOptions {
   onDetailClose: () => void;
   onDetailScrollUp: () => void;
   onDetailScrollDown: () => void;
+  onDetailScrollHalfPageUp: () => void;
+  onDetailScrollHalfPageDown: () => void;
   onFilter: () => void;
   onHelp: () => void;
   onHelpScroll?: (delta: number) => void;
@@ -64,6 +66,8 @@ export function useHotkeys({
   onDetailClose,
   onDetailScrollUp,
   onDetailScrollDown,
+  onDetailScrollHalfPageUp,
+  onDetailScrollHalfPageDown,
   onFilter,
   onHelp,
   onHelpScroll,
@@ -125,6 +129,14 @@ export function useHotkeys({
     }
 
     if (detailMode) {
+      if (key.ctrl && input === "u") {
+        onDetailScrollHalfPageUp();
+        return;
+      }
+      if (key.ctrl && input === "d") {
+        onDetailScrollHalfPageDown();
+        return;
+      }
       if (key.upArrow || input === "k") {
         onDetailScrollUp();
         return;
@@ -235,7 +247,7 @@ export function useHotkeys({
   const statusBarItems = helpMode
     ? ["↑↓/jk: scroll", "PgDn/Space: page", "↵/Esc/q/?: close"]
     : detailMode
-      ? ["↑↓/jk: scroll", "↵/Esc: close", "?: help"]
+      ? ["↑↓/jk: scroll", "C-u/d: ½page", "↵/Esc: close", "?: help"]
       : focus === "tree"
         ? [
             ...trackingItems,

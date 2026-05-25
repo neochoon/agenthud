@@ -71,4 +71,6 @@ export interface ActivityEntry {
   label: string;
   detail: string;
   count?: number;
+  detailBody?: string; // full multi-line body for the detail view (diff or file content)
+  detailKind?: "diff" | "code"; // how the detail view should color detailBody
 }

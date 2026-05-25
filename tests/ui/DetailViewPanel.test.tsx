@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { ActivityEntry } from "../../src/types/index.js";
 import {
   DetailViewPanel,
+  splitLineNumberGutter,
   wrapClassified,
   wrapText,
 } from "../../src/ui/DetailViewPanel.js";
@@ -264,5 +265,58 @@ describe("DetailViewPanel code body indentation", () => {
       />,
     );
     expect(lastFrame()).toContain("    const x = 1;");
+  });
+
+  it("renders a numbered Read body with the line numbers visible", () => {
+    const { lastFrame } = render(
+      <DetailViewPanel
+        activity={makeActivity({
+          type: "tool",
+          icon: "○",
+          label: "Read",
+          detail: "a.ts L38-39",
+          detailBody: "38: first line\n39:     indented",
+          detailKind: "code",
+          detailNumbered: true,
+        })}
+        sessionName="myproject"
+        width={80}
+        visibleRows={10}
+        scrollOffset={0}
+      />,
+    );
+    const frame = lastFrame() ?? "";
+    // Assert pieces separately: the dim gutter is a distinct text segment, so
+    // gutter and content are not contiguous when colors are emitted (and CI
+    // strips colors entirely). Avoids the ANSI-interleaving brittleness.
+    expect(frame).toContain("38: ");
+    expect(frame).toContain("first line");
+    expect(frame).toContain("    indented");
+  });
+});
+
+describe("splitLineNumberGutter", () => {
+  it("splits a 'NN: ' gutter from the rest of the line", () => {
+    expect(splitLineNumberGutter("38: first line")).toEqual([
+      "38: ",
+      "first line",
+    ]);
+  });
+
+  it("keeps right-aligned padding in the gutter", () => {
+    expect(splitLineNumberGutter(" 99: x")).toEqual([" 99: ", "x"]);
+  });
+
+  it("only matches the leading gutter, not number-like content after it", () => {
+    expect(splitLineNumberGutter("62: 42: foo")).toEqual(["62: ", "42: foo"]);
+  });
+
+  it("handles an empty line body after the gutter", () => {
+    expect(splitLineNumberGutter("61: ")).toEqual(["61: ", ""]);
+  });
+
+  it("returns null for lines without a leading gutter (continuations)", () => {
+    expect(splitLineNumberGutter("    const x = 1;")).toBeNull();
+    expect(splitLineNumberGutter("no number here")).toBeNull();
   });
 });

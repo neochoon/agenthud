@@ -232,7 +232,7 @@ describe("buildToolDetailBody", () => {
         { file_path: "/x/a.ts", offset: 38, limit: 2 },
         { file: { content: "first\nsecond", startLine: 38, numLines: 2 } },
       ),
-    ).toEqual({ text: "38: first\n39: second", kind: "code" });
+    ).toEqual({ text: "38: first\n39: second", kind: "code", numbered: true });
   });
 
   it("Read: right-aligns line numbers when the range crosses digit widths", () => {
@@ -242,7 +242,7 @@ describe("buildToolDetailBody", () => {
         { file_path: "/x/a.ts" },
         { file: { content: "a\nb\nc", startLine: 99, numLines: 3 } },
       ),
-    ).toEqual({ text: " 99: a\n100: b\n101: c", kind: "code" });
+    ).toEqual({ text: " 99: a\n100: b\n101: c", kind: "code", numbered: true });
   });
 
   it("Read: preserves indentation after the line-number prefix", () => {
@@ -252,7 +252,7 @@ describe("buildToolDetailBody", () => {
         { file_path: "/x/a.ts" },
         { file: { content: "fn() {\n    x = 1;", startLine: 1, numLines: 2 } },
       ),
-    ).toEqual({ text: "1: fn() {\n2:     x = 1;", kind: "code" });
+    ).toEqual({ text: "1: fn() {\n2:     x = 1;", kind: "code", numbered: true });
   });
 
   it("Read: drops the phantom trailing line from a final newline", () => {
@@ -262,7 +262,7 @@ describe("buildToolDetailBody", () => {
         { file_path: "/x/a.ts" },
         { file: { content: "x\ny\n", startLine: 5, numLines: 2 } },
       ),
-    ).toEqual({ text: "5: x\n6: y", kind: "code" });
+    ).toEqual({ text: "5: x\n6: y", kind: "code", numbered: true });
   });
 
   it("Read: falls back to input offset for the start line when startLine is absent", () => {
@@ -272,7 +272,7 @@ describe("buildToolDetailBody", () => {
         { file_path: "/x/a.ts", offset: 10, limit: 1 },
         { file: { content: "only" } },
       ),
-    ).toEqual({ text: "10: only", kind: "code" });
+    ).toEqual({ text: "10: only", kind: "code", numbered: true });
   });
 
   it("Read without file content, and Task/Bash tools, have no body", () => {

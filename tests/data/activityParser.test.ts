@@ -197,4 +197,62 @@ describe("parseActivitiesFromLines", () => {
       "Paragraph one.\n\nParagraph two.\n\nParagraph three.",
     );
   });
+
+  it("enriches an Edit with range/counts and a diff body from a later result", () => {
+    const editLines = [
+      JSON.stringify({
+        type: "assistant",
+        message: {
+          content: [
+            {
+              type: "tool_use",
+              id: "tool_1",
+              name: "Edit",
+              input: { file_path: "/src/App.tsx" },
+            },
+          ],
+        },
+        timestamp: "2025-01-15T10:00:00.000Z",
+      }),
+      JSON.stringify({
+        type: "user",
+        message: {
+          role: "user",
+          content: [{ type: "tool_result", tool_use_id: "tool_1", content: "ok" }],
+        },
+        toolUseResult: {
+          filePath: "/src/App.tsx",
+          structuredPatch: [
+            { oldStart: 45, oldLines: 3, newStart: 45, newLines: 3, lines: [" ctx", "-old", "+new"] },
+          ],
+        },
+        timestamp: "2025-01-15T10:00:01.000Z",
+      }),
+    ];
+    const result = parseActivitiesFromLines(editLines);
+    const edit = result.activities.find((a) => a.label === "Edit");
+    expect(edit?.detail).toBe("App.tsx L45-47 +1 -1");
+    expect(edit?.detailKind).toBe("diff");
+    expect(edit?.detailBody).toContain("@@ -45,3 +45,3 @@");
+    expect(edit?.detailBody).toContain("+new");
+  });
+
+  it("degrades gracefully when an Edit has no matching result", () => {
+    const editLines = [
+      JSON.stringify({
+        type: "assistant",
+        message: {
+          content: [
+            { type: "tool_use", id: "tool_x", name: "Edit", input: { file_path: "/src/App.tsx" } },
+          ],
+        },
+        timestamp: "2025-01-15T10:00:00.000Z",
+      }),
+    ];
+    const result = parseActivitiesFromLines(editLines);
+    const edit = result.activities.find((a) => a.label === "Edit");
+    expect(edit?.detail).toBe("App.tsx");
+    expect(edit?.detailBody).toBeUndefined();
+    expect(edit?.detailKind).toBeUndefined();
+  });
 });

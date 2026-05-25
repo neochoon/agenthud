@@ -1,13 +1,13 @@
 import { Box, Text } from "ink";
 import type React from "react";
 import type { ActivityEntry } from "../types/index.js";
+import { getActivityStyle } from "./ActivityViewerPanel.js";
 import {
   BOX,
   createBottomLine,
   getDisplayWidth,
   getInnerWidth,
 } from "./constants.js";
-import { getActivityStyle } from "./ActivityViewerPanel.js";
 import {
   classifyCodeFences,
   classifyDiffLines,
@@ -95,9 +95,16 @@ export function DetailViewPanel({
   const innerWidth = getInnerWidth(width);
   const contentWidth = innerWidth - 1;
 
+  const body = activity.detailBody ?? activity.detail;
   const classifier =
-    activity.type === "commit" ? classifyDiffLines : classifyCodeFences;
-  const allLines = wrapClassified(activity.detail, contentWidth, classifier);
+    activity.detailKind === "diff"
+      ? classifyDiffLines
+      : activity.detailKind === "code"
+        ? classifyCodeFences
+        : activity.type === "commit"
+          ? classifyDiffLines
+          : classifyCodeFences;
+  const allLines = wrapClassified(body, contentWidth, classifier);
   const totalLines = allLines.length;
   const clampedOffset = Math.min(
     scrollOffset,

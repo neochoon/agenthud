@@ -128,6 +128,69 @@ describe("DetailViewPanel", () => {
     // There must be a newline between them
     expect(frame.slice(oneIdx, twoIdx)).toContain("\n");
   });
+
+  it("renders an Edit diff body in the detail view", () => {
+    const { lastFrame } = render(
+      <DetailViewPanel
+        activity={makeActivity({
+          type: "tool",
+          icon: "~",
+          label: "Edit",
+          detail: "App.tsx L45-47 +1 -1",
+          detailBody: "@@ -45,3 +45,3 @@\n ctx\n-old line\n+new line",
+          detailKind: "diff",
+        })}
+        sessionName="myproject"
+        width={80}
+        visibleRows={10}
+        scrollOffset={0}
+      />,
+    );
+    const frame = lastFrame() ?? "";
+    // detailBody is shown (not the short row detail). We don't assert ANSI
+    // color codes here: CI runs without a TTY, so ink/chalk emit plain text.
+    // Diff coloring itself is covered by lineColoring.test.ts.
+    expect(frame).toContain("+new line");
+    expect(frame).toContain("@@ -45,3 +45,3 @@");
+  });
+
+  it("renders a Write content body as code", () => {
+    const { lastFrame } = render(
+      <DetailViewPanel
+        activity={makeActivity({
+          type: "tool",
+          icon: "~",
+          label: "Write",
+          detail: "a.ts L1-2 +2",
+          detailBody: "const a = 1;\nconst b = 2;",
+          detailKind: "code",
+        })}
+        sessionName="myproject"
+        width={80}
+        visibleRows={10}
+        scrollOffset={0}
+      />,
+    );
+    const frame = lastFrame() ?? "";
+    expect(frame).toContain("const a = 1;");
+    expect(frame).toContain("const b = 2;");
+  });
+
+  it("falls back to detail when there is no detailBody", () => {
+    const { lastFrame } = render(
+      <DetailViewPanel
+        activity={makeActivity({
+          detail: "plain detail text",
+          detailBody: undefined,
+        })}
+        sessionName="myproject"
+        width={80}
+        visibleRows={10}
+        scrollOffset={0}
+      />,
+    );
+    expect(lastFrame()).toContain("plain detail text");
+  });
 });
 
 describe("wrapText", () => {

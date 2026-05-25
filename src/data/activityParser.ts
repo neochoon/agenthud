@@ -1,11 +1,13 @@
-import { basename } from "node:path";
 import type { ActivityEntry } from "../types/index.js";
 import { ICONS } from "../types/index.js";
+import type { ToolInput, ToolUseResult } from "./toolDetails.js";
+import {
+  buildToolDetailBody,
+  getToolDetail,
+  summarizeToolDetail,
+} from "./toolDetails.js";
 
-function stripAnsi(text: string): string {
-  // eslint-disable-next-line no-control-regex
-  return text.replace(/\x1b\[[0-9;]*m/g, "");
-}
+export { getToolDetail };
 
 export function parseModelName(modelId: string): string {
   const opusMatch = modelId.match(/claude-opus-(\d+)-(\d+)/);
@@ -18,25 +20,6 @@ export function parseModelName(modelId: string): string {
   if (haikuMatch) return `haiku-${haikuMatch[1]}.${haikuMatch[2]}`;
 
   return modelId.replace(/-\d{8}$/, "");
-}
-
-export function getToolDetail(
-  _toolName: string,
-  input?: {
-    command?: string;
-    file_path?: string;
-    pattern?: string;
-    query?: string;
-    description?: string;
-  },
-): string {
-  if (!input) return "";
-  if (input.command) return stripAnsi(input.command);
-  if (input.file_path) return basename(input.file_path);
-  if (input.pattern) return stripAnsi(input.pattern);
-  if (input.query) return stripAnsi(input.query);
-  if (input.description) return stripAnsi(input.description);
-  return "";
 }
 
 interface ParseResult {
@@ -52,16 +35,11 @@ interface JsonlAssistantEntry {
     model?: string;
     content: Array<{
       type: string;
+      id?: string;
       text?: string;
       thinking?: string;
       name?: string;
-      input?: {
-        command?: string;
-        file_path?: string;
-        pattern?: string;
-        query?: string;
-        description?: string;
-      };
+      input?: ToolInput;
     }>;
     usage?: {
       input_tokens?: number;
@@ -83,6 +61,35 @@ export function parseActivitiesFromLines(lines: string[]): ParseResult {
   let tokenCount = 0;
   let modelName: string | null = null;
   let sessionStartTime: Date | null = null;
+
+  // Pre-pass: map tool_use_id → its result. A tool_result lands in a *later*
+  // JSONL entry than its tool_use, so we need full lookahead before the main
+  // pass below — hence the second walk over `lines`. Claude Code emits exactly
+  // one tool_result per user entry (even for parallel tool calls each result
+  // is its own entry), so the entry's single `toolUseResult` covers it.
+  const resultsById = new Map<string, ToolUseResult>();
+  for (const line of lines) {
+    let entry: {
+      type?: string;
+      toolUseResult?: unknown;
+      message?: { content?: unknown };
+    };
+    try {
+      entry = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (entry.type !== "user") continue;
+    const tur = entry.toolUseResult;
+    if (!tur || typeof tur !== "object") continue;
+    const content = entry.message?.content;
+    if (!Array.isArray(content)) continue;
+    for (const b of content as Array<{ type?: string; tool_use_id?: string }>) {
+      if (b?.type === "tool_result" && typeof b.tool_use_id === "string") {
+        resultsById.set(b.tool_use_id, tur as ToolUseResult);
+      }
+    }
+  }
 
   for (const line of lines) {
     let entry: { type: string; timestamp?: string };
@@ -151,7 +158,9 @@ export function parseActivitiesFromLines(lines: string[]): ParseResult {
             if (block.name === "TodoWrite") continue;
             const icon =
               (ICONS as Record<string, string>)[block.name] ?? ICONS.Default;
-            const detail = getToolDetail(block.name, block.input);
+            const result = block.id ? resultsById.get(block.id) : undefined;
+            const detail = summarizeToolDetail(block.name, block.input, result);
+            const body = buildToolDetailBody(block.name, block.input, result);
             const last = activities[activities.length - 1];
             if (
               last &&
@@ -162,13 +171,18 @@ export function parseActivitiesFromLines(lines: string[]): ParseResult {
               last.count = (last.count ?? 1) + 1;
               last.timestamp = timestamp;
             } else {
-              activities.push({
+              const entry: ActivityEntry = {
                 timestamp,
                 type: "tool",
                 icon,
                 label: block.name,
                 detail,
-              });
+              };
+              if (body) {
+                entry.detailBody = body.text;
+                entry.detailKind = body.kind;
+              }
+              activities.push(entry);
             }
           } else if (
             block.type === "text" &&

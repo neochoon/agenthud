@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-05-25
+
+### New
+- **Session liveness badges (`[working]` / `[waiting]`).** Recently-active session rows now show what state the session is in, not just when it was last touched. `[working]` (green) means Claude is mid-turn (a tool is running or it's about to respond); `[waiting]` (magenta) means Claude yielded the turn and the ball is in your court — including an explicit `AskUserQuestion`. Derived from the structure of the JSONL tail, so a long-running tool still reads as `[working]` even while the file is momentarily quiet. Only replaces `[hot]` (within the 30-minute window); `warm/cool/cold` stay time-based, and non-interactive sessions are unaffected.
+- **Rich tool activity details.** Tool rows now summarize what actually happened instead of just the tool name or filename: `Edit App.tsx L45-52 +3 -1` (line range + added/removed counts), `Write package.json L1-65 +65`, `Read App.tsx L60-189` (range), `TaskUpdate #1 pending→in_progress`, and `TaskCreate` shows the task subject. Pressing `↵` on an Edit opens the real unified diff with the same green/red/cyan coloring as git commits; a Write shows the written file content. Built by correlating each tool call with its result later in the session JSONL. `agenthud report` inherits the richer one-line detail for free.
+
 ## [0.9.5] - 2026-05-21
 
 ### New
@@ -365,7 +371,8 @@
 - **Test Panel** - Test results at a glance
 - Watch mode for live updates
 
-[Unreleased]: https://github.com/neochoon/agenthud/compare/v0.9.5...HEAD
+[Unreleased]: https://github.com/neochoon/agenthud/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/neochoon/agenthud/compare/v0.9.4...v0.10.0
 [0.9.5]: https://github.com/neochoon/agenthud/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/neochoon/agenthud/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/neochoon/agenthud/compare/v0.9.2...v0.9.3

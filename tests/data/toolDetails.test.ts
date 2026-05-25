@@ -225,7 +225,17 @@ describe("buildToolDetailBody", () => {
     expect(body).toEqual({ text: "@@ -0,0 +1,2 @@\n+a\n+b", kind: "diff" });
   });
 
-  it("Read and Task tools have no body", () => {
+  it("Read: shows the read content as code", () => {
+    expect(
+      buildToolDetailBody(
+        "Read",
+        { file_path: "/x/a.ts", offset: 1, limit: 2 },
+        { file: { content: "line1\nline2", startLine: 1, numLines: 2 } },
+      ),
+    ).toEqual({ text: "line1\nline2", kind: "code" });
+  });
+
+  it("Read without file content, and Task/Bash tools, have no body", () => {
     expect(
       buildToolDetailBody(
         "Read",

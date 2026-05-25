@@ -24,6 +24,14 @@ export interface SessionTreePanelProps {
   width?: number;
   maxRows?: number;
   expandedIds?: Set<string>;
+  /**
+   * When true the panel renders a `[LIVE …]` indicator (with spinner) in
+   * its title bar — same affordance as the activity viewer. Set by App
+   * while tracking mode is on so the user knows the tree is auto-following.
+   */
+  trackingOn?: boolean;
+  /** One-character spinner frame shown next to LIVE when trackingOn. */
+  spinner?: string;
 }
 
 /**
@@ -31,7 +39,10 @@ export interface SessionTreePanelProps {
  * elapsed time grows so cold sessions stop showing "27h35m" and become
  * "1d", "1w", "1mo", "1y". `now` is injectable so tests can pin time.
  */
-export function formatElapsed(lastModifiedMs: number, now = Date.now()): string {
+export function formatElapsed(
+  lastModifiedMs: number,
+  now = Date.now(),
+): string {
   const elapsed = Math.max(0, now - lastModifiedMs);
   const seconds = Math.floor(elapsed / 1000);
   const minutes = Math.floor(seconds / 60);
@@ -64,6 +75,17 @@ function getStatusColor(status: SessionStatus): string {
   }
 }
 
+export function getBadge(session: SessionNode): {
+  text: string;
+  color: string;
+} {
+  if (session.liveState === "working")
+    return { text: "[working]", color: "green" };
+  if (session.liveState === "waiting")
+    return { text: "[waiting]", color: "magenta" };
+  return { text: `[${session.status}]`, color: getStatusColor(session.status) };
+}
+
 interface SessionRowProps {
   session: SessionNode;
   isSelected: boolean;
@@ -94,8 +116,7 @@ function SessionRow({
   contentWidth,
 }: SessionRowProps): React.ReactElement {
   const isParent = prefix === "    ";
-  const statusColor = getStatusColor(session.status);
-  const badge = `[${session.status}]`;
+  const { text: badge, color: badgeColor } = getBadge(session);
   const elapsed = formatElapsed(session.lastModifiedMs);
   const model = session.modelName ?? "";
   const isNonInteractive = session.nonInteractive;
@@ -168,7 +189,7 @@ function SessionRow({
         <Text bold={!shouldDim}>{rawName}</Text>
         {shortIdDisplay ? <Text dimColor>{shortIdDisplay}</Text> : null}
         <Text> </Text>
-        <Text color={statusColor}>{badge}</Text>
+        <Text color={badgeColor}>{badge}</Text>
         {middleText ? <Text dimColor>{middleSection}</Text> : null}
         <Text>{gap}</Text>
         <Text dimColor>{elapsed}</Text>
@@ -434,11 +455,17 @@ export function SessionTreePanel({
   width = DEFAULT_PANEL_WIDTH,
   maxRows,
   expandedIds = new Set(),
+  trackingOn = false,
+  spinner = "",
 }: SessionTreePanelProps): React.ReactElement {
   const innerWidth = getInnerWidth(width);
   const contentWidth = innerWidth - 1; // account for space after │
 
-  const titleLine = createTitleLine("Projects", "", width);
+  // Same affordance the activity viewer uses for LIVE: when tracking is on
+  // the tree's title shows `[LIVE ⠧]` so the user knows the selection is
+  // moving on its own.
+  const titleSuffix = trackingOn ? `[LIVE ${spinner || "▼"}]` : "";
+  const titleLine = createTitleLine("Projects", titleSuffix, width);
   const bottomLine = createBottomLine(width);
 
   const totalProjectCount = projects.length + coldProjects.length;

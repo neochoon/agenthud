@@ -18,6 +18,7 @@ const SECTIONS: HelpSection[] = [
       ["PgDn / Ctrl+F", "Page down"],
       ["↵", "Expand/collapse project, session, or summary"],
       ["h", "Hide selected (project/session/sub-agent)"],
+      ["t", "Track: auto-follow the newest live sub-agent (any nav key turns it off)"],
       ["Tab", "Switch focus to activity viewer"],
       ["r", "Refresh now"],
     ],

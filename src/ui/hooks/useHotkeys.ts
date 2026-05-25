@@ -22,7 +22,9 @@ interface UseHotkeysOptions {
   onHelp: () => void;
   onHelpScroll?: (delta: number) => void;
   onHelpScrollToTop?: () => void;
+  onToggleTracking?: () => void;
   filterLabel: string; // e.g. "all", "response", "commit"
+  trackingOn?: boolean;
 }
 
 export interface UseHotkeysResult {
@@ -66,7 +68,9 @@ export function useHotkeys({
   onHelp,
   onHelpScroll,
   onHelpScrollToTop,
+  onToggleTracking,
   filterLabel,
+  trackingOn = false,
 }: UseHotkeysOptions): UseHotkeysResult {
   const handleInput = (
     input: string,
@@ -156,6 +160,10 @@ export function useHotkeys({
       onFilter();
       return;
     }
+    if (input === "t" && !key.ctrl && onToggleTracking) {
+      onToggleTracking();
+      return;
+    }
 
     if (key.pageUp) {
       onScrollPageUp();
@@ -220,12 +228,17 @@ export function useHotkeys({
     }
   };
 
+  // Leading item shown when tracking mode is on, so users can always tell
+  // at a glance that selection will move on its own.
+  const trackingItems = trackingOn ? ["TRK ●"] : ["t: track"];
+
   const statusBarItems = helpMode
     ? ["↑↓/jk: scroll", "PgDn/Space: page", "↵/Esc/q/?: close"]
     : detailMode
       ? ["↑↓/jk: scroll", "↵/Esc: close", "?: help"]
       : focus === "tree"
         ? [
+            ...trackingItems,
             "Tab: viewer",
             "↑↓/jk: select",
             "PgUp/Dn: page",
@@ -236,6 +249,7 @@ export function useHotkeys({
             "q: quit",
           ]
         : [
+            ...trackingItems,
             "Tab: projects",
             "↑↓/jk: scroll",
             "PgUp/Dn: page",

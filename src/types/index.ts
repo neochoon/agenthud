@@ -1,6 +1,9 @@
 // Session status
 export type SessionStatus = "hot" | "warm" | "cool" | "cold";
 
+// Live state derived from the JSONL tail (orthogonal to time-based status)
+export type LiveState = "working" | "waiting";
+
 // A single Claude session node (top-level or sub-agent)
 export interface SessionNode {
   id: string; // UUID from JSONL filename (without .jsonl)
@@ -16,6 +19,7 @@ export interface SessionNode {
   taskDescription?: string; // extracted task summary from first message (sub-agents only)
   nonInteractive: boolean; // true when entrypoint === "sdk-cli"
   firstUserPrompt: string | null; // First natural-language user message (system messages skipped)
+  liveState: LiveState | null; // working/waiting from JSONL tail; null = fall back to time-based status
 }
 
 // Project node grouping sessions

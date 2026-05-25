@@ -1,5 +1,6 @@
 import { Box, Text } from "ink";
 import type React from "react";
+import { memo } from "react";
 import type { ActivityEntry } from "../types/index.js";
 import {
   BOX,
@@ -12,6 +13,38 @@ import {
 export interface ActivityStyle {
   color?: string;
   dimColor: boolean;
+}
+
+/**
+ * Map a normal-intensity color name to its high-intensity variant so the
+ * "flashlight" sweep brightens the actual character color instead of
+ * inverting the background. Colors with no defined bright variant fall
+ * through unchanged.
+ */
+function brighten(color: string | undefined): string {
+  switch (color) {
+    case undefined:
+    case "gray":
+      return "white";
+    case "white":
+      return "whiteBright";
+    case "green":
+      return "greenBright";
+    case "yellow":
+      return "yellowBright";
+    case "magenta":
+      return "magentaBright";
+    case "cyan":
+      return "cyanBright";
+    case "red":
+      return "redBright";
+    case "blue":
+      return "blueBright";
+    case "black":
+      return "blackBright";
+    default:
+      return color;
+  }
 }
 
 export function getActivityStyle(activity: ActivityEntry): ActivityStyle {
@@ -44,22 +77,19 @@ export interface ActivityViewerPanelProps {
   newCount: number;
   visibleRows: number;
   /**
-   * Extra blank rows to render after the activity content. Gives the
-   * viewer a "next will arrive here" feel, like the empty space below
-   * `tail -f` output. Layout owner (App) accounts for these in its
-   * height math so the box still fits the screen.
+   * Spinner frame (one character) painted in place of the newest visible
+   * activity's icon when set AND `isLive` is true AND the viewer has
+   * content. Gives the live-edge row a moving glyph + bright text so the
+   * "this row is alive" cue lands on the row itself, not on a separate
+   * marker below. Pass null/undefined to disable the treatment.
    */
-  trailingBlankRows?: number;
+  liveSpinnerFrame?: string | null;
   /**
-   * Column offset (0-based) for the live-edge motion indicator inside the
-   * first trailing slot. When set AND `isLive` is true, an arrow (`▸`)
-   * renders that many cells from the left, painted dim cyan. The animation
-   * comes from `useSlide` ticking the offset on a fixed interval, so the
-   * arrow appears to slide left → right and wrap. Hidden whenever `isLive`
-   * is false so the motion doesn't mislead the user while they're reading
-   * history.
+   * Monotonic counter (e.g. from `useTick`) that drives the moving
+   * flashlight sweep across the live row's label. Each tick advances the
+   * highlight window by one cell. When omitted, no sweep effect.
    */
-  liveIndicatorPosition?: number | null;
+  liveTick?: number | null;
   width: number;
   cursorLine: number;
   hasFocus: boolean;
@@ -102,6 +132,121 @@ function truncateDetail(detail: string, maxWidth: number): string {
   return `${truncated}…`;
 }
 
+interface ActivityRowProps {
+  activity: ActivityEntry;
+  timestamp: string;
+  width: number;
+  contentWidth: number;
+  isCursor: boolean;
+  isLiveRow: boolean;
+  /** Set on the live row only; undefined elsewhere so memo equality holds. */
+  liveSpinnerFrame?: string;
+  /** Set on the live row only; undefined elsewhere so memo equality holds. */
+  liveTick?: number;
+}
+
+/**
+ * One row of the activity viewer. Wrapped in React.memo so non-live rows
+ * skip re-render on every spinner / flashlight tick — only the live row
+ * (whose liveSpinnerFrame/liveTick props actually change) re-runs.
+ */
+const ActivityRow = memo(function ActivityRow({
+  activity,
+  timestamp,
+  width,
+  contentWidth,
+  isCursor,
+  isLiveRow,
+  liveSpinnerFrame,
+  liveTick,
+}: ActivityRowProps): React.ReactElement {
+  const style = getActivityStyle(activity);
+  const timestampWidth = timestamp.length;
+  const icon = isLiveRow && liveSpinnerFrame ? liveSpinnerFrame : activity.icon;
+  const iconWidth = getDisplayWidth(icon);
+  const label = activity.label;
+  const detail = activity.detail;
+  const count = activity.count;
+
+  const countSuffix = count && count > 1 ? ` (×${count})` : "";
+  const countSuffixWidth = countSuffix.length;
+
+  const prefixWidth = 2 + timestampWidth + iconWidth + 1;
+  const labelPart = detail ? `${label}: ` : label;
+  const labelWidth = labelPart.length;
+  const detailMaxWidth =
+    width -
+    2 -
+    timestampWidth -
+    iconWidth -
+    1 -
+    labelWidth -
+    countSuffixWidth -
+    1;
+
+  let labelContent: string;
+  if (detail) {
+    const truncated = truncateDetail(detail, Math.max(0, detailMaxWidth));
+    labelContent = `${labelPart}${truncated}${countSuffix}`;
+  } else {
+    labelContent = label + countSuffix;
+  }
+
+  const usedWidth =
+    1 + 1 + timestampWidth + iconWidth + 1 + getDisplayWidth(labelContent) + 1;
+  const padding = Math.max(0, width - usedWidth);
+
+  // Live-row flashlight: split the label into pre/lit/post so the lit
+  // segment can render in the brightened variant of style.color.
+  const SWEEP_WIDTH = 10;
+  let labelNode: React.ReactNode = labelContent;
+  if (
+    isLiveRow &&
+    !isCursor &&
+    liveTick != null &&
+    labelContent.length > 0
+  ) {
+    const period = labelContent.length + SWEEP_WIDTH;
+    const offset = (liveTick % period) - SWEEP_WIDTH; // -W .. len-1
+    const litStart = Math.max(0, offset);
+    const litEnd = Math.min(labelContent.length, offset + SWEEP_WIDTH);
+    if (litEnd > litStart) {
+      const pre = labelContent.slice(0, litStart);
+      const lit = labelContent.slice(litStart, litEnd);
+      const post = labelContent.slice(litEnd);
+      labelNode = (
+        <>
+          {pre}
+          <Text color={brighten(style.color)} bold>
+            {lit}
+          </Text>
+          {post}
+        </>
+      );
+    }
+  }
+
+  return (
+    <Text>
+      {BOX.v}{" "}
+      <Text backgroundColor={isCursor ? "blue" : undefined}>
+        <Text dimColor={!isCursor && !isLiveRow}>{timestamp}</Text>
+        <Text color="cyan" bold={isLiveRow}>
+          {icon}
+        </Text>{" "}
+        <Text
+          color={isCursor ? undefined : style.color}
+          dimColor={!isCursor && !isLiveRow && style.dimColor}
+        >
+          {labelNode}
+        </Text>
+        {" ".repeat(padding)}
+      </Text>
+      {BOX.v}
+    </Text>
+  );
+});
+
 export function ActivityViewerPanel({
   activities,
   sessionName,
@@ -109,8 +254,8 @@ export function ActivityViewerPanel({
   isLive,
   newCount,
   visibleRows,
-  trailingBlankRows = 0,
-  liveIndicatorPosition = null,
+  liveSpinnerFrame = null,
+  liveTick = null,
   width,
   cursorLine,
   hasFocus,
@@ -164,122 +309,45 @@ export function ActivityViewerPanel({
     // newest, capped at the number of currently visible activities.
     const effectiveCursor = Math.min(cursorLine, visibleActivities.length - 1);
     const cursorIndexInSlice = visibleActivities.length - 1 - effectiveCursor;
+    // The newest visible activity sits at the last index; in LIVE mode with
+    // a spinner frame supplied, this row gets the "alive" treatment.
+    const liveRowIndex = visibleActivities.length - 1;
+    const liveTreatment = isLive && !!liveSpinnerFrame;
     for (let i = 0; i < visibleActivities.length; i++) {
       const activity = visibleActivities[i];
-      const style = getActivityStyle(activity);
       const isCursor = hasFocus && i === cursorIndexInSlice;
-
-      const time = formatActivityTime(activity.timestamp, now);
-      const timestamp = `[${time}] `;
-      const timestampWidth = timestamp.length;
-      const icon = activity.icon;
-      const iconWidth = getDisplayWidth(icon);
-      const label = activity.label;
-      const detail = activity.detail;
-      const count = activity.count;
-
-      const countSuffix = count && count > 1 ? ` (×${count})` : "";
-      const countSuffixWidth = countSuffix.length;
-
-      const prefixWidth = 2 + timestampWidth + iconWidth + 1;
-      const labelPart = detail ? `${label}: ` : label;
-      const labelWidth = labelPart.length;
-      const _availableForDetail =
-        contentWidth - prefixWidth - labelWidth - countSuffixWidth + 1;
-      const detailMaxWidth =
-        width -
-        2 -
-        timestampWidth -
-        iconWidth -
-        1 -
-        labelWidth -
-        countSuffixWidth -
-        1;
-
-      let labelContent: string;
-      let _displayWidth: number;
-
-      if (detail) {
-        const truncated = truncateDetail(detail, Math.max(0, detailMaxWidth));
-        labelContent = `${labelPart}${truncated}${countSuffix}`;
-        _displayWidth =
-          prefixWidth -
-          1 +
-          labelWidth +
-          getDisplayWidth(truncated) +
-          countSuffixWidth;
-      } else {
-        labelContent = label + countSuffix;
-        _displayWidth = prefixWidth - 1 + label.length + countSuffixWidth;
-      }
-
-      const usedWidth =
-        1 +
-        1 +
-        timestampWidth +
-        iconWidth +
-        1 +
-        getDisplayWidth(labelContent) +
-        1;
-      const padding = Math.max(0, width - usedWidth);
-
+      const isLiveRow = liveTreatment && i === liveRowIndex;
+      const timestamp = `[${formatActivityTime(activity.timestamp, now)}] `;
       lines.push(
-        <Text key={`activity-${i}`}>
-          {BOX.v}{" "}
-          <Text backgroundColor={isCursor ? "blue" : undefined}>
-            <Text dimColor={!isCursor}>{timestamp}</Text>
-            <Text color="cyan">{icon}</Text>{" "}
-            <Text
-              color={isCursor ? undefined : style.color}
-              dimColor={!isCursor && style.dimColor}
-            >
-              {labelContent}
-            </Text>
-            {" ".repeat(padding)}
-          </Text>
-          {BOX.v}
-        </Text>,
+        <ActivityRow
+          key={`activity-${i}`}
+          activity={activity}
+          timestamp={timestamp}
+          width={width}
+          contentWidth={contentWidth}
+          isCursor={isCursor}
+          isLiveRow={isLiveRow}
+          // Spinner / tick only flow to the live row so non-live rows keep
+          // identical prop refs across ticks and React.memo skips them.
+          liveSpinnerFrame={
+            isLiveRow ? (liveSpinnerFrame ?? undefined) : undefined
+          }
+          liveTick={isLiveRow ? (liveTick ?? undefined) : undefined}
+        />,
       );
     }
   }
 
   // Bottom-aligned: pad at the TOP so newest sits on the last content row.
-  // Then add `trailingBlankRows` empty rows below for breathing room.
+  // The live-edge cue now lives ON the newest activity row (spinner + bold)
+  // rather than in a separate slot below.
   const emptyRow = `${BOX.v}${" ".repeat(contentWidth + 1)}${BOX.v}`;
   const padCount = Math.max(0, visibleRows - lines.length);
   const padded: React.ReactElement[] = [];
   for (let i = 0; i < padCount; i++) {
     padded.push(<Text key={`pad-${i}`}>{emptyRow}</Text>);
   }
-  // Trailing slot: when live, draw a small arrow at the position dictated
-  // by `liveIndicatorPosition` so it appears to slide left → right across
-  // the row. Only the FIRST trailing row carries the indicator; any
-  // remaining trailing rows stay empty. When paused, every trailing row
-  // is empty (no motion over stale content).
-  const hasContent = visibleActivities.length > 0;
-  const trailing: React.ReactElement[] = [];
-  for (let i = 0; i < trailingBlankRows; i++) {
-    if (i === 0 && isLive && liveIndicatorPosition != null && hasContent) {
-      const pos = Math.max(0, liveIndicatorPosition);
-      const arrow = "›";
-      // Cap the arrow position to whatever fits inside the content area.
-      const safePos = Math.min(pos, Math.max(0, contentWidth - 1));
-      const padAfter = Math.max(0, contentWidth - safePos - 1);
-      trailing.push(
-        <Text key={`trail-${i}`}>
-          {BOX.v} {" ".repeat(safePos)}
-          <Text color="cyan" dimColor>
-            {arrow}
-          </Text>
-          {" ".repeat(padAfter)}
-          {BOX.v}
-        </Text>,
-      );
-    } else {
-      trailing.push(<Text key={`trail-${i}`}>{emptyRow}</Text>);
-    }
-  }
-  const finalLines = [...padded, ...lines, ...trailing];
+  const finalLines = [...padded, ...lines];
 
   return (
     <Box flexDirection="column" width={width}>

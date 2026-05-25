@@ -313,6 +313,7 @@ describe("useHotkeys", () => {
         useHotkeys(makeOptions({ focus: "tree" })),
       );
       expect(result.current.statusBarItems).toEqual([
+        "t: track",
         "Tab: viewer",
         "↑↓/jk: select",
         "PgUp/Dn: page",
@@ -324,11 +325,20 @@ describe("useHotkeys", () => {
       ]);
     });
 
+    it("shows TRK ● when tracking is on instead of the t: track hint", () => {
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ focus: "tree", trackingOn: true })),
+      );
+      expect(result.current.statusBarItems[0]).toBe("TRK ●");
+      expect(result.current.statusBarItems).not.toContain("t: track");
+    });
+
     it("returns viewer-focus status bar items when focus is viewer", () => {
       const { result } = renderHook(() =>
         useHotkeys(makeOptions({ focus: "viewer" })),
       );
       expect(result.current.statusBarItems).toEqual([
+        "t: track",
         "Tab: projects",
         "↑↓/jk: scroll",
         "PgUp/Dn: page",

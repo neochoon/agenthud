@@ -184,66 +184,65 @@ describe("ActivityViewerPanel", () => {
     expect(lastFrame()).toContain("+3↓");
   });
 
-  it("renders the sliding arrow in the trailing slot when live", () => {
+  it("replaces the newest row's icon with the live spinner frame when live", () => {
     const { lastFrame } = render(
       <ActivityViewerPanel
         {...baseProps}
-        activities={[makeActivity("Read", 0)]}
-        trailingBlankRows={1}
-        liveIndicatorPosition={2}
+        activities={[makeActivity("Older", 0), makeActivity("Newest", 1)]}
+        liveSpinnerFrame="⠧"
       />,
     );
-    expect(lastFrame()).toContain("›");
+    const frame = lastFrame() ?? "";
+    // Spinner glyph should appear; the static icon ("○") still appears on
+    // the older row only.
+    expect(frame).toContain("⠧");
+    // The newest row's icon is replaced — only the older row keeps "○".
+    expect(frame.match(/○/g)?.length ?? 0).toBe(1);
   });
 
-  it("hides the arrow when there are no activities", () => {
+  it("does not replace any icon when paused (isLive false)", () => {
+    // Three activities, scrollOffset 1 → top 2 visible (newest hidden below).
+    const { lastFrame } = render(
+      <ActivityViewerPanel
+        {...baseProps}
+        activities={[
+          makeActivity("A", 0),
+          makeActivity("B", 1),
+          makeActivity("C", 2),
+        ]}
+        isLive={false}
+        scrollOffset={1}
+        liveSpinnerFrame="⠧"
+      />,
+    );
+    const frame = lastFrame() ?? "";
+    // Spinner glyph must not appear over stale content.
+    expect(frame).not.toContain("⠧");
+    // Two visible rows, both keep their static icon.
+    expect(frame.match(/○/g)?.length ?? 0).toBe(2);
+  });
+
+  it("does not replace any icon when there are no activities", () => {
     const { lastFrame } = render(
       <ActivityViewerPanel
         {...baseProps}
         activities={[]}
-        trailingBlankRows={1}
-        liveIndicatorPosition={2}
+        liveSpinnerFrame="⠧"
       />,
     );
-    // Empty placeholder ("No activity yet") shouldn't sit under a sliding
-    // arrow — there's nothing alive to anchor to.
-    expect(lastFrame()).not.toContain("›");
+    expect(lastFrame()).not.toContain("⠧");
   });
 
-  it("hides the arrow when paused (isLive false)", () => {
+  it("does not animate when liveSpinnerFrame is null/undefined", () => {
     const { lastFrame } = render(
       <ActivityViewerPanel
         {...baseProps}
         activities={[makeActivity("Read", 0)]}
-        isLive={false}
-        scrollOffset={3}
-        trailingBlankRows={1}
-        liveIndicatorPosition={2}
-      />,
-    );
-    // The motion indicator must not appear over stale content when the
-    // viewer is scrolled away from the live edge.
-    expect(lastFrame()).not.toContain("›");
-  });
-
-  it("places the arrow at the requested column offset", () => {
-    const { lastFrame } = render(
-      <ActivityViewerPanel
-        {...baseProps}
-        activities={[makeActivity("Read", 0)]}
-        trailingBlankRows={1}
-        liveIndicatorPosition={5}
+        liveSpinnerFrame={null}
       />,
     );
     const frame = lastFrame() ?? "";
-    // Find the line containing the arrow (only the trailing slot has it).
-    const arrowLine = frame
-      .split("\n")
-      .find((line) => line.includes("›")) ?? "";
-    // Strip leading "│ " box border, then count spaces before the arrow.
-    const stripped = arrowLine.replace(/^.*?│\s/, "");
-    const spacesBeforeArrow = stripped.indexOf("›");
-    expect(spacesBeforeArrow).toBe(5);
+    expect(frame.match(/○/g)?.length ?? 0).toBe(1);
   });
 
   it("flattens multi-line detail to a single line in the viewer", () => {

@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import type {
   GlobalConfig,
+  LiveState,
   ProjectNode,
   SessionNode,
   SessionStatus,
@@ -10,6 +11,7 @@ import type {
 } from "../types/index.js";
 import { ONE_HOUR_MS, THIRTY_MINUTES_MS } from "../ui/constants.js";
 import { parseModelName } from "./activityParser.js";
+import { detectLiveState } from "./sessionLiveness.js";
 
 export function getProjectsDir(): string {
   return (
@@ -90,25 +92,33 @@ function readSubAgentInfo(filePath: string): {
   }
 }
 
-function readModelName(filePath: string): string | null {
-  if (!existsSync(filePath)) return null;
+function readSessionTail(
+  filePath: string,
+  mtimeMs: number,
+  now: number,
+): { modelName: string | null; liveState: LiveState | null } {
+  if (!existsSync(filePath)) return { modelName: null, liveState: null };
   try {
     const content = readFileSync(filePath, "utf-8");
-    const lines = content.trim().split("\n").filter(Boolean);
-    for (const line of lines.slice(-50).reverse()) {
+    const tail = content.trim().split("\n").filter(Boolean).slice(-50);
+
+    let modelName: string | null = null;
+    for (const line of [...tail].reverse()) {
       try {
         const entry = JSON.parse(line);
         if (entry.type === "assistant" && entry.message?.model) {
-          return parseModelName(entry.message.model as string);
+          modelName = parseModelName(entry.message.model as string);
+          break;
         }
       } catch {
         // skip
       }
     }
+
+    return { modelName, liveState: detectLiveState(tail, mtimeMs, now) };
   } catch {
-    // skip
+    return { modelName: null, liveState: null };
   }
-  return null;
 }
 
 const SYSTEM_PREFIXES = [
@@ -215,6 +225,11 @@ function buildSubAgents(
       try {
         const stat = statSync(filePath);
         const { agentId, taskDescription } = readSubAgentInfo(filePath);
+        const { modelName, liveState } = readSessionTail(
+          filePath,
+          stat.mtimeMs,
+          Date.now(),
+        );
         return {
           id,
           hideKey,
@@ -223,12 +238,13 @@ function buildSubAgents(
           projectName: "",
           lastModifiedMs: stat.mtimeMs,
           status: getSessionStatus(stat.mtimeMs),
-          modelName: readModelName(filePath),
+          modelName,
           subAgents: [],
           agentId: agentId ?? undefined,
           taskDescription: taskDescription ?? undefined,
           nonInteractive: false,
           firstUserPrompt: null,
+          liveState,
         };
       } catch {
         return null;
@@ -294,6 +310,12 @@ export function discoverSessions(config: GlobalConfig): SessionTree {
       try {
         const stat = statSync(filePath);
         const subAgents = buildSubAgents(id, projectDir, config, projectName);
+        const nonInteractive = readEntrypoint(filePath) === "sdk-cli";
+        const { modelName, liveState } = readSessionTail(
+          filePath,
+          stat.mtimeMs,
+          Date.now(),
+        );
         allSessions.push({
           id,
           hideKey,
@@ -302,10 +324,11 @@ export function discoverSessions(config: GlobalConfig): SessionTree {
           projectName,
           lastModifiedMs: stat.mtimeMs,
           status: getSessionStatus(stat.mtimeMs),
-          modelName: readModelName(filePath),
+          modelName,
           subAgents,
-          nonInteractive: readEntrypoint(filePath) === "sdk-cli",
+          nonInteractive,
           firstUserPrompt: readFirstUserPrompt(filePath),
+          liveState: nonInteractive ? null : liveState,
         });
       } catch {}
     }

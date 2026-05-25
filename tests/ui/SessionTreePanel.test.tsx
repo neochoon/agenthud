@@ -1,7 +1,7 @@
 import { render } from "ink-testing-library";
 import { describe, expect, it } from "vitest";
 import type { ProjectNode, SessionNode } from "../../src/types/index.js";
-import { SessionTreePanel } from "../../src/ui/SessionTreePanel.js";
+import { getBadge, SessionTreePanel } from "../../src/ui/SessionTreePanel.js";
 
 const makeSession = (overrides: Partial<SessionNode> = {}): SessionNode => ({
   id: "abc123",
@@ -15,6 +15,7 @@ const makeSession = (overrides: Partial<SessionNode> = {}): SessionNode => ({
   subAgents: [],
   nonInteractive: false,
   firstUserPrompt: null,
+  liveState: null,
   ...overrides,
 });
 
@@ -780,5 +781,66 @@ describe("SessionTreePanel", () => {
       />,
     );
     expect(lastFrame() ?? "").toContain("»");
+  });
+
+  describe("getBadge", () => {
+    it("returns green [working] for a working session", () => {
+      expect(getBadge(makeSession({ liveState: "working" }))).toEqual({
+        text: "[working]",
+        color: "green",
+      });
+    });
+
+    it("returns magenta [waiting] for a waiting session", () => {
+      expect(getBadge(makeSession({ liveState: "waiting" }))).toEqual({
+        text: "[waiting]",
+        color: "magenta",
+      });
+    });
+
+    it("falls back to the time-based badge when liveState is null", () => {
+      expect(getBadge(makeSession({ liveState: null, status: "hot" }))).toEqual(
+        {
+          text: "[hot]",
+          color: "green",
+        },
+      );
+      expect(
+        getBadge(makeSession({ liveState: null, status: "cold" })),
+      ).toEqual({
+        text: "[cold]",
+        color: "gray",
+      });
+    });
+  });
+
+  it("renders [working] badge for a working session", () => {
+    const session = makeSession({ liveState: "working" });
+    const project = makeProject("myproject", [session]);
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[project]}
+        coldProjects={[]}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+      />,
+    );
+    expect(lastFrame()).toContain("[working]");
+  });
+
+  it("renders [waiting] badge for a waiting session", () => {
+    const session = makeSession({ liveState: "waiting" });
+    const project = makeProject("myproject", [session]);
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[project]}
+        coldProjects={[]}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+      />,
+    );
+    expect(lastFrame()).toContain("[waiting]");
   });
 });

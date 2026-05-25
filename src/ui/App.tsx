@@ -27,7 +27,7 @@ import { getDisplayWidth } from "./constants.js";
 import { DetailViewPanel } from "./DetailViewPanel.js";
 import { HelpPanel } from "./HelpPanel.js";
 import { useHotkeys } from "./hooks/useHotkeys.js";
-import { useSlide } from "./hooks/useSlide.js";
+import { useTick } from "./hooks/useTick.js";
 import { useSpinner } from "./hooks/useSpinner.js";
 import { SessionTreePanel } from "./SessionTreePanel.js";
 
@@ -46,6 +46,7 @@ function subSummarySentinel(parentId: string): SessionNode {
     subAgents: [],
     nonInteractive: false,
     firstUserPrompt: null,
+    liveState: null,
   };
 }
 
@@ -102,6 +103,7 @@ function flattenSessions(
       subAgents: [],
       nonInteractive: false,
       firstUserPrompt: null,
+      liveState: null,
     });
 
     const shouldShowSessions = isCold
@@ -133,6 +135,7 @@ function flattenSessions(
       subAgents: [],
       nonInteractive: false,
       firstUserPrompt: null,
+      liveState: null,
     });
     if (expandedIds.has("__cold__")) {
       for (const project of tree.coldProjects) {
@@ -164,6 +167,94 @@ function getSelectedActivity(
   }
   const effectiveCursor = Math.min(cursorLine, visible.length - 1);
   return visible[visible.length - 1 - effectiveCursor] ?? null;
+}
+
+type LiveCandidate = { id: string; mtime: number; isNew: boolean };
+
+/**
+ * For tracking mode: pick the next jump target.
+ *
+ * 1. If any *new* hot/warm sub-agent (id not in `seen`) exists, jump to
+ *    the newest of those — this is the "B just started" case.
+ * 2. Else if no new sub-agent but a new parent session appeared, jump
+ *    to the newest of those.
+ * 3. Else if the currently selected id is still hot/warm, stay put —
+ *    avoids the oscillation between two equally-active sub-agents.
+ * 4. Else (current target died) jump to the newest live thing,
+ *    sub-agent preferred over parent.
+ *
+ * Also returns the full set of ids observed in this tree so the caller
+ * can update its "seen" snapshot.
+ */
+function pickTrackingTarget(
+  tree: SessionTree,
+  selectedId: string | null,
+  seen: Set<string>,
+): { target: string | null; ids: Set<string> } {
+  const ids = new Set<string>();
+  const liveSubs: LiveCandidate[] = [];
+  const liveParents: LiveCandidate[] = [];
+
+  for (const p of tree.projects) {
+    for (const s of p.sessions) {
+      ids.add(s.id);
+      if (s.status === "hot" || s.status === "warm") {
+        liveParents.push({
+          id: s.id,
+          mtime: s.lastModifiedMs,
+          isNew: !seen.has(s.id),
+        });
+      }
+      for (const sa of s.subAgents) {
+        ids.add(sa.id);
+        if (sa.status === "hot" || sa.status === "warm") {
+          liveSubs.push({
+            id: sa.id,
+            mtime: sa.lastModifiedMs,
+            isNew: !seen.has(sa.id),
+          });
+        }
+      }
+    }
+  }
+
+  const newest = (xs: LiveCandidate[]): string | null =>
+    xs.length === 0
+      ? null
+      : xs.reduce((a, b) => (a.mtime > b.mtime ? a : b)).id;
+
+  // 1. New live sub-agent wins.
+  const newSubTarget = newest(liveSubs.filter((s) => s.isNew));
+  if (newSubTarget) return { target: newSubTarget, ids };
+  // 2. New live parent session.
+  const newParentTarget = newest(liveParents.filter((p) => p.isNew));
+  if (newParentTarget) return { target: newParentTarget, ids };
+
+  // 3. Current selection still live → stay put.
+  const currentIsLive =
+    selectedId != null &&
+    (liveSubs.some((s) => s.id === selectedId) ||
+      liveParents.some((p) => p.id === selectedId));
+  if (currentIsLive) return { target: null, ids };
+
+  // 4. Current died (or never had one). Pick newest live thing,
+  //    sub-agents preferred over parents.
+  return {
+    target: newest(liveSubs) ?? newest(liveParents),
+    ids,
+  };
+}
+
+/** Walk a tree and collect every session + sub-agent id. */
+function collectAllIds(tree: SessionTree): Set<string> {
+  const ids = new Set<string>();
+  for (const p of tree.projects) {
+    for (const s of p.sessions) {
+      ids.add(s.id);
+      for (const sa of s.subAgents) ids.add(sa.id);
+    }
+  }
+  return ids;
 }
 
 export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
@@ -200,6 +291,15 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   const [helpMode, setHelpMode] = useState(false);
   const [helpScroll, setHelpScroll] = useState(0);
   const helpTotalLinesRef = useRef(0);
+  // Tracking mode: when on, the tree selection follows the newest live
+  // sub-agent (or session, if no hot/warm sub-agent exists) across the
+  // whole tree. Any explicit navigation key turns it off again.
+  const [tracking, setTracking] = useState(false);
+  // Snapshot of all session/sub-agent ids observed since tracking was
+  // enabled. Used by pickTrackingTarget to distinguish "brand new" from
+  // "already existed when we started watching" so we don't oscillate
+  // between two equally-active sub-agents.
+  const seenIdsRef = useRef<Set<string>>(new Set());
 
   const allFlat = useMemo(
     () => flattenSessions(sessionTree, expandedIds),
@@ -317,13 +417,31 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     const tree = discoverSessions(freshConfig);
     const updatedFlat = flattenSessions(tree, expandedIds);
 
+    // Tracking mode: pick the next jump target with the new-id-aware
+    // algorithm so we don't oscillate between two equally-active sub-agents.
+    let nextSelected: string | null = selectedId;
+    if (tracking) {
+      const { target, ids } = pickTrackingTarget(
+        tree,
+        selectedId,
+        seenIdsRef.current,
+      );
+      if (target && target !== selectedId) {
+        setSelectedId(target);
+        nextSelected = target;
+      }
+      // Update the seen snapshot every refresh so the next round can
+      // distinguish "new since last tick" from "existed already".
+      seenIdsRef.current = ids;
+    }
+
     // If selected item disappeared (e.g. sub-agent went cold), fall back to
     // its parent session so navigation doesn't snap to index 0.
-    const node = updatedFlat.find((s) => s.id === selectedId);
+    const node = updatedFlat.find((s) => s.id === nextSelected);
     if (!node) {
       const allSessions = tree.projects?.flatMap((p) => p.sessions) ?? [];
       const parentSession = allSessions.find((s) =>
-        s.subAgents.some((sa) => sa.id === selectedId),
+        s.subAgents.some((sa) => sa.id === nextSelected),
       );
       if (parentSession) setSelectedId(parentSession.id);
     }
@@ -337,7 +455,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
       setScrollOffset((o) => o + delta);
       setNewCount((n) => n + delta);
     }
-  }, [selectedId, isLive, expandedIds]);
+  }, [selectedId, isLive, expandedIds, tracking]);
 
   // Keep a stable ref so the watcher callback always calls the latest refresh
   const refreshRef = useRef(refresh);
@@ -382,6 +500,17 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     };
   }, [isWatchMode, config.refreshIntervalMs]);
 
+  // Tracking adds a 1-second polling timer on top of fs.watch. On macOS
+  // recursive fs.watch can quietly drop events for files inside other
+  // project directories — the polling guarantees the auto-follow finds
+  // the new live target within a second regardless of how the OS event
+  // delivery behaves.
+  useEffect(() => {
+    if (!isWatchMode || !tracking) return;
+    const timer = setInterval(() => refreshRef.current(), 1000);
+    return () => clearInterval(timer);
+  }, [isWatchMode, tracking]);
+
   const filterPresets = config.filterPresets;
   const activePreset = useMemo(
     () => filterPresets[filterIndex % filterPresets.length] ?? [],
@@ -411,34 +540,33 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   const maxTreeRows = Math.floor(height * (1 - VIEWER_HEIGHT_FRACTION));
   const naturalTreeRows = allFlat.length;
   const treeRows = Math.max(1, Math.min(naturalTreeRows, maxTreeRows));
-  // Breathing room: keep one blank row at the bottom of the viewer box so
-  // newest activity isn't flush against the border — gives a "next will
-  // appear here" feel, like a terminal cursor below tail -f output.
-  const VIEWER_BREATHING_ROWS = 1;
-  // statusBar(1) + margin(1) + tree(treeRows+2) + margin(1) + viewer(viewerRows+2+breathing) = height
-  const viewerRows = Math.max(
-    5,
-    height - 7 - treeRows - VIEWER_BREATHING_ROWS,
-  );
+  // statusBar(1) + margin(1) + tree(treeRows+2) + margin(1) + viewer(viewerRows+2) = height
+  const viewerRows = Math.max(5, height - 7 - treeRows);
 
-  const spinner = useSpinner(isWatchMode);
-  // Slide a small arrow across the viewer's live-edge slot every 180ms,
-  // edge-to-edge of the content area (panel inner width minus borders/pad).
-  // The animation only ticks in watch mode; the panel additionally hides
-  // it when the viewer is PAUSED.
-  const viewerIndicatorWidth = Math.max(1, width - 3);
-  const liveIndicatorPosition = useSlide(
-    isWatchMode,
-    viewerIndicatorWidth,
-    180,
-    // Reset to 0 whenever the viewer's subject changes so each new
-    // session/sub-agent restarts the arrow from the left.
-    selectedId,
-  );
+  // Spinner and flashlight tick on the same cadence (150ms) so the entire
+  // App re-renders ~6.7 times per second instead of 10 — measurably less
+  // work for the terminal to repaint, and the two animations end up in
+  // sync (a single React render advances both).
+  const spinner = useSpinner(isWatchMode, 150);
+  // Tick drives the moving-flashlight sweep on the live row. Gated tightly
+  // — only ticks when the viewer is actually showing live activity AND the
+  // user isn't in help / detail overlay. Without this gate the 100ms-per-
+  // tick App re-render runs even when the sweep isn't visible, and the
+  // accumulated work makes the sweep itself feel choppy.
+  const tickActive =
+    isWatchMode && isLive && !helpMode && !detailMode && activities.length > 0;
+  const liveTick = useTick(tickActive, 150);
   const helpViewportRows = Math.max(1, height - 3); // status bar + indicator
   const helpScrollStep = (delta: number) => {
     const max = Math.max(0, helpTotalLinesRef.current - helpViewportRows);
     setHelpScroll((s) => Math.max(0, Math.min(max, s + delta)));
+  };
+
+  // Tracking turns off any time the user takes manual control of the
+  // tree selection — j/k, PgUp/PgDn, h, Enter into a row, etc. Wrapping
+  // the disable in a small helper makes the intent obvious at the call site.
+  const stopTracking = () => {
+    if (tracking) setTracking(false);
   };
 
   const { handleInput, statusBarItems } = useHotkeys({
@@ -451,12 +579,33 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     },
     onHelpScroll: helpScrollStep,
     onHelpScrollToTop: () => setHelpScroll(0),
+    onToggleTracking: () => {
+      setTracking((on) => {
+        const next = !on;
+        if (next) {
+          // Seed the "seen" snapshot with everything currently in the tree
+          // so the next refresh only treats genuinely-new sessions/sub-agents
+          // as triggers. Then snap to the current newest live target so the
+          // user sees tracking take effect immediately.
+          seenIdsRef.current = collectAllIds(sessionTree);
+          const { target } = pickTrackingTarget(
+            sessionTree,
+            selectedId,
+            seenIdsRef.current,
+          );
+          if (target) setSelectedId(target);
+        }
+        return next;
+      });
+    },
+    trackingOn: tracking,
     onSwitchFocus: () => setFocus((f) => (f === "tree" ? "viewer" : "tree")),
     // cursorLine = "entries back from the newest" (0 = newest = bottom row).
     // Up arrow moves visually upward = older direction = cursorLine++.
     // Down arrow moves visually downward = newer direction = cursorLine--.
     onScrollUp: () => {
       if (focus === "tree") {
+        stopTracking();
         if (selectedIndex === -1) return;
         const prev = Math.max(0, selectedIndex - 1);
         setSelectedId(allFlat[prev]?.id ?? selectedId);
@@ -474,6 +623,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     },
     onScrollDown: () => {
       if (focus === "tree") {
+        stopTracking();
         if (selectedIndex === -1) return;
         const next = Math.min(allFlat.length - 1, selectedIndex + 1);
         setSelectedId(allFlat[next]?.id ?? selectedId);
@@ -498,6 +648,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     // PgDn = visually down = newer direction = scrollOffset--
     onScrollPageUp: () => {
       if (focus === "tree") {
+        stopTracking();
         const prev = Math.max(0, selectedIndex - 5);
         setSelectedId(allFlat[prev]?.id ?? selectedId);
       } else {
@@ -510,6 +661,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     },
     onScrollPageDown: () => {
       if (focus === "tree") {
+        stopTracking();
         const next = Math.min(allFlat.length - 1, selectedIndex + 5);
         setSelectedId(allFlat[next]?.id ?? selectedId);
       } else {
@@ -526,6 +678,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     },
     onScrollHalfPageUp: () => {
       if (focus === "tree") {
+        stopTracking();
         const prev = Math.max(0, selectedIndex - Math.ceil(5 / 2));
         setSelectedId(allFlat[prev]?.id ?? selectedId);
       } else {
@@ -541,6 +694,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     },
     onScrollHalfPageDown: () => {
       if (focus === "tree") {
+        stopTracking();
         const next = Math.min(
           allFlat.length - 1,
           selectedIndex + Math.ceil(5 / 2),
@@ -607,6 +761,9 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
         return;
       }
       if (focus !== "tree" || !selectedId) return;
+      // Any explicit Enter in the tree is a deliberate action; stop tracking
+      // so the user's chosen target doesn't get overwritten by the next refresh.
+      stopTracking();
 
       // Project sentinel: __proj-{projectName}__
       if (selectedId.startsWith("__proj-") && selectedId.endsWith("__")) {
@@ -714,6 +871,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     },
     onHide: () => {
       if (focus !== "tree" || !selectedId) return;
+      stopTracking();
 
       // Project sentinel: hide entire project
       if (selectedId.startsWith("__proj-") && selectedId.endsWith("__")) {
@@ -811,7 +969,9 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     return (
       <Box flexDirection="column" width={width}>
         <Text bold>AgentHUD needs a larger terminal.</Text>
-        <Text dimColor>{`Minimum: ${MIN_WIDTH} cols × ${MIN_HEIGHT} rows`}</Text>
+        <Text
+          dimColor
+        >{`Minimum: ${MIN_WIDTH} cols × ${MIN_HEIGHT} rows`}</Text>
         <Text dimColor>{`Current: ${width} cols × ${height + 1} rows`}</Text>
         <Text> </Text>
         <Text dimColor>
@@ -877,6 +1037,8 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
             width={width}
             maxRows={treeRows}
             expandedIds={expandedIds}
+            trackingOn={tracking}
+            spinner={spinner}
           />
 
           <Box marginTop={1}>
@@ -896,8 +1058,8 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
                 isLive={isLive}
                 newCount={newCount}
                 visibleRows={viewerRows}
-                trailingBlankRows={VIEWER_BREATHING_ROWS}
-                liveIndicatorPosition={liveIndicatorPosition}
+                liveSpinnerFrame={spinner}
+                liveTick={liveTick}
                 width={width}
                 cursorLine={viewerCursorLine}
                 hasFocus={focus === "viewer"}

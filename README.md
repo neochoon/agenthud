@@ -43,8 +43,7 @@ AgentHUD's TUI splits the screen into a project tree and an activity viewer:
 │ [10:23] ~ Edit  src/ui/App.tsx                           │
 │ [10:23] $ Bash  npm test                                 │
 │ [10:23] < Response  Tests passed successfully            │
-│ [10:25] ◆ abc1234  feat: fix auth callback               │
-│ ›                                                        │
+│ [10:25] ⠧ Edit  src/auth/oauth.ts  ← bold + spinner = live │
 └──────────────────────────────────────────────────────────┘
 ```
 
@@ -59,7 +58,7 @@ AgentHUD's TUI splits the screen into a project tree and an activity viewer:
 
 **Activity viewer (bottom pane)**
 - Real-time feed for the selected session: file reads, edits, bash, responses, thinking, git commits. Newest at the bottom, like `tail -f`.
-- A `›` slides left → right along the bottom row while the viewer is in LIVE mode — visible proof the feed is alive. Hidden when paused (scrolled into history) or when the session has no activity yet.
+- The **newest visible row is rendered "alive"** while in LIVE mode: its icon is replaced with a spinning glyph and the text turns bold. When a new activity arrives, the spinner moves to the new bottom row. Hidden when paused or empty.
 - Press `f` to cycle through filter presets (configurable).
 - Press `↵` on any row to open a scrollable detail view; on a commit row this shows `git show --stat --patch`.
 
@@ -106,9 +105,12 @@ Full reference is also available inside the app — press `?`.
 | `Tab` | Switch focus to activity viewer |
 | `PgUp` / `Ctrl+B` | Page up |
 | `PgDn` / `Ctrl+F` | Page down |
+| `t` | Track — auto-follow the newest live sub-agent (any nav key turns it off) |
 | `r` | Refresh now |
 | `?` | Help |
 | `q` | Quit |
+
+When tracking is on, the tree panel's title shows `[LIVE ⠧]` and the status bar replaces `t: track` with `TRK ●`. Any explicit selection-changing key (`↑/k`, `↓/j`, `PgUp/PgDn`, `↵`, `h`, or `t` again) turns tracking off.
 
 #### Activity viewer focus
 

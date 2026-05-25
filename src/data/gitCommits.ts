@@ -13,7 +13,7 @@ export function getCommitDetail(
   if (!projectPath) return null;
   try {
     return execSync(
-      `git --git-dir="${projectPath}/.git" show --stat --patch --no-color ${hash}`,
+      `git -C "${projectPath}" show --stat --patch --no-color ${hash}`,
       { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] },
     ).trim();
   } catch {
@@ -33,7 +33,7 @@ export function parseGitCommits(
   let raw: string;
   try {
     raw = execSync(
-      `git --git-dir="${projectPath}/.git" log --format="%ct|%h|%s" --after="${start} 00:00:00" --before="${end} 23:59:59"`,
+      `git -C "${projectPath}" log --format="%ct|%h|%s" --after="${start} 00:00:00" --before="${end} 23:59:59"`,
       { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] },
     ).trim();
   } catch {

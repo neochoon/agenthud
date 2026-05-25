@@ -63,6 +63,17 @@ describe("parseGitCommits", () => {
     expect(cmd).toContain("2026-05-14 23:59:59");
   });
 
+  it("runs git from the project dir so subdirectory projects find the ancestor repo", () => {
+    vi.mocked(execSync).mockReturnValue("");
+    parseGitCommits("/some/project", DAY);
+    const cmd = vi.mocked(execSync).mock.calls[0][0] as string;
+    // -C lets git discover the repo from the dir upward (handles a project
+    // that is a subdirectory of a repo, or a worktree). --git-dir=<path>/.git
+    // wrongly assumed the project path was always the repo root.
+    expect(cmd).toContain('-C "/some/project"');
+    expect(cmd).not.toContain("--git-dir");
+  });
+
   it("uses endDate for --before when provided", () => {
     vi.mocked(execSync).mockReturnValue("");
     const endDay = new Date(2026, 4, 16); // May 16
@@ -118,5 +129,13 @@ describe("getCommitDetail", () => {
     });
     const result = getCommitDetail("/not/a/repo", "abc1234");
     expect(result).toBeNull();
+  });
+
+  it("runs git from the project dir so subdirectory/worktree projects resolve", () => {
+    vi.mocked(execSync).mockReturnValue("out");
+    getCommitDetail("/some/project", "abc1234");
+    const cmd = vi.mocked(execSync).mock.calls[0][0] as string;
+    expect(cmd).toContain('-C "/some/project"');
+    expect(cmd).not.toContain("--git-dir");
   });
 });

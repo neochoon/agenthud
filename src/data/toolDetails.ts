@@ -92,7 +92,7 @@ export function summarizeToolDetail(
     if (name === "Write") {
       const content = result?.content ?? input?.content;
       if (content) {
-        const n = content.split("\n").length;
+        const n = content.split("\n").length - (content.endsWith("\n") ? 1 : 0);
         return joinParts(file, rangeStr(1, n), `+${n}`);
       }
     }
@@ -134,6 +134,8 @@ export function buildToolDetailBody(
   input: ToolInput | undefined,
   result: ToolUseResult | undefined,
 ): { text: string; kind: "diff" | "code" } | null {
+  // Write intentionally shows the written file content (more useful to read
+  // than an all-additions diff); the row summary still uses patch stats.
   if (name === "Write") {
     const content = result?.content ?? input?.content;
     if (content) return { text: content, kind: "code" };

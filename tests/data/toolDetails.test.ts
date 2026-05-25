@@ -80,6 +80,16 @@ describe("summarizeToolDetail", () => {
     ).toBe("a.ts L1-3 +3");
   });
 
+  it("Write: counts lines correctly when content ends with a trailing newline", () => {
+    expect(
+      summarizeToolDetail(
+        "Write",
+        { file_path: "/x/a.ts", content: "l1\nl2\n" },
+        undefined,
+      ),
+    ).toBe("a.ts L1-2 +2");
+  });
+
   it("Read: range from result.file startLine/numLines", () => {
     expect(
       summarizeToolDetail(
@@ -176,6 +186,43 @@ describe("buildToolDetailBody", () => {
         undefined,
       ),
     ).toEqual({ text: "hello\nworld", kind: "code" });
+  });
+
+  it("Write: prefers content (code) even when a structuredPatch is also present", () => {
+    const hunks = [
+      {
+        oldStart: 0,
+        oldLines: 0,
+        newStart: 1,
+        newLines: 2,
+        lines: ["+a", "+b"],
+      },
+    ];
+    expect(
+      buildToolDetailBody(
+        "Write",
+        { file_path: "/x/a.ts" },
+        { content: "a\nb", structuredPatch: hunks },
+      ),
+    ).toEqual({ text: "a\nb", kind: "code" });
+  });
+
+  it("Write: falls back to a diff body when there is a patch but no content", () => {
+    const hunks = [
+      {
+        oldStart: 0,
+        oldLines: 0,
+        newStart: 1,
+        newLines: 2,
+        lines: ["+a", "+b"],
+      },
+    ];
+    const body = buildToolDetailBody(
+      "Write",
+      { file_path: "/x/a.ts" },
+      { structuredPatch: hunks },
+    );
+    expect(body).toEqual({ text: "@@ -0,0 +1,2 @@\n+a\n+b", kind: "diff" });
   });
 
   it("Read and Task tools have no body", () => {

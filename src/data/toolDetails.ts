@@ -129,6 +129,18 @@ export function summarizeToolDetail(
   return getToolDetail(name, input);
 }
 
+// Prefix each line with its real file line number, right-aligned so the
+// colons line up (cat -n style). A single trailing-newline phantom line is
+// dropped so the count matches the lines actually read.
+function numberLines(content: string, start: number): string {
+  const lines = content.split("\n");
+  if (lines.length > 1 && lines[lines.length - 1] === "") lines.pop();
+  const width = String(start + lines.length - 1).length;
+  return lines
+    .map((line, i) => `${String(start + i).padStart(width)}: ${line}`)
+    .join("\n");
+}
+
 export function buildToolDetailBody(
   name: string,
   input: ToolInput | undefined,
@@ -142,7 +154,10 @@ export function buildToolDetailBody(
   }
   if (name === "Read") {
     const content = result?.file?.content;
-    if (content) return { text: content, kind: "code" };
+    if (content) {
+      const start = result?.file?.startLine ?? input?.offset ?? 1;
+      return { text: numberLines(content, start), kind: "code" };
+    }
   }
   if (name === "Edit" || name === "Write") {
     const hunks = result?.structuredPatch;

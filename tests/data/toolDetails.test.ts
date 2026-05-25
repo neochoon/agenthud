@@ -225,14 +225,54 @@ describe("buildToolDetailBody", () => {
     expect(body).toEqual({ text: "@@ -0,0 +1,2 @@\n+a\n+b", kind: "diff" });
   });
 
-  it("Read: shows the read content as code", () => {
+  it("Read: shows the read content as code with line numbers from startLine", () => {
     expect(
       buildToolDetailBody(
         "Read",
-        { file_path: "/x/a.ts", offset: 1, limit: 2 },
-        { file: { content: "line1\nline2", startLine: 1, numLines: 2 } },
+        { file_path: "/x/a.ts", offset: 38, limit: 2 },
+        { file: { content: "first\nsecond", startLine: 38, numLines: 2 } },
       ),
-    ).toEqual({ text: "line1\nline2", kind: "code" });
+    ).toEqual({ text: "38: first\n39: second", kind: "code" });
+  });
+
+  it("Read: right-aligns line numbers when the range crosses digit widths", () => {
+    expect(
+      buildToolDetailBody(
+        "Read",
+        { file_path: "/x/a.ts" },
+        { file: { content: "a\nb\nc", startLine: 99, numLines: 3 } },
+      ),
+    ).toEqual({ text: " 99: a\n100: b\n101: c", kind: "code" });
+  });
+
+  it("Read: preserves indentation after the line-number prefix", () => {
+    expect(
+      buildToolDetailBody(
+        "Read",
+        { file_path: "/x/a.ts" },
+        { file: { content: "fn() {\n    x = 1;", startLine: 1, numLines: 2 } },
+      ),
+    ).toEqual({ text: "1: fn() {\n2:     x = 1;", kind: "code" });
+  });
+
+  it("Read: drops the phantom trailing line from a final newline", () => {
+    expect(
+      buildToolDetailBody(
+        "Read",
+        { file_path: "/x/a.ts" },
+        { file: { content: "x\ny\n", startLine: 5, numLines: 2 } },
+      ),
+    ).toEqual({ text: "5: x\n6: y", kind: "code" });
+  });
+
+  it("Read: falls back to input offset for the start line when startLine is absent", () => {
+    expect(
+      buildToolDetailBody(
+        "Read",
+        { file_path: "/x/a.ts", offset: 10, limit: 1 },
+        { file: { content: "only" } },
+      ),
+    ).toEqual({ text: "10: only", kind: "code" });
   });
 
   it("Read without file content, and Task/Bash tools, have no body", () => {

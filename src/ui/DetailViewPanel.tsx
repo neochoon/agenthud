@@ -45,10 +45,34 @@ export function wrapText(text: string, maxWidth: number): string[] {
  * piece. Classification happens on raw source lines (before wrapping) so
  * fence/diff heuristics see the original prefixes intact.
  */
+// Hard-wrap a line into chunks no wider than maxWidth display columns,
+// preserving every character (including leading/internal whitespace). Used for
+// code and diff bodies where indentation is meaningful.
+function hardWrapByWidth(line: string, maxWidth: number): string[] {
+  if (maxWidth <= 0) return [line];
+  const out: string[] = [];
+  let cur = "";
+  let curW = 0;
+  for (const ch of line) {
+    const w = getDisplayWidth(ch);
+    if (curW + w > maxWidth && cur !== "") {
+      out.push(cur);
+      cur = ch;
+      curW = w;
+    } else {
+      cur += ch;
+      curW += w;
+    }
+  }
+  if (cur !== "") out.push(cur);
+  return out.length > 0 ? out : [line];
+}
+
 export function wrapClassified(
   text: string,
   maxWidth: number,
   classifier: (lines: string[]) => LineCategory[],
+  preserveWhitespace = false,
 ): Array<{ text: string; category: LineCategory }> {
   if (!text) return [{ text: "(empty)", category: "prose" }];
   const sourceLines = text.split("\n");
@@ -59,6 +83,12 @@ export function wrapClassified(
     const cat = categories[i] ?? "prose";
     if (!line) {
       out.push({ text: "", category: cat });
+      continue;
+    }
+    if (preserveWhitespace) {
+      for (const chunk of hardWrapByWidth(line, maxWidth)) {
+        out.push({ text: chunk, category: cat });
+      }
       continue;
     }
     const words = line.split(" ");
@@ -104,7 +134,16 @@ export function DetailViewPanel({
         : activity.type === "commit"
           ? classifyDiffLines
           : classifyCodeFences;
-  const allLines = wrapClassified(body, contentWidth, classifier);
+  const preserveWhitespace =
+    activity.detailKind === "diff" ||
+    activity.detailKind === "code" ||
+    activity.type === "commit";
+  const allLines = wrapClassified(
+    body,
+    contentWidth,
+    classifier,
+    preserveWhitespace,
+  );
   const totalLines = allLines.length;
   const clampedOffset = Math.min(
     scrollOffset,

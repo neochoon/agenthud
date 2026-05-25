@@ -1,7 +1,12 @@
 import { render } from "ink-testing-library";
 import { describe, expect, it } from "vitest";
 import type { ActivityEntry } from "../../src/types/index.js";
-import { DetailViewPanel, wrapText } from "../../src/ui/DetailViewPanel.js";
+import {
+  DetailViewPanel,
+  wrapClassified,
+  wrapText,
+} from "../../src/ui/DetailViewPanel.js";
+import { classifyCodeFences } from "../../src/ui/lineColoring.js";
 
 const makeActivity = (
   overrides: Partial<ActivityEntry> = {},
@@ -211,5 +216,53 @@ describe("wrapText", () => {
     const result = wrapText(text, 30);
     expect(result[0]).toBe("short");
     expect(result.length).toBeGreaterThan(2);
+  });
+});
+
+describe("wrapClassified whitespace", () => {
+  it("preserves leading indentation when preserveWhitespace is true", () => {
+    const code = "function f() {\n    const x = 1;\n        return x;";
+    const out = wrapClassified(code, 80, classifyCodeFences, true);
+    expect(out.map((l) => l.text)).toEqual([
+      "function f() {",
+      "    const x = 1;",
+      "        return x;",
+    ]);
+  });
+
+  it("hard-wraps a long line by width while keeping leading spaces", () => {
+    const line = `${"  "}${"a".repeat(10)}`; // 2 spaces + 10 a's = width 12
+    const out = wrapClassified(line, 6, classifyCodeFences, true);
+    // every original character is preserved across the wrapped chunks
+    expect(out.map((l) => l.text).join("")).toBe(line);
+    expect(out.length).toBeGreaterThan(1);
+    expect(out[0].text.startsWith("  ")).toBe(true);
+  });
+
+  it("still word-wraps (collapsing runs) for prose by default", () => {
+    const out = wrapClassified("    indented prose", 80, classifyCodeFences);
+    expect(out[0].text).toBe("indented prose");
+  });
+});
+
+describe("DetailViewPanel code body indentation", () => {
+  it("preserves indentation when rendering a code detailBody", () => {
+    const { lastFrame } = render(
+      <DetailViewPanel
+        activity={makeActivity({
+          type: "tool",
+          icon: "○",
+          label: "Read",
+          detail: "a.ts L1-3",
+          detailBody: "function f() {\n    const x = 1;\n}",
+          detailKind: "code",
+        })}
+        sessionName="myproject"
+        width={80}
+        visibleRows={10}
+        scrollOffset={0}
+      />,
+    );
+    expect(lastFrame()).toContain("    const x = 1;");
   });
 });

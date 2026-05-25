@@ -129,7 +129,7 @@ describe("DetailViewPanel", () => {
     expect(frame.slice(oneIdx, twoIdx)).toContain("\n");
   });
 
-  it("renders an Edit diff body with diff coloring", () => {
+  it("renders an Edit diff body in the detail view", () => {
     const { lastFrame } = render(
       <DetailViewPanel
         activity={makeActivity({
@@ -147,11 +147,11 @@ describe("DetailViewPanel", () => {
       />,
     );
     const frame = lastFrame() ?? "";
-    // detailBody is shown (not the short row detail)
+    // detailBody is shown (not the short row detail). We don't assert ANSI
+    // color codes here: CI runs without a TTY, so ink/chalk emit plain text.
+    // Diff coloring itself is covered by lineColoring.test.ts.
     expect(frame).toContain("+new line");
     expect(frame).toContain("@@ -45,3 +45,3 @@");
-    // diff-add lines are colored green (ANSI)
-    expect(frame).toContain("[32m");
   });
 
   it("renders a Write content body as code", () => {

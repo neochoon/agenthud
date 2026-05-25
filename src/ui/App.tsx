@@ -736,6 +736,15 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
     onDetailScrollDown: () => {
       setDetailScrollOffset((o) => o + 1);
     },
+    onDetailScrollHalfPageUp: () => {
+      const step = Math.max(1, Math.floor(viewerRows / 2));
+      setDetailScrollOffset((o) => Math.max(0, o - step));
+    },
+    onDetailScrollHalfPageDown: () => {
+      // DetailViewPanel clamps the upper bound, so overshooting is safe.
+      const step = Math.max(1, Math.floor(viewerRows / 2));
+      setDetailScrollOffset((o) => o + step);
+    },
     onEnter: () => {
       if (focus === "viewer") {
         const act = getSelectedActivity(

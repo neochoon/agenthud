@@ -134,7 +134,8 @@ When tracking is on, the tree panel's title shows `[LIVE ⠧]` and the status ba
 
 | Key | Action |
 |-----|--------|
-| `↑` / `k` / `↓` / `j` | Scroll |
+| `↑` / `k` / `↓` / `j` | Scroll one line |
+| `Ctrl+U` / `Ctrl+D` | Half page up / down |
 | `↵` / `Esc` / `q` | Close |
 
 Detail view colors the content based on activity type:

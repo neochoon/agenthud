@@ -25,7 +25,7 @@ interface PatchHunk {
 export interface ToolUseResult {
   structuredPatch?: PatchHunk[];
   content?: string;
-  file?: { startLine?: number; numLines?: number };
+  file?: { startLine?: number; numLines?: number; content?: string };
   statusChange?: { from?: string; to?: string };
   updatedFields?: string[];
   taskId?: string;
@@ -138,6 +138,10 @@ export function buildToolDetailBody(
   // than an all-additions diff); the row summary still uses patch stats.
   if (name === "Write") {
     const content = result?.content ?? input?.content;
+    if (content) return { text: content, kind: "code" };
+  }
+  if (name === "Read") {
+    const content = result?.file?.content;
     if (content) return { text: content, kind: "code" };
   }
   if (name === "Edit" || name === "Write") {

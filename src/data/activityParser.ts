@@ -62,6 +62,11 @@ export function parseActivitiesFromLines(lines: string[]): ParseResult {
   let modelName: string | null = null;
   let sessionStartTime: Date | null = null;
 
+  // Pre-pass: map tool_use_id → its result. A tool_result lands in a *later*
+  // JSONL entry than its tool_use, so we need full lookahead before the main
+  // pass below — hence the second walk over `lines`. Claude Code emits exactly
+  // one tool_result per user entry (even for parallel tool calls each result
+  // is its own entry), so the entry's single `toolUseResult` covers it.
   const resultsById = new Map<string, ToolUseResult>();
   for (const line of lines) {
     let entry: {

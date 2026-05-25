@@ -181,6 +181,7 @@ export function parseActivitiesFromLines(lines: string[]): ParseResult {
               if (body) {
                 entry.detailBody = body.text;
                 entry.detailKind = body.kind;
+                if (body.numbered) entry.detailNumbered = true;
               }
               activities.push(entry);
             }

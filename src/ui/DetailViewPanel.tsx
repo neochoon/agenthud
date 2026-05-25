@@ -45,6 +45,15 @@ export function wrapText(text: string, maxWidth: number): string[] {
  * piece. Classification happens on raw source lines (before wrapping) so
  * fence/diff heuristics see the original prefixes intact.
  */
+// Split a leading "NN: " line-number gutter from the rest of a row so the
+// gutter can be rendered dim. Returns null when there is no leading gutter
+// (e.g. a hard-wrapped continuation chunk). Only the leading number matches,
+// so number-like content after the gutter is left untouched.
+export function splitLineNumberGutter(text: string): [string, string] | null {
+  const m = text.match(/^(\s*\d+: )(.*)$/);
+  return m ? [m[1], m[2]] : null;
+}
+
 // Hard-wrap a line into chunks no wider than maxWidth display columns,
 // preserving every character (including leading/internal whitespace). Used for
 // code and diff bodies where indentation is meaningful.
@@ -176,12 +185,24 @@ export function DetailViewPanel({
     const entry = visibleSlice[i] ?? { text: "", category: "prose" as const };
     const padding = Math.max(0, contentWidth - getDisplayWidth(entry.text));
     const lineStyle = getLineStyle(entry.category);
+    const gutterSplit = activity.detailNumbered
+      ? splitLineNumberGutter(entry.text)
+      : null;
     contentRows.push(
       <Text key={i}>
         {BOX.v}{" "}
-        <Text color={lineStyle.color} dimColor={lineStyle.dimColor}>
-          {entry.text}
-        </Text>
+        {gutterSplit ? (
+          <>
+            <Text dimColor>{gutterSplit[0]}</Text>
+            <Text color={lineStyle.color} dimColor={lineStyle.dimColor}>
+              {gutterSplit[1]}
+            </Text>
+          </>
+        ) : (
+          <Text color={lineStyle.color} dimColor={lineStyle.dimColor}>
+            {entry.text}
+          </Text>
+        )}
         {" ".repeat(padding)}
         {BOX.v}
       </Text>,

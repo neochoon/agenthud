@@ -145,7 +145,7 @@ export function buildToolDetailBody(
   name: string,
   input: ToolInput | undefined,
   result: ToolUseResult | undefined,
-): { text: string; kind: "diff" | "code" } | null {
+): { text: string; kind: "diff" | "code"; numbered?: boolean } | null {
   // Write intentionally shows the written file content (more useful to read
   // than an all-additions diff); the row summary still uses patch stats.
   if (name === "Write") {
@@ -156,7 +156,7 @@ export function buildToolDetailBody(
     const content = result?.file?.content;
     if (content) {
       const start = result?.file?.startLine ?? input?.offset ?? 1;
-      return { text: numberLines(content, start), kind: "code" };
+      return { text: numberLines(content, start), kind: "code", numbered: true };
     }
   }
   if (name === "Edit" || name === "Write") {

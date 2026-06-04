@@ -11,7 +11,9 @@ vi.mock("node:fs", () => ({
 const { existsSync, readdirSync, statSync, readFileSync } = await import(
   "node:fs"
 );
-const { discoverSessions } = await import("../../src/data/sessions.js");
+const { discoverSessions, findContainingProject } = await import(
+  "../../src/data/sessions.js"
+);
 
 const NOW = 1_700_000_000_000;
 
@@ -888,5 +890,147 @@ describe("discoverSessions", () => {
     );
     expect(all[0].nonInteractive).toBe(true);
     expect(all[0].liveState).toBeNull();
+  });
+});
+
+describe("findContainingProject", () => {
+  it("returns the project path when cwd exactly equals a project path", () => {
+    const result = findContainingProject("/Users/me/proj/agenthud", [
+      "/Users/me/proj/agenthud",
+      "/Users/me/proj/other",
+    ]);
+    expect(result).toBe("/Users/me/proj/agenthud");
+  });
+
+  it("returns the project path when cwd is a subdirectory of a project", () => {
+    const result = findContainingProject("/Users/me/proj/agenthud/src/data", [
+      "/Users/me/proj/agenthud",
+      "/Users/me/proj/other",
+    ]);
+    expect(result).toBe("/Users/me/proj/agenthud");
+  });
+
+  it("returns null when no project contains cwd", () => {
+    const result = findContainingProject("/tmp/random", [
+      "/Users/me/proj/agenthud",
+      "/Users/me/proj/other",
+    ]);
+    expect(result).toBeNull();
+  });
+
+  it("returns the nearest (longest-prefix) project when several ancestors exist", () => {
+    // Both /Users/me and /Users/me/proj/agenthud are registered;
+    // cwd inside agenthud should resolve to the deeper one.
+    const result = findContainingProject("/Users/me/proj/agenthud/src", [
+      "/Users/me",
+      "/Users/me/proj/agenthud",
+    ]);
+    expect(result).toBe("/Users/me/proj/agenthud");
+  });
+
+  it("does not match on string prefix without a path-separator boundary", () => {
+    // /Users/me/proj/agent is NOT an ancestor of /Users/me/proj/agenthud/src
+    const result = findContainingProject("/Users/me/proj/agenthud/src", [
+      "/Users/me/proj/agent",
+    ]);
+    expect(result).toBeNull();
+  });
+
+  it("returns null for an empty project list", () => {
+    expect(findContainingProject("/anywhere", [])).toBeNull();
+  });
+
+  it("accepts Windows-style backslash separators as boundary", () => {
+    const result = findContainingProject(
+      "C:\\Users\\me\\proj\\agenthud\\src",
+      ["C:\\Users\\me\\proj\\agenthud", "C:\\Users\\me\\proj\\other"],
+    );
+    expect(result).toBe("C:\\Users\\me\\proj\\agenthud");
+  });
+
+  it("normalizes both sides via the injected realpath", () => {
+    // Both cwd and the registered project go through realpath. After
+    // resolution they share the same real path, so the project matches.
+    const realpath = (p: string) =>
+      p.replace("/sym/cwd", "/real/proj").replace("/sym/proj", "/real/proj");
+    const result = findContainingProject("/sym/cwd/src", ["/sym/proj"], {
+      realpath,
+    });
+    expect(result).toBe("/sym/proj");
+  });
+});
+
+describe("discoverSessions with scopeToProject", () => {
+  const projectsDir = join(
+    process.env.HOME ?? "/home/user",
+    ".claude",
+    "projects",
+  );
+  const targetEncoded = "-Users-me-target";
+  const otherEncoded = "-Users-me-other";
+  const targetDir = join(projectsDir, targetEncoded);
+  const otherDir = join(projectsDir, otherEncoded);
+
+  function wireMocksForTwoProjects() {
+    vi.mocked(existsSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === projectsDir) return true;
+      if (path === targetDir || path === otherDir) return true;
+      if (path.endsWith(".jsonl")) return true;
+      return false;
+    });
+
+    vi.mocked(readdirSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === projectsDir)
+        return [targetEncoded, otherEncoded] as unknown as ReturnType<
+          typeof readdirSync
+        >;
+      if (path === targetDir)
+        return ["a.jsonl"] as unknown as ReturnType<typeof readdirSync>;
+      if (path === otherDir)
+        return ["b.jsonl"] as unknown as ReturnType<typeof readdirSync>;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+
+    vi.mocked(statSync).mockImplementation((p) => {
+      const path = String(p);
+      const isDir = path === targetDir || path === otherDir;
+      return {
+        isDirectory: () => isDir,
+        mtimeMs: NOW - 10_000,
+        size: 100,
+      } as ReturnType<typeof statSync>;
+    });
+
+    vi.mocked(readFileSync).mockReturnValue("");
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+  }
+
+  it("returns only the scoped project, dropping the others", () => {
+    wireMocksForTwoProjects();
+    const tree = discoverSessions(mockConfig, {
+      scopeToProject: "/Users/me/target",
+    });
+    const all = [...tree.projects, ...tree.coldProjects];
+    expect(all).toHaveLength(1);
+    expect(all[0].projectPath).toBe("/Users/me/target");
+  });
+
+  it("returns an empty tree when scopeToProject matches no registered project", () => {
+    wireMocksForTwoProjects();
+    const tree = discoverSessions(mockConfig, {
+      scopeToProject: "/Users/me/nothing-here",
+    });
+    expect(tree.projects).toHaveLength(0);
+    expect(tree.coldProjects).toHaveLength(0);
+    expect(tree.totalCount).toBe(0);
+  });
+
+  it("keeps the unfiltered behaviour when scopeToProject is omitted", () => {
+    wireMocksForTwoProjects();
+    const tree = discoverSessions(mockConfig);
+    const all = [...tree.projects, ...tree.coldProjects];
+    expect(all).toHaveLength(2);
   });
 });

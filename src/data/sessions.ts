@@ -19,7 +19,7 @@ export function getProjectsDir(): string {
   );
 }
 
-function decodeProjectPath(encoded: string): string {
+export function decodeProjectPath(encoded: string): string {
   const windowsDriveMatch = encoded.match(/^([A-Za-z])--(.*)$/);
   if (windowsDriveMatch) {
     const drive = windowsDriveMatch[1];
@@ -257,7 +257,59 @@ function buildSubAgents(
     .sort((a, b) => b.lastModifiedMs - a.lastModifiedMs);
 }
 
-export function discoverSessions(config: GlobalConfig): SessionTree {
+// Returns the registered project whose path is the nearest ancestor of cwd
+// (or equals cwd). Both inputs and the returned value are matched as strings,
+// so callers that care about symlinks should pre-resolve their paths or
+// inject a `realpath` via options.
+export function findContainingProject(
+  cwd: string,
+  projectPaths: string[],
+  options?: { realpath?: (p: string) => string },
+): string | null {
+  const resolve = options?.realpath ?? ((p: string) => p);
+  const cwdR = resolve(cwd);
+
+  let best: string | null = null;
+  let bestLen = -1;
+  for (const raw of projectPaths) {
+    let pR: string;
+    try {
+      pR = resolve(raw);
+    } catch {
+      continue;
+    }
+    if (cwdR === pR) {
+      if (pR.length > bestLen) {
+        best = raw;
+        bestLen = pR.length;
+      }
+      continue;
+    }
+    // Accept either separator as the boundary so the helper works on both
+    // POSIX (/) and Windows (\), regardless of which form a particular
+    // caller's paths happen to use.
+    const boundary = cwdR[pR.length];
+    if ((boundary === "/" || boundary === "\\") && cwdR.startsWith(pR)) {
+      if (pR.length > bestLen) {
+        best = raw;
+        bestLen = pR.length;
+      }
+    }
+  }
+  return best;
+}
+
+export interface DiscoverOptions {
+  // When set, drop every project whose decoded path is not exactly this
+  // string. Caller is responsible for resolving symlinks and choosing
+  // the matching project (see findContainingProject).
+  scopeToProject?: string;
+}
+
+export function discoverSessions(
+  config: GlobalConfig,
+  options?: DiscoverOptions,
+): SessionTree {
   const projectsDir = getProjectsDir();
 
   if (!existsSync(projectsDir)) {
@@ -289,9 +341,12 @@ export function discoverSessions(config: GlobalConfig): SessionTree {
 
   const allSessions: SessionNode[] = [];
 
+  const scope = options?.scopeToProject ?? null;
+
   for (const encodedDir of projectDirs) {
     const projectDir = join(projectsDir, encodedDir);
     const decodedPath = decodeProjectPath(encodedDir);
+    if (scope !== null && decodedPath !== scope) continue;
     const projectName = basename(decodedPath);
 
     let files: string[];

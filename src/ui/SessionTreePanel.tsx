@@ -32,6 +32,11 @@ export interface SessionTreePanelProps {
   trackingOn?: boolean;
   /** One-character spinner frame shown next to LIVE when trackingOn. */
   spinner?: string;
+  /**
+   * When set, the title bar renders as `Projects [<scopeLabel>]` to signal
+   * that the view is filtered to a single project (typically by --cwd).
+   */
+  scopeLabel?: string;
 }
 
 /**
@@ -457,6 +462,7 @@ export function SessionTreePanel({
   expandedIds = new Set(),
   trackingOn = false,
   spinner = "",
+  scopeLabel,
 }: SessionTreePanelProps): React.ReactElement {
   const innerWidth = getInnerWidth(width);
   const contentWidth = innerWidth - 1; // account for space after │
@@ -465,7 +471,8 @@ export function SessionTreePanel({
   // the tree's title shows `[LIVE ⠧]` so the user knows the selection is
   // moving on its own.
   const titleSuffix = trackingOn ? `[LIVE ${spinner || "▼"}]` : "";
-  const titleLine = createTitleLine("Projects", titleSuffix, width);
+  const titleText = scopeLabel ? `Projects [${scopeLabel}]` : "Projects";
+  const titleLine = createTitleLine(titleText, titleSuffix, width);
   const bottomLine = createBottomLine(width);
 
   const totalProjectCount = projects.length + coldProjects.length;

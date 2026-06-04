@@ -31,6 +31,7 @@ export interface CliOptions {
   summaryForce?: boolean;
   summaryModel?: string;
   summaryError?: string;
+  scopeToCwd?: boolean;
 }
 
 const KNOWN_WATCH_FLAGS = new Set([
@@ -41,6 +42,7 @@ const KNOWN_WATCH_FLAGS = new Set([
   "--version",
   "-h",
   "--help",
+  "--cwd",
 ]);
 const KNOWN_REPORT_FLAGS = new Set([
   "--date",
@@ -70,6 +72,9 @@ Monitors all running Claude Code sessions in real-time.
 Options:
   -w, --watch                   Watch mode (default) — live updates
   --once                        Print once and exit
+  --cwd                         Scope the view to the Claude project
+                                containing the current directory.
+                                Exits 1 if no such project is found.
   -V, --version                 Show version number
   -h, --help                    Show this help message
 
@@ -154,7 +159,9 @@ export function parseArgs(args: string[]): CliOptions {
     return { mode: "watch", command: "version" };
   }
   if (args.includes("--once")) {
-    return { mode: "once" };
+    return args.includes("--cwd")
+      ? { mode: "once", scopeToCwd: true }
+      : { mode: "once" };
   }
 
   if (args[0] === "report") {
@@ -411,5 +418,7 @@ export function parseArgs(args: string[]): CliOptions {
     }
   }
 
-  return { mode: "watch" };
+  return args.includes("--cwd")
+    ? { mode: "watch", scopeToCwd: true }
+    : { mode: "watch" };
 }

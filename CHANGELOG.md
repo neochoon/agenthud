@@ -2,6 +2,39 @@
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-06-04
+
+### New
+- **`--cwd` to scope the view to a single project.** Walks up from
+  `process.cwd()` to find the nearest registered Claude project and
+  shows only that project (and its sub-agents). Header reads
+  `Projects [<basename>]`. Exits 1 with a stderr message when no
+  containing project is found — keeps an empty view from being
+  mistaken for "no activity". Works in both `--watch` and `--once`,
+  runs side-by-side with an unfiltered instance.
+- **Read detail view shows the file content.** Pressing `↵` on a
+  `Read` activity now shows the read content with the same
+  syntax-coloring rules as Edit diffs, instead of just the path/range
+  header.
+- **Line numbers in the Read detail view.** Read content rows are
+  prefixed with file line numbers; the gutter is dimmed so the eye
+  lands on the code first.
+
+### Fixed
+- **`--cwd` on Windows.** First implementation used `path.sep` for the
+  boundary check, so POSIX-style stored paths never matched on
+  Windows. Accepts both `/` and `\` now.
+- **Git commits surface inside nested repos.** When agenthud's project
+  was a subdirectory of a larger repo, the commit feed could miss
+  commits because the search ran from the wrong directory. Walks up to
+  the actual repo root now.
+- **Half-page scroll in the detail view.** Ctrl+U / Ctrl+D weren't
+  wired up in the detail view — only the activity viewer. Both scroll
+  consistently now.
+- **Whitespace/indentation preserved in code and diff detail views.**
+  Trailing-space trimming was collapsing indentation in some Edit/Read
+  views; preserved verbatim now.
+
 ## [0.10.0] - 2026-05-25
 
 ### New

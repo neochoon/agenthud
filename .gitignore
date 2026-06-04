@@ -50,6 +50,10 @@ vitest.config.ts.timestamp-*
 # Git worktrees
 .worktrees/
 
+# Recording cache for scripts/record-demo.sh — keeps the asciinema
+# .cast file local so we only version the rendered gif.
+demo/.cache/
+
 # Profiling artifacts (Node --prof / clinic / Chrome DevTools exports)
 CPU.*.cpuprofile
 *.heapsnapshot

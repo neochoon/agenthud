@@ -17,11 +17,13 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CAST="$ROOT/demo/.cache/live.cast"
 GIF="$ROOT/demo/live.gif"
 
-# Approximately matches the VHS tape (Width 1400, Height 800, FontSize 16).
-# Tune COLS/ROWS to taste — most modern emulators honor the xterm resize
+# Wider than the VHS tape's effective area so the split-pane TUI has
+# room to breathe (tree gets ~22 rows, activity viewer ~25 rows at
+# 48 total). For an even more generous recording use e.g.
+# COLS=220 ROWS=56. Most modern emulators honor the xterm resize
 # escape used below.
-COLS="${COLS:-140}"
-ROWS="${ROWS:-38}"
+COLS="${COLS:-180}"
+ROWS="${ROWS:-48}"
 
 # agg ships: asciinema, dracula, github-dark, github-light, monokai,
 # solarized-dark, solarized-light. Pass a path to a TOML file for

@@ -6,7 +6,7 @@
 
 An observability layer for [Claude Code](https://github.com/anthropics/claude-code). **See** your live sessions, **export** structured activity logs, and **summarize** a day or a week into an LLM digest — all from one CLI.
 
-![demo](./output960.gif)
+![demo](./demo/live.gif)
 
 AgentHUD reads Claude Code's session files from `~/.claude/projects/` and gives you three things:
 

@@ -940,6 +940,14 @@ describe("findContainingProject", () => {
     expect(findContainingProject("/anywhere", [])).toBeNull();
   });
 
+  it("accepts Windows-style backslash separators as boundary", () => {
+    const result = findContainingProject(
+      "C:\\Users\\me\\proj\\agenthud\\src",
+      ["C:\\Users\\me\\proj\\agenthud", "C:\\Users\\me\\proj\\other"],
+    );
+    expect(result).toBe("C:\\Users\\me\\proj\\agenthud");
+  });
+
   it("normalizes both sides via the injected realpath", () => {
     // Both cwd and the registered project go through realpath. After
     // resolution they share the same real path, so the project matches.

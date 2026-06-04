@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, join, sep } from "node:path";
+import { basename, join } from "node:path";
 import type {
   GlobalConfig,
   LiveState,
@@ -278,7 +278,18 @@ export function findContainingProject(
     } catch {
       continue;
     }
-    if (cwdR === pR || cwdR.startsWith(pR + sep)) {
+    if (cwdR === pR) {
+      if (pR.length > bestLen) {
+        best = raw;
+        bestLen = pR.length;
+      }
+      continue;
+    }
+    // Accept either separator as the boundary so the helper works on both
+    // POSIX (/) and Windows (\), regardless of which form a particular
+    // caller's paths happen to use.
+    const boundary = cwdR[pR.length];
+    if ((boundary === "/" || boundary === "\\") && cwdR.startsWith(pR)) {
       if (pR.length > bestLen) {
         best = raw;
         bestLen = pR.length;

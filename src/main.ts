@@ -1,22 +1,22 @@
-import { existsSync, rmSync } from "node:fs";
+import { existsSync, readdirSync, realpathSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
-import { isLegacyProjectConfig } from "./utils/legacyConfig.js";
-
 import { render } from "ink";
 import React from "react";
-
 import { clearScreen, getHelp, getVersion, parseArgs } from "./cli.js";
-import {
-  enterAltScreen,
-  installAltScreenCleanup,
-} from "./utils/altScreen.js";
 import { loadGlobalConfig } from "./config/globalConfig.js";
 import { generateReport } from "./data/reportGenerator.js";
+import {
+  decodeProjectPath,
+  discoverSessions,
+  findContainingProject,
+  getProjectsDir,
+} from "./data/sessions.js";
 import { runRangeSummary, runSummary } from "./data/summaryRunner.js";
-import { discoverSessions } from "./data/sessions.js";
 import { App } from "./ui/App.js";
+import { enterAltScreen, installAltScreenCleanup } from "./utils/altScreen.js";
+import { isLegacyProjectConfig } from "./utils/legacyConfig.js";
 
 const options = parseArgs(process.argv.slice(2));
 
@@ -36,7 +36,10 @@ if (options.command === "version") {
 }
 
 const legacyConfig = join(process.cwd(), ".agenthud", "config.yaml");
-if (isLegacyProjectConfig(process.cwd(), homedir()) && existsSync(legacyConfig)) {
+if (
+  isLegacyProjectConfig(process.cwd(), homedir()) &&
+  existsSync(legacyConfig)
+) {
   console.log(
     "The project-level config file (.agenthud/config.yaml) is no longer supported.",
   );
@@ -107,6 +110,35 @@ if (options.mode === "summary") {
   process.exit(exitCode);
 }
 
+let scopeToProject: string | undefined;
+if (options.scopeToCwd) {
+  const projectsDir = getProjectsDir();
+  let registered: string[] = [];
+  try {
+    registered = (readdirSync(projectsDir) as string[]).map(decodeProjectPath);
+  } catch {
+    // projects dir missing or unreadable — treated as "no match"
+  }
+  const safeReal = (p: string): string => {
+    try {
+      return realpathSync(p);
+    } catch {
+      return p;
+    }
+  };
+  const match = findContainingProject(process.cwd(), registered, {
+    realpath: safeReal,
+  });
+  if (!match) {
+    process.stderr.write(
+      `agenthud: --cwd: no Claude project found at or above ${process.cwd()}\n`,
+    );
+    process.exit(1);
+  }
+  scopeToProject = match;
+  process.stderr.write(`agenthud: scope = ${match}\n`);
+}
+
 if (options.mode === "watch") {
   // Switch to the alternate screen buffer so quitting restores the user's
   // pre-launch shell instead of leaving the rendered tree behind. The
@@ -120,4 +152,4 @@ if (options.mode === "watch") {
   if (options.mode === "once") clearScreen();
 }
 
-render(React.createElement(App, { mode: options.mode }));
+render(React.createElement(App, { mode: options.mode, scopeToProject }));

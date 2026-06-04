@@ -29,6 +29,22 @@ describe("parseArgs", () => {
     expect(parseArgs(["-V"])).toEqual({ mode: "watch", command: "version" });
   });
 
+  it("parses --cwd as a watch-mode scope flag", () => {
+    expect(parseArgs(["--cwd"])).toEqual({ mode: "watch", scopeToCwd: true });
+  });
+
+  it("parses --cwd combined with --once", () => {
+    expect(parseArgs(["--once", "--cwd"])).toEqual({
+      mode: "once",
+      scopeToCwd: true,
+    });
+  });
+
+  it("does not set scopeToCwd when --cwd is absent", () => {
+    const opts = parseArgs([]);
+    expect(opts.scopeToCwd).toBeUndefined();
+  });
+
   describe("unknown commands and flags", () => {
     it("returns error for unknown subcommand", () => {
       const opts = parseArgs(["foobar"]);

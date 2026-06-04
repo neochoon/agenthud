@@ -2,6 +2,7 @@
 
 import type { FSWatcher } from "node:fs";
 import { existsSync, watch } from "node:fs";
+import { basename } from "node:path";
 import { Box, Text, useApp, useInput, useStdout } from "ink";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -27,8 +28,8 @@ import { getDisplayWidth } from "./constants.js";
 import { DetailViewPanel } from "./DetailViewPanel.js";
 import { HelpPanel } from "./HelpPanel.js";
 import { useHotkeys } from "./hooks/useHotkeys.js";
-import { useTick } from "./hooks/useTick.js";
 import { useSpinner } from "./hooks/useSpinner.js";
+import { useTick } from "./hooks/useTick.js";
 import { SessionTreePanel } from "./SessionTreePanel.js";
 
 const VIEWER_HEIGHT_FRACTION = 0.55;
@@ -257,7 +258,13 @@ function collectAllIds(tree: SessionTree): Set<string> {
   return ids;
 }
 
-export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
+export function App({
+  mode,
+  scopeToProject,
+}: {
+  mode: "watch" | "once";
+  scopeToProject?: string;
+}): React.ReactElement {
   const { exit } = useApp();
   const { stdout } = useStdout();
   const isWatchMode = mode === "watch";
@@ -265,8 +272,13 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
   const config = useMemo(() => loadGlobalConfig(), []);
   const migrationWarning = useMemo(() => hasProjectLevelConfig(), []);
 
+  const discoverOptions = useMemo(
+    () => (scopeToProject ? { scopeToProject } : undefined),
+    [scopeToProject],
+  );
+
   const [sessionTree, setSessionTree] = useState<SessionTree>(() =>
-    discoverSessions(config),
+    discoverSessions(config, discoverOptions),
   );
   const [selectedId, setSelectedId] = useState<string | null>(() => {
     // Select the first project sentinel if projects exist, otherwise null.
@@ -414,7 +426,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
 
   const refresh = useCallback(() => {
     const freshConfig = loadGlobalConfig();
-    const tree = discoverSessions(freshConfig);
+    const tree = discoverSessions(freshConfig, discoverOptions);
     const updatedFlat = flattenSessions(tree, expandedIds);
 
     // Tracking mode: pick the next jump target with the new-id-aware
@@ -455,7 +467,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
       setScrollOffset((o) => o + delta);
       setNewCount((n) => n + delta);
     }
-  }, [selectedId, isLive, expandedIds, tracking]);
+  }, [selectedId, isLive, expandedIds, tracking, discoverOptions]);
 
   // Keep a stable ref so the watcher callback always calls the latest refresh
   const refreshRef = useRef(refresh);
@@ -1048,6 +1060,7 @@ export function App({ mode }: { mode: "watch" | "once" }): React.ReactElement {
             expandedIds={expandedIds}
             trackingOn={tracking}
             spinner={spinner}
+            scopeLabel={scopeToProject ? basename(scopeToProject) : undefined}
           />
 
           <Box marginTop={1}>

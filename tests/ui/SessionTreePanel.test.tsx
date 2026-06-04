@@ -843,4 +843,35 @@ describe("SessionTreePanel", () => {
     );
     expect(lastFrame()).toContain("[waiting]");
   });
+
+  it("renders scope label in the header when scopeLabel is set", () => {
+    const session = makeSession();
+    const project = makeProject("agenthud", [session]);
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[project]}
+        coldProjects={[]}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+        scopeLabel="agenthud"
+      />,
+    );
+    expect(lastFrame()).toContain("Projects [agenthud]");
+  });
+
+  it("omits scope label when scopeLabel is not set", () => {
+    const session = makeSession();
+    const project = makeProject("myproject", [session]);
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[project]}
+        coldProjects={[]}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+      />,
+    );
+    expect(lastFrame()).not.toMatch(/Projects \[/);
+  });
 });

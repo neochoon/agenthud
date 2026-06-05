@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { render } from "ink";
 import React from "react";
-import { clearScreen, getHelp, getVersion, parseArgs } from "./cli.js";
+import { getHelp, getVersion, parseArgs } from "./cli.js";
 import { loadGlobalConfig } from "./config/globalConfig.js";
 import { generateReport } from "./data/reportGenerator.js";
 import {
@@ -146,10 +146,9 @@ if (options.mode === "watch") {
   // uncaught errors.
   installAltScreenCleanup();
   enterAltScreen();
-} else {
-  // Non-watch modes (--once, report, summary) keep their output on the
-  // user's normal terminal, just like any CLI utility.
-  if (options.mode === "once") clearScreen();
 }
+// Non-watch modes (--once, report, summary) render in place at the
+// cursor so the user's existing scrollback is preserved — like any
+// CLI utility.
 
 render(React.createElement(App, { mode: options.mode, scopeToProject }));

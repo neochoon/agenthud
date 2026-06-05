@@ -62,48 +62,63 @@ const KNOWN_SUMMARY_FLAGS = new Set([
   "-y",
   "--yes",
 ]);
-const KNOWN_SUBCOMMANDS = new Set(["report", "summary"]);
+const KNOWN_SUBCOMMANDS = new Set(["watch", "report", "summary"]);
 
 export function getHelp(): string {
-  return `Usage: agenthud [options]
+  return `Usage: agenthud [command] [options]
 
-Monitors all running Claude Code sessions in real-time.
+Monitors all running Claude Code sessions.
 
-Options:
-  -w, --watch                   Watch mode (default) — live updates
-  --once                        Print once and exit
-  --cwd                         Scope the view to the Claude project
-                                containing the current directory.
-                                Exits 1 if no such project is found.
+Commands:
+  watch (default)               Live TUI — project tree on top, activity
+                                viewer on bottom, both updating in real
+                                time. Running \`agenthud\` with no
+                                command does this.
+    -w, --watch                 Explicit alias for the default
+    --once                      Print one frame and exit
+    --cwd                       Scope to the Claude project containing
+                                the current directory. Exits 1 if no
+                                such project is found.
+
+  report [--date DATE] [--include TYPES] [--format FORMAT]
+         [--detail-limit N] [--with-git]
+                                Print activity report for a date
+                                (default: today). Markdown or JSON.
+    --date YYYY-MM-DD|today|yesterday|-Nd     Date to report on
+    --include TYPES             Comma-separated types or "all"
+                                Types:   user, response, bash, edit,
+                                         thinking, read, glob
+                                Default: user, response, bash, edit, thinking
+    --format FORMAT             markdown (default) or json
+    --detail-limit N            Max chars per detail (default 120;
+                                0 = unlimited)
+    --with-git                  Merge git commits from each session's
+                                project into the timeline
+
+  summary [--date DATE | --last Nd | --from DATE --to DATE]
+          [--prompt TEXT] [--force] [--model NAME] [-y]
+                                Generate an LLM summary via the claude
+                                CLI. A single day produces a daily
+                                summary; a date range produces a
+                                meta-summary built from daily summaries.
+    --date YYYY-MM-DD|today|yesterday|-Nd     Date to summarize (default: today)
+    --last Nd                   Date range: last N days, ending today
+                                (e.g. --last 7d)
+    --from YYYY-MM-DD           Range start (use with --to)
+    --to YYYY-MM-DD             Range end (use with --from)
+    --prompt TEXT               Override prompt for this run (daily only)
+    --force                     Regenerate even if cached
+    --model NAME                Pass --model to claude (e.g. "sonnet",
+                                "haiku", or a full model id)
+    -y, --yes                   Skip confirmation prompts for new daily
+                                summaries
+
+Global options:
   -V, --version                 Show version number
   -h, --help                    Show this help message
 
-Commands:
-  report [--date DATE] [--include TYPES] [--format FORMAT] [--detail-limit N] [--with-git]
-                                Print activity report for a date (default: today)
-    --date YYYY-MM-DD|today|yesterday|-Nd     Date to report on
-    --include TYPES             Comma-separated types or "all"
-                                Types: response,bash,edit,thinking,read,glob,user
-                                Default: user,response,bash,edit,thinking
-    --format FORMAT             Output format: markdown (default) or json
-    --detail-limit N            Max chars per activity detail (default: 120, 0 = unlimited)
-    --with-git                  Merge git commits from each session's project into the timeline
-
-  summary [--date DATE | --last Nd | --from DATE --to DATE] [--prompt TEXT] [--force] [-y]
-                                Generate LLM summary via claude CLI.
-                                Single day produces a daily summary;
-                                a date range produces a meta-summary built from daily summaries.
-    --date YYYY-MM-DD|today|yesterday|-Nd     Date to summarize (default: today)
-    --last Nd                   Date range: last N days, ending today (e.g. --last 7d)
-    --from YYYY-MM-DD           Date range: start date (use with --to)
-    --to YYYY-MM-DD             Date range: end date (use with --from)
-    --prompt TEXT               Override prompt for this run (daily only)
-    --force                     Regenerate even if cached
-    --model NAME                Pass --model to claude (e.g. "sonnet", "haiku", or a full model ID)
-    -y, --yes                   Skip confirmation prompts for new daily summaries
-
 Environment:
-  CLAUDE_PROJECTS_DIR           Path to Claude projects directory
+  CLAUDE_PROJECTS_DIR           Path to the Claude projects directory
                                 (default: ~/.claude/projects)
 
 Config: ~/.agenthud/config.yaml
@@ -152,6 +167,9 @@ function todayLocalMidnight(): Date {
 }
 
 export function parseArgs(args: string[]): CliOptions {
+  // `watch` is the explicit form of the default mode — strip it so the
+  // rest of parsing sees the same shape it always has.
+  if (args[0] === "watch") args = args.slice(1);
   if (args.includes("--help") || args.includes("-h")) {
     return { mode: "watch", command: "help" };
   }

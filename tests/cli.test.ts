@@ -45,6 +45,21 @@ describe("parseArgs", () => {
     expect(opts.scopeToCwd).toBeUndefined();
   });
 
+  it("parses 'watch' as a positional command (equivalent to no command)", () => {
+    expect(parseArgs(["watch"])).toEqual({ mode: "watch" });
+  });
+
+  it("parses 'watch --once' the same as bare --once", () => {
+    expect(parseArgs(["watch", "--once"])).toEqual({ mode: "once" });
+  });
+
+  it("parses 'watch --cwd' as scoped watch mode", () => {
+    expect(parseArgs(["watch", "--cwd"])).toEqual({
+      mode: "watch",
+      scopeToCwd: true,
+    });
+  });
+
   it("includes 'user' in report's default --include set", () => {
     // Without 'user', report drops every user prompt and 'Thinking' ends
     // up as the first entry of each session block — the report reads as

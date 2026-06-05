@@ -54,6 +54,9 @@ vitest.config.ts.timestamp-*
 # .cast file local so we only version the rendered gif.
 demo/.cache/
 
+# Local Claude Code state (scheduled-task locks, transient buffers, etc.).
+.claude/
+
 # Profiling artifacts (Node --prof / clinic / Chrome DevTools exports)
 CPU.*.cpuprofile
 *.heapsnapshot

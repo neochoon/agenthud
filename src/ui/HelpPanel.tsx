@@ -14,6 +14,7 @@ const SECTIONS: HelpSection[] = [
     title: "Project tree",
     rows: [
       ["↑ ↓ / k j", "Move selection"],
+      ["←", "Jump to parent (sub-agent → session, session → project)"],
       ["PgUp / Ctrl+B", "Page up"],
       ["PgDn / Ctrl+F", "Page down"],
       ["↵", "Expand/collapse project, session, or summary"],

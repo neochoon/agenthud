@@ -230,6 +230,27 @@ describe("useHotkeys", () => {
       expect(onScrollDown).toHaveBeenCalledTimes(1);
     });
 
+    it("calls onJumpToParent when leftArrow is pressed", () => {
+      const onJumpToParent = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ focus: "tree", onJumpToParent })),
+      );
+      act(() =>
+        result.current.handleInput("", { ...noopKey, leftArrow: true }),
+      );
+      expect(onJumpToParent).toHaveBeenCalledTimes(1);
+    });
+
+    it("ignores leftArrow gracefully when onJumpToParent is not provided", () => {
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ focus: "tree" })),
+      );
+      expect(() =>
+        act(() =>
+          result.current.handleInput("", { ...noopKey, leftArrow: true }),
+        ),
+      ).not.toThrow();
+    });
   });
 
   describe("viewer focus", () => {
@@ -318,6 +339,7 @@ describe("useHotkeys", () => {
         "t: track",
         "Tab: viewer",
         "↑↓/jk: select",
+        "←: parent",
         "PgUp/Dn: page",
         "↵: expand",
         "h: hide",

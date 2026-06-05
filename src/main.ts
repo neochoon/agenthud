@@ -4,7 +4,12 @@ import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { render } from "ink";
 import React from "react";
-import { getHelp, getVersion, parseArgs } from "./cli.js";
+import {
+  formatEffectiveOptionsLine,
+  getHelp,
+  getVersion,
+  parseArgs,
+} from "./cli.js";
 import { loadGlobalConfig } from "./config/globalConfig.js";
 import { generateReport } from "./data/reportGenerator.js";
 import {
@@ -18,7 +23,10 @@ import { App } from "./ui/App.js";
 import { enterAltScreen, installAltScreenCleanup } from "./utils/altScreen.js";
 import { isLegacyProjectConfig } from "./utils/legacyConfig.js";
 
-const options = parseArgs(process.argv.slice(2));
+// Load config up front so parseArgs can layer flags over user defaults
+// (report.* / summary.* keys in ~/.agenthud/config.yaml).
+const globalConfig = loadGlobalConfig();
+const options = parseArgs(process.argv.slice(2), globalConfig);
 
 if (options.error) {
   process.stderr.write(`agenthud: ${options.error}\n`);
@@ -65,8 +73,15 @@ if (options.mode === "report") {
     process.stderr.write(`agenthud: ${options.reportError}\n`);
     process.exit(1);
   }
-  const config = loadGlobalConfig();
-  const tree = discoverSessions(config);
+  process.stderr.write(
+    `${formatEffectiveOptionsLine("report", {
+      include: options.reportInclude!,
+      detailLimit: options.reportDetailLimit,
+      withGit: options.reportWithGit ?? false,
+      format: options.reportFormat,
+    })}\n`,
+  );
+  const tree = discoverSessions(globalConfig);
   const flatSessions = [
     ...tree.projects.flatMap((p) => p.sessions),
     ...tree.coldProjects.flatMap((p) => p.sessions),
@@ -88,6 +103,14 @@ if (options.mode === "summary") {
     process.stderr.write(`agenthud: ${options.summaryError}\n`);
     process.exit(1);
   }
+  process.stderr.write(
+    `${formatEffectiveOptionsLine("summary", {
+      include: options.summaryInclude!,
+      detailLimit: options.summaryDetailLimit,
+      withGit: options.summaryWithGit ?? false,
+      model: options.summaryModel,
+    })}\n`,
+  );
   const today = new Date();
   if (options.summaryFrom && options.summaryTo) {
     const exitCode = await runRangeSummary({
@@ -97,6 +120,9 @@ if (options.mode === "summary") {
       force: options.summaryForce ?? false,
       assumeYes: options.summaryAssumeYes ?? false,
       model: options.summaryModel,
+      include: options.summaryInclude!,
+      detailLimit: options.summaryDetailLimit!,
+      withGit: options.summaryWithGit!,
     });
     process.exit(exitCode);
   }
@@ -106,6 +132,9 @@ if (options.mode === "summary") {
     force: options.summaryForce ?? false,
     today,
     model: options.summaryModel,
+    include: options.summaryInclude!,
+    detailLimit: options.summaryDetailLimit!,
+    withGit: options.summaryWithGit!,
   });
   process.exit(exitCode);
 }

@@ -324,6 +324,102 @@ describe("hasProjectLevelConfig", () => {
   });
 });
 
+describe("report/summary config", () => {
+  it("returns built-in report defaults when the section is absent", () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue("refreshInterval: 2s\n");
+    const cfg = loadGlobalConfig();
+    expect(cfg.report.include).toEqual([
+      "user",
+      "response",
+      "bash",
+      "edit",
+      "thinking",
+    ]);
+    expect(cfg.report.detailLimit).toBe(120);
+    expect(cfg.report.withGit).toBe(false);
+    expect(cfg.report.format).toBe("markdown");
+  });
+
+  it("parses a report section and overrides defaults field-by-field", () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(`report:
+  include: [response, edit]
+  detailLimit: 0
+  withGit: true
+  format: json
+`);
+    const cfg = loadGlobalConfig();
+    expect(cfg.report.include).toEqual(["response", "edit"]);
+    expect(cfg.report.detailLimit).toBe(0);
+    expect(cfg.report.withGit).toBe(true);
+    expect(cfg.report.format).toBe("json");
+  });
+
+  it("partial report section overrides only the named fields", () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(`report:
+  withGit: true
+`);
+    const cfg = loadGlobalConfig();
+    expect(cfg.report.withGit).toBe(true);
+    // unspecified fields fall back to the built-in default
+    expect(cfg.report.include).toEqual([
+      "user",
+      "response",
+      "bash",
+      "edit",
+      "thinking",
+    ]);
+    expect(cfg.report.detailLimit).toBe(120);
+    expect(cfg.report.format).toBe("markdown");
+  });
+
+  it("summary section is empty when absent (inherits from report at use-site)", () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue("refreshInterval: 2s\n");
+    const cfg = loadGlobalConfig();
+    expect(cfg.summary).toEqual({});
+  });
+
+  it("summary section captures the keys the user pinned", () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(`summary:
+  withGit: true
+  detailLimit: 0
+  model: sonnet
+`);
+    const cfg = loadGlobalConfig();
+    expect(cfg.summary.withGit).toBe(true);
+    expect(cfg.summary.detailLimit).toBe(0);
+    expect(cfg.summary.model).toBe("sonnet");
+    // include/format unset → undefined so the caller can fall back to report.*
+    expect(cfg.summary.include).toBeUndefined();
+    expect(cfg.summary.format).toBeUndefined();
+  });
+
+  it("rejects bogus values silently and falls back to defaults", () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(`report:
+  include: "not-an-array"
+  detailLimit: "not-a-number"
+  withGit: "yes"
+  format: "html"
+`);
+    const cfg = loadGlobalConfig();
+    expect(cfg.report.include).toEqual([
+      "user",
+      "response",
+      "bash",
+      "edit",
+      "thinking",
+    ]);
+    expect(cfg.report.detailLimit).toBe(120);
+    expect(cfg.report.withGit).toBe(false);
+    expect(cfg.report.format).toBe("markdown");
+  });
+});
+
 describe("hideSession - writes to state.yaml (explicit path check)", () => {
   it("writes to state.yaml path", () => {
     vi.mocked(existsSync).mockReturnValue(false);

@@ -7,6 +7,27 @@ import type { GlobalConfig } from "../types/index.js";
 const CONFIG_PATH = join(homedir(), ".agenthud", "config.yaml");
 const STATE_PATH = join(homedir(), ".agenthud", "state.yaml");
 
+// The canonical built-in include set. report and summary both lean on
+// this when neither the CLI flag nor the user config narrows it down.
+export const DEFAULT_INCLUDE_TYPES = [
+  "user",
+  "response",
+  "bash",
+  "edit",
+  "thinking",
+];
+
+const ALLOWED_INCLUDE_TYPES = new Set([
+  "user",
+  "response",
+  "bash",
+  "edit",
+  "thinking",
+  "read",
+  "glob",
+  "commit",
+]);
+
 export const DEFAULT_GLOBAL_CONFIG: GlobalConfig = {
   refreshIntervalMs: 2000,
   hiddenSessions: [],
@@ -15,6 +36,13 @@ export const DEFAULT_GLOBAL_CONFIG: GlobalConfig = {
   // commits-only preset filters down to git activity.
   filterPresets: [[], ["response", "user"], ["commit"]],
   hiddenProjects: [],
+  report: {
+    include: [...DEFAULT_INCLUDE_TYPES],
+    detailLimit: 120,
+    withGit: false,
+    format: "markdown",
+  },
+  summary: {},
 };
 
 const ALL_PRESET_KEYWORDS = new Set(["all", "*", "any"]);
@@ -51,6 +79,26 @@ filterPresets:
   - ["all"]
   - ["response", "user"]
   - ["commit"]
+
+# Defaults for \`agenthud report\` (CLI flags still win per-invocation).
+# include: activity types to keep. Types: user, response, bash, edit,
+#          thinking, read, glob.
+# detailLimit: max chars per activity detail (0 = unlimited).
+# withGit: merge git commits from each session's project.
+# format: markdown | json.
+report:
+  include: [user, response, bash, edit, thinking]
+  detailLimit: 120
+  withGit: false
+  format: markdown
+
+# Defaults for \`agenthud summary\`. Any field omitted here is inherited
+# from \`report\` above. \`model\` is summary-specific and passed to
+# \`claude --model\` (e.g. sonnet, haiku, or a full model id).
+summary:
+  withGit: true
+  detailLimit: 0
+  # model: sonnet
 `;
   try {
     writeFileSync(CONFIG_PATH, defaultYaml, "utf-8");
@@ -92,7 +140,20 @@ function rewriteConfigWithoutHideFields(raw: Record<string, unknown>): void {
 }
 
 export function loadGlobalConfig(): GlobalConfig {
-  const config = { ...DEFAULT_GLOBAL_CONFIG };
+  // Deep-clone the defaults so per-call mutations (e.g. assigning
+  // config.report.withGit) don't leak into the shared default record.
+  const config: GlobalConfig = {
+    ...DEFAULT_GLOBAL_CONFIG,
+    hiddenSessions: [...DEFAULT_GLOBAL_CONFIG.hiddenSessions],
+    hiddenSubAgents: [...DEFAULT_GLOBAL_CONFIG.hiddenSubAgents],
+    hiddenProjects: [...DEFAULT_GLOBAL_CONFIG.hiddenProjects],
+    filterPresets: DEFAULT_GLOBAL_CONFIG.filterPresets.map((p) => [...p]),
+    report: {
+      ...DEFAULT_GLOBAL_CONFIG.report,
+      include: [...DEFAULT_GLOBAL_CONFIG.report.include],
+    },
+    summary: { ...DEFAULT_GLOBAL_CONFIG.summary },
+  };
 
   // Read config.yaml (non-hide settings)
   let configRaw: Record<string, unknown> = {};
@@ -124,6 +185,44 @@ export function loadGlobalConfig(): GlobalConfig {
         return normalizePreset(tokens);
       });
     if (presets.length > 0) config.filterPresets = presets;
+  }
+
+  if (configRaw.report && typeof configRaw.report === "object") {
+    const r = configRaw.report as Record<string, unknown>;
+    // Each field is validated independently — a single bogus key drops
+    // back to the built-in default for that field, leaving the rest of
+    // the section intact.
+    if (Array.isArray(r.include)) {
+      const tokens = (r.include as unknown[]).filter(
+        (t): t is string => typeof t === "string",
+      );
+      const cleaned = tokens.filter((t) => ALLOWED_INCLUDE_TYPES.has(t));
+      if (cleaned.length > 0) config.report.include = cleaned;
+    }
+    if (typeof r.detailLimit === "number" && Number.isInteger(r.detailLimit) && r.detailLimit >= 0) {
+      config.report.detailLimit = r.detailLimit;
+    }
+    if (typeof r.withGit === "boolean") config.report.withGit = r.withGit;
+    if (r.format === "markdown" || r.format === "json") config.report.format = r.format;
+  }
+
+  if (configRaw.summary && typeof configRaw.summary === "object") {
+    const s = configRaw.summary as Record<string, unknown>;
+    if (Array.isArray(s.include)) {
+      const tokens = (s.include as unknown[]).filter(
+        (t): t is string => typeof t === "string",
+      );
+      const cleaned = tokens.filter((t) => ALLOWED_INCLUDE_TYPES.has(t));
+      if (cleaned.length > 0) config.summary.include = cleaned;
+    }
+    if (typeof s.detailLimit === "number" && Number.isInteger(s.detailLimit) && s.detailLimit >= 0) {
+      config.summary.detailLimit = s.detailLimit;
+    }
+    if (typeof s.withGit === "boolean") config.summary.withGit = s.withGit;
+    if (s.format === "markdown" || s.format === "json") config.summary.format = s.format;
+    if (typeof s.model === "string" && s.model.trim().length > 0) {
+      config.summary.model = s.model.trim();
+    }
   }
 
   // Detect legacy hide fields in config.yaml for migration

@@ -39,12 +39,41 @@ export interface SessionTree {
 }
 
 // Global config (~/.agenthud/config.yaml)
+/**
+ * Defaults shared by `agenthud report` and (via inheritance) by the
+ * report half of `agenthud summary`. CLI flags override these per
+ * invocation; this struct is what the user puts in
+ * `~/.agenthud/config.yaml` under the `report:` key.
+ */
+export interface ReportConfig {
+  include: string[]; // activity types to include
+  detailLimit: number; // max chars per activity detail (0 = unlimited)
+  withGit: boolean; // merge git commits into the timeline
+  format: "markdown" | "json"; // output format
+}
+
+/**
+ * Per-config overrides for `agenthud summary`. Any field left
+ * undefined falls back to the matching `ReportConfig` field — so the
+ * user can pin one shape under `report:` and have summary inherit it.
+ * The `model` key is summary-specific (no equivalent on report).
+ */
+export interface SummaryConfig {
+  include?: string[];
+  detailLimit?: number;
+  withGit?: boolean;
+  format?: "markdown" | "json";
+  model?: string;
+}
+
 export interface GlobalConfig {
   refreshIntervalMs: number; // default: 2000
   hiddenSessions: string[];
   hiddenSubAgents: string[];
   filterPresets: string[][]; // [] = all; default: [[], ["response", "user"], ["commit"]]
   hiddenProjects: string[]; // by projectName
+  report: ReportConfig;
+  summary: SummaryConfig;
 }
 
 // Centralized icon definitions

@@ -1,5 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { getHelp, parseArgs } from "../src/cli.js";
+import { DEFAULT_GLOBAL_CONFIG } from "../src/config/globalConfig.js";
+import {
+  formatEffectiveOptionsLine,
+  getHelp,
+  parseArgs,
+} from "../src/cli.js";
+import type { GlobalConfig } from "../src/types/index.js";
+
+function makeConfig(overrides: Partial<GlobalConfig> = {}): GlobalConfig {
+  return {
+    ...DEFAULT_GLOBAL_CONFIG,
+    ...overrides,
+    report: { ...DEFAULT_GLOBAL_CONFIG.report, ...(overrides.report ?? {}) },
+    summary: { ...DEFAULT_GLOBAL_CONFIG.summary, ...(overrides.summary ?? {}) },
+  };
+}
 
 describe("parseArgs", () => {
   it("defaults to watch mode", () => {
@@ -227,6 +242,47 @@ describe("parseArgs", () => {
       const opts = parseArgs(["report"]);
       expect(opts.reportWithGit).toBeFalsy();
     });
+
+    describe("config-driven defaults", () => {
+      it("uses config.report values when no flag is given", () => {
+        const config = makeConfig({
+          report: {
+            include: ["bash", "edit"],
+            detailLimit: 50,
+            withGit: true,
+            format: "json",
+          },
+        });
+        const opts = parseArgs(["report"], config);
+        expect(opts.reportInclude).toEqual(["bash", "edit"]);
+        expect(opts.reportDetailLimit).toBe(50);
+        expect(opts.reportWithGit).toBe(true);
+        expect(opts.reportFormat).toBe("json");
+      });
+
+      it("CLI flag overrides config for --include", () => {
+        const config = makeConfig({
+          report: { ...DEFAULT_GLOBAL_CONFIG.report, include: ["bash"] },
+        });
+        const opts = parseArgs(["report", "--include", "edit"], config);
+        expect(opts.reportInclude).toEqual(["edit"]);
+      });
+
+      it("CLI flag overrides config for --with-git (--with-git on)", () => {
+        const config = makeConfig({
+          report: { ...DEFAULT_GLOBAL_CONFIG.report, withGit: false },
+        });
+        const opts = parseArgs(["report", "--with-git"], config);
+        expect(opts.reportWithGit).toBe(true);
+      });
+
+      it("falls back to the built-in defaults when no config is passed", () => {
+        const opts = parseArgs(["report"]);
+        expect(opts.reportInclude).toEqual(
+          DEFAULT_GLOBAL_CONFIG.report.include,
+        );
+      });
+    });
   });
 
   describe("summary subcommand", () => {
@@ -382,6 +438,138 @@ describe("parseArgs", () => {
       const opts = parseArgs(["summary"]);
       expect(opts.summaryModel).toBeUndefined();
     });
+
+    describe("report-shaped options on summary", () => {
+      it("parses --include and threads it through", () => {
+        const opts = parseArgs(["summary", "--include", "response,user"]);
+        expect(opts.summaryError).toBeUndefined();
+        expect(opts.summaryInclude).toEqual(["response", "user"]);
+      });
+
+      it("parses --include all", () => {
+        const opts = parseArgs(["summary", "--include", "all"]);
+        expect(opts.summaryInclude).toEqual([
+          "response",
+          "bash",
+          "edit",
+          "thinking",
+          "read",
+          "glob",
+          "user",
+        ]);
+      });
+
+      it("parses --detail-limit", () => {
+        const opts = parseArgs(["summary", "--detail-limit", "0"]);
+        expect(opts.summaryDetailLimit).toBe(0);
+      });
+
+      it("parses --with-git", () => {
+        const opts = parseArgs(["summary", "--with-git"]);
+        expect(opts.summaryWithGit).toBe(true);
+      });
+
+      it("parses --format json", () => {
+        const opts = parseArgs(["summary", "--format", "json"]);
+        expect(opts.summaryFormat).toBe("json");
+      });
+    });
+
+    describe("config-driven defaults", () => {
+      it("inherits report.* when summary section is empty", () => {
+        const config = makeConfig({
+          report: {
+            include: ["bash", "edit"],
+            detailLimit: 50,
+            withGit: true,
+            format: "json",
+          },
+          summary: {},
+        });
+        const opts = parseArgs(["summary"], config);
+        expect(opts.summaryInclude).toEqual(["bash", "edit"]);
+        expect(opts.summaryDetailLimit).toBe(50);
+        expect(opts.summaryWithGit).toBe(true);
+        expect(opts.summaryFormat).toBe("json");
+      });
+
+      it("summary.* overrides report.* field-by-field", () => {
+        const config = makeConfig({
+          report: {
+            include: ["bash"],
+            detailLimit: 50,
+            withGit: false,
+            format: "markdown",
+          },
+          summary: {
+            include: ["edit"],
+            detailLimit: 0,
+            withGit: true,
+            model: "haiku",
+          },
+        });
+        const opts = parseArgs(["summary"], config);
+        expect(opts.summaryInclude).toEqual(["edit"]);
+        expect(opts.summaryDetailLimit).toBe(0);
+        expect(opts.summaryWithGit).toBe(true);
+        // format unset on summary → falls back to report
+        expect(opts.summaryFormat).toBe("markdown");
+        expect(opts.summaryModel).toBe("haiku");
+      });
+
+      it("CLI flag beats both summary and report config", () => {
+        const config = makeConfig({
+          report: { ...DEFAULT_GLOBAL_CONFIG.report, include: ["bash"] },
+          summary: { include: ["edit"] },
+        });
+        const opts = parseArgs(["summary", "--include", "user"], config);
+        expect(opts.summaryInclude).toEqual(["user"]);
+      });
+
+      it("falls back to the built-in defaults when no config is passed", () => {
+        const opts = parseArgs(["summary"]);
+        expect(opts.summaryInclude).toEqual(
+          DEFAULT_GLOBAL_CONFIG.report.include,
+        );
+      });
+    });
+  });
+});
+
+describe("formatEffectiveOptionsLine", () => {
+  it("formats report defaults compactly", () => {
+    const line = formatEffectiveOptionsLine("report", {
+      include: ["user", "response", "bash", "edit", "thinking"],
+      detailLimit: 120,
+      withGit: false,
+      format: "markdown",
+    });
+    expect(line).toBe(
+      "agenthud: report → include=[user,response,bash,edit,thinking] detail-limit=120 with-git=off format=markdown",
+    );
+  });
+
+  it("renders detailLimit=0 as ∞ and with-git=true as on", () => {
+    const line = formatEffectiveOptionsLine("summary", {
+      include: ["bash"],
+      detailLimit: 0,
+      withGit: true,
+      model: "sonnet",
+    });
+    expect(line).toBe(
+      "agenthud: summary → include=[bash] detail-limit=∞ with-git=on model=sonnet",
+    );
+  });
+
+  it("omits format/model when not set", () => {
+    const line = formatEffectiveOptionsLine("report", {
+      include: ["response"],
+      detailLimit: 120,
+      withGit: false,
+    });
+    expect(line).toContain("include=[response]");
+    expect(line).not.toContain("format=");
+    expect(line).not.toContain("model=");
   });
 });
 

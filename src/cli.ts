@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { DEFAULT_INCLUDE_TYPES } from "./config/globalConfig.js";
+import type { GlobalConfig } from "./types/index.js";
 
 const ALL_TYPES = [
   "response",
@@ -11,7 +13,6 @@ const ALL_TYPES = [
   "glob",
   "user",
 ];
-const DEFAULT_TYPES = ["user", "response", "bash", "edit", "thinking"];
 
 export interface CliOptions {
   mode: "watch" | "once" | "report" | "summary";
@@ -30,6 +31,12 @@ export interface CliOptions {
   summaryPrompt?: string;
   summaryForce?: boolean;
   summaryModel?: string;
+  // Report-shaped options on summary. Resolved as
+  // CLI flag → config.summary.X → config.report.X → built-in default.
+  summaryInclude?: string[];
+  summaryFormat?: "markdown" | "json";
+  summaryDetailLimit?: number;
+  summaryWithGit?: boolean;
   summaryError?: string;
   scopeToCwd?: boolean;
 }
@@ -61,6 +68,10 @@ const KNOWN_SUMMARY_FLAGS = new Set([
   "--model",
   "-y",
   "--yes",
+  "--include",
+  "--format",
+  "--detail-limit",
+  "--with-git",
 ]);
 const KNOWN_SUBCOMMANDS = new Set(["watch", "report", "summary"]);
 
@@ -96,6 +107,7 @@ Commands:
                                 project into the timeline
 
   summary [--date DATE | --last Nd | --from DATE --to DATE]
+          [--include TYPES] [--detail-limit N] [--with-git]
           [--prompt TEXT] [--force] [--model NAME] [-y]
                                 Generate an LLM summary via the claude
                                 CLI. A single day produces a daily
@@ -106,12 +118,21 @@ Commands:
                                 (e.g. --last 7d)
     --from YYYY-MM-DD           Range start (use with --to)
     --to YYYY-MM-DD             Range end (use with --from)
+    --include TYPES             Activity types fed to the LLM
+                                (same shape as report's --include)
+    --detail-limit N            Max chars per activity detail in the
+                                LLM payload (0 = unlimited)
+    --with-git                  Merge git commits into the LLM payload
     --prompt TEXT               Override prompt for this run (daily only)
     --force                     Regenerate even if cached
     --model NAME                Pass --model to claude (e.g. "sonnet",
                                 "haiku", or a full model id)
     -y, --yes                   Skip confirmation prompts for new daily
                                 summaries
+
+  Defaults for report and summary live under \`report:\` and \`summary:\`
+  in ~/.agenthud/config.yaml. Flags override config values per-run; the
+  effective values are printed to stderr at the start of each run.
 
 Global options:
   -V, --version                 Show version number
@@ -157,12 +178,44 @@ function parseLocalMidnight(dateStr: string): Date | null {
   return date;
 }
 
+/**
+ * One-line stderr summary of the options that report/summary just
+ * resolved through the flag → config → default hierarchy. The line is
+ * informational, not actionable — values only, no `(flag)`/`(config)`
+ * source markers (read the yaml if you need to know).
+ */
+export function formatEffectiveOptionsLine(
+  command: "report" | "summary",
+  fields: {
+    include: string[];
+    detailLimit?: number;
+    withGit: boolean;
+    format?: "markdown" | "json";
+    model?: string;
+  },
+): string {
+  const parts: string[] = [];
+  parts.push(`include=[${fields.include.join(",")}]`);
+  if (fields.detailLimit !== undefined) {
+    parts.push(
+      `detail-limit=${fields.detailLimit === 0 ? "∞" : fields.detailLimit}`,
+    );
+  }
+  parts.push(`with-git=${fields.withGit ? "on" : "off"}`);
+  if (fields.format) parts.push(`format=${fields.format}`);
+  if (fields.model) parts.push(`model=${fields.model}`);
+  return `agenthud: ${command} → ${parts.join(" ")}`;
+}
+
 function todayLocalMidnight(): Date {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
-export function parseArgs(args: string[]): CliOptions {
+export function parseArgs(
+  args: string[],
+  config?: GlobalConfig,
+): CliOptions {
   // `watch` is the explicit form of the default mode — strip it so the
   // rest of parsing sees the same shape it always has.
   if (args[0] === "watch") args = args.slice(1);
@@ -181,7 +234,7 @@ export function parseArgs(args: string[]): CliOptions {
   if (args[0] === "report") {
     const rest = args.slice(1);
     let reportDate = todayLocalMidnight();
-    let reportInclude = DEFAULT_TYPES;
+    let reportInclude = config?.report.include ?? DEFAULT_INCLUDE_TYPES;
     let reportError: string | undefined;
 
     // Check for unknown flags in report subcommand. Skip the value
@@ -239,7 +292,7 @@ export function parseArgs(args: string[]): CliOptions {
       }
     }
 
-    let reportFormat: "markdown" | "json" = "markdown";
+    let reportFormat: "markdown" | "json" = config?.report.format ?? "markdown";
     const formatIdx = rest.indexOf("--format");
     if (formatIdx !== -1) {
       const fmt = rest[formatIdx + 1];
@@ -252,7 +305,7 @@ export function parseArgs(args: string[]): CliOptions {
       }
     }
 
-    let reportDetailLimit: number | undefined;
+    let reportDetailLimit: number | undefined = config?.report.detailLimit;
     const detailLimitIdx = rest.indexOf("--detail-limit");
     if (detailLimitIdx !== -1) {
       const val = rest[detailLimitIdx + 1];
@@ -264,7 +317,8 @@ export function parseArgs(args: string[]): CliOptions {
       }
     }
 
-    const reportWithGit = rest.includes("--with-git");
+    const reportWithGit =
+      rest.includes("--with-git") || (config?.report.withGit ?? false);
 
     return {
       mode: "report",
@@ -295,6 +349,9 @@ export function parseArgs(args: string[]): CliOptions {
       "--to",
       "--prompt",
       "--model",
+      "--include",
+      "--format",
+      "--detail-limit",
     ]);
 
     for (let i = 0; i < rest.length; i++) {
@@ -412,6 +469,76 @@ export function parseArgs(args: string[]): CliOptions {
     if (rest.includes("--force")) summaryForce = true;
     if (rest.includes("-y") || rest.includes("--yes")) summaryAssumeYes = true;
 
+    // Resolve report-shaped options for summary:
+    //   CLI flag → config.summary.X → config.report.X → built-in default.
+    let summaryInclude: string[] =
+      config?.summary.include ??
+      config?.report.include ??
+      DEFAULT_INCLUDE_TYPES;
+    const summaryIncludeIdx = rest.indexOf("--include");
+    if (summaryIncludeIdx !== -1) {
+      const includeStr = rest[summaryIncludeIdx + 1];
+      if (!includeStr) {
+        summaryError = summaryError ?? "Invalid --include: missing value.";
+      } else if (includeStr === "all") {
+        summaryInclude = ALL_TYPES;
+      } else {
+        const tokens = includeStr
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+        const unknown = tokens.filter((t) => !ALL_TYPES.includes(t));
+        if (unknown.length > 0) {
+          summaryError =
+            summaryError ??
+            `Unknown --include type${unknown.length > 1 ? "s" : ""}: ${unknown
+              .map((u) => `"${u}"`)
+              .join(", ")}. Valid types: ${ALL_TYPES.join(", ")} (or "all").`;
+        } else {
+          summaryInclude = tokens;
+        }
+      }
+    }
+
+    let summaryFormat: "markdown" | "json" =
+      config?.summary.format ?? config?.report.format ?? "markdown";
+    const summaryFormatIdx = rest.indexOf("--format");
+    if (summaryFormatIdx !== -1) {
+      const fmt = rest[summaryFormatIdx + 1];
+      if (fmt === "json" || fmt === "markdown") {
+        summaryFormat = fmt;
+      } else if (fmt) {
+        summaryError =
+          summaryError ?? `Invalid format: "${fmt}". Use "markdown" or "json".`;
+      } else {
+        summaryError =
+          summaryError ?? "Invalid format: missing value for --format.";
+      }
+    }
+
+    let summaryDetailLimit: number | undefined =
+      config?.summary.detailLimit ?? config?.report.detailLimit;
+    const summaryDetailLimitIdx = rest.indexOf("--detail-limit");
+    if (summaryDetailLimitIdx !== -1) {
+      const val = rest[summaryDetailLimitIdx + 1];
+      const n = Number(val);
+      if (!val || Number.isNaN(n) || n < 0 || !Number.isInteger(n)) {
+        summaryError =
+          summaryError ??
+          `Invalid --detail-limit: "${val}". Must be a non-negative integer.`;
+      } else {
+        summaryDetailLimit = n;
+      }
+    }
+
+    const summaryWithGit =
+      rest.includes("--with-git") ||
+      (config?.summary.withGit ?? config?.report.withGit ?? false);
+
+    if (summaryModel === undefined && config?.summary.model) {
+      summaryModel = config.summary.model;
+    }
+
     return {
       mode: "summary",
       summaryDate,
@@ -421,6 +548,10 @@ export function parseArgs(args: string[]): CliOptions {
       summaryForce,
       summaryAssumeYes,
       summaryModel,
+      summaryInclude,
+      summaryFormat,
+      summaryDetailLimit,
+      summaryWithGit,
       summaryError,
     };
   }

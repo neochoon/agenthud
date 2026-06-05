@@ -2,6 +2,42 @@
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-06-05
+
+### Added
+- **Config-driven defaults for `report` and `summary`.** New
+  `report:` and `summary:` sections in
+  `~/.agenthud/config.yaml` carry the include set, detail limit,
+  with-git toggle, and format. CLI flags still win per
+  invocation. `summary:` keys inherit from `report:` when
+  omitted, so most users can pin one shape under `report:` and
+  have summary follow. Resolution order: `CLI flag → summary.* →
+  report.* → built-in default`.
+- **`summary` exposes the same option surface as `report`.** New
+  `--include`, `--detail-limit`, `--with-git`, `--format` flags
+  on the `summary` subcommand let you tune what feeds the LLM
+  payload from the command line.
+- **Effective-options line on stderr** at the start of every
+  `report` / `summary` run, e.g.
+  `agenthud: report → include=[user,response,bash,edit,thinking]
+  detail-limit=120 with-git=off format=markdown`. Tells you what
+  was actually used; no surprises about hidden hardcodes.
+
+### Fixed
+- **`summary` daily payload no longer drops user prompts.** The
+  hardcoded include set inside `summaryRunner.ts` missed `user`,
+  so the LLM saw no prompts even after v0.11.2 added `user` to
+  the `report` default. The include set is now shared via
+  `DEFAULT_INCLUDE_TYPES` and both surfaces resolve it the same
+  way.
+
+### Upgrade notes
+- Existing config files are not migrated — the new `report:` and
+  `summary:` sections are only written when the file does not
+  exist. Behavior is unchanged for upgrading users (built-in
+  defaults). To pin your preferences, add the sections by hand
+  using the example block in the README.
+
 ## [0.11.4] - 2026-06-05
 
 ### Fixed

@@ -22,6 +22,12 @@ export interface SummaryOptions {
   today: Date;
   /** Forwarded to `claude --model` (e.g. "sonnet", "haiku", or full model ID). */
   model?: string;
+  /** Activity types fed into the LLM payload (resolved by CLI + config). */
+  include: string[];
+  /** Max chars per activity detail (0 = unlimited). */
+  detailLimit: number;
+  /** Whether to merge git commits into the LLM payload. */
+  withGit: boolean;
 }
 
 export interface RangeSummaryOptions {
@@ -31,6 +37,12 @@ export interface RangeSummaryOptions {
   force: boolean;
   assumeYes: boolean;
   model?: string;
+  /** Activity types fed into the per-day LLM payload. */
+  include: string[];
+  /** Max chars per activity detail in the per-day payload (0 = unlimited). */
+  detailLimit: number;
+  /** Whether to merge git commits into the per-day payload. */
+  withGit: boolean;
 }
 
 type PromptKind = "daily" | "range";
@@ -349,6 +361,12 @@ interface DailyGenOpts {
   assumeYes?: boolean;
   /** Forwarded to `claude --model`. */
   model?: string;
+  /** Activity types fed into the LLM payload. */
+  include: string[];
+  /** Max chars per activity detail (0 = unlimited). */
+  detailLimit: number;
+  /** Whether to merge git commits into the LLM payload. */
+  withGit: boolean;
 }
 
 /**
@@ -411,10 +429,13 @@ async function generateDailySummary(
   ];
   const reportMarkdown = generateReport(flatSessions, {
     date: opts.date,
-    include: ["response", "bash", "edit", "thinking"],
+    include: opts.include,
+    // The LLM only ingests markdown — the format option on summary is
+    // for the report-extraction *export* surface (post-LLM), not for
+    // the payload itself, so this stays fixed.
     format: "markdown",
-    detailLimit: 0,
-    withGit: true,
+    detailLimit: opts.detailLimit,
+    withGit: opts.withGit,
   });
 
   const reportBytes = Buffer.byteLength(reportMarkdown, "utf-8");
@@ -513,6 +534,9 @@ export async function runSummary(options: SummaryOptions): Promise<number> {
     streamToStdout: true,
     announce: true,
     model: options.model,
+    include: options.include,
+    detailLimit: options.detailLimit,
+    withGit: options.withGit,
   });
   return res.code;
 }
@@ -593,6 +617,9 @@ export async function runRangeSummary(
       confirmBeforeSpawn: confirmer,
       assumeYes: options.assumeYes,
       model: options.model,
+      include: options.include,
+      detailLimit: options.detailLimit,
+      withGit: options.withGit,
     });
 
     if (res.skipped) {

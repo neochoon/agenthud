@@ -240,7 +240,23 @@ filterPresets:
   - ["all"]
   - ["response", "user"]
   - ["commit"]
+
+# Defaults for `agenthud report` (CLI flags still win per-invocation).
+report:
+  include: [user, response, bash, edit, thinking]
+  detailLimit: 120
+  withGit: false
+  format: markdown
+
+# Defaults for `agenthud summary`. Any field omitted here is inherited
+# from `report` above. `model` is summary-specific.
+summary:
+  withGit: true
+  detailLimit: 0
+  # model: sonnet
 ```
+
+`report` / `summary` resolve each option as **CLI flag → `summary:` key → `report:` key → built-in default**. The effective set is printed to stderr at the start of each run (e.g. `agenthud: report → include=[user,response,bash,edit,thinking] detail-limit=120 with-git=off format=markdown`), so the actual values are always visible.
 
 App-managed state (hidden items) lives separately in `~/.agenthud/state.yaml` so your config file stays clean. You shouldn't need to edit it manually — use `h` in the TUI to hide things.
 

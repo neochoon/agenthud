@@ -51,7 +51,17 @@ function subSummarySentinel(parentId: string): SessionNode {
   };
 }
 
-function appendSubAgentRows(
+/**
+ * Append the sub-agent rows for `session` onto `result` per the same
+ * expand-state rules the renderer uses. Exported for unit testing.
+ *
+ * Cold sessions hide their sub-agents by default and only show them
+ * when the user explicitly expanded the session (Enter on the row,
+ * which adds `__expanded-session-<id>` to expandedIds). When that flag
+ * is present the entire sub-agent list is included — not just
+ * hot/warm — to match the renderer.
+ */
+export function appendSubAgentRows(
   result: SessionNode[],
   session: SessionNode,
   expandedIds: Set<string>,
@@ -65,7 +75,16 @@ function appendSubAgentRows(
 
   if (sessionHidden) return;
 
-  if (expandedIds.has(session.id)) {
+  // Match SessionTreePanel's "subAgentsFullyExpanded" rule. A cold
+  // session expanded via Enter writes `__expanded-session-<id>` to
+  // expandedIds — that should produce the full sub-agent list here
+  // too, otherwise the renderer shows every sub-agent but App's
+  // allFlat misses them and j/k go silent (selectedIndex = -1).
+  const subAgentsFullyExpanded =
+    expandedIds.has(session.id) ||
+    (isCold && expandedIds.has(sessionExpandedKey));
+
+  if (subAgentsFullyExpanded) {
     result.push(...session.subAgents);
   } else {
     result.push(
@@ -265,6 +284,52 @@ function collectAllIds(tree: SessionTree): Set<string> {
  * would be -1 against an empty hot list and the navigation handlers
  * short-circuit on that).
  */
+/**
+ * Pick the selection target for "jump up one level" (left arrow / `h`)
+ * given the current selected id.
+ *
+ * - Sub-agent row → the parent session it belongs to.
+ * - Sub-summary sentinel (`__sub-<sid>__`) → that session.
+ * - Plain session row → the project sentinel that contains it.
+ * - Project sentinel / cold-projects sentinel → the previous flat row
+ *   (acts like an up-arrow at the top level so users can still climb
+ *   out of the project group they're sitting in).
+ */
+export function findParentTarget(
+  currentId: string,
+  tree: SessionTree,
+  flat: SessionNode[],
+): string | null {
+  // sub-summary sentinel → parent session id encoded in the sentinel
+  if (currentId.startsWith("__sub-") && currentId.endsWith("__")) {
+    return currentId.slice("__sub-".length, -"__".length);
+  }
+
+  const allProjects = [...tree.projects, ...tree.coldProjects];
+  const allSessions = allProjects.flatMap((p) => p.sessions);
+
+  // sub-agent → containing session
+  for (const session of allSessions) {
+    if (session.subAgents.some((sa) => sa.id === currentId)) {
+      return session.id;
+    }
+  }
+
+  // session → project sentinel
+  for (const project of allProjects) {
+    if (project.sessions.some((s) => s.id === currentId)) {
+      return `__proj-${project.name}__`;
+    }
+  }
+
+  // project sentinel / cold-projects sentinel / unknown row →
+  // previous row in the flat list. Falls back to current when already
+  // at the top so the cursor doesn't jump to a phantom id.
+  const idx = flat.findIndex((row) => row.id === currentId);
+  if (idx <= 0) return currentId;
+  return flat[idx - 1]?.id ?? currentId;
+}
+
 export function initialSelectedId(tree: SessionTree): string | null {
   const firstProject = tree.projects[0];
   if (firstProject) return `__proj-${firstProject.name}__`;
@@ -636,6 +701,13 @@ export function App({
       });
     },
     trackingOn: tracking,
+    onJumpToParent: () => {
+      if (focus !== "tree") return;
+      stopTracking();
+      if (!selectedId) return;
+      const target = findParentTarget(selectedId, sessionTree, allFlat);
+      if (target && target !== selectedId) setSelectedId(target);
+    },
     onSwitchFocus: () => setFocus((f) => (f === "tree" ? "viewer" : "tree")),
     // cursorLine = "entries back from the newest" (0 = newest = bottom row).
     // Up arrow moves visually upward = older direction = cursorLine++.

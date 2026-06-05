@@ -25,6 +25,9 @@ interface UseHotkeysOptions {
   onHelpScroll?: (delta: number) => void;
   onHelpScrollToTop?: () => void;
   onToggleTracking?: () => void;
+  /** Tree only: jump to the parent of the current row (sub-agent →
+   * session, session → project, project → previous row). */
+  onJumpToParent?: () => void;
   filterLabel: string; // e.g. "all", "response", "commit"
   trackingOn?: boolean;
 }
@@ -41,6 +44,8 @@ export interface UseHotkeysResult {
       return: boolean;
       ctrl: boolean;
       escape?: boolean;
+      leftArrow?: boolean;
+      rightArrow?: boolean;
     },
   ) => void;
   statusBarItems: string[];
@@ -73,6 +78,7 @@ export function useHotkeys({
   onHelpScroll,
   onHelpScrollToTop,
   onToggleTracking,
+  onJumpToParent,
   filterLabel,
   trackingOn = false,
 }: UseHotkeysOptions): UseHotkeysResult {
@@ -87,6 +93,8 @@ export function useHotkeys({
       return: boolean;
       ctrl: boolean;
       escape?: boolean;
+      leftArrow?: boolean;
+      rightArrow?: boolean;
     },
   ) => {
     if (helpMode) {
@@ -210,6 +218,10 @@ export function useHotkeys({
         onHide();
         return;
       }
+      if (key.leftArrow && onJumpToParent) {
+        onJumpToParent();
+        return;
+      }
       if (key.upArrow || input === "k") {
         onScrollUp();
         return;
@@ -253,6 +265,7 @@ export function useHotkeys({
             ...trackingItems,
             "Tab: viewer",
             "↑↓/jk: select",
+            "←: parent",
             "PgUp/Dn: page",
             "↵: expand",
             "h: hide",

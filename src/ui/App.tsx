@@ -258,6 +258,32 @@ function collectAllIds(tree: SessionTree): Set<string> {
   return ids;
 }
 
+/**
+ * Pick the initial selection for the tree. Prefers the first live
+ * project; falls back to the cold-group sentinel when only cold
+ * projects exist so j/k aren't silent no-ops at boot (selectedIndex
+ * would be -1 against an empty hot list and the navigation handlers
+ * short-circuit on that).
+ */
+export function initialSelectedId(tree: SessionTree): string | null {
+  const firstProject = tree.projects[0];
+  if (firstProject) return `__proj-${firstProject.name}__`;
+  if (tree.coldProjects.length > 0) return "__cold__";
+  return null;
+}
+
+/**
+ * Auto-expand the cold group when there are no live projects so the
+ * user lands on a visible list of projects instead of a single
+ * "N cold" summary row.
+ */
+export function initialExpandedIds(tree: SessionTree): Set<string> {
+  if (tree.projects.length === 0 && tree.coldProjects.length > 0) {
+    return new Set(["__cold__"]);
+  }
+  return new Set();
+}
+
 export function App({
   mode,
   scopeToProject,
@@ -280,19 +306,18 @@ export function App({
   const [sessionTree, setSessionTree] = useState<SessionTree>(() =>
     discoverSessions(config, discoverOptions),
   );
-  const [selectedId, setSelectedId] = useState<string | null>(() => {
-    // Select the first project sentinel if projects exist, otherwise null.
-    const firstProject = sessionTree.projects[0];
-    if (firstProject) return `__proj-${firstProject.name}__`;
-    return null;
-  });
+  const [selectedId, setSelectedId] = useState<string | null>(() =>
+    initialSelectedId(sessionTree),
+  );
   const [focus, setFocus] = useState<"tree" | "viewer">("tree");
   const [scrollOffset, setScrollOffset] = useState(0);
   const [isLive, setIsLive] = useState(true);
   const [activities, setActivities] = useState<ActivityEntry[]>([]);
   const [gitActivities, setGitActivities] = useState<ActivityEntry[]>([]);
   const [newCount, setNewCount] = useState(0);
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() =>
+    initialExpandedIds(sessionTree),
+  );
   const [viewerCursorLine, setViewerCursorLine] = useState(0);
   const [detailMode, setDetailMode] = useState(false);
   const [detailActivity, setDetailActivity] = useState<ActivityEntry | null>(

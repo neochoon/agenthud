@@ -45,6 +45,14 @@ describe("parseArgs", () => {
     expect(opts.scopeToCwd).toBeUndefined();
   });
 
+  it("includes 'user' in report's default --include set", () => {
+    // Without 'user', report drops every user prompt and 'Thinking' ends
+    // up as the first entry of each session block — the report reads as
+    // if Claude acted out of nowhere.
+    const opts = parseArgs(["report"]);
+    expect(opts.reportInclude).toContain("user");
+  });
+
   describe("unknown commands and flags", () => {
     it("returns error for unknown subcommand", () => {
       const opts = parseArgs(["foobar"]);
@@ -95,6 +103,7 @@ describe("parseArgs", () => {
     it("uses default include types when --include not given", () => {
       const opts = parseArgs(["report"]);
       expect(opts.reportInclude).toEqual([
+        "user",
         "response",
         "bash",
         "edit",

@@ -11,7 +11,7 @@ const ALL_TYPES = [
   "glob",
   "user",
 ];
-const DEFAULT_TYPES = ["response", "bash", "edit", "thinking"];
+const DEFAULT_TYPES = ["user", "response", "bash", "edit", "thinking"];
 
 export interface CliOptions {
   mode: "watch" | "once" | "report" | "summary";
@@ -84,7 +84,7 @@ Commands:
     --date YYYY-MM-DD|today|yesterday|-Nd     Date to report on
     --include TYPES             Comma-separated types or "all"
                                 Types: response,bash,edit,thinking,read,glob,user
-                                Default: response,bash,edit,thinking
+                                Default: user,response,bash,edit,thinking
     --format FORMAT             Output format: markdown (default) or json
     --detail-limit N            Max chars per activity detail (default: 120, 0 = unlimited)
     --with-git                  Merge git commits from each session's project into the timeline

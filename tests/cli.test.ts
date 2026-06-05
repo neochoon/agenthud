@@ -45,6 +45,21 @@ describe("parseArgs", () => {
     expect(opts.scopeToCwd).toBeUndefined();
   });
 
+  it("parses 'watch' as a positional command (equivalent to no command)", () => {
+    expect(parseArgs(["watch"])).toEqual({ mode: "watch" });
+  });
+
+  it("parses 'watch --once' the same as bare --once", () => {
+    expect(parseArgs(["watch", "--once"])).toEqual({ mode: "once" });
+  });
+
+  it("parses 'watch --cwd' as scoped watch mode", () => {
+    expect(parseArgs(["watch", "--cwd"])).toEqual({
+      mode: "watch",
+      scopeToCwd: true,
+    });
+  });
+
   it("includes 'user' in report's default --include set", () => {
     // Without 'user', report drops every user prompt and 'Thinking' ends
     // up as the first entry of each session block — the report reads as
@@ -127,6 +142,19 @@ describe("parseArgs", () => {
     it("parses --include response,edit", () => {
       const opts = parseArgs(["report", "--include", "response,edit"]);
       expect(opts.reportInclude).toEqual(["response", "edit"]);
+    });
+
+    it("accepts a -Nd value to --date without flagging it as unknown", () => {
+      // The unknown-flag scan must skip values that follow flags taking
+      // a value (otherwise `-1d` as a documented --date format is read
+      // as an unknown flag).
+      const opts = parseArgs(["report", "--date", "-1d"]);
+      expect(opts.reportError).toBeUndefined();
+      // -1d → yesterday at local midnight
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      yesterday.setHours(0, 0, 0, 0);
+      expect(opts.reportDate?.getTime()).toBe(yesterday.getTime());
     });
 
     it("returns error for an unknown --include type (typo)", () => {

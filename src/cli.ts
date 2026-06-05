@@ -133,10 +133,6 @@ export function getVersion(): string {
   return packageJson.version;
 }
 
-export function clearScreen(): void {
-  console.clear();
-}
-
 function parseLocalMidnight(dateStr: string): Date | null {
   if (dateStr === "today") {
     const now = new Date();

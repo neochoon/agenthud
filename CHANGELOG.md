@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [0.11.4] - 2026-06-05
+
+### Fixed
+- **`--once` no longer wipes terminal scrollback.** The mode used to
+  call `console.clear()` before rendering, which emits the
+  clear-screen + clear-scrollback escape on modern terminals — the
+  user's working context above the snapshot disappeared even though
+  `--once` never entered an alt-screen. The snapshot now renders in
+  place at the cursor like any other print-and-exit CLI tool.
+
 ## [0.11.3] - 2026-06-05
 
 ### Fixed

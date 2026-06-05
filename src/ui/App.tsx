@@ -650,10 +650,16 @@ export function App({
         if (viewerCursorLine < viewerRows - 1) {
           setViewerCursorLine((c) => c + 1);
         } else {
-          // cursor at top of viewport — scroll viewport toward older
+          // cursor at top of viewport — scroll viewport toward older.
+          // Clamp against the merged length so git-merged entries at the
+          // head of the stream stay reachable (the viewer renders
+          // mergedActivities, not raw activities).
           setIsLive(false);
           setScrollOffset((o) =>
-            Math.min(o + 1, Math.max(0, activities.length - viewerRows)),
+            Math.min(
+              o + 1,
+              Math.max(0, mergedActivities.length - viewerRows),
+            ),
           );
         }
       }
@@ -692,7 +698,10 @@ export function App({
         setViewerCursorLine(0);
         setIsLive(false);
         setScrollOffset((o) =>
-          Math.min(o + viewerRows, Math.max(0, activities.length - viewerRows)),
+          Math.min(
+            o + viewerRows,
+            Math.max(0, mergedActivities.length - viewerRows),
+          ),
         );
       }
     },
@@ -724,7 +733,7 @@ export function App({
         setScrollOffset((o) =>
           Math.min(
             o + Math.floor(viewerRows / 2),
-            Math.max(0, activities.length - viewerRows),
+            Math.max(0, mergedActivities.length - viewerRows),
           ),
         );
       }

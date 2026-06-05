@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+## [0.11.3] - 2026-06-05
+
+### Fixed
+- **`report --date -1d` (and any `-Nd` value) was rejected as an
+  unknown flag.** The report subcommand's unknown-flag scan didn't
+  skip values after value-taking flags, so the documented `-Nd`
+  shorthand tripped the check. Mirrors the `summary` subcommand's
+  existing pattern.
+
+### Changed
+- **`watch` is now a first-class command in the help layout.** It
+  used to live under `Options:` alongside `--version` / `--help`
+  while less-central modes (report, summary) got the top-level
+  `Commands:` billing. The help is restructured so watch sits in
+  `Commands:` with `(default)` annotation; its flags (`-w/--watch`,
+  `--once`, `--cwd`) sit under it the way report's and summary's
+  flags do. `agenthud watch` is also accepted as an explicit
+  positional now (it used to error as "Unknown command").
+
 ## [0.11.2] - 2026-06-05
 
 ### Fixed

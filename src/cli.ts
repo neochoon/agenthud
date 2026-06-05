@@ -170,12 +170,23 @@ export function parseArgs(args: string[]): CliOptions {
     let reportInclude = DEFAULT_TYPES;
     let reportError: string | undefined;
 
-    // Check for unknown flags in report subcommand
-    for (const arg of rest) {
-      if (arg.startsWith("-") && !KNOWN_REPORT_FLAGS.has(arg)) {
+    // Check for unknown flags in report subcommand. Skip the value
+    // following any flag that takes one, otherwise a `-Nd` date like
+    // `-1d` gets misread as an unknown flag.
+    const FLAGS_WITH_VALUE = new Set([
+      "--date",
+      "--include",
+      "--format",
+      "--detail-limit",
+    ]);
+    for (let i = 0; i < rest.length; i++) {
+      const arg = rest[i];
+      if (!arg.startsWith("-")) continue;
+      if (!KNOWN_REPORT_FLAGS.has(arg)) {
         reportError = `Unknown option: "${arg}". Run agenthud --help for usage.`;
         break;
       }
+      if (FLAGS_WITH_VALUE.has(arg)) i++;
     }
 
     const dateIdx = rest.indexOf("--date");

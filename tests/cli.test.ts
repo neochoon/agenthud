@@ -129,6 +129,19 @@ describe("parseArgs", () => {
       expect(opts.reportInclude).toEqual(["response", "edit"]);
     });
 
+    it("accepts a -Nd value to --date without flagging it as unknown", () => {
+      // The unknown-flag scan must skip values that follow flags taking
+      // a value (otherwise `-1d` as a documented --date format is read
+      // as an unknown flag).
+      const opts = parseArgs(["report", "--date", "-1d"]);
+      expect(opts.reportError).toBeUndefined();
+      // -1d → yesterday at local midnight
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      yesterday.setHours(0, 0, 0, 0);
+      expect(opts.reportDate?.getTime()).toBe(yesterday.getTime());
+    });
+
     it("returns error for an unknown --include type (typo)", () => {
       const opts = parseArgs(["report", "--include", "response,bas"]);
       expect(opts.reportError).toBeDefined();

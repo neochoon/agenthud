@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-06-04
+
+### Fixed
+- **Cold-only project tree was unusable at boot.** When every
+  project's most recent session was older than today (e.g. after a few
+  days away), the tree showed just a "N cold" summary row with no
+  selection and j/k were silent no-ops. The cold group now expands by
+  default and the boot selection lands on the cold-group sentinel so
+  navigation works immediately.
+
 ## [0.11.0] - 2026-06-04
 
 ### New

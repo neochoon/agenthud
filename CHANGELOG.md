@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-06-05
+
+### Fixed
+- **`report` dropped user prompts by default.** The default
+  `--include` set didn't contain `user`, so every session block
+  opened on `Thinking` and the prompt that actually triggered the
+  turn was missing — reports read as if Claude acted out of nowhere.
+  `user` is in the default set now; anyone who wants the prior
+  output passes `--include response,bash,edit,thinking`.
+- **Activity-viewer scroll-up couldn't reach git-merged entries.**
+  The viewer renders `mergedActivities` (session activities + git
+  commits, time-sorted), but `k` / `PgUp` / `Ctrl+U` clamped
+  `scrollOffset` against the raw session-activity length, leaving
+  the earliest entries unreachable when git commits were merged in.
+  All three scroll-up handlers now clamp against the merged length,
+  matching `g`'s existing behavior.
+
 ## [0.11.1] - 2026-06-04
 
 ### Fixed

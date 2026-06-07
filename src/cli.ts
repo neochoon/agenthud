@@ -221,6 +221,24 @@ export function formatEffectiveOptionsLine(
   return `${command} → ${parts.join(" ")}`;
 }
 
+/**
+ * Expand POSIX-style short-flag clusters: `-oI` → `-o -I`, `-yo` →
+ * `-y -o`. Only triggers when the arg is `-` + two or more letters
+ * (no digits), so date short-forms like `-1d` (used as
+ * `--date -1d`) stay intact.
+ */
+function expandCombinedShortFlags(args: string[]): string[] {
+  return args.flatMap((arg) => {
+    if (/^-[a-zA-Z]{2,}$/.test(arg)) {
+      return arg
+        .slice(1)
+        .split("")
+        .map((ch) => `-${ch}`);
+    }
+    return arg;
+  });
+}
+
 function todayLocalMidnight(): Date {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -233,6 +251,10 @@ export function parseArgs(
   // `watch` is the explicit form of the default mode — strip it so the
   // rest of parsing sees the same shape it always has.
   if (args[0] === "watch") args = args.slice(1);
+  // Expand POSIX-style short-flag clusters (-oI → -o -I) so downstream
+  // `args.includes(...)` / `rest.indexOf(...)` checks work without
+  // each subcommand needing to know about clusters.
+  args = expandCombinedShortFlags(args);
   if (args.includes("--help") || args.includes("-h")) {
     return { mode: "watch", command: "help" };
   }

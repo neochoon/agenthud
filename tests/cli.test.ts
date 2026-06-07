@@ -491,6 +491,37 @@ describe("parseArgs", () => {
       });
     });
 
+    describe("combined short flags (POSIX-style cluster)", () => {
+      it("treats `-oI` as `-o -I`", () => {
+        const opts = parseArgs(["summary", "-oI"]);
+        expect(opts.summaryError).toBeUndefined();
+        expect(opts.summaryOpen).toBe(true);
+        expect(opts.summaryOpenIndex).toBe(true);
+      });
+
+      it("order does not matter — `-Io` works too", () => {
+        const opts = parseArgs(["summary", "-Io"]);
+        expect(opts.summaryError).toBeUndefined();
+        expect(opts.summaryOpen).toBe(true);
+        expect(opts.summaryOpenIndex).toBe(true);
+      });
+
+      it("combines with -y (`-yo` → assume-yes + open)", () => {
+        const opts = parseArgs(["summary", "--last", "3d", "-yo"]);
+        expect(opts.summaryError).toBeUndefined();
+        expect(opts.summaryAssumeYes).toBe(true);
+        expect(opts.summaryOpen).toBe(true);
+      });
+
+      it("does not split `-1d` etc. — date short-form stays intact", () => {
+        // -1d is a documented --date value (1 day ago) and contains a
+        // digit, so the cluster expander must leave it alone.
+        const opts = parseArgs(["report", "--date", "-1d"]);
+        expect(opts.reportError).toBeUndefined();
+        expect(opts.reportDate).toBeDefined();
+      });
+    });
+
     describe("report-shaped options on summary", () => {
       it("parses --include and threads it through", () => {
         const opts = parseArgs(["summary", "--include", "response,user"]);

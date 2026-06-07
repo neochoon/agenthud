@@ -18,7 +18,11 @@ import {
   findContainingProject,
   getProjectsDir,
 } from "./data/sessions.js";
-import { runRangeSummary, runSummary } from "./data/summaryRunner.js";
+import {
+  formatPromptSource,
+  runRangeSummary,
+  runSummary,
+} from "./data/summaryRunner.js";
 import { App } from "./ui/App.js";
 import { enterAltScreen, installAltScreenCleanup } from "./utils/altScreen.js";
 import { isLegacyProjectConfig } from "./utils/legacyConfig.js";
@@ -110,6 +114,13 @@ if (options.mode === "summary") {
       withGit: options.summaryWithGit ?? false,
       model: options.summaryModel,
     })}\n`,
+  );
+  const isRangeMode = !!(options.summaryFrom && options.summaryTo);
+  process.stderr.write(
+    `agenthud: prompt = ${formatPromptSource(
+      isRangeMode ? "range" : "daily",
+      options.summaryPrompt,
+    )}\n`,
   );
   const today = new Date();
   if (options.summaryFrom && options.summaryTo) {

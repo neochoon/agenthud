@@ -72,6 +72,26 @@ function userPromptPath(kind: PromptKind): string {
   return join(homedir(), ".agenthud", promptFilename(kind));
 }
 
+/**
+ * Compact, user-facing label for the prompt this summary run is using.
+ * - daily/range with no inline override → the user prompt file path,
+ *   abbreviated to `~/...` so the line stays readable.
+ * - daily with `--prompt TEXT` → "<inline> (from --prompt)".
+ *   (Range mode does not accept --prompt, so override is ignored when
+ *   kind is "range".)
+ */
+export function formatPromptSource(
+  kind: "daily" | "range",
+  override?: string,
+): string {
+  if (kind === "daily" && override) {
+    return "<inline> (from --prompt)";
+  }
+  const home = homedir();
+  const path = userPromptPath(kind);
+  return path.startsWith(home) ? `~${path.slice(home.length)}` : path;
+}
+
 function templatePath(kind: PromptKind): string {
   const here = dirname(fileURLToPath(import.meta.url));
   return join(here, "templates", promptFilename(kind));
@@ -531,12 +551,15 @@ async function generateDailySummary(
 }
 
 export async function runSummary(options: SummaryOptions): Promise<number> {
+  // With --open the user is going to read the rendered file in their
+  // default app anyway, so streaming the same markdown to the terminal
+  // is duplicate noise (and breaks downstream piping). Suppress.
   const res = await generateDailySummary({
     date: options.date,
     today: options.today,
     force: options.force,
     promptOverride: options.prompt,
-    streamToStdout: true,
+    streamToStdout: !options.open,
     announce: true,
     model: options.model,
     include: options.include,
@@ -573,8 +596,10 @@ export async function runRangeSummary(
       process.stderr.write(
         `agenthud: cached range summary from ${rangeCache}\n`,
       );
-      process.stdout.write(content);
-      if (!content.endsWith("\n")) process.stdout.write("\n");
+      if (!options.open) {
+        process.stdout.write(content);
+        if (!content.endsWith("\n")) process.stdout.write("\n");
+      }
       if (options.open) openInDefaultApp(rangeCache);
       return 0;
     } catch {
@@ -672,7 +697,7 @@ export async function runRangeSummary(
     prompt: metaPrompt,
     stdin: metaInput,
     cachePath: rangeCache,
-    streamToStdout: true,
+    streamToStdout: !options.open,
     model: options.model,
   });
 

@@ -6,7 +6,6 @@ import {
   mkdirSync,
   readFileSync,
   unlinkSync,
-  writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -495,34 +494,23 @@ async function generateDailySummary(
     );
   }
 
-  // Skip the LLM call entirely when there's nothing to summarize. Without
-  // this, `summary --date today` against an empty day still pays for a
-  // claude call that produces nothing useful (and on `-o` it would open
-  // an empty page). Write a small stub so the cache exists for the
-  // index and future calls return instantly.
+  // Skip the LLM call entirely when there's nothing to summarize.
+  // Mirrors the range path's "<label> has no activity — skipping"
+  // behavior: announce, return as skipped, and don't touch disk —
+  // creating an empty stub file just clutters the user's summaries
+  // dir, and `--open` / index regeneration both already check
+  // `!res.skipped` so they'll no-op for us automatically.
   if (sessionCount === 0 && activityCount === 0 && commitCount === 0) {
-    const stub =
-      `## Context\n\nNo activity recorded for ${dateLabel}.\n` +
-      "No claude call was issued — the report was empty.\n";
-    try {
-      writeFileSync(cached, stub, "utf-8");
-    } catch {
-      // Best-effort: stub still lets us return a useful result even if
-      // the cache write fails (downstream reads will just regenerate).
-    }
     if (opts.announce) {
       process.stderr.write(
-        `${dateLabel} has no activity — wrote stub to ${cached}, skipped claude\n`,
+        `${dateLabel} has no activity — skipping (no file written)\n`,
       );
-    }
-    if (opts.streamToStdout) {
-      process.stdout.write(stub);
     }
     return {
       code: 0,
-      markdown: stub,
+      markdown: "",
       fromCache: false,
-      skipped: false,
+      skipped: true,
       usage: null,
     };
   }
@@ -621,17 +609,28 @@ export async function runSummary(options: SummaryOptions): Promise<number> {
     detailLimit: options.detailLimit,
     withGit: options.withGit,
   });
-  if (res.code === 0 && !res.skipped) {
+  // Regenerate the index when something *changed* on disk (a new
+  // daily got written), OR when the user explicitly asked for the
+  // navigation hub via `--open-index` (so we guarantee `index.md`
+  // exists before openInDefaultApp tries to launch it).
+  const indexRefreshNeeded =
+    res.code === 0 && (!res.skipped || options.openIndex === true);
+  if (indexRefreshNeeded) {
     try {
       regenerateIndex(summariesDir());
     } catch {
       /* best-effort — index regen never blocks the summary path */
     }
   }
+  // `--open` is about *today's result* — nothing to open when we
+  // skipped because the day was empty.
   if (options.open && res.code === 0 && !res.skipped) {
     await openInDefaultApp(dailyCachePath(options.date));
   }
-  if (options.openIndex && res.code === 0 && !res.skipped) {
+  // `--open-index` is about *navigating the corpus* — fire it even
+  // on empty/skipped days. The user may be running summary purely as
+  // a shortcut to "show me my summary hub".
+  if (options.openIndex && res.code === 0) {
     await openInDefaultApp(join(summariesDir(), "index.md"));
   }
   return res.code;
@@ -730,7 +729,11 @@ export async function runRangeSummary(
     });
 
     if (res.skipped) {
-      process.stderr.write(`agenthud: ${label} — skipped by user.\n`);
+      // `skipped` covers both "user declined the confirm prompt" AND
+      // "the day was empty so we never asked claude". The two look
+      // identical at the result-shape level; one neutral message
+      // works for both.
+      process.stderr.write(`agenthud: ${label} — skipped.\n`);
       skippedCount++;
       continue;
     }
@@ -749,8 +752,23 @@ export async function runRangeSummary(
   }
 
   if (dailyMarkdowns.length === 0) {
-    process.stderr.write("agenthud: no daily summaries to combine.\n");
-    return 1;
+    // No activity in the whole range — nothing to send to claude.
+    // Treat this as a normal state (exit 0), matching `report` and
+    // single-day summary behavior on empty input. Honor `-I` so
+    // users running `summary --last 7d -I` as a "navigate to my hub"
+    // shortcut still get the index.
+    process.stderr.write(
+      "no daily activity in this range — nothing to combine\n",
+    );
+    if (options.openIndex) {
+      try {
+        regenerateIndex(summariesDir());
+      } catch {
+        /* best-effort */
+      }
+      await openInDefaultApp(join(summariesDir(), "index.md"));
+    }
+    return 0;
   }
 
   // Build meta input: each daily summary prefixed with its date, separated by ---.

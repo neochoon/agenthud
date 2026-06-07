@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildBacklinkFooter,
   buildIndexMarkdown,
+  extractContextSnippet,
   parseSummaryFilename,
   prependBacklinkFooter,
   stripExistingBacklinkFooter,
@@ -83,19 +84,38 @@ describe("buildIndexMarkdown", () => {
     expect(md).toContain("<!-- agenthud-summaries-index -->");
   });
 
-  it("renders a daily-only single-month list", () => {
+  it("renders a daily-only single-month list with weekday tags", () => {
     const md = buildIndexMarkdown([
       mkDaily("2026-06-07"),
       mkDaily("2026-06-06"),
     ]);
     expect(md).toContain("## 2026");
     expect(md).toContain("### June");
-    expect(md).toContain("- [2026-06-07](./2026-06-07.md)");
-    expect(md).toContain("- [2026-06-06](./2026-06-06.md)");
+    // 2026-06-07 is a Sunday, 2026-06-06 is a Saturday.
+    expect(md).toContain("- [2026-06-07 (Sun)](./2026-06-07.md)");
+    expect(md).toContain("- [2026-06-06 (Sat)](./2026-06-06.md)");
     // newest first
     expect(md.indexOf("2026-06-07.md")).toBeLessThan(
       md.indexOf("2026-06-06.md"),
     );
+  });
+
+  it("appends snippets when provided via the snippets map", () => {
+    const md = buildIndexMarkdown(
+      [mkDaily("2026-06-07")],
+      new Map([
+        ["2026-06-07.md", "Shipped --open / -o for summary."],
+      ]),
+    );
+    expect(md).toContain(
+      "- [2026-06-07 (Sun)](./2026-06-07.md) — Shipped --open / -o for summary.",
+    );
+  });
+
+  it("omits the em-dash when no snippet is available for that file", () => {
+    const md = buildIndexMarkdown([mkDaily("2026-06-07")]);
+    expect(md).toContain("- [2026-06-07 (Sun)](./2026-06-07.md)\n");
+    expect(md).not.toContain("- [2026-06-07 (Sun)](./2026-06-07.md) —");
   });
 
   it("renders a range entry with the range label and links to its file", () => {
@@ -152,21 +172,21 @@ describe("buildBacklinkFooter", () => {
     expect(footer).toContain("[← all summaries](./index.md)");
   });
 
-  it("daily with both prev and next dailies emits all three links", () => {
+  it("daily with both prev and next dailies emits all three links with weekday tags", () => {
     const entries = [
-      mkDaily("2026-06-08"),
-      mkDaily("2026-06-07"),
-      mkDaily("2026-06-06"),
+      mkDaily("2026-06-08"), // Mon
+      mkDaily("2026-06-07"), // Sun
+      mkDaily("2026-06-06"), // Sat
     ];
     const footer = buildBacklinkFooter("2026-06-07.md", entries);
-    expect(footer).toContain("[← 2026-06-06](./2026-06-06.md)");
-    expect(footer).toContain("[2026-06-08 →](./2026-06-08.md)");
+    expect(footer).toContain("[← 2026-06-06 (Sat)](./2026-06-06.md)");
+    expect(footer).toContain("[2026-06-08 (Mon) →](./2026-06-08.md)");
   });
 
   it("daily with only prev does not synthesize a next", () => {
     const entries = [mkDaily("2026-06-07"), mkDaily("2026-06-06")];
     const footer = buildBacklinkFooter("2026-06-07.md", entries);
-    expect(footer).toContain("[← 2026-06-06](./2026-06-06.md)");
+    expect(footer).toContain("[← 2026-06-06 (Sat)](./2026-06-06.md)");
     expect(footer).not.toContain("→");
   });
 
@@ -217,5 +237,50 @@ describe("stripExistingBacklinkFooter / prependBacklinkFooter", () => {
       "<!-- agenthud-backlinks-start -->\norphan\n# title\n";
     // No closing marker → leave alone, don't risk eating real content.
     expect(stripExistingBacklinkFooter(body)).toBe(body);
+  });
+});
+
+describe("extractContextSnippet", () => {
+  it("returns the first prose line after the heading", () => {
+    const content =
+      "## Context\n\nTwo workstreams ran today: built the index feature and reviewed PRs.\n\n## More\n";
+    expect(extractContextSnippet(content)).toBe(
+      "Two workstreams ran today: built the index feature and reviewed PRs.",
+    );
+  });
+
+  it("ignores leading backlink footer when extracting", () => {
+    const content =
+      "<!-- agenthud-backlinks-start -->\n[← all](./index.md)\n<!-- agenthud-backlinks-end -->\n\n## Context\n\nReal content here.\n";
+    expect(extractContextSnippet(content)).toBe("Real content here.");
+  });
+
+  it("truncates with ellipsis at 200 chars by default", () => {
+    const long = "x".repeat(500);
+    const content = `${long}\n`;
+    const snippet = extractContextSnippet(content);
+    expect(snippet).not.toBeNull();
+    expect(snippet!.length).toBeLessThanOrEqual(200);
+    expect(snippet!.endsWith("…")).toBe(true);
+  });
+
+  it("respects a custom max-char cap", () => {
+    const content =
+      "This is a fairly long sentence that should be cut by the cap.\n";
+    expect(extractContextSnippet(content, 20)).toBe("This is a fairly lo…");
+  });
+
+  it("returns null for an empty file", () => {
+    expect(extractContextSnippet("")).toBeNull();
+  });
+
+  it("returns null for a file with only headings and blanks", () => {
+    expect(extractContextSnippet("## Context\n\n## More\n")).toBeNull();
+  });
+
+  it("returns null for a file with only the backlink footer (no body)", () => {
+    const content =
+      "<!-- agenthud-backlinks-start -->\n[← all](./index.md)\n<!-- agenthud-backlinks-end -->\n";
+    expect(extractContextSnippet(content)).toBeNull();
   });
 });

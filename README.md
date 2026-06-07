@@ -210,7 +210,14 @@ agenthud summary --last 7d --model haiku            # ~80% cheaper, 200K context
 
 # Open the resulting summary in your OS default app (browser, VS Code, etc.)
 agenthud summary --last 7d --open                   # -o is the short form
+
+# Open the index (~/.agenthud/summaries/index.md) instead — a hub
+# listing every daily and range summary, grouped by year/month.
+agenthud summary --open-index                       # -I is the short form
+agenthud summary -oI                                # open today + the index
 ```
+
+The index is auto-regenerated whenever a summary writes, and each summary file gets a one-line backlink footer at the top (`← all summaries · ← prev · next →`) so any markdown viewer is enough to navigate the whole corpus without leaving the file.
 
 **Daily summaries** are saved to `~/.agenthud/summaries/YYYY-MM-DD.md`. Past dates are cached and returned instantly; today is always regenerated (activity still growing).
 

@@ -6,7 +6,6 @@ import {
   mkdirSync,
   readFileSync,
   unlinkSync,
-  writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -495,34 +494,23 @@ async function generateDailySummary(
     );
   }
 
-  // Skip the LLM call entirely when there's nothing to summarize. Without
-  // this, `summary --date today` against an empty day still pays for a
-  // claude call that produces nothing useful (and on `-o` it would open
-  // an empty page). Write a small stub so the cache exists for the
-  // index and future calls return instantly.
+  // Skip the LLM call entirely when there's nothing to summarize.
+  // Mirrors the range path's "<label> has no activity — skipping"
+  // behavior: announce, return as skipped, and don't touch disk —
+  // creating an empty stub file just clutters the user's summaries
+  // dir, and `--open` / index regeneration both already check
+  // `!res.skipped` so they'll no-op for us automatically.
   if (sessionCount === 0 && activityCount === 0 && commitCount === 0) {
-    const stub =
-      `## Context\n\nNo activity recorded for ${dateLabel}.\n` +
-      "No claude call was issued — the report was empty.\n";
-    try {
-      writeFileSync(cached, stub, "utf-8");
-    } catch {
-      // Best-effort: stub still lets us return a useful result even if
-      // the cache write fails (downstream reads will just regenerate).
-    }
     if (opts.announce) {
       process.stderr.write(
-        `${dateLabel} has no activity — wrote stub to ${cached}, skipped claude\n`,
+        `${dateLabel} has no activity — skipping (no file written)\n`,
       );
-    }
-    if (opts.streamToStdout) {
-      process.stdout.write(stub);
     }
     return {
       code: 0,
-      markdown: stub,
+      markdown: "",
       fromCache: false,
-      skipped: false,
+      skipped: true,
       usage: null,
     };
   }

@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-06-07
+
+### Fixed
+- **Windows: `prompt = ...` stderr line used backslash separators.**
+  `formatPromptSource` now normalises its output to forward slashes
+  so the user-facing label reads as `~/.agenthud/summary-prompt.md`
+  on every platform. (Pure cosmetic on POSIX; lets the Windows
+  CI tests pass.)
+
+v0.12.0 was tagged but never reached npm — the Windows test job in
+CI caught this issue before the publish step ran. v0.12.1 is the
+first 0.12 release on npm.
+
 ## [0.12.0] - 2026-06-07
 
 ### Added

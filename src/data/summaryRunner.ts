@@ -95,7 +95,13 @@ export function formatPromptSource(
   }
   const home = homedir();
   const path = userPromptPath(kind);
-  return path.startsWith(home) ? `~${path.slice(home.length)}` : path;
+  const abbreviated = path.startsWith(home)
+    ? `~${path.slice(home.length)}`
+    : path;
+  // Normalize to forward slashes for the user-facing label — POSIX
+  // form reads cleanly on every platform, including Windows where
+  // `join()` would otherwise produce `~\.agenthud\summary-prompt.md`.
+  return abbreviated.replace(/\\/g, "/");
 }
 
 function templatePath(kind: PromptKind): string {

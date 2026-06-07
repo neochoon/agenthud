@@ -12,6 +12,8 @@ import { dirname, join } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { loadGlobalConfig } from "../config/globalConfig.js";
+import { openInDefaultApp } from "../utils/openInDefaultApp.js";
+import { startStderrTicker } from "../utils/stderrTicker.js";
 import { generateReport } from "./reportGenerator.js";
 import { discoverSessions } from "./sessions.js";
 
@@ -28,6 +30,8 @@ export interface SummaryOptions {
   detailLimit: number;
   /** Whether to merge git commits into the LLM payload. */
   withGit: boolean;
+  /** Launch the resulting summary in the OS default app after writing. */
+  open?: boolean;
 }
 
 export interface RangeSummaryOptions {
@@ -43,6 +47,8 @@ export interface RangeSummaryOptions {
   detailLimit: number;
   /** Whether to merge git commits into the per-day payload. */
   withGit: boolean;
+  /** Launch the resulting range summary in the OS default app after writing. */
+  open?: boolean;
 }
 
 type PromptKind = "daily" | "range";
@@ -65,6 +71,26 @@ function promptFilename(kind: PromptKind): string {
 
 function userPromptPath(kind: PromptKind): string {
   return join(homedir(), ".agenthud", promptFilename(kind));
+}
+
+/**
+ * Compact, user-facing label for the prompt this summary run is using.
+ * - daily/range with no inline override → the user prompt file path,
+ *   abbreviated to `~/...` so the line stays readable.
+ * - daily with `--prompt TEXT` → "<inline> (from --prompt)".
+ *   (Range mode does not accept --prompt, so override is ignored when
+ *   kind is "range".)
+ */
+export function formatPromptSource(
+  kind: "daily" | "range",
+  override?: string,
+): string {
+  if (kind === "daily" && override) {
+    return "<inline> (from --prompt)";
+  }
+  const home = homedir();
+  const path = userPromptPath(kind);
+  return path.startsWith(home) ? `~${path.slice(home.length)}` : path;
 }
 
 function templatePath(kind: PromptKind): string {
@@ -399,7 +425,7 @@ async function generateDailySummary(
     try {
       const content = readFileSync(cached, "utf-8");
       if (opts.announce) {
-        process.stderr.write(`agenthud: cached summary from ${cached}\n`);
+        process.stderr.write(`cached summary from ${cached}\n`);
       }
       if (opts.streamToStdout) {
         process.stdout.write(content);
@@ -418,7 +444,7 @@ async function generateDailySummary(
   }
 
   if (opts.announce) {
-    process.stderr.write(`agenthud: scanning sessions for ${dateLabel}...\n`);
+    process.stderr.write(`scanning sessions for ${dateLabel}...\n`);
   }
 
   const config = loadGlobalConfig();
@@ -452,7 +478,7 @@ async function generateDailySummary(
     ).length;
     const sizeKb = (reportBytes / 1024).toFixed(1);
     process.stderr.write(
-      `agenthud: input: ${sessionCount} sessions, ${activityCount} activities, ${commitCount} commits (${reportLines.length} lines, ${sizeKb}KB ≈ ${estimatedTokens.toLocaleString()} tokens)\n`,
+      `input: ${sessionCount} sessions, ${activityCount} activities, ${commitCount} commits (${reportLines.length} lines, ${sizeKb}KB ≈ ${estimatedTokens.toLocaleString()} tokens)\n`,
     );
   }
 
@@ -493,11 +519,19 @@ async function generateDailySummary(
     }
   }
 
-  if (opts.announce) {
+  // When streamToStdout is on, the streaming markdown itself is the
+  // progress indicator. When it's off (--open suppression) we'd be
+  // staring at a frozen-looking terminal — start a stderr ticker so
+  // the user knows the LLM call is still running.
+  const showTicker = opts.announce && !opts.streamToStdout;
+  if (opts.announce && !showTicker) {
     process.stderr.write(
-      `agenthud: sending to claude (this may take a minute)...\n\n`,
+      `sending to claude (this may take a minute)...\n\n`,
     );
   }
+  const stopTicker = showTicker
+    ? startStderrTicker("sending to claude")
+    : null;
 
   const prompt = resolvePrompt("daily", opts.promptOverride);
   const result = await spawnClaude({
@@ -507,12 +541,13 @@ async function generateDailySummary(
     streamToStdout: opts.streamToStdout,
     model: opts.model,
   });
+  if (stopTicker) stopTicker();
 
   if (opts.announce && result.code === 0) {
     process.stderr.write("\n");
-    process.stderr.write(`agenthud: saved to ${cached}\n`);
+    process.stderr.write(`saved to ${cached}\n`);
     if (result.usage) {
-      process.stderr.write(`agenthud: ${formatUsage(result.usage)}\n`);
+      process.stderr.write(`${formatUsage(result.usage)}\n`);
     }
   }
 
@@ -526,18 +561,24 @@ async function generateDailySummary(
 }
 
 export async function runSummary(options: SummaryOptions): Promise<number> {
+  // With --open the user is going to read the rendered file in their
+  // default app anyway, so streaming the same markdown to the terminal
+  // is duplicate noise (and breaks downstream piping). Suppress.
   const res = await generateDailySummary({
     date: options.date,
     today: options.today,
     force: options.force,
     promptOverride: options.prompt,
-    streamToStdout: true,
+    streamToStdout: !options.open,
     announce: true,
     model: options.model,
     include: options.include,
     detailLimit: options.detailLimit,
     withGit: options.withGit,
   });
+  if (options.open && res.code === 0 && !res.skipped) {
+    openInDefaultApp(dailyCachePath(options.date));
+  }
   return res.code;
 }
 
@@ -563,10 +604,13 @@ export async function runRangeSummary(
     try {
       const content = readFileSync(rangeCache, "utf-8");
       process.stderr.write(
-        `agenthud: cached range summary from ${rangeCache}\n`,
+        `cached range summary from ${rangeCache}\n`,
       );
-      process.stdout.write(content);
-      if (!content.endsWith("\n")) process.stdout.write("\n");
+      if (!options.open) {
+        process.stdout.write(content);
+        if (!content.endsWith("\n")) process.stdout.write("\n");
+      }
+      if (options.open) openInDefaultApp(rangeCache);
       return 0;
     } catch {
       // fall through to regenerate
@@ -583,10 +627,10 @@ export async function runRangeSummary(
   }
 
   process.stderr.write(
-    `agenthud: range ${fromLabel} → ${toLabel} (${dates.length} days)\n`,
+    `range ${fromLabel} → ${toLabel} (${dates.length} days)\n`,
   );
   process.stderr.write(
-    `agenthud: ${cachedCount} cached, ${missingCount} to generate\n`,
+    `${cachedCount} cached, ${missingCount} to generate\n`,
   );
 
   // Generate dailies sequentially. Confirm just-in-time after scan (when --yes is off).
@@ -596,7 +640,7 @@ export async function runRangeSummary(
   for (const d of dates) {
     const label = dateKey(d);
     const isToday = isSameLocalDay(d, options.today);
-    process.stderr.write(`\nagenthud: --- ${label} ---\n`);
+    process.stderr.write(`\n--- ${label} ---\n`);
 
     const willPrompt = !options.assumeYes && (isToday || !existsSync(dailyCachePath(d)));
     const confirmer = willPrompt
@@ -635,7 +679,7 @@ export async function runRangeSummary(
     }
     const text = res.markdown.trim();
     if (text.length === 0 || /^no activity found/i.test(text)) {
-      process.stderr.write(`agenthud: ${label} has no activity — skipping.\n`);
+      process.stderr.write(`${label} has no activity — skipping.\n`);
       continue;
     }
     dailyMarkdowns.push({ date: d, markdown: text });
@@ -652,30 +696,41 @@ export async function runRangeSummary(
     .join("\n\n---\n\n");
 
   process.stderr.write(
-    `\nagenthud: combining ${dailyMarkdowns.length} daily summaries into range summary...\n`,
+    `\ncombining ${dailyMarkdowns.length} daily summaries into range summary...\n`,
   );
-  process.stderr.write(
-    `agenthud: sending to claude (this may take a minute)...\n\n`,
-  );
+  const metaStreams = !options.open;
+  if (!metaStreams) {
+    // -o suppresses the streamed output — show a ticker instead so the
+    // user has visible feedback during the minute-long LLM call.
+  } else {
+    process.stderr.write(
+      `sending to claude (this may take a minute)...\n\n`,
+    );
+  }
+  const stopMetaTicker = metaStreams
+    ? null
+    : startStderrTicker("sending to claude");
 
   const metaPrompt = resolvePrompt("range");
   const metaResult = await spawnClaude({
     prompt: metaPrompt,
     stdin: metaInput,
     cachePath: rangeCache,
-    streamToStdout: true,
+    streamToStdout: metaStreams,
     model: options.model,
   });
+  if (stopMetaTicker) stopMetaTicker();
 
   if (metaResult.code !== 0) {
     return metaResult.code;
   }
 
   process.stderr.write("\n");
-  process.stderr.write(`agenthud: saved to ${rangeCache}\n`);
+  process.stderr.write(`saved to ${rangeCache}\n`);
   if (metaResult.usage) {
-    process.stderr.write(`agenthud: ${formatUsage(metaResult.usage)}\n`);
+    process.stderr.write(`${formatUsage(metaResult.usage)}\n`);
   }
 
+  if (options.open) openInDefaultApp(rangeCache);
   return 0;
 }

@@ -439,6 +439,32 @@ describe("parseArgs", () => {
       expect(opts.summaryModel).toBeUndefined();
     });
 
+    describe("--open / -o flag", () => {
+      it("parses --open", () => {
+        const opts = parseArgs(["summary", "--open"]);
+        expect(opts.summaryError).toBeUndefined();
+        expect(opts.summaryOpen).toBe(true);
+      });
+
+      it("parses -o", () => {
+        const opts = parseArgs(["summary", "-o"]);
+        expect(opts.summaryError).toBeUndefined();
+        expect(opts.summaryOpen).toBe(true);
+      });
+
+      it("works alongside --last", () => {
+        const opts = parseArgs(["summary", "--last", "7d", "--open"]);
+        expect(opts.summaryError).toBeUndefined();
+        expect(opts.summaryOpen).toBe(true);
+        expect(opts.summaryFrom).toBeDefined();
+      });
+
+      it("defaults to undefined when neither flag is given", () => {
+        const opts = parseArgs(["summary"]);
+        expect(opts.summaryOpen).toBeUndefined();
+      });
+    });
+
     describe("report-shaped options on summary", () => {
       it("parses --include and threads it through", () => {
         const opts = parseArgs(["summary", "--include", "response,user"]);
@@ -545,7 +571,7 @@ describe("formatEffectiveOptionsLine", () => {
       format: "markdown",
     });
     expect(line).toBe(
-      "agenthud: report → include=[user,response,bash,edit,thinking] detail-limit=120 with-git=off format=markdown",
+      "report → include=[user,response,bash,edit,thinking] detail-limit=120 with-git=off format=markdown",
     );
   });
 
@@ -557,7 +583,7 @@ describe("formatEffectiveOptionsLine", () => {
       model: "sonnet",
     });
     expect(line).toBe(
-      "agenthud: summary → include=[bash] detail-limit=∞ with-git=on model=sonnet",
+      "summary → include=[bash] detail-limit=∞ with-git=on model=sonnet",
     );
   });
 

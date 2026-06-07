@@ -18,7 +18,11 @@ import {
   findContainingProject,
   getProjectsDir,
 } from "./data/sessions.js";
-import { runRangeSummary, runSummary } from "./data/summaryRunner.js";
+import {
+  formatPromptSource,
+  runRangeSummary,
+  runSummary,
+} from "./data/summaryRunner.js";
 import { App } from "./ui/App.js";
 import { enterAltScreen, installAltScreenCleanup } from "./utils/altScreen.js";
 import { isLegacyProjectConfig } from "./utils/legacyConfig.js";
@@ -111,6 +115,13 @@ if (options.mode === "summary") {
       model: options.summaryModel,
     })}\n`,
   );
+  const isRangeMode = !!(options.summaryFrom && options.summaryTo);
+  process.stderr.write(
+    `prompt = ${formatPromptSource(
+      isRangeMode ? "range" : "daily",
+      options.summaryPrompt,
+    )}\n`,
+  );
   const today = new Date();
   if (options.summaryFrom && options.summaryTo) {
     const exitCode = await runRangeSummary({
@@ -123,6 +134,7 @@ if (options.mode === "summary") {
       include: options.summaryInclude!,
       detailLimit: options.summaryDetailLimit!,
       withGit: options.summaryWithGit!,
+      open: options.summaryOpen,
     });
     process.exit(exitCode);
   }
@@ -135,6 +147,7 @@ if (options.mode === "summary") {
     include: options.summaryInclude!,
     detailLimit: options.summaryDetailLimit!,
     withGit: options.summaryWithGit!,
+    open: options.summaryOpen,
   });
   process.exit(exitCode);
 }
@@ -165,7 +178,7 @@ if (options.scopeToCwd) {
     process.exit(1);
   }
   scopeToProject = match;
-  process.stderr.write(`agenthud: scope = ${match}\n`);
+  process.stderr.write(`scope = ${match}\n`);
 }
 
 if (options.mode === "watch") {

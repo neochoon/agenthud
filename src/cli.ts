@@ -37,6 +37,8 @@ export interface CliOptions {
   summaryFormat?: "markdown" | "json";
   summaryDetailLimit?: number;
   summaryWithGit?: boolean;
+  /** Launch the resulting summary in the OS default app after writing. */
+  summaryOpen?: boolean;
   summaryError?: string;
   scopeToCwd?: boolean;
 }
@@ -72,6 +74,8 @@ const KNOWN_SUMMARY_FLAGS = new Set([
   "--format",
   "--detail-limit",
   "--with-git",
+  "-o",
+  "--open",
 ]);
 const KNOWN_SUBCOMMANDS = new Set(["watch", "report", "summary"]);
 
@@ -108,7 +112,7 @@ Commands:
 
   summary [--date DATE | --last Nd | --from DATE --to DATE]
           [--include TYPES] [--detail-limit N] [--with-git]
-          [--prompt TEXT] [--force] [--model NAME] [-y]
+          [--prompt TEXT] [--force] [--model NAME] [-y] [-o]
                                 Generate an LLM summary via the claude
                                 CLI. A single day produces a daily
                                 summary; a date range produces a
@@ -129,6 +133,9 @@ Commands:
                                 "haiku", or a full model id)
     -y, --yes                   Skip confirmation prompts for new daily
                                 summaries
+    -o, --open                  Launch the resulting summary in your OS
+                                default app once it's written (or read
+                                back from cache).
 
   Defaults for report and summary live under \`report:\` and \`summary:\`
   in ~/.agenthud/config.yaml. Flags override config values per-run; the
@@ -204,7 +211,7 @@ export function formatEffectiveOptionsLine(
   parts.push(`with-git=${fields.withGit ? "on" : "off"}`);
   if (fields.format) parts.push(`format=${fields.format}`);
   if (fields.model) parts.push(`model=${fields.model}`);
-  return `agenthud: ${command} → ${parts.join(" ")}`;
+  return `${command} → ${parts.join(" ")}`;
 }
 
 function todayLocalMidnight(): Date {
@@ -468,6 +475,8 @@ export function parseArgs(
 
     if (rest.includes("--force")) summaryForce = true;
     if (rest.includes("-y") || rest.includes("--yes")) summaryAssumeYes = true;
+    const summaryOpen =
+      rest.includes("--open") || rest.includes("-o") || undefined;
 
     // Resolve report-shaped options for summary:
     //   CLI flag → config.summary.X → config.report.X → built-in default.
@@ -552,6 +561,7 @@ export function parseArgs(
       summaryFormat,
       summaryDetailLimit,
       summaryWithGit,
+      summaryOpen,
       summaryError,
     };
   }

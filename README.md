@@ -29,22 +29,22 @@ Run this in a separate terminal while using Claude Code. Press `?` inside the TU
 AgentHUD's TUI splits the screen into a project tree and an activity viewer:
 
 ```
-┌─ Projects ───────────────────────────────────────────────┐
-│ > agenthud  ~/WestbrookAI/agenthud                   13m │
-│     #864f [hot] Fix the auth bug in login flow           │
-│         ├─ » code-reviewer                               │
-│     (#398c [warm])                                       │
-│   myproject  ~/work/myproject                         2d │
-│     #def4 [hot] Add OAuth support                        │
-│ ... 12 cold projects                                     │
-└──────────────────────────────────────────────────────────┘
-┌─ Activity · agenthud ────────────────────────────────────┐
-│ [10:23] ○ Read  src/ui/App.tsx                           │
-│ [10:23] ~ Edit  src/ui/App.tsx                           │
-│ [10:23] $ Bash  npm test                                 │
-│ [10:23] < Response  Tests passed successfully            │
+┌─ Projects ─────────────────────────────────────────────────┐
+│ > agenthud  ~/WestbrookAI/agenthud                     13m │
+│     #864f [hot] Fix the auth bug in login flow             │
+│         ├─ » code-reviewer                                 │
+│     (#398c [warm])                                         │
+│   myproject  ~/work/myproject                           2d │
+│     #def4 [hot] Add OAuth support                          │
+│ ... 12 cold projects                                       │
+└────────────────────────────────────────────────────────────┘
+┌─ Activity · agenthud ──────────────────────────────────────┐
+│ [10:23] ○ Read  src/ui/App.tsx                             │
+│ [10:23] ~ Edit  src/ui/App.tsx                             │
+│ [10:23] $ Bash  npm test                                   │
+│ [10:23] < Response  Tests passed successfully              │
 │ [10:25] ⠧ Edit  src/auth/oauth.ts  ← bold + spinner = live │
-└──────────────────────────────────────────────────────────┘
+└────────────────────────────────────────────────────────────┘
 ```
 
 **Project tree (top pane)**
@@ -207,6 +207,9 @@ agenthud summary --last 7d -y                       # skip per-day confirmations
 # Cheaper model — summarization doesn't need Opus-tier reasoning
 agenthud summary --date today --model sonnet        # ~40% cheaper than Opus
 agenthud summary --last 7d --model haiku            # ~80% cheaper, 200K context
+
+# Open the resulting summary in your OS default app (browser, VS Code, etc.)
+agenthud summary --last 7d --open                   # -o is the short form
 ```
 
 **Daily summaries** are saved to `~/.agenthud/summaries/YYYY-MM-DD.md`. Past dates are cached and returned instantly; today is always regenerated (activity still growing).

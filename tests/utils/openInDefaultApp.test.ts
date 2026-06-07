@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildOpenCommand } from "../../src/utils/openInDefaultApp.js";
+import {
+  buildOpenCommand,
+  commandExists,
+} from "../../src/utils/openInDefaultApp.js";
 
 describe("buildOpenCommand", () => {
   it("uses `open <path>` on macOS", () => {
@@ -9,11 +12,20 @@ describe("buildOpenCommand", () => {
     });
   });
 
-  it("uses `xdg-open <path>` on Linux", () => {
+  it("uses `xdg-open <path>` on Linux by default", () => {
     expect(buildOpenCommand("linux", "/tmp/foo.md")).toEqual({
       command: "xdg-open",
       args: ["/tmp/foo.md"],
     });
+  });
+
+  it("prefers `wslview` on Linux when the wslView opt is set", () => {
+    // On WSL, openInDefaultApp passes wslView=true after a sync
+    // check that wslview is on PATH; this lets the host's default app
+    // handle the file (browser, VS Code, …) instead of an X server.
+    expect(
+      buildOpenCommand("linux", "/mnt/c/Users/me/foo.md", { wslView: true }),
+    ).toEqual({ command: "wslview", args: ["/mnt/c/Users/me/foo.md"] });
   });
 
   it("uses `cmd /c start \"\" <path>` on Windows", () => {
@@ -38,5 +50,19 @@ describe("buildOpenCommand", () => {
       command: "open",
       args: ["/Users/me/Library/Application Support/agenthud/summary.md"],
     });
+  });
+});
+
+describe("commandExists", () => {
+  it("returns true for a command on the test runner's PATH", () => {
+    // `node` runs vitest, so it's guaranteed to be on PATH everywhere
+    // this test could plausibly execute (CI, dev machines, WSL).
+    expect(commandExists("node")).toBe(true);
+  });
+
+  it("returns false for a command that does not exist", () => {
+    expect(commandExists("definitely-not-a-real-command-xyz-12345")).toBe(
+      false,
+    );
   });
 });

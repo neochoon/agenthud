@@ -6,6 +6,7 @@ import {
   mkdirSync,
   readFileSync,
   unlinkSync,
+  writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -478,19 +479,52 @@ async function generateDailySummary(
   const reportBytes = Buffer.byteLength(reportMarkdown, "utf-8");
   const estimatedTokens = Math.ceil(reportBytes / 4);
 
+  const reportLines = reportMarkdown.split("\n");
+  const sessionCount = reportLines.filter((l) => l.startsWith("## ")).length;
+  const activityCount = reportLines.filter((l) =>
+    /^\[\d{2}:\d{2}\]/.test(l),
+  ).length;
+  const commitCount = reportLines.filter((l) =>
+    /^\[\d{2}:\d{2}\] ◆/.test(l),
+  ).length;
+
   if (opts.announce) {
-    const reportLines = reportMarkdown.split("\n");
-    const sessionCount = reportLines.filter((l) => l.startsWith("## ")).length;
-    const activityCount = reportLines.filter((l) =>
-      /^\[\d{2}:\d{2}\]/.test(l),
-    ).length;
-    const commitCount = reportLines.filter((l) =>
-      /^\[\d{2}:\d{2}\] ◆/.test(l),
-    ).length;
     const sizeKb = (reportBytes / 1024).toFixed(1);
     process.stderr.write(
       `input: ${sessionCount} sessions, ${activityCount} activities, ${commitCount} commits (${reportLines.length} lines, ${sizeKb}KB ≈ ${estimatedTokens.toLocaleString()} tokens)\n`,
     );
+  }
+
+  // Skip the LLM call entirely when there's nothing to summarize. Without
+  // this, `summary --date today` against an empty day still pays for a
+  // claude call that produces nothing useful (and on `-o` it would open
+  // an empty page). Write a small stub so the cache exists for the
+  // index and future calls return instantly.
+  if (sessionCount === 0 && activityCount === 0 && commitCount === 0) {
+    const stub =
+      `## Context\n\nNo activity recorded for ${dateLabel}.\n` +
+      "No claude call was issued — the report was empty.\n";
+    try {
+      writeFileSync(cached, stub, "utf-8");
+    } catch {
+      // Best-effort: stub still lets us return a useful result even if
+      // the cache write fails (downstream reads will just regenerate).
+    }
+    if (opts.announce) {
+      process.stderr.write(
+        `${dateLabel} has no activity — wrote stub to ${cached}, skipped claude\n`,
+      );
+    }
+    if (opts.streamToStdout) {
+      process.stdout.write(stub);
+    }
+    return {
+      code: 0,
+      markdown: stub,
+      fromCache: false,
+      skipped: false,
+      usage: null,
+    };
   }
 
   if (opts.confirmBeforeSpawn) {
@@ -595,10 +629,10 @@ export async function runSummary(options: SummaryOptions): Promise<number> {
     }
   }
   if (options.open && res.code === 0 && !res.skipped) {
-    openInDefaultApp(dailyCachePath(options.date));
+    await openInDefaultApp(dailyCachePath(options.date));
   }
   if (options.openIndex && res.code === 0 && !res.skipped) {
-    openInDefaultApp(join(summariesDir(), "index.md"));
+    await openInDefaultApp(join(summariesDir(), "index.md"));
   }
   return res.code;
 }
@@ -636,9 +670,9 @@ export async function runRangeSummary(
       } catch {
         /* best-effort */
       }
-      if (options.open) openInDefaultApp(rangeCache);
+      if (options.open) await openInDefaultApp(rangeCache);
       if (options.openIndex) {
-        openInDefaultApp(join(summariesDir(), "index.md"));
+        await openInDefaultApp(join(summariesDir(), "index.md"));
       }
       return 0;
     } catch {
@@ -765,9 +799,9 @@ export async function runRangeSummary(
   } catch {
     /* best-effort */
   }
-  if (options.open) openInDefaultApp(rangeCache);
+  if (options.open) await openInDefaultApp(rangeCache);
   if (options.openIndex) {
-    openInDefaultApp(join(summariesDir(), "index.md"));
+    await openInDefaultApp(join(summariesDir(), "index.md"));
   }
   return 0;
 }

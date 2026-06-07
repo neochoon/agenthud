@@ -123,6 +123,7 @@ if (options.mode === "summary") {
       include: options.summaryInclude!,
       detailLimit: options.summaryDetailLimit!,
       withGit: options.summaryWithGit!,
+      open: options.summaryOpen,
     });
     process.exit(exitCode);
   }
@@ -135,6 +136,7 @@ if (options.mode === "summary") {
     include: options.summaryInclude!,
     detailLimit: options.summaryDetailLimit!,
     withGit: options.summaryWithGit!,
+    open: options.summaryOpen,
   });
   process.exit(exitCode);
 }

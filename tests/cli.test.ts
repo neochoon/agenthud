@@ -439,6 +439,32 @@ describe("parseArgs", () => {
       expect(opts.summaryModel).toBeUndefined();
     });
 
+    describe("--open / -o flag", () => {
+      it("parses --open", () => {
+        const opts = parseArgs(["summary", "--open"]);
+        expect(opts.summaryError).toBeUndefined();
+        expect(opts.summaryOpen).toBe(true);
+      });
+
+      it("parses -o", () => {
+        const opts = parseArgs(["summary", "-o"]);
+        expect(opts.summaryError).toBeUndefined();
+        expect(opts.summaryOpen).toBe(true);
+      });
+
+      it("works alongside --last", () => {
+        const opts = parseArgs(["summary", "--last", "7d", "--open"]);
+        expect(opts.summaryError).toBeUndefined();
+        expect(opts.summaryOpen).toBe(true);
+        expect(opts.summaryFrom).toBeDefined();
+      });
+
+      it("defaults to undefined when neither flag is given", () => {
+        const opts = parseArgs(["summary"]);
+        expect(opts.summaryOpen).toBeUndefined();
+      });
+    });
+
     describe("report-shaped options on summary", () => {
       it("parses --include and threads it through", () => {
         const opts = parseArgs(["summary", "--include", "response,user"]);

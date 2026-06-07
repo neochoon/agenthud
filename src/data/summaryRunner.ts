@@ -12,6 +12,7 @@ import { dirname, join } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { loadGlobalConfig } from "../config/globalConfig.js";
+import { openInDefaultApp } from "../utils/openInDefaultApp.js";
 import { generateReport } from "./reportGenerator.js";
 import { discoverSessions } from "./sessions.js";
 
@@ -28,6 +29,8 @@ export interface SummaryOptions {
   detailLimit: number;
   /** Whether to merge git commits into the LLM payload. */
   withGit: boolean;
+  /** Launch the resulting summary in the OS default app after writing. */
+  open?: boolean;
 }
 
 export interface RangeSummaryOptions {
@@ -43,6 +46,8 @@ export interface RangeSummaryOptions {
   detailLimit: number;
   /** Whether to merge git commits into the per-day payload. */
   withGit: boolean;
+  /** Launch the resulting range summary in the OS default app after writing. */
+  open?: boolean;
 }
 
 type PromptKind = "daily" | "range";
@@ -538,6 +543,9 @@ export async function runSummary(options: SummaryOptions): Promise<number> {
     detailLimit: options.detailLimit,
     withGit: options.withGit,
   });
+  if (options.open && res.code === 0 && !res.skipped) {
+    openInDefaultApp(dailyCachePath(options.date));
+  }
   return res.code;
 }
 
@@ -567,6 +575,7 @@ export async function runRangeSummary(
       );
       process.stdout.write(content);
       if (!content.endsWith("\n")) process.stdout.write("\n");
+      if (options.open) openInDefaultApp(rangeCache);
       return 0;
     } catch {
       // fall through to regenerate
@@ -677,5 +686,6 @@ export async function runRangeSummary(
     process.stderr.write(`agenthud: ${formatUsage(metaResult.usage)}\n`);
   }
 
+  if (options.open) openInDefaultApp(rangeCache);
   return 0;
 }

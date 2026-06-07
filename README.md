@@ -24,6 +24,14 @@ npx agenthud
 
 Run this in a separate terminal while using Claude Code. Press `?` inside the TUI any time for in-app help.
 
+Pass `--cwd` to scope the view to the Claude project that contains your current directory — useful when you have many projects but only care about the one you're in right now. Exits 1 with a stderr message if no such project is registered.
+
+```bash
+agenthud           # all Claude projects on the machine
+agenthud --cwd     # only the project containing the current dir
+agenthud --once    # print one frame and exit (no alt-screen)
+```
+
 ## Live monitor
 
 AgentHUD's TUI splits the screen into a project tree and an activity viewer:
@@ -100,6 +108,7 @@ Full reference is also available inside the app — press `?`.
 |-----|--------|
 | `↑` / `k` | Move up |
 | `↓` / `j` | Move down |
+| `←` | Jump to parent (sub-agent → session, session → project) |
 | `↵` | Expand/collapse project, session, or sub-agent summary |
 | `h` | Hide selected (project / session / sub-agent) |
 | `Tab` | Switch focus to activity viewer |
@@ -180,7 +189,7 @@ Output:
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--date` | today | `YYYY-MM-DD`, `today`, `yesterday`, or `-Nd` (N days ago, local date) |
-| `--include` | `response,bash,edit,thinking` | Comma-separated types or `all` |
+| `--include` | `user,response,bash,edit,thinking` | Comma-separated types or `all` |
 | `--format` | `markdown` | `markdown` or `json` |
 | `--detail-limit` | `120` | Max chars per detail field; `0` = unlimited |
 | `--with-git` | off | Merge git commits from each session's project into the timeline |
@@ -203,6 +212,12 @@ agenthud summary --prompt "Only commits"    # override prompt
 agenthud summary --last 7d                          # last 7 days, ending today
 agenthud summary --from 2026-05-10 --to 2026-05-16  # explicit range
 agenthud summary --last 7d -y                       # skip per-day confirmations
+
+# Tune what gets sent to the LLM — same option shape as `report`
+agenthud summary --include all                      # include every activity type
+agenthud summary --detail-limit 200                 # truncate long tool outputs
+agenthud summary --with-git                         # include git commits (default in config)
+# Defaults are CLI flag → `summary:` config → `report:` config → built-in.
 
 # Cheaper model — summarization doesn't need Opus-tier reasoning
 agenthud summary --date today --model sonnet        # ~40% cheaper than Opus
@@ -280,6 +295,7 @@ App-managed state (hidden items) lives separately in `~/.agenthud/state.yaml` so
 | `~/.agenthud/summary-range-prompt.md` | LLM prompt template for range `summary --last/--from/--to` |
 | `~/.agenthud/summaries/YYYY-MM-DD.md` | Cached daily summaries |
 | `~/.agenthud/summaries/range-FROM_TO.md` | Cached range summaries |
+| `~/.agenthud/summaries/index.md` | Auto-regenerated hub linking every summary; each summary also gets a backlink footer at the top |
 
 ## Environment Variables
 

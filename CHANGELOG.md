@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-## [0.12.0] - 2026-06-05
+## [0.12.0] - 2026-06-07
 
 ### Added
 - **Config-driven defaults for `report` and `summary`.** New
@@ -17,11 +17,36 @@
   `--include`, `--detail-limit`, `--with-git`, `--format` flags
   on the `summary` subcommand let you tune what feeds the LLM
   payload from the command line.
+- **`summary --open` / `-o`.** Once the summary markdown is
+  written (or returned from cache), launch it in the OS's default
+  app — typically a browser with a markdown extension or VS Code.
+  Native spawn, no extra dependency. Works across daily, range,
+  and cache-hit paths.
+- **`summary --open-index` / `-I` and the auto-managed
+  `~/.agenthud/summaries/index.md`.** Every successful summary
+  write regenerates a hub markdown file that lists every daily
+  and range summary, grouped year → month, newest first, with a
+  one-line first-paragraph snippet and `(Sun)`-style weekday tag
+  on each row. Each summary file gets a backlink footer at the
+  top (`← all summaries · ← prev · next →`) plus an H1 title
+  (`# 2026-05-15 (Friday)`), so any markdown viewer is enough to
+  navigate the whole corpus. `-oI` opens both the day's summary
+  and the index in one go.
+- **Left-arrow "jump to parent" in the project tree.** Pressing
+  `←` climbs out of the current row: sub-agent → parent session,
+  session → project sentinel, project / cold-projects sentinel →
+  the row above. Vim/tree-UI convention; the `←: parent` hint
+  shows in the status bar and the help overlay.
 - **Effective-options line on stderr** at the start of every
   `report` / `summary` run, e.g.
-  `agenthud: report → include=[user,response,bash,edit,thinking]
-  detail-limit=120 with-git=off format=markdown`. Tells you what
-  was actually used; no surprises about hidden hardcodes.
+  `summary → include=[user,response,bash,edit,thinking]
+  detail-limit=∞ with-git=on`. Followed by `prompt = ...` so the
+  template source is visible too. Tells you what was actually
+  used; no surprises about hidden hardcodes.
+- **Stderr ticker during the claude call** when stdout streaming
+  is suppressed (e.g. `--open`). Writes one self-updating line
+  like `sending to claude... 12s` so a 30–60-second LLM wait
+  doesn't look like a frozen terminal.
 
 ### Fixed
 - **`summary` daily payload no longer drops user prompts.** The
@@ -30,6 +55,23 @@
   the `report` default. The include set is now shared via
   `DEFAULT_INCLUDE_TYPES` and both surfaces resolve it the same
   way.
+- **Cold-only project tree was unusable at boot.** When every
+  project's latest session was older than today, nothing was
+  highlighted and j/k were silent no-ops. The cold group now
+  expands by default and the boot selection lands on the
+  cold-group sentinel so navigation works immediately.
+- **Cold sub-agent rows were rendered but unreachable.** A cold
+  session expanded via Enter wrote a `__expanded-session-<id>`
+  key that the renderer respected but the navigation flat-list
+  ignored — selection landed on a sub-agent that j/k/PgUp/PgDn
+  couldn't move from. The flatten functions now agree.
+
+### Changed
+- **`agenthud:` prefix removed from routine info/progress lines.**
+  Seven prefixed lines per summary run was visual noise; the
+  prefix now only leads error and warning lines so a redirected
+  log still reads as "this is from agenthud" when something
+  goes wrong.
 
 ### Upgrade notes
 - Existing config files are not migrated — the new `report:` and
@@ -37,6 +79,11 @@
   exist. Behavior is unchanged for upgrading users (built-in
   defaults). To pin your preferences, add the sections by hand
   using the example block in the README.
+- On the first `summary` after upgrading, the index and the
+  per-file backlinks + H1 titles are written across every
+  existing summary file in one pass. The originals are preserved
+  below the header block; only the auto-managed top region
+  changes.
 
 ## [0.11.4] - 2026-06-05
 

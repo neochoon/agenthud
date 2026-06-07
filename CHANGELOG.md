@@ -2,6 +2,41 @@
 
 ## [Unreleased]
 
+## [0.12.3] - 2026-06-08
+
+### Fixed
+- **`summary` no longer writes a stub file on empty days.** v0.12.2
+  added "skip claude on empty input" but compromised it by writing
+  a `## Context\n\nNo activity recorded …` stub into
+  `~/.agenthud/summaries/YYYY-MM-DD.md` every time — opposite of the
+  "don't waste anything on nothing" intent. Now matches the range
+  path: announce, return success, touch no disk.
+- **`summary --open-index` / `-I` now works on empty days.** The
+  flag is for navigating the past-summaries hub, so it shouldn't be
+  gated by whether *today* produced a new file. `runSummary` now
+  fires `regenerateIndex` and `openInDefaultApp(index.md)` whenever
+  `-I` is set, independent of the daily result.
+- **`summary --last Nd` on an all-empty range returns exit 0.** The
+  whole rest of the codebase treats "no activity" as a normal state
+  (`report`, daily summary). Range mode was returning 1 — fixed.
+  The empty-range branch also honors `-I` now.
+- **Clearer skip message in range mode.** Previously printed
+  `<label> — skipped by user` even when claude was never asked
+  (because the day was empty). Replaced with a neutral
+  `<label> — skipped` since the two cases are indistinguishable at
+  the result-shape level.
+
+### Added
+- **POSIX-style short-flag clusters.** `agenthud summary -oI` now
+  parses as `-o -I`; `-yo` as `-y -o`; etc. The expander only
+  triggers on `-` + two-or-more letters, so the documented `-Nd`
+  date short-form (`--date -1d`) is left intact.
+
+### Upgrade notes
+- Empty-day stub files left over from v0.12.2 are not auto-deleted
+  — `rm ~/.agenthud/summaries/<empty-date>.md` to clean them up.
+  Future empty days will not create new files.
+
 ## [0.12.2] - 2026-06-07
 
 ### Fixed

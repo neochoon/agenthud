@@ -2,7 +2,38 @@
 
 ## [Unreleased]
 
-## [0.12.1] - 2026-06-07
+## [0.12.2] - 2026-06-07
+
+### Fixed
+- **`--open` no longer fails silently on WSL.** Spawning the OS
+  opener with `stdio: "ignore"` + immediate `process.exit()` meant
+  the user never saw the spawn error when `xdg-open` was missing
+  (typical on a headless WSL) or exited non-zero. `openInDefaultApp`
+  now (1) sync-checks the command is on PATH, (2) prefers `wslview`
+  when WSL is detected and the binary is installed, (3) waits up to
+  200ms for the spawned child to fail fast and surfaces both `error`
+  events and non-zero exit codes on stderr.
+- **`summary` on a day with zero activity no longer spends LLM
+  tokens.** `report --date today` already returns "No activity
+  found"; `summary` was happily piping that empty payload to claude
+  for a useless answer (and `-o` opened an empty page). The daily
+  path now matches the range path's "no activity → skip" behavior:
+  writes a stub to the cache, prints a clear stderr line, returns
+  success without spawning claude.
+
+### Added
+- **`Smoke (Windows)` workflow.** Manual-trigger CI job that
+  exercises the real CLI on a Windows runner (`agenthud --version /
+  --help / --once / --cwd / report / summary` against a faked
+  session and a pre-seeded cache file). The unit-test matrix already
+  covered Windows, but it can't catch path-separator regressions in
+  stderr labels, `cmd /c start` quoting, or the filesystem side of
+  `regenerateIndex` — this one can. Trigger from the Actions tab.
+- **README "Platform notes"** paragraph clarifying that macOS and
+  Linux are the daily-driver targets, Windows is best on WSL2
+  (Anthropic's recommendation for Claude Code itself), and native
+  PowerShell may need an ExecutionPolicy adjustment for any
+  npm-installed CLI.
 
 ### Fixed
 - **Windows: `prompt = ...` stderr line used backslash separators.**

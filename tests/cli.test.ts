@@ -571,7 +571,7 @@ describe("formatEffectiveOptionsLine", () => {
       format: "markdown",
     });
     expect(line).toBe(
-      "agenthud: report → include=[user,response,bash,edit,thinking] detail-limit=120 with-git=off format=markdown",
+      "report → include=[user,response,bash,edit,thinking] detail-limit=120 with-git=off format=markdown",
     );
   });
 
@@ -583,7 +583,7 @@ describe("formatEffectiveOptionsLine", () => {
       model: "sonnet",
     });
     expect(line).toBe(
-      "agenthud: summary → include=[bash] detail-limit=∞ with-git=on model=sonnet",
+      "summary → include=[bash] detail-limit=∞ with-git=on model=sonnet",
     );
   });
 

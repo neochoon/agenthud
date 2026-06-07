@@ -211,7 +211,7 @@ export function formatEffectiveOptionsLine(
   parts.push(`with-git=${fields.withGit ? "on" : "off"}`);
   if (fields.format) parts.push(`format=${fields.format}`);
   if (fields.model) parts.push(`model=${fields.model}`);
-  return `agenthud: ${command} → ${parts.join(" ")}`;
+  return `${command} → ${parts.join(" ")}`;
 }
 
 function todayLocalMidnight(): Date {

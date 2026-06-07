@@ -117,7 +117,7 @@ if (options.mode === "summary") {
   );
   const isRangeMode = !!(options.summaryFrom && options.summaryTo);
   process.stderr.write(
-    `agenthud: prompt = ${formatPromptSource(
+    `prompt = ${formatPromptSource(
       isRangeMode ? "range" : "daily",
       options.summaryPrompt,
     )}\n`,
@@ -178,7 +178,7 @@ if (options.scopeToCwd) {
     process.exit(1);
   }
   scopeToProject = match;
-  process.stderr.write(`agenthud: scope = ${match}\n`);
+  process.stderr.write(`scope = ${match}\n`);
 }
 
 if (options.mode === "watch") {

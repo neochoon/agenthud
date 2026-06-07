@@ -1,0 +1,166 @@
+name: Smoke (Windows)
+
+# Manual-trigger end-to-end smoke for Windows. The standard CI matrix
+# already runs vitest on windows-latest, but unit tests can't catch
+# things like path separators in stderr labels, `cmd /c start` quoting,
+# or filesystem operations from regenerateIndex. This workflow exercises
+# the real CLI on a Windows runner.
+#
+# To run: GitHub → Actions → "Smoke (Windows)" → Run workflow.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Pack
+        shell: bash
+        run: npm pack
+
+      - name: Install globally
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install -g agenthud-*.tgz
+          which agenthud
+
+      # ─── 1. Basic invocation ────────────────────────────────────────
+
+      - name: agenthud --version
+        shell: bash
+        run: |
+          set -euo pipefail
+          v=$(agenthud --version)
+          echo "version: $v"
+          # Expect something like "0.12.1"
+          if ! [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Unexpected version format: $v" >&2
+            exit 1
+          fi
+
+      - name: agenthud --help
+        shell: bash
+        run: |
+          set -euo pipefail
+          out=$(agenthud --help)
+          echo "$out" | head -5
+          echo "$out" | grep -q "Usage: agenthud"
+          echo "$out" | grep -q "summary"
+          echo "$out" | grep -q "report"
+
+      # ─── 2. Watch mode (TUI rendering) ──────────────────────────────
+
+      - name: agenthud --once with empty projects dir
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/empty-projects"
+          CLAUDE_PROJECTS_DIR="$RUNNER_TEMP/empty-projects" \
+            agenthud --once 2>&1 | head -10
+          # Should not crash; expect the "No Claude sessions" panel.
+
+      # ─── 3. --cwd from a non-Claude-project directory ───────────────
+
+      - name: agenthud --cwd from random dir → exit 1
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/empty-projects" "$RUNNER_TEMP/random-cwd"
+          cd "$RUNNER_TEMP/random-cwd"
+          set +e
+          CLAUDE_PROJECTS_DIR="$RUNNER_TEMP/empty-projects" \
+            agenthud --once --cwd 2>err.log
+          code=$?
+          set -e
+          echo "exit code: $code"
+          cat err.log
+          test "$code" = "1"
+          grep -q "no Claude project found" err.log
+
+      # ─── 4. report — empty + with a real (faked) session ─────────────
+
+      - name: agenthud report --date today (empty)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/empty-projects"
+          CLAUDE_PROJECTS_DIR="$RUNNER_TEMP/empty-projects" \
+            agenthud report --date today 2>&1 | head -10
+
+      - name: agenthud report --date today (faked session)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Build a fake projects dir with one jsonl on today's date.
+          PROJECTS="$RUNNER_TEMP/fake-projects"
+          DIR="$PROJECTS/-C--Users-runneradmin-fake-project"
+          mkdir -p "$DIR"
+          ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          cat > "$DIR/abc123.jsonl" <<EOF
+          {"type":"user","message":{"content":[{"type":"text","text":"smoke test"}]},"timestamp":"$ts"}
+          {"type":"assistant","message":{"model":"claude-sonnet-4-20250514","content":[{"type":"text","text":"Hello from Windows."}]},"timestamp":"$ts"}
+          EOF
+          out=$(CLAUDE_PROJECTS_DIR="$PROJECTS" \
+                agenthud report --date today)
+          echo "$out"
+          # Header + at least the assistant response.
+          echo "$out" | grep -q "AgentHUD Report"
+          echo "$out" | grep -q "Hello from Windows"
+
+      # ─── 5. summary cache hit — exercises regenerateIndex on Windows ─
+
+      - name: agenthud summary --date X (cache hit, no LLM call)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Pre-seed a cached summary so claude is never spawned.
+          mkdir -p "$HOME/.agenthud/summaries"
+          DATE="2026-06-01"
+          cat > "$HOME/.agenthud/summaries/$DATE.md" <<'EOF'
+          ## Context
+
+          Pre-seeded summary for the Windows smoke test.
+          EOF
+          mkdir -p "$RUNNER_TEMP/empty-projects"
+          CLAUDE_PROJECTS_DIR="$RUNNER_TEMP/empty-projects" \
+            agenthud summary --date "$DATE" 2>err.log
+          # Stderr label should normalise to forward slashes (the
+          # v0.12.0 bug that prompted this workflow).
+          cat err.log
+          grep -q "prompt = ~/.agenthud/summary-prompt.md" err.log || {
+            echo "Expected POSIX-style prompt path in stderr" >&2
+            exit 1
+          }
+          # Index + backlink machinery should have written index.md.
+          test -f "$HOME/.agenthud/summaries/index.md"
+          head -10 "$HOME/.agenthud/summaries/index.md"
+          # Cached file should have a title + backlink header now.
+          head -10 "$HOME/.agenthud/summaries/$DATE.md"
+          grep -q "agenthud-backlinks-start" "$HOME/.agenthud/summaries/$DATE.md"
+          grep -q "^# $DATE" "$HOME/.agenthud/summaries/$DATE.md"
+
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          echo "Windows smoke job finished."
+          echo "Steps above cover: version/help, watch --once,"
+          echo "--cwd exit-1 path, report (empty + faked session),"
+          echo "summary cache-hit + index/backlink regeneration."

@@ -24,6 +24,8 @@ npx agenthud
 
 Run this in a separate terminal while using Claude Code. Press `?` inside the TUI any time for in-app help.
 
+> **Platform support.** Primary development is on macOS and Linux; the full test suite runs on all three platforms in CI (including Windows). Windows runtime behavior is exercised by a manual smoke job but isn't daily-driven — issues there are valued bug reports.
+
 Pass `--cwd` to scope the view to the Claude project that contains your current directory — useful when you have many projects but only care about the one you're in right now. Exits 1 with a stderr message if no such project is registered.
 
 ```bash

@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildBacklinkFooter,
+  buildHeaderBlock,
   buildIndexMarkdown,
+  buildTitleLine,
   extractContextSnippet,
   parseSummaryFilename,
-  prependBacklinkFooter,
-  stripExistingBacklinkFooter,
+  prependHeaderBlock,
+  stripExistingHeaderBlock,
   type SummaryEntry,
 } from "../../src/data/summariesIndex.js";
 
@@ -138,7 +139,7 @@ describe("buildIndexMarkdown", () => {
   });
 });
 
-describe("buildBacklinkFooter", () => {
+describe("buildTitleLine", () => {
   const mkDaily = (iso: string): SummaryEntry => {
     const [y, m, d] = iso.split("-").map(Number);
     return {
@@ -158,18 +159,57 @@ describe("buildBacklinkFooter", () => {
     };
   };
 
-  it("wraps the line in HTML-comment markers so we can re-prepend idempotently", () => {
-    const entries = [mkDaily("2026-06-07")];
-    const footer = buildBacklinkFooter("2026-06-07.md", entries);
-    expect(footer).toContain("<!-- agenthud-backlinks-start -->");
-    expect(footer).toContain("<!-- agenthud-backlinks-end -->");
+  it("renders a daily title with the long weekday for readability", () => {
+    // 2026-06-07 is a Sunday.
+    expect(buildTitleLine(mkDaily("2026-06-07"))).toBe(
+      "# 2026-06-07 (Sunday)",
+    );
   });
 
-  it("always includes a link back to the index", () => {
-    const footer = buildBacklinkFooter("2026-06-07.md", [
-      mkDaily("2026-06-07"),
-    ]);
-    expect(footer).toContain("[← all summaries](./index.md)");
+  it("renders a Friday daily as 'Friday'", () => {
+    expect(buildTitleLine(mkDaily("2026-05-15"))).toBe(
+      "# 2026-05-15 (Friday)",
+    );
+  });
+
+  it("renders a range title without the weekday (the span carries the meaning)", () => {
+    expect(buildTitleLine(mkRange("2026-05-11", "2026-05-17"))).toBe(
+      "# Range: 2026-05-11 → 2026-05-17",
+    );
+  });
+});
+
+describe("buildHeaderBlock", () => {
+  const mkDaily = (iso: string): SummaryEntry => {
+    const [y, m, d] = iso.split("-").map(Number);
+    return {
+      kind: "daily",
+      date: new Date(y, m - 1, d),
+      filename: `${iso}.md`,
+    };
+  };
+  const mkRange = (fromIso: string, toIso: string): SummaryEntry => {
+    const [fy, fm, fd] = fromIso.split("-").map(Number);
+    const [ty, tm, td] = toIso.split("-").map(Number);
+    return {
+      kind: "range",
+      from: new Date(fy, fm - 1, fd),
+      to: new Date(ty, tm - 1, td),
+      filename: `range-${fromIso}_${toIso}.md`,
+    };
+  };
+
+  it("wraps the block in HTML-comment markers so we can re-prepend idempotently", () => {
+    const entries = [mkDaily("2026-06-07")];
+    const block = buildHeaderBlock("2026-06-07.md", entries);
+    expect(block).toContain("<!-- agenthud-backlinks-start -->");
+    expect(block).toContain("<!-- agenthud-backlinks-end -->");
+  });
+
+  it("always includes a link back to the index and the H1 title", () => {
+    const block = buildHeaderBlock("2026-06-07.md", [mkDaily("2026-06-07")]);
+    expect(block).toContain("[← all summaries](./index.md)");
+    expect(block).toContain("# 2026-06-07 (Sunday)");
   });
 
   it("daily with both prev and next dailies emits all three links with weekday tags", () => {
@@ -178,40 +218,41 @@ describe("buildBacklinkFooter", () => {
       mkDaily("2026-06-07"), // Sun
       mkDaily("2026-06-06"), // Sat
     ];
-    const footer = buildBacklinkFooter("2026-06-07.md", entries);
-    expect(footer).toContain("[← 2026-06-06 (Sat)](./2026-06-06.md)");
-    expect(footer).toContain("[2026-06-08 (Mon) →](./2026-06-08.md)");
+    const block = buildHeaderBlock("2026-06-07.md", entries);
+    expect(block).toContain("[← 2026-06-06 (Sat)](./2026-06-06.md)");
+    expect(block).toContain("[2026-06-08 (Mon) →](./2026-06-08.md)");
   });
 
   it("daily with only prev does not synthesize a next", () => {
     const entries = [mkDaily("2026-06-07"), mkDaily("2026-06-06")];
-    const footer = buildBacklinkFooter("2026-06-07.md", entries);
-    expect(footer).toContain("[← 2026-06-06 (Sat)](./2026-06-06.md)");
-    expect(footer).not.toContain("→");
+    const block = buildHeaderBlock("2026-06-07.md", entries);
+    expect(block).toContain("[← 2026-06-06 (Sat)](./2026-06-06.md)");
+    expect(block).not.toContain("→");
   });
 
-  it("range entries get the index link only — no prev/next chain", () => {
+  it("range entries get the index link + range title — no prev/next chain", () => {
     const entries = [
       mkRange("2026-06-01", "2026-06-07"),
       mkDaily("2026-06-07"),
       mkDaily("2026-06-06"),
     ];
-    const footer = buildBacklinkFooter(
+    const block = buildHeaderBlock(
       "range-2026-06-01_2026-06-07.md",
       entries,
     );
-    expect(footer).toContain("[← all summaries](./index.md)");
-    expect(footer).not.toContain("→");
-    expect(footer).not.toContain("[← 2026");
+    expect(block).toContain("[← all summaries](./index.md)");
+    expect(block).toContain("# Range: 2026-06-01 → 2026-06-07");
+    expect(block).not.toContain("→](./");
+    expect(block).not.toContain("[← 2026");
   });
 });
 
-describe("stripExistingBacklinkFooter / prependBacklinkFooter", () => {
+describe("stripExistingHeaderBlock / prependHeaderBlock", () => {
   it("prepending onto fresh content yields footer + body", () => {
     const body = "# title\n\nbody\n";
     const footer =
       "<!-- agenthud-backlinks-start -->\n[← all summaries](./index.md)\n<!-- agenthud-backlinks-end -->\n\n";
-    const out = prependBacklinkFooter(body, footer);
+    const out = prependHeaderBlock(body, footer);
     expect(out).toBe(`${footer}${body}`);
   });
 
@@ -222,21 +263,21 @@ describe("stripExistingBacklinkFooter / prependBacklinkFooter", () => {
     const withOld = `${oldFooter}${body}`;
     const newFooter =
       "<!-- agenthud-backlinks-start -->\nnew\n<!-- agenthud-backlinks-end -->\n\n";
-    const out = prependBacklinkFooter(withOld, newFooter);
+    const out = prependHeaderBlock(withOld, newFooter);
     expect(out).toBe(`${newFooter}${body}`);
     expect(out).not.toContain("old");
   });
 
   it("strip-only on content with no footer is a no-op", () => {
     const body = "# title\n\nbody\n";
-    expect(stripExistingBacklinkFooter(body)).toBe(body);
+    expect(stripExistingHeaderBlock(body)).toBe(body);
   });
 
   it("strip-only on content with only the start marker is a no-op (defensive)", () => {
     const body =
       "<!-- agenthud-backlinks-start -->\norphan\n# title\n";
     // No closing marker → leave alone, don't risk eating real content.
-    expect(stripExistingBacklinkFooter(body)).toBe(body);
+    expect(stripExistingHeaderBlock(body)).toBe(body);
   });
 });
 

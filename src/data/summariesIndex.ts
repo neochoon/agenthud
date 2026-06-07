@@ -153,6 +153,15 @@ const MONTHS = [
 ];
 
 const WEEKDAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const WEEKDAYS_LONG = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
 
 function formatDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -220,9 +229,39 @@ export function buildIndexMarkdown(
   return `${lines.join("\n")}\n`;
 }
 
-// ─── buildBacklinkFooter ─────────────────────────────────────────────────────
+// ─── buildTitleLine ──────────────────────────────────────────────────────────
 
-export function buildBacklinkFooter(
+/**
+ * H1 title for the summary file — added inside the header block so a
+ * reader landing on the file directly knows what date / span it covers
+ * without consulting the filename or breadcrumbs above.
+ *
+ * - Daily: `# 2026-05-15 (Friday)` — long weekday for at-a-glance
+ *   reading; the index rows use the short form to keep them tight.
+ * - Range: `# Range: 2026-05-11 → 2026-05-17` — the span itself is
+ *   the meaning; weekdays would just be noise.
+ */
+export function buildTitleLine(entry: SummaryEntry): string {
+  if (entry.kind === "range") {
+    return `# Range: ${formatDateKey(entry.from)} → ${formatDateKey(entry.to)}`;
+  }
+  const iso = formatDateKey(entry.date);
+  const weekday = WEEKDAYS_LONG[entry.date.getDay()];
+  return `# ${iso} (${weekday})`;
+}
+
+// ─── buildHeaderBlock ────────────────────────────────────────────────────────
+
+/**
+ * The auto-managed block at the top of every summary file: backlinks
+ * (index + prev/next chain) plus the H1 title. Bracketed by HTML-comment
+ * markers so successive regenerations strip-and-replace it cleanly,
+ * leaving the body untouched.
+ *
+ * Marker constants kept under their original `agenthud-backlinks-*`
+ * names — renaming would orphan files written before this change.
+ */
+export function buildHeaderBlock(
   currentFilename: string,
   entries: SummaryEntry[],
 ): string {
@@ -251,13 +290,14 @@ export function buildBacklinkFooter(
     }
   }
 
-  const line = parts.join(" · ");
-  return `${BACKLINK_START_MARKER}\n${line}\n${BACKLINK_END_MARKER}\n\n`;
+  const backlinkLine = parts.join(" · ");
+  const title = me ? buildTitleLine(me) : "";
+  return `${BACKLINK_START_MARKER}\n${backlinkLine}\n\n${title}\n${BACKLINK_END_MARKER}\n\n`;
 }
 
-// ─── strip / prepend backlink footer ─────────────────────────────────────────
+// ─── strip / prepend header block ────────────────────────────────────────────
 
-export function stripExistingBacklinkFooter(content: string): string {
+export function stripExistingHeaderBlock(content: string): string {
   if (!content.startsWith(BACKLINK_START_MARKER)) return content;
   const endIdx = content.indexOf(BACKLINK_END_MARKER);
   if (endIdx === -1) return content; // defensive: orphan start marker, leave alone
@@ -270,8 +310,8 @@ export function stripExistingBacklinkFooter(content: string): string {
   return content.slice(cut);
 }
 
-export function prependBacklinkFooter(content: string, footer: string): string {
-  return footer + stripExistingBacklinkFooter(content);
+export function prependHeaderBlock(content: string, block: string): string {
+  return block + stripExistingHeaderBlock(content);
 }
 
 // ─── extractContextSnippet ───────────────────────────────────────────────────
@@ -286,7 +326,7 @@ export function extractContextSnippet(
   content: string,
   maxChars = 200,
 ): string | null {
-  const body = stripExistingBacklinkFooter(content);
+  const body = stripExistingHeaderBlock(content);
   for (const raw of body.split("\n")) {
     const line = raw.trim();
     if (!line) continue;
@@ -320,8 +360,8 @@ export function regenerateIndex(summariesDir: string): void {
       const content = readFileSync(path, "utf-8");
       const snippet = extractContextSnippet(content);
       if (snippet) snippets.set(entry.filename, snippet);
-      const footer = buildBacklinkFooter(entry.filename, entries);
-      const updated = prependBacklinkFooter(content, footer);
+      const block = buildHeaderBlock(entry.filename, entries);
+      const updated = prependHeaderBlock(content, block);
       if (updated !== content) {
         writeFileSync(path, updated, "utf-8");
       }

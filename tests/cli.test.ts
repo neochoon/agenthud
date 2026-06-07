@@ -465,6 +465,32 @@ describe("parseArgs", () => {
       });
     });
 
+    describe("--open-index / -I flag", () => {
+      it("parses --open-index", () => {
+        const opts = parseArgs(["summary", "--open-index"]);
+        expect(opts.summaryError).toBeUndefined();
+        expect(opts.summaryOpenIndex).toBe(true);
+      });
+
+      it("parses -I", () => {
+        const opts = parseArgs(["summary", "-I"]);
+        expect(opts.summaryError).toBeUndefined();
+        expect(opts.summaryOpenIndex).toBe(true);
+      });
+
+      it("defaults to undefined when neither flag is given", () => {
+        const opts = parseArgs(["summary"]);
+        expect(opts.summaryOpenIndex).toBeUndefined();
+      });
+
+      it("can be combined with -o (both flags become true)", () => {
+        const opts = parseArgs(["summary", "-o", "-I"]);
+        expect(opts.summaryError).toBeUndefined();
+        expect(opts.summaryOpen).toBe(true);
+        expect(opts.summaryOpenIndex).toBe(true);
+      });
+    });
+
     describe("report-shaped options on summary", () => {
       it("parses --include and threads it through", () => {
         const opts = parseArgs(["summary", "--include", "response,user"]);

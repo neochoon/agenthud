@@ -135,6 +135,7 @@ if (options.mode === "summary") {
       detailLimit: options.summaryDetailLimit!,
       withGit: options.summaryWithGit!,
       open: options.summaryOpen,
+      openIndex: options.summaryOpenIndex,
     });
     process.exit(exitCode);
   }
@@ -148,6 +149,7 @@ if (options.mode === "summary") {
     detailLimit: options.summaryDetailLimit!,
     withGit: options.summaryWithGit!,
     open: options.summaryOpen,
+    openIndex: options.summaryOpenIndex,
   });
   process.exit(exitCode);
 }

@@ -39,6 +39,8 @@ export interface CliOptions {
   summaryWithGit?: boolean;
   /** Launch the resulting summary in the OS default app after writing. */
   summaryOpen?: boolean;
+  /** Launch ~/.agenthud/summaries/index.md in the OS default app. */
+  summaryOpenIndex?: boolean;
   summaryError?: string;
   scopeToCwd?: boolean;
 }
@@ -76,6 +78,8 @@ const KNOWN_SUMMARY_FLAGS = new Set([
   "--with-git",
   "-o",
   "--open",
+  "-I",
+  "--open-index",
 ]);
 const KNOWN_SUBCOMMANDS = new Set(["watch", "report", "summary"]);
 
@@ -136,6 +140,9 @@ Commands:
     -o, --open                  Launch the resulting summary in your OS
                                 default app once it's written (or read
                                 back from cache).
+    -I, --open-index            Launch ~/.agenthud/summaries/index.md
+                                in your OS default app. Combinable with
+                                -o (e.g. -oI opens both).
 
   Defaults for report and summary live under \`report:\` and \`summary:\`
   in ~/.agenthud/config.yaml. Flags override config values per-run; the
@@ -477,6 +484,10 @@ export function parseArgs(
     if (rest.includes("-y") || rest.includes("--yes")) summaryAssumeYes = true;
     const summaryOpen =
       rest.includes("--open") || rest.includes("-o") || undefined;
+    const summaryOpenIndex =
+      rest.includes("--open-index") ||
+      rest.includes("-I") ||
+      undefined;
 
     // Resolve report-shaped options for summary:
     //   CLI flag → config.summary.X → config.report.X → built-in default.
@@ -562,6 +573,7 @@ export function parseArgs(
       summaryDetailLimit,
       summaryWithGit,
       summaryOpen,
+      summaryOpenIndex,
       summaryError,
     };
   }

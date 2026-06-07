@@ -13,6 +13,7 @@ import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { loadGlobalConfig } from "../config/globalConfig.js";
 import { openInDefaultApp } from "../utils/openInDefaultApp.js";
+import { regenerateIndex } from "./summariesIndex.js";
 import { startStderrTicker } from "../utils/stderrTicker.js";
 import { generateReport } from "./reportGenerator.js";
 import { discoverSessions } from "./sessions.js";
@@ -32,6 +33,8 @@ export interface SummaryOptions {
   withGit: boolean;
   /** Launch the resulting summary in the OS default app after writing. */
   open?: boolean;
+  /** Launch ~/.agenthud/summaries/index.md in the OS default app. */
+  openIndex?: boolean;
 }
 
 export interface RangeSummaryOptions {
@@ -49,6 +52,8 @@ export interface RangeSummaryOptions {
   withGit: boolean;
   /** Launch the resulting range summary in the OS default app after writing. */
   open?: boolean;
+  /** Launch ~/.agenthud/summaries/index.md in the OS default app. */
+  openIndex?: boolean;
 }
 
 type PromptKind = "daily" | "range";
@@ -576,8 +581,18 @@ export async function runSummary(options: SummaryOptions): Promise<number> {
     detailLimit: options.detailLimit,
     withGit: options.withGit,
   });
+  if (res.code === 0 && !res.skipped) {
+    try {
+      regenerateIndex(summariesDir());
+    } catch {
+      /* best-effort — index regen never blocks the summary path */
+    }
+  }
   if (options.open && res.code === 0 && !res.skipped) {
     openInDefaultApp(dailyCachePath(options.date));
+  }
+  if (options.openIndex && res.code === 0 && !res.skipped) {
+    openInDefaultApp(join(summariesDir(), "index.md"));
   }
   return res.code;
 }
@@ -610,7 +625,15 @@ export async function runRangeSummary(
         process.stdout.write(content);
         if (!content.endsWith("\n")) process.stdout.write("\n");
       }
+      try {
+        regenerateIndex(summariesDir());
+      } catch {
+        /* best-effort */
+      }
       if (options.open) openInDefaultApp(rangeCache);
+      if (options.openIndex) {
+        openInDefaultApp(join(summariesDir(), "index.md"));
+      }
       return 0;
     } catch {
       // fall through to regenerate
@@ -731,6 +754,14 @@ export async function runRangeSummary(
     process.stderr.write(`${formatUsage(metaResult.usage)}\n`);
   }
 
+  try {
+    regenerateIndex(summariesDir());
+  } catch {
+    /* best-effort */
+  }
   if (options.open) openInDefaultApp(rangeCache);
+  if (options.openIndex) {
+    openInDefaultApp(join(summariesDir(), "index.md"));
+  }
   return 0;
 }

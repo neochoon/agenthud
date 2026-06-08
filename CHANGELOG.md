@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Changed
+- **Range summary input format: XML-tag delimited.** Each daily summary
+  is now wrapped in `<day date="YYYY-MM-DD">…</day>` instead of a
+  `# YYYY-MM-DD` heading + `---` separator. Two reasons: (1) the date
+  travels as a structured attribute so the LLM can't conflate it with
+  date headings *inside* a summary; (2) the `---` separator collided
+  with markdown horizontal rules and yaml frontmatter that a daily
+  summary might legitimately contain. The bundled
+  `src/templates/summary-range-prompt.md` was updated to match. **If
+  you have a customized `~/.agenthud/summary-range-prompt.md`,
+  agenthud will keep using yours unchanged** — sync your edits against
+  the new template if you want the XML-aware instructions, or delete
+  the file and agenthud will regenerate it on next run.
+
 ## [0.12.4] - 2026-06-08
 
 ### Fixed

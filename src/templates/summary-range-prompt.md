@@ -1,5 +1,18 @@
-The following are daily engineering summaries from a date range, separated by `---` lines.
-Each daily summary uses the structure: Context / Key Accomplishments / Technical Insights / Major Code Changes / Open Questions.
+The input contains daily engineering summaries from a date range.
+
+Each day is wrapped in an XML tag with its date as an attribute:
+
+<day date="YYYY-MM-DD">
+(that day's summary — markdown using sections like
+Context / Key Accomplishments / Technical Insights /
+Major Code Changes / Open Questions)
+</day>
+
+Multiple `<day>` blocks follow in chronological order. Use the
+`date` attribute as the authoritative date for that block — do not
+infer dates from headings or text inside the block. Any `# YYYY-MM-DD`
+heading or `---` line you see inside a `<day>` block is part of the
+day's content, not a structural divider.
 
 Write a range-level synthesis in English.
 Aim for roughly 400-700 words total — the value of a range summary is cross-day pattern extraction, not re-summarization.
@@ -14,6 +27,8 @@ The point of a range summary is to surface what only becomes visible by looking 
 - recurring debugging patterns or repeated tradeoffs
 - outcomes that matter at the range level, not at any single day
 - work that started in one day and continued, completed, or was abandoned later
+
+When you reference a specific day, use its `date` attribute value verbatim (`2026-06-07`), not a relative term like "Monday" or "yesterday".
 
 Use the following format:
 
@@ -32,4 +47,4 @@ Themes that surfaced on more than one day: repeated debugging classes, recurring
 ## Carried-Over / Unfinished Work
 Work still in progress at the end of the range, or open questions that persisted across multiple days.
 
-Daily summaries:
+Daily summaries follow:

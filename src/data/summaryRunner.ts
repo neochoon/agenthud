@@ -229,6 +229,12 @@ interface SpawnClaudeOpts {
   streamToStdout: boolean;
   /** Forwarded to `claude --model` if set. */
   model?: string;
+  /**
+   * Fires once, when the first chunk of LLM output arrives. The caller
+   * uses this to stop any "waiting on claude" stderr ticker so it
+   * doesn't fight the streaming output for the same row.
+   */
+  onFirstChunk?: () => void;
 }
 
 interface SpawnClaudeResult {
@@ -286,7 +292,12 @@ function spawnClaude(opts: SpawnClaudeOpts): Promise<SpawnClaudeResult> {
       }
     });
 
+    let firstChunkFired = false;
     const writeText = (text: string) => {
+      if (!firstChunkFired) {
+        firstChunkFired = true;
+        opts.onFirstChunk?.();
+      }
       assembledText += text;
       if (opts.streamToStdout) process.stdout.write(text);
       cacheStream?.write(text);
@@ -552,17 +563,12 @@ async function generateDailySummary(
     }
   }
 
-  // When streamToStdout is on, the streaming markdown itself is the
-  // progress indicator. When it's off (--open suppression) we'd be
-  // staring at a frozen-looking terminal — start a stderr ticker so
-  // the user knows the LLM call is still running.
-  const showTicker = opts.announce && !opts.streamToStdout;
-  if (opts.announce && !showTicker) {
-    process.stderr.write(
-      `sending to claude (this may take a minute)...\n\n`,
-    );
-  }
-  const stopTicker = showTicker
+  // Live "still waiting on claude" ticker on stderr — gives the user
+  // a visible heartbeat through the (typically 30–60s) latency before
+  // claude starts streaming. The ticker auto-stops on the first chunk
+  // (see onFirstChunk below) so it doesn't fight the streaming output
+  // for the same terminal row.
+  const stopTicker = opts.announce
     ? startStderrTicker("sending to claude")
     : null;
 
@@ -573,7 +579,11 @@ async function generateDailySummary(
     cachePath: cached,
     streamToStdout: opts.streamToStdout,
     model: opts.model,
+    onFirstChunk: () => {
+      if (stopTicker) stopTicker();
+    },
   });
+  // Defensive in case the spawn never produced a chunk (error path).
   if (stopTicker) stopTicker();
 
   if (opts.announce && result.code === 0) {
@@ -780,17 +790,9 @@ export async function runRangeSummary(
     `\ncombining ${dailyMarkdowns.length} daily summaries into range summary...\n`,
   );
   const metaStreams = !options.open;
-  if (!metaStreams) {
-    // -o suppresses the streamed output — show a ticker instead so the
-    // user has visible feedback during the minute-long LLM call.
-  } else {
-    process.stderr.write(
-      `sending to claude (this may take a minute)...\n\n`,
-    );
-  }
-  const stopMetaTicker = metaStreams
-    ? null
-    : startStderrTicker("sending to claude");
+  // Same approach as the daily call: ticker always-on, auto-stops on
+  // first chunk so it doesn't fight streamed output for the same row.
+  const stopMetaTicker = startStderrTicker("sending to claude");
 
   const metaPrompt = resolvePrompt("range");
   const metaResult = await spawnClaude({
@@ -799,8 +801,9 @@ export async function runRangeSummary(
     cachePath: rangeCache,
     streamToStdout: metaStreams,
     model: options.model,
+    onFirstChunk: () => stopMetaTicker(),
   });
-  if (stopMetaTicker) stopMetaTicker();
+  stopMetaTicker();
 
   if (metaResult.code !== 0) {
     return metaResult.code;

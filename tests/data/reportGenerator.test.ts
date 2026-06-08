@@ -551,4 +551,95 @@ describe("generateReport", () => {
     generateReport([makeSession()], { date: DAY, include: ["response"] });
     expect(vi.mocked(parseGitCommits)).not.toHaveBeenCalled();
   });
+
+  it("includes Task detailBody as an XML-tagged block in markdown format", () => {
+    vi.mocked(statSync).mockReturnValue({
+      mtimeMs: new Date("2026-05-14T10:00:00Z").getTime(),
+    } as ReturnType<typeof statSync>);
+    vi.mocked(parseSessionHistory).mockReturnValue([
+      makeActivity({
+        type: "tool",
+        icon: "⚙",
+        label: "Task",
+        detail: "find auth code",
+        detailBody: "Found auth in src/auth.ts:42.\nUses passport strategy.",
+        detailKind: "code",
+      }),
+    ]);
+    const result = generateReport([makeSession()], {
+      date: DAY,
+      include: ["bash", "edit", "thinking", "response", "user", "task"],
+    });
+    expect(result).toContain("⚙ Task: find auth code");
+    expect(result).toContain("<task-result>");
+    expect(result).toContain("Found auth in src/auth.ts:42.");
+    expect(result).toContain("Uses passport strategy.");
+    expect(result).toContain("</task-result>");
+  });
+
+  it("does not include detailBody for non-Task activities in markdown format", () => {
+    vi.mocked(statSync).mockReturnValue({
+      mtimeMs: new Date("2026-05-14T10:00:00Z").getTime(),
+    } as ReturnType<typeof statSync>);
+    vi.mocked(parseSessionHistory).mockReturnValue([
+      makeActivity({
+        type: "tool",
+        icon: "✎",
+        label: "Edit",
+        detail: "auth.ts L10-12 (+2/-1)",
+        detailBody: "@@ -10,3 +10,2 @@\n ctx\n-old\n+new",
+        detailKind: "diff",
+      }),
+    ]);
+    const result = generateReport([makeSession()], {
+      date: DAY,
+      include: ["edit"],
+    });
+    expect(result).toContain("✎ Edit: auth.ts L10-12 (+2/-1)");
+    expect(result).not.toContain("<task-result>");
+    expect(result).not.toContain("@@ -10,3");
+  });
+
+  it("Task without detailBody renders as a normal one-line activity", () => {
+    vi.mocked(statSync).mockReturnValue({
+      mtimeMs: new Date("2026-05-14T10:00:00Z").getTime(),
+    } as ReturnType<typeof statSync>);
+    vi.mocked(parseSessionHistory).mockReturnValue([
+      makeActivity({
+        type: "tool",
+        icon: "⚙",
+        label: "Task",
+        detail: "explore",
+      }),
+    ]);
+    const result = generateReport([makeSession()], {
+      date: DAY,
+      include: ["bash", "edit", "thinking", "response", "user", "task"],
+    });
+    expect(result).toContain("⚙ Task: explore");
+    expect(result).not.toContain("<task-result>");
+  });
+
+  it("Task detailBody is truncated by detailLimit (preserving newlines)", () => {
+    vi.mocked(statSync).mockReturnValue({
+      mtimeMs: new Date("2026-05-14T10:00:00Z").getTime(),
+    } as ReturnType<typeof statSync>);
+    vi.mocked(parseSessionHistory).mockReturnValue([
+      makeActivity({
+        type: "tool",
+        icon: "⚙",
+        label: "Task",
+        detail: "do thing",
+        detailBody: "line one\nline two\nline three",
+        detailKind: "code",
+      }),
+    ]);
+    const result = generateReport([makeSession()], {
+      date: DAY,
+      include: ["bash", "edit", "thinking", "response", "user", "task"],
+      detailLimit: 12,
+    });
+    expect(result).toContain("line one\nlin");
+    expect(result).not.toContain("line three");
+  });
 });

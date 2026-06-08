@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Added
+- **`task` activity type, default-on.** Task tool delegations to
+  subagents are now visible in `report` and `summary` output. The
+  subagent's returned text is surfaced as a `<task-result>…</task-result>`
+  XML block below the row, so the LLM summary pipeline can see what the
+  subagent actually did instead of only the parent's task description.
+  Previously Task activities were filtered out of every report — work
+  delegated to subagents was invisible to the daily summary. Use
+  `--include` (e.g. `--include user,response,bash,edit`) to opt out
+  per-invocation, or omit `task` from `report.include` in
+  `~/.agenthud/config.yaml` to opt out by default. The XML tag form
+  matches the range meta-input change below — content can't forge
+  the delimiter.
+
 ### Changed
 - **Range summary input format: XML-tag delimited.** Each daily summary
   is now wrapped in `<day date="YYYY-MM-DD">…</day>` instead of a

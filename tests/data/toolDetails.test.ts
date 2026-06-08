@@ -275,7 +275,7 @@ describe("buildToolDetailBody", () => {
     ).toEqual({ text: "10: only", kind: "code", numbered: true });
   });
 
-  it("Read without file content, and Task/Bash tools, have no body", () => {
+  it("Read without file content, and TaskUpdate/Bash tools, have no body", () => {
     expect(
       buildToolDetailBody(
         "Read",
@@ -289,5 +289,28 @@ describe("buildToolDetailBody", () => {
     expect(
       buildToolDetailBody("Bash", { command: "ls" }, undefined),
     ).toBeNull();
+  });
+
+  it("Task: returns the subagent result content as kind 'code'", () => {
+    expect(
+      buildToolDetailBody(
+        "Task",
+        { description: "find auth code" },
+        { content: "Found auth in src/auth.ts:42 — uses passport.\n" },
+      ),
+    ).toEqual({
+      text: "Found auth in src/auth.ts:42 — uses passport.\n",
+      kind: "code",
+    });
+  });
+
+  it("Task: null when result is missing", () => {
+    expect(
+      buildToolDetailBody("Task", { description: "x" }, undefined),
+    ).toBeNull();
+  });
+
+  it("Task: null when result has no content", () => {
+    expect(buildToolDetailBody("Task", { description: "x" }, {})).toBeNull();
   });
 });

@@ -15,6 +15,7 @@ export const DEFAULT_INCLUDE_TYPES = [
   "bash",
   "edit",
   "thinking",
+  "task",
 ];
 
 const ALLOWED_INCLUDE_TYPES = new Set([
@@ -26,6 +27,7 @@ const ALLOWED_INCLUDE_TYPES = new Set([
   "read",
   "glob",
   "commit",
+  "task",
 ]);
 
 export const DEFAULT_GLOBAL_CONFIG: GlobalConfig = {

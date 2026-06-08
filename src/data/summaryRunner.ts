@@ -159,6 +159,38 @@ function resolvePrompt(kind: PromptKind, override?: string): string {
 }
 
 /**
+ * Build the LLM input for a range summary by wrapping each daily
+ * summary in a `<day date="YYYY-MM-DD">…</day>` tag and joining with
+ * blank lines.
+ *
+ * The tag form (over the previous `# YYYY-MM-DD` heading + `---`
+ * separator) buys two things:
+ *
+ *   1. The date is an XML attribute, not free text the model has to
+ *      tokenize out of a header line — eliminates conflation with
+ *      date headings *inside* a daily summary (e.g. a section that
+ *      quotes a past date).
+ *   2. No separator collision. The old `---` delimiter clashed with
+ *      markdown horizontal rules and yaml frontmatter that a daily
+ *      summary might legitimately contain; tag boundaries can't be
+ *      faked by content.
+ *
+ * Anthropic's prompting guidance recommends XML-style tags for
+ * delimited inputs, which this format matches.
+ */
+export function buildRangeMetaInput(
+  dailyMarkdowns: { date: Date; markdown: string }[],
+): string {
+  if (dailyMarkdowns.length === 0) return "";
+  return dailyMarkdowns
+    .map(
+      ({ date, markdown }) =>
+        `<day date="${dateKey(date)}">\n\n${markdown}\n\n</day>`,
+    )
+    .join("\n\n");
+}
+
+/**
  * Range cache is only valid when today is NOT in the range. Today's activity
  * grows throughout the day, so any cached range that includes today is stale
  * the moment the day continues.
@@ -771,10 +803,7 @@ export async function runRangeSummary(
     return 0;
   }
 
-  // Build meta input: each daily summary prefixed with its date, separated by ---.
-  const metaInput = dailyMarkdowns
-    .map(({ date, markdown }) => `# ${dateKey(date)}\n\n${markdown}`)
-    .join("\n\n---\n\n");
+  const metaInput = buildRangeMetaInput(dailyMarkdowns);
 
   process.stderr.write(
     `\ncombining ${dailyMarkdowns.length} daily summaries into range summary...\n`,

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-06-08
+
 ### Added
 - **`task` activity type, default-on.** Task tool delegations to
   subagents are now visible in `report` and `summary` output. The

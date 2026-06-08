@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { isWSL } from "./platform.js";
 
 export interface OpenCommand {
   command: string;
@@ -37,21 +38,6 @@ export function buildOpenCommand(
       return { command: "cmd", args: ["/c", "start", "", path] };
     default:
       return null;
-  }
-}
-
-/**
- * True when this Node process is running inside WSL. Detected by the
- * `WSL_DISTRO_NAME` env var (set by Microsoft's launcher) or by the
- * `microsoft`/`wsl` markers in `/proc/version`.
- */
-export function isWSL(): boolean {
-  if (process.env.WSL_DISTRO_NAME) return true;
-  try {
-    const ver = readFileSync("/proc/version", "utf-8");
-    return /microsoft|wsl/i.test(ver);
-  } catch {
-    return false;
   }
 }
 

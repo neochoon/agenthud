@@ -335,6 +335,7 @@ describe("report/summary config", () => {
       "bash",
       "edit",
       "thinking",
+      "task",
     ]);
     expect(cfg.report.detailLimit).toBe(120);
     expect(cfg.report.withGit).toBe(false);
@@ -370,6 +371,7 @@ describe("report/summary config", () => {
       "bash",
       "edit",
       "thinking",
+      "task",
     ]);
     expect(cfg.report.detailLimit).toBe(120);
     expect(cfg.report.format).toBe("markdown");
@@ -413,6 +415,7 @@ describe("report/summary config", () => {
       "bash",
       "edit",
       "thinking",
+      "task",
     ]);
     expect(cfg.report.detailLimit).toBe(120);
     expect(cfg.report.withGit).toBe(false);

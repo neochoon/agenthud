@@ -152,6 +152,13 @@ export function buildToolDetailBody(
     const content = result?.content ?? input?.content;
     if (content) return { text: content, kind: "code" };
   }
+  // Task surfaces the subagent's returned text — without this, the LLM
+  // summary pipeline sees only the task description and is blind to
+  // whatever the subagent actually did or concluded.
+  if (name === "Task") {
+    const content = result?.content;
+    if (content) return { text: content, kind: "code" };
+  }
   if (name === "Read") {
     const content = result?.file?.content;
     if (content) {

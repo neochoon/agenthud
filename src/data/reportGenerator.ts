@@ -33,6 +33,7 @@ function activityMatchesInclude(
     return true;
   if (include.includes("glob") && (label === "glob" || label === "grep"))
     return true;
+  if (include.includes("task") && label === "task") return true;
   return false;
 }
 
@@ -53,6 +54,27 @@ function formatActivity(activity: ActivityEntry, limit: number): string {
   const detail = truncateDetail(activity.detail, limit);
   const suffix = detail ? `: ${detail}` : "";
   return `[${time}] ${activity.icon} ${activity.label}${suffix}`;
+}
+
+/**
+ * For Task activities, expose the subagent's returned text on its own
+ * lines as an XML-tagged block. XML tags (over fenced code blocks or
+ * `---` separators) survive the kind of content subagent results
+ * typically contain — code fences, horizontal rules, yaml frontmatter
+ * — without ambiguity.
+ *
+ * Returns null for any other tool. The markdown report deliberately
+ * keeps `detailBody` out of the LLM payload elsewhere: a full Edit
+ * diff or Read body would balloon the input without adding
+ * proportional signal. Task is the exception because its row summary
+ * is otherwise just the task description — the actual result is the
+ * only signal.
+ */
+function formatTaskBody(activity: ActivityEntry, limit: number): string | null {
+  if (activity.label !== "Task") return null;
+  if (!activity.detailBody) return null;
+  const body = truncateRaw(activity.detailBody, limit);
+  return `<task-result>\n${body}\n</task-result>`;
 }
 
 function formatDateString(date: Date): string {
@@ -191,6 +213,8 @@ export function generateReport(
     lines.push("");
     for (const activity of activities) {
       lines.push(formatActivity(activity, detailLimit));
+      const taskBody = formatTaskBody(activity, detailLimit);
+      if (taskBody) lines.push(taskBody);
     }
     lines.push("");
   }

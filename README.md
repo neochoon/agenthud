@@ -191,12 +191,12 @@ Output:
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--date` | today | `YYYY-MM-DD`, `today`, `yesterday`, or `-Nd` (N days ago, local date) |
-| `--include` | `user,response,bash,edit,thinking` | Comma-separated types or `all` |
+| `--include` | `user,response,bash,edit,thinking,task` | Comma-separated types or `all` |
 | `--format` | `markdown` | `markdown` or `json` |
 | `--detail-limit` | `120` | Max chars per detail field; `0` = unlimited |
 | `--with-git` | off | Merge git commits from each session's project into the timeline |
 
-`--include` types: `response`, `bash`, `edit`, `thinking`, `read`, `glob`, `user`
+`--include` types: `response`, `bash`, `edit`, `thinking`, `read`, `glob`, `user`, `task` (Task tool delegations to subagents — surfaces the subagent's returned text so the LLM summary can see what the subagent actually did)
 
 ## Summary
 
@@ -262,7 +262,7 @@ refreshInterval: 2s
 
 # Activity filter presets (cycle with 'f' key in viewer)
 # Each list is one preset. Use "all" (or "*") to show everything.
-# Types: response, user, bash, edit, thinking, read, glob, commit
+# Types: response, user, bash, edit, thinking, read, glob, commit, task
 filterPresets:
   - ["all"]
   - ["response", "user"]
@@ -270,7 +270,7 @@ filterPresets:
 
 # Defaults for `agenthud report` (CLI flags still win per-invocation).
 report:
-  include: [user, response, bash, edit, thinking]
+  include: [user, response, bash, edit, thinking, task]
   detailLimit: 120
   withGit: false
   format: markdown

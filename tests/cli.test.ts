@@ -138,6 +138,7 @@ describe("parseArgs", () => {
         "bash",
         "edit",
         "thinking",
+        "task",
       ]);
     });
 

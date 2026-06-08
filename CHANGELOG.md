@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [0.12.4] - 2026-06-08
+
+### Fixed
+- **Don't propose deleting the Windows-side global config when
+  running from WSL.** From inside WSL, `homedir()` returns the
+  Linux home (`/home/<X>`), but the user's effective cwd is often
+  `/mnt/c/Users/<Y>` — the Windows-side home. The legacy-config
+  migration prompt's "this is a project-level config" check only
+  bailed when `cwd === home` literally, so on WSL it incorrectly
+  offered to delete the Windows-native `.agenthud/config.yaml` —
+  potential data loss. The check now also recognises
+  `/mnt/<drive>/Users/<name>` as a user home **only when running
+  inside WSL**, where `homedir()` is known to lie. Native
+  Linux/macOS/Windows behavior is unchanged.
+- **Internal: `isWSL()` moved to `src/utils/platform.ts`** so both
+  `openInDefaultApp` and `legacyConfig` share one detector (env
+  var + `/proc/version` markers, cached for the process).
+
 ## [0.12.3] - 2026-06-08
 
 ### Fixed

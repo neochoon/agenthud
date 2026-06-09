@@ -1,8 +1,17 @@
-The following is an activity log from a single day of Claude Code sessions.
-Each entry: `[HH:MM] <icon> <label>: <detail>`. Icons indicate activity type (◆ = git commit).
+The following is an activity log from a single day of Claude Code sessions,
+possibly spanning multiple projects.
 
-Write a concise but high-signal engineering summary in English.
-Aim for roughly 300-500 words total — favor synthesis over completeness.
+Each entry: `[HH:MM] <icon> <label>: <detail>`. Icons:
+  ○ Read           ~ Edit/Write       $ Bash
+  * Glob/Grep      @ WebFetch         » Sub-agent task
+  < Response       > User message     … Thinking
+  ◆ Git commit
+
+Write a concise, high-signal engineering retro in first-person voice
+("I implemented X", "I discovered Y") — treat the developer as the author.
+
+Target ~300-500 words total; individual sections may be 50-100 words.
+Favor synthesis over completeness.
 
 Focus on:
 - meaningful accomplishments
@@ -10,28 +19,38 @@ Focus on:
 - architectural decisions
 - implementation progress
 - important tradeoffs or realizations
-- unfinished work and next steps
+- unfinished work and explicit next steps
 
-Do NOT mechanically summarize every edit, response, or commit.
-Do NOT list every modified file.
-Omit any section that has no substantive content — do not emit placeholders like "None" or "N/A".
-Prefer high-level synthesis grouped by theme or workstream.
+Do NOT:
+- mechanically summarize every edit, response, or commit
+- list every modified file (cite paths only for important changes)
+- invent follow-ups not present in the log (no "consider refactoring X")
+- include placeholders like "None" or "N/A" — omit empty sections entirely
 
-Use the following format:
+If activity spans multiple projects, group findings by project where clarity
+improves. If they share a theme, synthesize.
+
+If the day was light (few entries, no meaningful work), output a single short
+paragraph instead of the full template. Do not pad.
+
+Format (omit any section without substance):
 
 ## Context
-What was the primary goal or investigation today?
+The primary goal(s) of the day. If multi-project, briefly note each.
 
 ## Key Accomplishments
 Meaningful progress, completed implementations, resolved issues.
 
 ## Technical Insights
-Important debugging findings, architectural decisions, tradeoffs, or discoveries.
+Important debugging findings, architectural decisions, tradeoffs, discoveries.
 
 ## Major Code Changes
-Significant codebase or subsystem changes, grouped by theme. Reference relevant commits inline where useful (e.g. `abc1234`). Do not enumerate every commit.
+Significant codebase changes grouped by theme. Reference commits inline
+(e.g., `abc1234`).
 
 ## Open Questions / Next Steps
-Only include items explicitly stated in the log or strongly implied by an unfinished workflow. Do not invent generic follow-ups ("consider refactoring X").
+Only items explicitly stated in the log or directly tied to unfinished workflows.
+
+After reading the log below, write the summary.
 
 Activity log:

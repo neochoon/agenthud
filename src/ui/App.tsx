@@ -692,20 +692,29 @@ export function App({
   // Keep the viewer cursor anchored to its activity when new entries
   // arrive in LIVE mode. Without this, the visible window auto-scrolls
   // to show new content but cursorLine stays at the same screen row —
-  // the highlighted activity silently slides forward. Math is in
-  // viewerCursor.ts; this effect just feeds it the current snapshot.
+  // the highlighted activity silently slides forward. When the cursor
+  // would scroll off the top, the helper switches to PAUSED so the
+  // view freezes on the same snapshot and the cursor's activity stays
+  // put. Math is in viewerCursor.ts; this effect just feeds it the
+  // current snapshot and applies the resulting state changes.
   useEffect(() => {
     const prev = prevMergedCountRef.current;
     prevMergedCountRef.current = mergedActivities.length;
-    setViewerCursorLine((current) =>
-      adjustViewerCursorOnNewActivities({
+    setViewerCursorLine((current) => {
+      const result = adjustViewerCursorOnNewActivities({
         prevCursorLine: current,
         prevActivityCount: prev,
         newActivityCount: mergedActivities.length,
         isLive,
         viewerRows,
-      }),
-    );
+      });
+      if (result.autoPause) {
+        setIsLive(false);
+        setScrollOffset((o) => o + result.scrollDelta);
+        setNewCount((n) => n + result.scrollDelta);
+      }
+      return result.cursorLine;
+    });
   }, [mergedActivities.length, isLive, viewerRows]);
 
   // Spinner and flashlight tick on the same cadence (150ms) so the entire

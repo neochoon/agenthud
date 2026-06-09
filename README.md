@@ -10,9 +10,11 @@ An observability layer for [Claude Code](https://github.com/anthropics/claude-co
 
 AgentHUD reads Claude Code's session files from `~/.claude/projects/` and gives you three things:
 
-- **Live monitor** ([`agenthud`](#live-monitor)) — a split-view TUI showing every project, session, sub-agent, and activity as it happens.
-- **Structured export** ([`agenthud report`](#report)) — print activity for any date as Markdown or JSON for piping to scripts, dashboards, or other LLMs.
-- **LLM digest** ([`agenthud summary`](#summary)) — synthesize a day or a date range into an engineering summary via the `claude` CLI, with caching so weekly digests are cheap to regenerate.
+- **Live monitor** (`agenthud`) — a split-view TUI showing every project, session, sub-agent, and activity as it happens
+- **Structured export** (`agenthud report`) — Markdown or JSON for piping to scripts, dashboards, or other LLMs
+- **LLM digest** (`agenthud summary`) — a day or a date range synthesized into an engineering summary via the `claude` CLI
+
+→ **See [FEATURES.md](./FEATURES.md) for the full surface** — every flag, keybinding, config key, file path, and env var.
 
 ## Install
 
@@ -26,17 +28,28 @@ Run this in a separate terminal while using Claude Code. Press `?` inside the TU
 
 > **Platform support.** Primary development is on macOS and Linux; the full test suite runs on all three platforms in CI (including Windows). Windows runtime behavior is exercised by a manual smoke job but isn't daily-driven — issues there are valued bug reports.
 
-Pass `--cwd` to scope the view to the Claude project that contains your current directory — useful when you have many projects but only care about the one you're in right now. Exits 1 with a stderr message if no such project is registered.
+## Quickstart
 
 ```bash
-agenthud           # all Claude projects on the machine
-agenthud --cwd     # only the project containing the current dir
-agenthud --once    # print one frame and exit (no alt-screen)
+# Live monitor
+agenthud                                  # all Claude projects
+agenthud --cwd                            # scope to the project containing $PWD
+agenthud --once                           # snapshot mode, no alt-screen
+
+# Activity report
+agenthud report --date today              # today's activity as markdown
+agenthud report --format json             # script-readable
+agenthud report --with-git                # merge git commits into the timeline
+
+# LLM summary
+agenthud summary --date today             # daily summary via `claude -p`
+agenthud summary --last 7d                # cross-day synthesis of last 7 days
+agenthud summary -oI                      # open the summary + the summaries index
 ```
 
-## Live monitor
+## What you see
 
-AgentHUD's TUI splits the screen into a project tree and an activity viewer:
+The TUI splits into a project tree (top) and an activity viewer (bottom):
 
 ```
 ┌─ Projects ─────────────────────────────────────────────────┐
@@ -57,257 +70,24 @@ AgentHUD's TUI splits the screen into a project tree and an activity viewer:
 └────────────────────────────────────────────────────────────┘
 ```
 
-**Project tree (top pane)**
-- Sessions grouped under their project (project name + path at the top).
-- Session rows show short ID + first user prompt (the session's "topic"). Long titles truncate with a `…` suffix.
-- Right edge of each row shows how long ago it was last touched: `42m`, `17h`, `3d`, `2w`, `1mo`, `1y`. Project rows use the most recent session's mtime.
-- Non-interactive sessions (from `claude -p`, SDK, `agenthud summary`) appear in parens and dimmed.
-- Sub-agents nest one level deeper under their parent session.
-- Cold projects collapse under `... N cold projects` at the bottom (press Enter on the line to expand).
-- Press `h` to hide a project, session, or sub-agent (saved to `~/.agenthud/state.yaml`).
+Sessions get colored badges — `[hot]` / `[warm]` / `[cool]` / `[cold]` — based on how recently their JSONL file was touched. Cold projects collapse under a `... N cold projects` sentinel. Press `↵` on any activity to open a scrollable detail view.
 
-**Activity viewer (bottom pane)**
-- Real-time feed for the selected session: file reads, edits, bash, responses, thinking, git commits. Newest at the bottom, like `tail -f`.
-- The **newest visible row is rendered "alive"** while in LIVE mode: its icon is replaced with a spinning glyph and the text turns bold. When a new activity arrives, the spinner moves to the new bottom row. Hidden when paused or empty.
-- Press `f` to cycle through filter presets (configurable).
-- Press `↵` on any row to open a scrollable detail view; on a commit row this shows `git show --stat --patch`.
-
-### Session status
-
-Each session row carries a colored badge derived from when its JSONL file was last touched:
-
-| Badge | Color | Meaning |
-|-------|-------|---------|
-| `[hot]` | green | Updated in the last 30 minutes — actively running |
-| `[warm]` | yellow | Updated in the last hour |
-| `[cool]` | cyan | Updated earlier today |
-| `[cold]` | gray | Last updated yesterday or earlier — collapsed under `... N cold projects` at the bottom |
-
-Sub-agents use the same scheme. Projects inherit the hottest status of their sessions; a project is treated as "cold" only when all its sessions are cold.
-
-### Activity types
-
-| Icon | Type | Description |
-|------|------|-------------|
-| `○` | Read | File being read |
-| `~` | Edit / Write | File being modified |
-| `$` | Bash | Shell command |
-| `*` | Glob / Grep | File search |
-| `@` | WebFetch / WebSearch | Web request |
-| `»` | Task | Sub-agent task |
-| `<` | Response | Claude's text response |
-| `>` | User | Your message |
-| `…` | Thinking | Claude's thinking (requires `showThinkingSummaries: true`) |
-| `◆` | Commit | Git commit in the project (when `--with-git` or in viewer) |
-
-### Keyboard shortcuts
-
-Full reference is also available inside the app — press `?`.
-
-#### Project tree focus
-
-| Key | Action |
-|-----|--------|
-| `↑` / `k` | Move up |
-| `↓` / `j` | Move down |
-| `←` | Jump to parent (sub-agent → session, session → project) |
-| `↵` | Expand/collapse project, session, or sub-agent summary |
-| `h` | Hide selected (project / session / sub-agent) |
-| `Tab` | Switch focus to activity viewer |
-| `PgUp` / `Ctrl+B` | Page up |
-| `PgDn` / `Ctrl+F` | Page down |
-| `t` | Track — auto-follow the newest live sub-agent (any nav key turns it off) |
-| `r` | Refresh now |
-| `?` | Help |
-| `q` | Quit |
-
-When tracking is on, the tree panel's title shows `[LIVE ⠧]` and the status bar replaces `t: track` with `TRK ●`. Any explicit selection-changing key (`↑/k`, `↓/j`, `PgUp/PgDn`, `↵`, `h`, or `t` again) turns tracking off.
-
-#### Activity viewer focus
-
-| Key | Action |
-|-----|--------|
-| `↑` / `k` | Scroll one line up |
-| `↓` / `j` | Scroll one line down |
-| `PgUp` / `Ctrl+B` | Page up |
-| `PgDn` / `Ctrl+F` | Page down |
-| `Ctrl+U` / `Ctrl+D` | Half page up / down |
-| `g` | Jump to top (oldest) |
-| `G` | Jump to live (newest, bottom) |
-| `↵` | Open detail view |
-| `f` | Cycle filter preset |
-| `r` | Refresh now |
-| `Tab` | Switch focus to project tree |
-| `?` | Help |
-| `q` | Quit |
-
-#### Detail view
-
-| Key | Action |
-|-----|--------|
-| `↑` / `k` / `↓` / `j` | Scroll one line |
-| `Ctrl+U` / `Ctrl+D` | Half page up / down |
-| `↵` / `Esc` / `q` | Close |
-
-Detail view colors the content based on activity type:
-
-- **Git commit detail** (`git show --stat --patch`): added lines green (`+`), removed lines red (`-`), hunk headers cyan (`@@ ... @@`), `commit/Author/Date/diff` metadata dimmed.
-- **Response / thinking / prompt**: text inside triple-backtick code fences renders in cyan so the boundary between prose and code is obvious. No language-specific syntax highlighting — just code-vs-prose separation.
-
-### Behavior
-
-- **Alternate screen buffer.** Watch mode uses the alt-screen (like `vim`, `htop`, `btop`), so quitting (`q`) restores the pre-launch shell completely. No TUI residue, no "is it still running?" confusion.
-- **Minimum terminal size.** 80 cols × 20 rows. Smaller terminals show a one-line hint and redraw automatically when you resize.
-- **Help overlay scrolls.** Press `?` for an in-app reference. The overlay scrolls (`j/k`, `PgUp/PgDn`, `Ctrl+B/F`, `Space`, `g/G`) so the full content is reachable on shorter terminals.
-
-## Report
-
-Print activity for a date in Markdown or JSON — suitable for piping to scripts or LLMs:
-
-```bash
-agenthud report                                      # today (Markdown)
-agenthud report --date 2026-05-14                    # specific date
-agenthud report --date today --include all           # all activity types
-agenthud report --format json                        # JSON output
-agenthud report --detail-limit 0                     # no truncation (full text)
-agenthud report --with-git                           # merge git commits into timeline
-```
-
-Output:
-
-```
-# AgentHUD Report: 2026-05-14
-
-## myproject (10:23 – 14:45)
-
-[10:23] $ npm test
-[10:35] ~ src/ui/App.tsx
-[11:15] < Added spinner hook to make the UI feel alive.
-[14:30] ◆ abc1234 feat: fix auth callback
-```
-
-**Options:**
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--date` | today | `YYYY-MM-DD`, `today`, `yesterday`, or `-Nd` (N days ago, local date) |
-| `--include` | `user,response,bash,edit,thinking,task` | Comma-separated types or `all` |
-| `--format` | `markdown` | `markdown` or `json` |
-| `--detail-limit` | `120` | Max chars per detail field; `0` = unlimited |
-| `--with-git` | off | Merge git commits from each session's project into the timeline |
-
-`--include` types: `response`, `bash`, `edit`, `thinking`, `read`, `glob`, `user`, `task` (Task tool delegations to subagents — surfaces the subagent's returned text so the LLM summary can see what the subagent actually did)
-
-## Summary
-
-Generate an LLM-based summary of one day or a date range using the `claude` CLI:
-
-```bash
-# Single day
-agenthud summary                            # today (always regenerated)
-agenthud summary --date yesterday           # natural-language date
-agenthud summary --date 2026-05-14          # past date (cached on second run)
-agenthud summary --date 2026-05-14 --force  # ignore cache
-agenthud summary --prompt "Only commits"    # override prompt
-
-# Date range — daily summaries are re-summarized into a meta-summary
-agenthud summary --last 7d                          # last 7 days, ending today
-agenthud summary --from 2026-05-10 --to 2026-05-16  # explicit range
-agenthud summary --last 7d -y                       # skip per-day confirmations
-
-# Tune what gets sent to the LLM — same option shape as `report`
-agenthud summary --include all                      # include every activity type
-agenthud summary --detail-limit 200                 # truncate long tool outputs
-agenthud summary --with-git                         # include git commits (default in config)
-# Defaults are CLI flag → `summary:` config → `report:` config → built-in.
-
-# Cheaper model — summarization doesn't need Opus-tier reasoning
-agenthud summary --date today --model sonnet        # ~40% cheaper than Opus
-agenthud summary --last 7d --model haiku            # ~80% cheaper, 200K context
-
-# Open the resulting summary in your OS default app (browser, VS Code, etc.)
-agenthud summary --last 7d --open                   # -o is the short form
-
-# Open the index (~/.agenthud/summaries/index.md) instead — a hub
-# listing every daily and range summary, grouped by year/month.
-agenthud summary --open-index                       # -I is the short form
-agenthud summary -oI                                # open today + the index
-```
-
-The index is auto-regenerated whenever a summary writes, and each summary file gets a one-line backlink footer at the top (`← all summaries · ← prev · next →`) so any markdown viewer is enough to navigate the whole corpus without leaving the file.
-
-**Daily summaries** are saved to `~/.agenthud/summaries/YYYY-MM-DD.md`. Past dates are cached and returned instantly; today is always regenerated (activity still growing).
-
-**Range summaries** generate any missing daily summaries first, then feed those into a second `claude` call that produces a cross-day synthesis (themes, multi-day workstreams, recurring patterns). Output is cached to `~/.agenthud/summaries/range-FROM_TO.md`. Cached dailies cost nothing to reuse, so weekly summaries are cheap after the first run.
-
-Each missing daily prompts for confirmation just before generation, so you see concrete context (session/activity/commit counts and report size) before deciding. Pass `-y` / `--yes` to skip all prompts. Press Enter to accept the default (`[Y/n]`).
-
-**Prompt customization:** The daily template lives at `~/.agenthud/summary-prompt.md` and the range template at `~/.agenthud/summary-range-prompt.md`. Both are auto-created from built-in templates on first run. Edit them freely.
-
-**`--date` formats:** `YYYY-MM-DD`, `today`, `yesterday`, or `-Nd` (N days ago).
-
-**Model selection:** Summarization is a low-reasoning task (structured input → structured markdown) — Sonnet or Haiku usually beats Opus on cost-per-summary with no quality loss. Pass `--model sonnet`, `--model haiku`, or a full model id (`--model claude-sonnet-4-6`). With no flag, `claude` uses its default model.
-
-**Cost warning:** If the day's activity log is large (~300K tokens or more), AgentHUD prints a warning before sending and asks for one more confirmation in interactive mode. `-y` skips the prompt but still prints the warning.
-
-**Requires:** [`@anthropic-ai/claude-code`](https://www.npmjs.com/package/@anthropic-ai/claude-code) installed and authenticated.
+Full keybinding and badge reference: [FEATURES.md](./FEATURES.md#keybindings).
 
 ## Configuration
 
-`~/.agenthud/config.yaml` is auto-created on first run with sensible defaults. Edit it freely:
+`~/.agenthud/config.yaml` is auto-created on first run with sensible defaults. CLI flags override config values per-invocation. Resolution order is `CLI flag → summary.<key> → report.<key> → built-in default`, and the effective values print to stderr at the start of every `report` / `summary` run.
 
-```yaml
-# How often to poll for activity updates (Linux fallback when fs.watch isn't used)
-refreshInterval: 2s
+App-managed UI state (hidden projects/sessions/sub-agents toggled by `h`) lives separately in `~/.agenthud/state.yaml`.
 
-# Activity filter presets (cycle with 'f' key in viewer)
-# Each list is one preset. Use "all" (or "*") to show everything.
-# Types: response, user, bash, edit, thinking, read, glob, commit, task
-filterPresets:
-  - ["all"]
-  - ["response", "user"]
-  - ["commit"]
+Full schema, file paths, and env vars: [FEATURES.md → Config](./FEATURES.md#config).
 
-# Defaults for `agenthud report` (CLI flags still win per-invocation).
-report:
-  include: [user, response, bash, edit, thinking, task]
-  detailLimit: 120
-  withGit: false
-  format: markdown
+## More
 
-# Defaults for `agenthud summary`. Any field omitted here is inherited
-# from `report` above. `model` is summary-specific.
-summary:
-  withGit: true
-  detailLimit: 0
-  # model: sonnet
-```
-
-`report` / `summary` resolve each option as **CLI flag → `summary:` key → `report:` key → built-in default**. The effective set is printed to stderr at the start of each run (e.g. `agenthud: report → include=[user,response,bash,edit,thinking] detail-limit=120 with-git=off format=markdown`), so the actual values are always visible.
-
-App-managed state (hidden items) lives separately in `~/.agenthud/state.yaml` so your config file stays clean. You shouldn't need to edit it manually — use `h` in the TUI to hide things.
-
-## Files
-
-| Path | Purpose |
-|------|---------|
-| `~/.agenthud/config.yaml` | User settings (edit freely) |
-| `~/.agenthud/state.yaml` | Hidden projects/sessions/sub-agents (app-managed) |
-| `~/.agenthud/summary-prompt.md` | LLM prompt template for daily `summary` |
-| `~/.agenthud/summary-range-prompt.md` | LLM prompt template for range `summary --last/--from/--to` |
-| `~/.agenthud/summaries/YYYY-MM-DD.md` | Cached daily summaries |
-| `~/.agenthud/summaries/range-FROM_TO.md` | Cached range summaries |
-| `~/.agenthud/summaries/index.md` | Auto-regenerated hub linking every summary; each summary also gets a backlink footer at the top |
-
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `CLAUDE_PROJECTS_DIR` | `~/.claude/projects` | Path to Claude Code projects directory. Useful for backups or mounted volumes. |
-
-## Feedback
-
-Issues and PRs welcome at [GitHub](https://github.com/neochoon/agenthud).
+- **Reference:** [FEATURES.md](./FEATURES.md) — every flag, keybinding, config key, file path, env var
+- **Release history:** [CHANGELOG.md](./CHANGELOG.md)
+- **Deferred items:** [BACKLOG.md](./BACKLOG.md)
+- **Issues / PRs:** [GitHub](https://github.com/neochoon/agenthud)
 
 ## License
 

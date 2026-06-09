@@ -1,3 +1,17 @@
+/**
+ * Shared TypeScript types and constants: session tree
+ * (`SessionNode`, `ProjectNode`, `SessionTree`), activity entries
+ * (`ActivityEntry`), config (`GlobalConfig`, `ReportConfig`,
+ * `SummaryConfig`), and the `ICONS` table.
+ *
+ * Design decision:
+ * - `ICONS` lives here, not under `src/ui/`, so the data layer
+ *   (`activityParser`, `reportGenerator`) can use it without
+ *   importing UI. Icons are an attribute of the activity, not of
+ *   the renderer. Keeps the dep graph clean (data → types →
+ *   nothing).
+ */
+
 // Session status
 export type SessionStatus = "hot" | "warm" | "cool" | "cold";
 

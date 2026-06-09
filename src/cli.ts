@@ -1,3 +1,30 @@
+/**
+ * Parse `process.argv` into a typed `CliOptions` for each subcommand
+ * (`watch` / `once` / `report` / `summary` / `help` / `version`).
+ * Also owns help text (`getHelp()`), version string (`getVersion()`),
+ * and the effective-options summarizer (`formatEffectiveOptionsLine`).
+ *
+ * Design decisions:
+ * - POSIX short-flag clusters (`-oI` → `-o -I`, `-yo` → `-y -o`)
+ *   are expanded once at the top via `expandCombinedShortFlags`
+ *   so each per-subcommand parser sees individual flags only. The
+ *   expander triggers only on `-` + two-or-more letters so the
+ *   `-Nd` date short-form (`--date -1d`) stays intact.
+ * - Options resolution is shared across surfaces: CLI flag wins,
+ *   then `summary.<key>`, then `report.<key>`, then built-in
+ *   default. `formatEffectiveOptionsLine` formats the resolved
+ *   set for the stderr breadcrumb.
+ * - Unknown subcommands / flags / include types are *errors* at
+ *   parse time, not silently dropped. The validation gates live
+ *   in `KNOWN_*_FLAGS` sets and `ALL_TYPES`.
+ *
+ * Gotcha:
+ * - `--include` validation must reject typos: a real v0.9.x bug
+ *   was `--include response,bas` being silently accepted (no
+ *   match, no error). Unknown values now error with the full list
+ *   of valid types.
+ */
+
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";

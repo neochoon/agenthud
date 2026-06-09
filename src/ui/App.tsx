@@ -464,6 +464,17 @@ export function App({
   // changes per render but never needs to trigger one.
   const prevMergedCountRef = useRef(0);
 
+  // Live mirror of `isLive` so the polling refresh callback below can
+  // read the current value rather than the stale one captured at the
+  // time `refresh` was last memoized by useCallback. Without this,
+  // the very first refresh fire after an auto-PAUSE transition keeps
+  // running the LIVE branch (skipping the scrollOffset/newCount bump)
+  // because the closure still has isLive=true.
+  const isLiveRef = useRef(isLive);
+  useEffect(() => {
+    isLiveRef.current = isLive;
+  }, [isLive]);
+
   // Load activities whenever selected session changes.
   // Only resets cursor/scroll when the loaded FILE changes (selection moved or
   // hottest-session-of-project changed), not on every sessionTree refresh.
@@ -597,11 +608,15 @@ export function App({
     const newActivities = parseSessionHistory(node.filePath);
     const delta = newActivities.length - activitiesLengthRef.current;
     setActivities(newActivities);
-    if (!isLive && delta > 0) {
+    // Read isLive through the ref to avoid the stale-closure race that
+    // skips the PAUSED-mode delta bump on the first poll right after
+    // an auto-PAUSE transition (when the useCallback closure still has
+    // isLive=true even though state has flipped to false).
+    if (!isLiveRef.current && delta > 0) {
       setScrollOffset((o) => o + delta);
       setNewCount((n) => n + delta);
     }
-  }, [selectedId, isLive, expandedIds, tracking, discoverOptions]);
+  }, [selectedId, expandedIds, tracking, discoverOptions]);
 
   // Keep a stable ref so the watcher callback always calls the latest refresh
   const refreshRef = useRef(refresh);

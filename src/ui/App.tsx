@@ -697,25 +697,30 @@ export function App({
   // view freezes on the same snapshot and the cursor's activity stays
   // put. Math is in viewerCursor.ts; this effect just feeds it the
   // current snapshot and applies the resulting state changes.
+  //
+  // State updates intentionally live at the top of the effect body
+  // (not inside `setViewerCursorLine`'s functional updater) — mixing
+  // side-effect setStates inside an updater can fire twice in Strict
+  // Mode and double-count the auto-pause scroll/badge delta.
   useEffect(() => {
     const prev = prevMergedCountRef.current;
     prevMergedCountRef.current = mergedActivities.length;
-    setViewerCursorLine((current) => {
-      const result = adjustViewerCursorOnNewActivities({
-        prevCursorLine: current,
-        prevActivityCount: prev,
-        newActivityCount: mergedActivities.length,
-        isLive,
-        viewerRows,
-      });
-      if (result.autoPause) {
-        setIsLive(false);
-        setScrollOffset((o) => o + result.scrollDelta);
-        setNewCount((n) => n + result.scrollDelta);
-      }
-      return result.cursorLine;
+    const result = adjustViewerCursorOnNewActivities({
+      prevCursorLine: viewerCursorLine,
+      prevActivityCount: prev,
+      newActivityCount: mergedActivities.length,
+      isLive,
+      viewerRows,
     });
-  }, [mergedActivities.length, isLive, viewerRows]);
+    if (result.cursorLine !== viewerCursorLine) {
+      setViewerCursorLine(result.cursorLine);
+    }
+    if (result.autoPause) {
+      setIsLive(false);
+      setScrollOffset((o) => o + result.scrollDelta);
+      setNewCount((n) => n + result.scrollDelta);
+    }
+  }, [mergedActivities.length, isLive, viewerRows, viewerCursorLine]);
 
   // Spinner and flashlight tick on the same cadence (150ms) so the entire
   // App re-renders ~6.7 times per second instead of 10 — measurably less

@@ -69,6 +69,7 @@ import { useHotkeys } from "./hooks/useHotkeys.js";
 import { useSpinner } from "./hooks/useSpinner.js";
 import { useTick } from "./hooks/useTick.js";
 import { SessionTreePanel } from "./SessionTreePanel.js";
+import { adjustViewerCursorOnNewActivities } from "./viewerCursor.js";
 
 const VIEWER_HEIGHT_FRACTION = 0.55;
 
@@ -458,6 +459,11 @@ export function App({
     activitiesRef.current = activities;
   }, [activities]);
 
+  // Snapshot of the previous merged-activity count, used by the
+  // cursor-anchor effect below. Refs (not state) because the value
+  // changes per render but never needs to trigger one.
+  const prevMergedCountRef = useRef(0);
+
   // Load activities whenever selected session changes.
   // Only resets cursor/scroll when the loaded FILE changes (selection moved or
   // hottest-session-of-project changed), not on every sessionTree refresh.
@@ -682,6 +688,25 @@ export function App({
   const treeRows = Math.max(1, Math.min(naturalTreeRows, maxTreeRows));
   // statusBar(1) + margin(1) + tree(treeRows+2) + margin(1) + viewer(viewerRows+2) = height
   const viewerRows = Math.max(5, height - 7 - treeRows);
+
+  // Keep the viewer cursor anchored to its activity when new entries
+  // arrive in LIVE mode. Without this, the visible window auto-scrolls
+  // to show new content but cursorLine stays at the same screen row —
+  // the highlighted activity silently slides forward. Math is in
+  // viewerCursor.ts; this effect just feeds it the current snapshot.
+  useEffect(() => {
+    const prev = prevMergedCountRef.current;
+    prevMergedCountRef.current = mergedActivities.length;
+    setViewerCursorLine((current) =>
+      adjustViewerCursorOnNewActivities({
+        prevCursorLine: current,
+        prevActivityCount: prev,
+        newActivityCount: mergedActivities.length,
+        isLive,
+        viewerRows,
+      }),
+    );
+  }, [mergedActivities.length, isLive, viewerRows]);
 
   // Spinner and flashlight tick on the same cadence (150ms) so the entire
   // App re-renders ~6.7 times per second instead of 10 — measurably less

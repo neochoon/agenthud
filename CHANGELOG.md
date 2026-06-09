@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [0.13.2] - 2026-06-09
+
+### Changed
+- **Package description and keywords optimized for npm search
+  ranking.** Description rewritten to compress every realistic
+  search query — "Claude Code", "TUI", "dashboard", "live
+  monitor", "parallel sessions", "sub-agents", "LLM", "digest" —
+  into one natural sentence without keyword-stuffing reading.
+  Keywords expanded from 7 to 26 across the Claude/Anthropic /
+  agent / TUI / observability / session-monitor / LLM-summary
+  clusters, with phrase keywords like `claude-code-tui` and
+  `claude-code-cli` for multi-word query matches. Pure metadata
+  change, no code or behavior shift; surfaces in npm's search
+  index on next crawl.
+
 ## [0.13.1] - 2026-06-09
 
 ### Added

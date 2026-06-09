@@ -1,6 +1,6 @@
 {
   "name": "agenthud",
-  "version": "0.13.1",
+  "version": "0.13.2",
   "description": "Claude Code TUI dashboard: live monitor for parallel sessions and sub-agents, with LLM-generated daily/weekly digest",
   "type": "module",
   "main": "dist/index.js",

@@ -1,3 +1,14 @@
+/**
+ * Filesystem wrapper: read a session JSONL file from disk and
+ * return the complete activity history in chronological order.
+ *
+ * Design decision:
+ * - Pure I/O. All parsing logic stays in `activityParser.ts`. This
+ *   split lets the parser be unit-tested with synthetic lines
+ *   without touching the filesystem, while callers that already
+ *   have a path can stay one-liner.
+ */
+
 import { existsSync, readFileSync } from "node:fs";
 import type { ActivityEntry } from "../types/index.js";
 import { parseActivitiesFromLines } from "./activityParser.js";

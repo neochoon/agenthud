@@ -1,3 +1,37 @@
+/**
+ * Walk `~/.claude/projects/` to discover every session and sub-agent,
+ * build the typed `SessionTree` (active projects + cold-only projects
+ * × their sessions × their sub-agents). Also exposes
+ * `findContainingProject` for the `--cwd` scoping feature and
+ * `decodeProjectPath` for reversing Claude's directory-name encoding.
+ *
+ * Design decisions:
+ * - Project paths are encoded in directory names with hyphens
+ *   replacing `/` (e.g., `/Users/neo/myproject` →
+ *   `-Users-neochoon-WestbrookAI-agenthud`). `decodeProjectPath`
+ *   reverses this. Windows drives use a different encoding
+ *   (`C--Users-neo` → `C:\Users\neo`) and are detected by a
+ *   leading-letter pattern.
+ * - Sub-agents live under `<projectDir>/<sessionId>/subagents/*.jsonl`.
+ *   `buildSubAgents` is intentionally per-session so the parent
+ *   carries its own sub-agent list as a tree branch — never a
+ *   flat global list.
+ * - `findContainingProject` does longest-prefix match for cwd →
+ *   project resolution (used by `--cwd`). A `realpath` injection
+ *   point exists for callers that want symlink-aware resolution.
+ *
+ * Gotchas:
+ * - `findContainingProject` matches by string by default. Callers
+ *   on systems with symlinks should pass `{ realpath: realpathSync }`
+ *   or pre-resolve before calling.
+ * - `CLAUDE_PROJECTS_DIR` env var overrides the default
+ *   `~/.claude/projects` location — useful for backups or mounted
+ *   volumes. Read once at module load via `getProjectsDir()`.
+ * - Imports `ONE_HOUR_MS` / `THIRTY_MINUTES_MS` from
+ *   `ui/constants.ts` — same layer-violation note as
+ *   `sessionLiveness.ts`.
+ */
+
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";

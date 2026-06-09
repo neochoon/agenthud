@@ -1,3 +1,31 @@
+/**
+ * Parse Claude Code session JSONL lines into typed `ActivityEntry[]`:
+ * user prompts, assistant responses, thinking blocks, tool calls
+ * (with their results), and token usage.
+ *
+ * Design decisions:
+ * - Two-pass parser. The first pass walks every line to build a
+ *   `tool_use_id → tool_result` map; the second pass walks again
+ *   to build the activity timeline. A tool_result lands in a
+ *   *later* JSONL entry than its tool_use, so the lookahead has
+ *   to happen up front — otherwise we'd attach the result to the
+ *   next tool call, not the current one.
+ * - Adjacent identical activities (same `label + detail`) are
+ *   collapsed into a single entry with a `count` field rather
+ *   than rendered as separate rows. Keeps `"Edit foo.ts ×3"`
+ *   instead of three Edit lines for a rapid back-to-back retry.
+ * - `TodoWrite` is silently dropped — surfaced only via task
+ *   status changes (`TaskUpdate`), not as a row of its own.
+ *
+ * Gotchas:
+ * - `entry.toolUseResult` lives on the *user* entry that contains
+ *   the tool_result content block; the entry's `message.content`
+ *   array is what we match `tool_use_id` against.
+ * - Model name parsing keys off hard-coded patterns
+ *   (`claude-opus-X-Y`, `claude-sonnet-X`, `claude-X-Y-haiku`).
+ *   New model families need new patterns added here.
+ */
+
 import type { ActivityEntry } from "../types/index.js";
 import { ICONS } from "../types/index.js";
 import type { ToolInput, ToolUseResult } from "./toolDetails.js";

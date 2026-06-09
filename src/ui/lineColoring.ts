@@ -1,3 +1,23 @@
+/**
+ * Tag each line of a unified-diff– or markdown-fenced–shaped block
+ * with a `LineCategory` so the renderer (`DetailViewPanel`) can
+ * color them: `diff-add` green, `diff-remove` red, `diff-hunk`
+ * cyan, `diff-meta` dimmed, `code-fence` cyan, `code` plain, etc.
+ *
+ * Design decision:
+ * - Heuristic-only — no language parser, no AST. Goal is
+ *   "structural cues a reader uses to skim a diff or a code
+ *   block", not real syntax highlighting. Keeps the file under
+ *   100 lines and the dep surface zero.
+ *
+ * Gotcha:
+ * - Order matters in `classifyDiffLines`: `+++ /path` and
+ *   `--- /path` are unified-diff *file headers* and must be
+ *   matched BEFORE the generic `+`/`-` prefix check. Without the
+ *   ordering, file headers get colored green/red and look like
+ *   added/removed code lines.
+ */
+
 export type LineCategory =
   | "diff-add"
   | "diff-remove"

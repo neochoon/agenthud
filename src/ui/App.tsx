@@ -1,3 +1,41 @@
+/**
+ * Top-level Ink component. Owns the global state — sessions, selected
+ * id, expand-state set, viewer scroll, focus, tracking — and wires the
+ * background refresh: a ~2s poll plus a supplementary `fs.watch` on
+ * the projects directory. Dispatches keystrokes to the right
+ * sub-panel via `useHotkeys`.
+ *
+ * Design decisions:
+ * - Inverse expansion. Hot/warm sessions and projects default to
+ *   *expanded*; cold ones default to *collapsed*. Reason: on boot,
+ *   the user almost always cares about today's hot work, not last
+ *   month's cold tree. Enter toggles in either direction.
+ * - Polling is primary; `fs.watch` is supplemental. macOS
+ *   recursive `fs.watch` silently drops cross-project events, so
+ *   the ~2s poll guarantees the tree converges within one
+ *   interval even when the OS watcher missed an event.
+ * - Tracking mode jumps only on *new* sub-agent ids (or when the
+ *   current one cools). A naive "newest mtime" implementation
+ *   loses every race to the already-busy sub-agent — the user
+ *   selected it, it keeps writing fastest, tracking never
+ *   advances. Snapshot the known-id set when tracking turns on,
+ *   then chase additions to it.
+ * - `appendSubAgentRows` is exported solely so the same expansion
+ *   rule the renderer applies is pinned by unit test. Keeping the
+ *   rule one-place-only (in the render code) makes drift between
+ *   App's flattened nav list and SessionTreePanel's rendered list
+ *   inevitable — and that drift is exactly what breaks j/k
+ *   navigation silently.
+ *
+ * Gotcha:
+ * - Cold-session sub-agent expansion uses its own flag
+ *   (`__expanded-session-<id>`), separate from the global
+ *   `expandedIds`. Both `appendSubAgentRows` here AND
+ *   `SessionTreePanel:subAgentsFullyExpanded` must consult it or
+ *   the renderer shows every sub-agent while App's nav list
+ *   misses them (selectedIndex = -1, j/k go silent).
+ */
+
 // src/ui/App.tsx
 
 import type { FSWatcher } from "node:fs";

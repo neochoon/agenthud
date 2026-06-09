@@ -1,3 +1,30 @@
+/**
+ * Full-screen detail overlay for one activity entry. Renders the
+ * multi-line body — diff for Edit, written content for Write,
+ * line-numbered content for Read, subagent response for Task, full
+ * `git show --stat --patch` for commits — with syntax-aware
+ * coloring (green/red/cyan for diffs, cyan for fenced code blocks,
+ * plain for prose).
+ *
+ * Design decisions:
+ * - Coloring routes through `lineColoring.classifyDiffLines` and
+ *   `classifyCodeFences`, not language-specific syntax
+ *   highlighters. Goal is structural cues (added vs removed,
+ *   prose vs code), not real syntax highlighting — keeps the
+ *   dependency surface tiny and the renderer fast.
+ * - Scroll-only overlay: `↑/↓/j/k` to scroll, `Esc/q/↵` to close.
+ *   No find/search/copy — Ink's text rendering would have to
+ *   reimplement them and they're easily available outside the
+ *   TUI.
+ *
+ * Gotcha:
+ * - Indentation and whitespace inside code and diff bodies must
+ *   be preserved verbatim. Ink's `<Text>` is rendered with no
+ *   `wrap` so the trailing spaces on patch hunk context lines
+ *   stay intact (v0.11.0 fix — earlier versions flattened lines
+ *   and broke hunk alignment in the renderer).
+ */
+
 import { Box, Text } from "ink";
 import type React from "react";
 import type { ActivityEntry } from "../types/index.js";

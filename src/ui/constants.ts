@@ -1,3 +1,27 @@
+/**
+ * Shared UI constants — time thresholds, panel widths, terminal
+ * limits, box-drawing characters — plus the display-width helpers
+ * (`getDisplayWidth`, `getInnerWidth`, `createTitleLine`,
+ * `createBottomLine`) used by every panel for borders and
+ * truncation.
+ *
+ * Design decision:
+ * - `getDisplayWidth` is memoized across calls. Without
+ *   memoization, repeated `stringWidth` invocations on the same
+ *   string across renders cost ~17% CPU on a 60-row tree
+ *   (measured in v0.9.0). The cache survives renders and is
+ *   stable across the process lifetime — no invalidation needed
+ *   since string display width is a pure function.
+ *
+ * Gotcha:
+ * - `THIRTY_MINUTES_MS` and `ONE_HOUR_MS` are imported by
+ *   `src/data/sessions.ts` and `src/data/sessionLiveness.ts` —
+ *   a data → ui layer violation flagged in those files. The
+ *   constants should move to `src/utils/timeConstants.ts` (or
+ *   live on `types/index.ts`) on a future refactor; keeping them
+ *   here for now to avoid mixing the move with unrelated work.
+ */
+
 // Time constants (in milliseconds)
 export const THIRTY_SECONDS_MS = 30 * 1000;
 export const THIRTY_MINUTES_MS = 30 * 60 * 1000;

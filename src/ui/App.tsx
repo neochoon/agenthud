@@ -503,18 +503,25 @@ export function App({
     const fileChanged = lastLoadedFileRef.current !== newFile;
     lastLoadedFileRef.current = newFile;
 
+    // Only react when the loaded FILE changes (selection moved or
+    // hottest-session-of-project changed). Activity updates for the
+    // already-selected file flow through `refresh` (polling /
+    // fs.watch), which has the delta-aware PAUSED bump for
+    // scrollOffset + newCount. A second `setActivities` from this
+    // effect on every sessionTree change would bypass that bump —
+    // view would scroll forward while the badge sat frozen.
+    if (!fileChanged) return;
+
     if (node?.filePath) {
       setActivities(parseSessionHistory(node.filePath));
-      if (fileChanged) {
-        setScrollOffset(0);
-        setIsLive(true);
-        setNewCount(0);
-        setViewerCursorLine(0);
-        setGitActivities([]);
-      }
+      setScrollOffset(0);
+      setIsLive(true);
+      setNewCount(0);
+      setViewerCursorLine(0);
+      setGitActivities([]);
     } else {
       setActivities([]);
-      if (fileChanged) setGitActivities([]);
+      setGitActivities([]);
     }
   }, [selectedId, sessionTree]);
 

@@ -1,3 +1,33 @@
+/**
+ * Build a chronological activity report for one date, scoped to a
+ * given set of sessions. Two output formats: Markdown (human-/
+ * LLM-readable) and JSON (script-readable). Drives both `agenthud
+ * report` and the LLM payload that feeds `agenthud summary`.
+ *
+ * Design decisions:
+ * - JSON nests sub-agent activities under their parent session;
+ *   Markdown does *not*. Reason: sub-agent activity is high-volume
+ *   exploratory output. JSON consumers can filter, but a markdown
+ *   report aimed at human reading would balloon by 10× per day.
+ *   Subagent results still reach the LLM via the parent's Task row
+ *   (see `formatTaskBody`).
+ * - `activityMatchesInclude` is a hand-written switch on label,
+ *   not a label→type map. The fan-in is small (~10 labels) and
+ *   the explicit branches double as documentation of what each
+ *   include type captures.
+ * - Markdown deliberately omits `detailBody` for every tool
+ *   *except* Task. Edit/Write/Read bodies stay TUI-only to keep
+ *   the LLM payload bounded; Task's body is the subagent's
+ *   returned text, which is the entire point of including Task.
+ *
+ * Gotcha:
+ * - `sessionIsOnDate` checks BOTH file mtime AND activity
+ *   timestamps. mtime alone misclassifies cases where today's
+ *   only activity was a small tool result that didn't bump mtime
+ *   visibly, and timestamps alone misclassify sessions that
+ *   touched today but whose tail entries are still parsing.
+ */
+
 import { statSync } from "node:fs";
 import type { ActivityEntry, SessionNode } from "../types/index.js";
 import { parseGitCommits } from "./gitCommits.js";

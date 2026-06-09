@@ -1,18 +1,37 @@
 /**
- * Maintenance for ~/.agenthud/summaries/ as a navigable knowledge base:
+ * Maintain `~/.agenthud/summaries/` as a navigable knowledge base.
+ * Two artifacts: `index.md` (auto-regenerated hub listing every
+ * daily and range summary, grouped year → month → entry,
+ * newest-first), and a one-line backlink footer prepended to each
+ * summary file so a reader can hop to the index or to neighboring
+ * dates without leaving their markdown viewer.
  *
- * - `index.md` is an auto-regenerated hub listing every daily and range
- *   summary, grouped year → month → entry (newest first).
- * - Each summary file gets a one-line backlink footer prepended at the
- *   top so a reader can hop back to the index or to neighboring dates
- *   without leaving their markdown viewer.
+ * Design decisions:
+ * - Markdown only — no HTML, no extra dependency. VS Code preview
+ *   and browser markdown extensions render relative links inline,
+ *   so a plain `.md` file is enough to be a navigable hub.
+ * - Pure helpers (`parseSummaryFilename`, `listSummaries`,
+ *   `buildIndexMarkdown`, `buildBacklinkFooter`,
+ *   `stripExistingBacklinkFooter`, `prependBacklinkFooter`) are
+ *   exported individually so each is unit-testable in isolation.
+ *   The side-effect orchestrator `regenerateIndex` sits at the
+ *   bottom and is covered by manual smoke + integration tests.
+ * - Backlink footer wrapped in HTML comment markers
+ *   (`<!-- agenthud-backlinks-start -->` /
+ *   `<!-- agenthud-backlinks-end -->`) so re-runs strip-and-prepend
+ *   cleanly. Without the markers, a re-run would either duplicate
+ *   the footer or corrupt the file.
+ * - Backlink prev/next walks only over daily entries, not range
+ *   entries. The day-to-day chain stays a clean sequence; a range
+ *   entry in the middle would break the "next day" navigation
+ *   intent.
  *
- * Markdown only — VS Code preview and browser markdown extensions
- * render relative links inline, so we never need to ship HTML.
- *
- * The pure helpers in this module are exported individually so each
- * one is unit-testable; the side-effect orchestrator `regenerateIndex`
- * sits at the bottom and is exercised end-to-end via manual smoke.
+ * Gotcha:
+ * - Index regen is *best-effort*. Errors are logged to stderr but
+ *   never thrown — the LLM call's success is what matters, and a
+ *   stale index file shouldn't block the summary write path or
+ *   the user's exit code. Callers should not rely on
+ *   `regenerateIndex` always succeeding.
  */
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";

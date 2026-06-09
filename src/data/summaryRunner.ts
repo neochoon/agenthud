@@ -1,3 +1,49 @@
+/**
+ * Daily and range summary orchestrators. Activity report →
+ * `claude -p` → cache write → index regeneration.
+ *
+ * Design decisions:
+ * - Daily and range share state intentionally — `runRangeSummary`
+ *   calls `runSummary` per day to reuse the cache-write path.
+ *   One code path means cache lookups, prompt resolution, ticker
+ *   handling, and index regen all happen the same way regardless
+ *   of how the user invoked summary.
+ * - Past-day caches are immutable; today is always regenerated.
+ *   Today's activity grows during the day, so any cached output
+ *   that includes today is stale the moment the day continues.
+ *   Same logic for range caches that contain today.
+ * - Meta-input format for range summaries is XML-tag delimited
+ *   (`<day date="YYYY-MM-DD">…</day>`, see `buildRangeMetaInput`).
+ *   The date rides as a structured attribute (no LLM conflation
+ *   with date headings inside a daily) and tag boundaries can't
+ *   be forged by content (avoids `---` collision with markdown
+ *   horizontal rules / yaml frontmatter inside summaries). Lands
+ *   in v0.13.0; older user-customized
+ *   `~/.agenthud/summary-range-prompt.md` files keep their old
+ *   format until manually synced.
+ * - The stderr ticker (`startStderrTicker`) is unconditionally
+ *   started during the claude call; the `onFirstChunk` callback
+ *   stops it the moment output begins streaming. Required for
+ *   `-o` (silent stdout) mode — otherwise the call looks frozen.
+ *
+ * Gotchas:
+ * - `claude -p` is invoked with `--no-session-persistence`.
+ *   Without it, every summary call creates a JSONL session under
+ *   `~/.claude/projects/` and pollutes agenthud's own session
+ *   tree (v0.9.3 fix).
+ * - The empty-day check counts 3 string-parsed metrics from the
+ *   built report markdown (`sessionCount` / `activityCount` /
+ *   `commitCount`). Fragile — deriving from `flatSessions`
+ *   upstream would be cleaner, but the count needs to reflect
+ *   what the LLM will actually see, which means parsing the
+ *   final markdown.
+ * - User home-dir prompt files (`~/.agenthud/summary-prompt.md`,
+ *   `~/.agenthud/summary-range-prompt.md`) are auto-created from
+ *   the bundled template on first run. Subsequent template
+ *   updates are NOT propagated — users who customized are left
+ *   alone. CHANGELOG documents the manual sync path.
+ */
+
 import { spawn } from "node:child_process";
 import {
   copyFileSync,

@@ -1,3 +1,27 @@
+/**
+ * Classify a recently-active session as `working` or `waiting`
+ * from the structure of its JSONL tail.
+ *
+ * Design decision:
+ * - The signal is the *tail structure*, not file mtime. A
+ *   long-running tool (multi-minute `Bash`) leaves the JSONL
+ *   silent — mtime goes stale — even though the session is
+ *   `working`: there's a pending `tool_use` at the tail with no
+ *   matching `tool_result` yet. mtime alone would misclassify
+ *   this as `waiting` and the user would assume Claude is idle.
+ *
+ * Gotchas:
+ * - `AskUserQuestion` is treated as `waiting`. Even though it's
+ *   technically a pending tool_use, the ball is in the user's
+ *   court — they need to answer before Claude can continue.
+ * - Returns `null` outside the 30-minute recency window;
+ *   upstream falls back to the time-based `[hot/warm/cool/cold]`
+ *   ladder.
+ * - Imports `THIRTY_MINUTES_MS` from `ui/constants.ts` — a known
+ *   data → ui layer violation. Should move to `utils/` or a
+ *   shared time-constants module on a future refactor.
+ */
+
 import type { LiveState } from "../types/index.js";
 import { THIRTY_MINUTES_MS } from "../ui/constants.js";
 

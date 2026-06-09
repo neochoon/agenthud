@@ -1,3 +1,27 @@
+/**
+ * Shell out to `git log` to merge commit entries into the activity
+ * timeline (`--with-git` flag on `report` / `summary`), and to
+ * `git show --stat --patch` for the commit detail view (`↵` on a
+ * commit row).
+ *
+ * Design decisions:
+ * - `git -C <projectPath>` instead of `cwd`. Callers don't have
+ *   to `chdir`, and the project path can point anywhere — useful
+ *   when agenthud is invoked from outside the project tree.
+ * - `--format="%ct|%h|%s"` (unix-timestamp | short-hash | subject)
+ *   chosen over `--format=json` because shipped `git` versions
+ *   don't all support `--format=json`. Subject lines with embedded
+ *   pipes are joined back from the trailing parts.
+ *
+ * Gotcha:
+ * - stderr is suppressed (`stdio: ["ignore", "pipe", "ignore"]`).
+ *   `git log` on a non-repo path prints "fatal: not a git
+ *   repository" — without the redirect, that leaks into the TUI
+ *   and corrupts the Ink render. The trade-off is that real git
+ *   errors also go silent; callers detect failure via the
+ *   try/catch returning `[]` or `null`.
+ */
+
 import { execSync } from "node:child_process";
 import type { ActivityEntry } from "../types/index.js";
 import { ICONS } from "../types/index.js";

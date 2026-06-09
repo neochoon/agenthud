@@ -1,3 +1,33 @@
+/**
+ * Bottom panel: render the activity feed for the selected session
+ * as a tail-feed (newest at the bottom). Scrollable, filterable
+ * via filter presets, with a "live" highlight band that sweeps
+ * across the newest row while the session is mid-update.
+ *
+ * Design decisions:
+ * - Tail-feed layout (v0.9.3 reversal). Newest entry sits at the
+ *   bottom like `tail -f`, terminal logs, chat apps. Empty
+ *   padding moved to the top. `g` jumps to the oldest (top), `G`
+ *   to the live edge (bottom) — vim convention. PgUp/PgDn
+ *   directions swap accordingly.
+ * - "Live" row gets a spinner icon + flashlight highlight band
+ *   that sweeps left → right across its label. Replaces the
+ *   v0.9.3 standalone sliding-arrow row — the alive cue now
+ *   lives on the actual row, freeing the breathing slot back as
+ *   real activity space.
+ * - Filter application is memoized on `(sessionId + visible
+ *   activities window)` only, NOT on the spinner tick. Including
+ *   the tick in the key trashes the memo every 100ms and recomputes
+ *   the filter on every render — measurable scroll-position
+ *   regression on long histories.
+ *
+ * Gotcha:
+ * - Status-bar PAUSED indicator distinguishes `↑N` (scrolled up
+ *   from live) from `+N↓` (new entries below current view) so the
+ *   user always knows their position relative to live. A single
+ *   "PAUSED" with no counter loses that signal.
+ */
+
 import { Box, Text } from "ink";
 import type React from "react";
 import { memo } from "react";

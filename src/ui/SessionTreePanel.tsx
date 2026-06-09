@@ -1,3 +1,30 @@
+/**
+ * Top panel: renders the project tree — projects → sessions →
+ * sub-agents — with status badges, elapsed time, model name, and
+ * the active selection highlight.
+ *
+ * Design decisions:
+ * - Cold projects collapse into a single
+ *   `... N cold projects` sentinel at the bottom of the tree, not
+ *   per-project. Enter on that sentinel expands the entire cold
+ *   group at once. Reason: a single user usually has 10–30 cold
+ *   projects scattered over time; per-row expansion turns the
+ *   tree into mostly grayed noise.
+ * - Sub-agents under cold sessions group under a
+ *   `__sub-parent__` sentinel; Enter on the cold session expands
+ *   them all (must agree with App's `appendSubAgentRows` rule —
+ *   see App.tsx's gotcha).
+ * - Right-edge column reserves 3 cells of padding so the
+ *   project/session title doesn't run flush against the
+ *   elapsed/model column. Improves readability at every width.
+ *
+ * Gotcha:
+ * - Width-aware title truncation uses display *cells* (CJK-aware
+ *   via `getDisplayWidth`), not JavaScript character count. A
+ *   `.length`-based truncation would chop CJK strings at the
+ *   wrong width and leave bare half-width remnants.
+ */
+
 import { homedir } from "node:os";
 import { Box, Text } from "ink";
 import type React from "react";

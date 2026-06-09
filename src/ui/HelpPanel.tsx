@@ -1,3 +1,30 @@
+/**
+ * Full-screen `?` help overlay listing every keybinding by panel,
+ * session-status badges with their colors, CLI commands, and file
+ * paths agenthud reads/writes. The canonical "what does X key do"
+ * reference inside the app.
+ *
+ * Design decisions:
+ * - The `SECTIONS` constant is hand-curated, not generated from
+ *   `useHotkeys` callbacks. Reason: hotkeys are runtime
+ *   dispatchers, the help table is documentation — they want
+ *   different groupings ("Project tree", "Activity viewer",
+ *   "Always available") that don't map 1:1 to call sites. Drift
+ *   is caught in code review; the value of human-readable
+ *   section grouping outweighs deduplication.
+ * - Scrollable (`j/k`, `↑/↓`, `PgUp/PgDn`, `Ctrl+B/F`, `Space`,
+ *   `g/G`) with a bottom indicator (`-- current/total --`) so
+ *   users on terminals shorter than the help content know there's
+ *   more to scroll to. v0.9.3 added this after the help silently
+ *   truncated on smaller windows.
+ *
+ * Gotcha:
+ * - The key-column width is auto-computed but capped at 30 cells.
+ *   Without the cap, a single long keybind label
+ *   (e.g. `PgUp / PgDn / Ctrl+B / Ctrl+F`) crushes the
+ *   description column on narrow terminals.
+ */
+
 import { Box, Text } from "ink";
 import type React from "react";
 import { getDisplayWidth } from "./constants.js";

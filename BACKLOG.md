@@ -102,16 +102,6 @@ elided)") would be more scannable.
 
 ## Docs
 
-### README ↔ FEATURES.md cross-link
-
-`README.md` still has feature summaries that duplicate FEATURES.md.
-Sync them: README becomes intro + quickstart + "see FEATURES.md
-for the full surface"; FEATURES.md stays the reference. Flagged
-as out-of-scope in PR #120.
-
-- **Effort:** ~20 min.
-- **When:** Next doc pass.
-
 ### Auto-sync getHelp() / HelpPanel.SECTIONS / FEATURES.md
 
 Three sources of truth for keybindings and CLI flags:
@@ -126,6 +116,66 @@ out-of-scope in PR #120.
 
 - **Effort:** ~2-3 hours for a robust generator.
 - **When:** If/when FEATURES.md drifts again within a release cycle.
+
+---
+
+## Distribution / discoverability
+
+npm + GitHub metadata SEO was done in v0.13.2 (#132) plus the
+direct `gh repo edit` for description / homepage / 20 topics.
+Remaining levers are external — they need outbound work, not
+just metadata tweaks.
+
+### Submit to `awesome-claude-code` (and similar curated lists)
+
+Direct backlinks + traffic from people specifically browsing
+"things to use with Claude Code". Highest expected ROI for the
+effort.
+
+- **Effort:** ~30 min. Fork the awesome-list repo, add an entry
+  in the right section, open PR. Each list has its own format
+  rules — read CONTRIBUTING first.
+- **Candidates:**
+  - [hesreallyhim/awesome-claude-code](https://github.com/hesreallyhim/awesome-claude-code)
+    (or whoever the current canonical maintainer is — check
+    GitHub topic `awesome-claude-code`)
+  - [steipete/awesome-claude-cli](https://github.com/steipete/awesome-claude-cli)
+    if it exists at submission time
+  - Generic `awesome-cli-apps` for the TUI/CLI angle
+- **When:** Any time. Sooner = compound effect from more
+  inbound traffic.
+
+### GitHub social preview image
+
+Repo's "About" sidebar and any social share (HN, Reddit, X
+links) currently show GitHub's default placeholder. A custom
+1280×640 PNG with the agenthud TUI screenshot + one-line
+tagline lifts click-through from share posts substantially.
+
+- **Effort:** ~1 hour. Design (Figma or even Apple's Keynote
+  works), upload via repo Settings → Social preview. Iterate
+  if it looks bad small.
+- **When:** Before any external promotion push (HN launch,
+  etc.). After is too late — first impression set by the
+  default placeholder.
+
+### External promotion: HackerNews, Reddit, X
+
+Stars + downloads compound into search ranking over months,
+but the first hundred users come from outbound posts. Plan
+once metadata, social preview, and a polished README are all in
+place (we have those now).
+
+- **Channels:**
+  - HN "Show HN" post — single shot, do it right
+  - r/ClaudeAI, r/Anthropic, r/commandline subreddits
+  - X / Mastodon developer-tools accounts
+- **Don't until:** all the inbound landing surfaces are polished.
+  npm page is the most-clicked destination from these posts;
+  CHANGELOG and FEATURES.md are the second click.
+- **Effort:** Half a day to write the HN post well + monitor +
+  respond. The actual posting is 5 minutes; the prep is most of
+  it.
 
 ---
 
@@ -144,3 +194,9 @@ decisions don't get re-litigated:
   headers (PRs #121-#125) cover the per-module rationale; if a
   cross-cutting view is needed later, the headers are the
   starting material.
+- **README ↔ FEATURES.md cross-link** — done in PR #131 (v0.13.2).
+  README slimmed to 94 lines, links to FEATURES.md as the
+  reference.
+- **npm + GitHub search metadata** — done in PR #132 (v0.13.2)
+  plus repo description / homepage / 20 topics set via
+  `gh repo edit`. Effect surfaces on next npm crawl (~24h).

@@ -1,3 +1,29 @@
+/**
+ * Application bootstrap. Loads `~/.agenthud/config.yaml`, parses
+ * argv, runs the legacy-config migration check, and dispatches
+ * to one of: watch (interactive TUI), once (snapshot), report,
+ * or summary.
+ *
+ * Design decisions:
+ * - Global config is loaded *before* `parseArgs` so the CLI parser
+ *   can layer flags over `report.*` / `summary.*` user defaults
+ *   (resolution order: CLI flag → summary key → report key →
+ *   built-in default). Done eagerly here, not lazily downstream,
+ *   so the effective-options stderr line at run start reflects the
+ *   real values before any work begins.
+ * - The legacy-config migration prompt fires from this entry
+ *   point, not from inside the App component, so non-interactive
+ *   modes (`--once`, `report`, `summary`) get the same prompt.
+ *
+ * Gotcha:
+ * - The "is this a project-level config?" check honors WSL: from
+ *   inside WSL, `homedir()` returns the Linux home but cwd often
+ *   sits under `/mnt/c/Users/<X>` — the Windows-side home. Without
+ *   the WSL guard, we'd offer to delete the Windows-native
+ *   `.agenthud/config.yaml`. See `isLegacyProjectConfig()` for the
+ *   actual detection.
+ */
+
 import { existsSync, readdirSync, realpathSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";

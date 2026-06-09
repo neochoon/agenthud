@@ -1,3 +1,35 @@
+/**
+ * Read/write the global config at `~/.agenthud/config.yaml` and the
+ * sibling app-managed state at `~/.agenthud/state.yaml`. Owns the
+ * canonical default sets (`DEFAULT_INCLUDE_TYPES`,
+ * `ALLOWED_INCLUDE_TYPES`, `DEFAULT_GLOBAL_CONFIG`) — every other
+ * module reads from these instead of redefining defaults locally.
+ *
+ * Design decisions:
+ * - Config / state are SPLIT into two files. `config.yaml` holds
+ *   user-edited preferences (filter presets, defaults, refresh
+ *   interval). `state.yaml` holds app-managed UI state (hidden
+ *   sessions / sub-agents / projects toggled by the `h` key).
+ *   Reason: with one combined file, `git diff` on dotfiles churns
+ *   constantly as the user hides/unhides items at runtime. Split
+ *   in v0.9.0 with one-time auto-migration of the merged shape.
+ * - `summary.*` keys INHERIT from `report.*` at the call site
+ *   (not at parse time). An empty `summary:` block in the user's
+ *   config means "use everything from report"; explicit summary
+ *   keys override per-field. This lets users pin one defaults
+ *   block under `report:` and have summary follow.
+ * - `ALLOWED_INCLUDE_TYPES` is the validation gate (what's a
+ *   *legal* type); `DEFAULT_INCLUDE_TYPES` is the default subset
+ *   (what's ON by default). The two are not the same — `read`,
+ *   `glob`, `commit` are allowed but not default-on.
+ *
+ * Gotcha:
+ * - Auto-migration runs once on first load; the migrated file is
+ *   then re-saved with the new schema. Editing the old schema
+ *   after migration won't take effect — read the current shape
+ *   from the actual file, not from old docs.
+ */
+
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";

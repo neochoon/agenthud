@@ -1,4 +1,26 @@
 #!/usr/bin/env node
+/**
+ * CLI binary entry. Performs Node-version gate and forces
+ * `NODE_ENV=production` *before* dynamically importing the main
+ * application bundle.
+ *
+ * Design decisions:
+ * - Pre-import work lives here as plain top-level code (no imports
+ *   of project modules) because some transitive deps require Node
+ *   20+. If we let those load on Node 18 the error message is an
+ *   incomprehensible stack from inside a dep — the guard here
+ *   replaces it with a one-line "upgrade Node" message.
+ * - The main app is loaded via `await import("./main.js")` so the
+ *   bundler keeps it as a deferred chunk and the guard above
+ *   actually runs first.
+ *
+ * Gotcha:
+ * - `process.env.NODE_ENV = "production"` MUST happen before
+ *   importing anything that pulls in React/Ink, or the dev-mode
+ *   profiler accumulates `PerformanceMeasure` objects (~600KB/s)
+ *   and watch mode OOMs after ~88 min. Confirmed regression
+ *   pattern — do not move this assignment after the import.
+ */
 
 // Check Node.js version before importing any dependencies
 // This prevents ugly crashes from libraries that require Node 20+

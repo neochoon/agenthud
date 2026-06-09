@@ -1,954 +1,451 @@
 # Features
 
-## Git Data Collection
+This is the user-facing reference for everything `agenthud` exposes —
+commands, flags, keybindings, config keys, file paths, environment
+variables. For changes per version, see [CHANGELOG.md](./CHANGELOG.md).
+For getting started, see [README.md](./README.md).
 
-- **Added**: 2026-01-09
-- **Issue**: #1
-- **Status**: Complete
-- **Tests**: `tests/git.test.ts`
-- **Source**: `src/data/git.ts`, `src/types/index.ts`
+> **History note:** agenthud was rewritten around v0.8.x from a
+> "custom panels" framework into the current session-tree + activity
+> viewer model. Versions before that (v0.3.0 – v0.7.x) describe an
+> earlier product and are kept in CHANGELOG.md for the historical
+> record only. The "Stable since" column below tracks the first
+> shipping version of each feature *in its current form*.
 
-### Functions
+---
 
-| Function | Description | Return Type |
-|----------|-------------|-------------|
-| `getCurrentBranch()` | Get current git branch name | `string \| null` |
-| `getTodayCommits()` | Get commits since midnight | `Commit[]` |
-| `getTodayStats()` | Get lines added/deleted today | `GitStats` |
+## Overview
 
-### Types
+| Mode | Command | Stable since | Reference |
+|---|---|---|---|
+| Watch (live TUI) | `agenthud` | v0.8.x rewrite | [Watch](#watch) |
+| Snapshot | `agenthud --once` | v0.8.2 | [Snapshot](#snapshot) |
+| Cwd-scoped watch | `agenthud --cwd` | v0.11.0 | [Cwd scope](#cwd-scope) |
+| Activity tracker (auto-follow) | `t` key | v0.9.5 | [Tracker](#tracker) |
+| Activity report | `agenthud report` | v0.8.2 | [Report](#report) |
+| Daily LLM summary | `agenthud summary --date` | v0.8.5 | [Summary daily](#summary-daily) |
+| Range LLM summary | `agenthud summary --from/--to` / `--last Nd` | v0.9.2 | [Summary range](#summary-range) |
+| Summary `--open` | `agenthud summary -o` | v0.12.0 | [Summary open](#summary-open) |
+| Summaries index hub | `agenthud summary --open-index` / `-I` | v0.12.0 | [Summaries index](#summaries-index) |
+| Subagent visibility in reports | `task` include type | v0.13.0 | [Subagent reporting](#subagent-reporting) |
+| Global config | `~/.agenthud/config.yaml` | v0.9.0 | [Config](#config) |
+| Effective-options stderr line | (automatic) | v0.12.0 | [Effective options](#effective-options) |
 
-```typescript
-interface Commit {
-  hash: string;
-  message: string;
-  timestamp: Date;
-}
+Cross-cutting reference:
 
-interface GitStats {
-  added: number;
-  deleted: number;
-}
+- [Keybindings](#keybindings) — full key map (mirrors what `?` shows in-app)
+- [Files & directories](#files--directories) — what lives in `~/.agenthud/`
+- [Environment variables](#environment-variables)
+
+---
+
+## Watch
+
+The default mode. Real-time TUI: project tree on top, activity viewer
+on the bottom, both polling `~/.claude/projects/` every ~2 s.
+
+**Invocation:** `agenthud` or `agenthud watch` (also `-w`,
+`--watch`).
+
+**Behavior:**
+- Renders an Ink-based split view. Top panel: hot/warm/cool/cold
+  session tree grouped by project. Bottom panel: tail-feed of the
+  selected session's activity.
+- Switches to the alternate screen buffer on startup and restores
+  the pre-launch terminal verbatim on quit (`q`, Ctrl+C, SIGTERM).
+- Refuses to render on terminals smaller than 80 cols × 20 rows
+  and shows a clear "needs larger terminal" panel that
+  auto-redraws on resize.
+
+**Available since:** v0.8.x rewrite (project-grouped tree v0.9.0,
+session liveness badges v0.10.0, rich tool details v0.10.0).
+
+## Snapshot
+
+Print one frame of watch mode and exit. Useful for piping to a file
+or for non-interactive contexts (CI, scripts).
+
+**Invocation:** `agenthud --once`
+
+**Behavior:**
+- Renders the current session tree to stdout without entering the
+  alternate screen, then exits cleanly. Scrollback preserved
+  (fixed in v0.11.4).
+
+**Available since:** v0.8.2.
+
+## Cwd scope
+
+Scope the watch view (or snapshot) to whichever Claude project
+contains the current working directory.
+
+**Invocation:** `agenthud --cwd` (combinable with `--once`)
+
+**Behavior:**
+- Walks up from `cwd` looking for a Claude project directory match.
+- Exits 1 if no such project is found.
+- On WSL, `homedir()` lies; the cwd-detection skips
+  `/mnt/<drive>/Users/<name>` paths from being treated as project
+  paths (v0.12.4).
+
+**Available since:** v0.11.0 (Windows separator fix same release).
+
+## Tracker
+
+Auto-follow the newest live sub-agent (or session if no live
+sub-agent exists) across the entire tree. Designed for ambient
+monitoring on a second monitor while long Claude skills churn
+through many sub-agents.
+
+**Invocation:** press `t` in watch mode.
+
+**Behavior:**
+- Status bar swaps `t: track` for `TRK ●`; Projects panel header
+  shows `[LIVE ⠧]`.
+- Polling jumps to 1 second while tracking is on (macOS `fs.watch`
+  recursive drops cross-project events otherwise).
+- Selection jumps only when a *new* sub-agent id appears, or when
+  the current selection cools off — not just because the current
+  one was busiest (v0.9.5 fix).
+- Any explicit nav key (↑/↓/Tab/etc.) turns tracking off.
+
+**Available since:** v0.9.5.
+
+## Report
+
+Print a chronological activity report for a date — Markdown for
+humans, JSON for scripts.
+
+**Invocation:** `agenthud report [flags]`
+
+**Flags:**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--date YYYY-MM-DD \| today \| yesterday \| -Nd` | `today` | Date to report on |
+| `--include TYPES` | `user,response,bash,edit,thinking,task` | Comma-separated activity types or `all` |
+| `--format markdown \| json` | `markdown` | Output format |
+| `--detail-limit N` | `120` | Max chars per activity detail; `0` = unlimited |
+| `--with-git` | off | Merge git commits from each session's project path into the timeline |
+
+**Include types:** `user`, `response`, `bash`, `edit`, `thinking`,
+`task`, `read`, `glob`, `commit`. Unknown values error (v0.9.4
+fix). The default set is shared with `summary` via
+`DEFAULT_INCLUDE_TYPES`.
+
+**Output:**
+- **Markdown:** one section per session with `[HH:MM] <icon>
+  <label>: <detail>` rows. Times in local timezone. Task tool
+  activities also unroll the subagent's returned text as a
+  `<task-result>…</task-result>` block (v0.13.0).
+- **JSON:** structured output with sub-agents nested under their
+  parent session.
+
+**Behavior:**
+- Reads `~/.claude/projects/<id>/*.jsonl` for each session on the
+  target date.
+- With `--with-git`: invokes `git log --git-dir <project>/.git`
+  for each session's project path.
+
+**Defaults source:** `~/.agenthud/config.yaml → report.*`, then
+built-in defaults. CLI flags override per-run.
+
+**Available since:** v0.8.2 (with-git v0.8.4, JSON format v0.8.4,
+config-driven defaults v0.12.0).
+
+## Summary daily
+
+Generate an LLM summary of a single day's activity by piping the
+activity report (markdown) into `claude -p`.
+
+**Invocation:** `agenthud summary [--date ...] [flags]`
+
+**Flags** (in addition to `report`'s `--include`, `--detail-limit`,
+`--with-git`):
+
+| Flag | Default | Description |
+|---|---|---|
+| `--date YYYY-MM-DD \| today \| yesterday \| -Nd` | `today` | Date to summarize |
+| `--prompt TEXT` | (template file) | Override prompt inline (daily only) |
+| `--force` | off | Regenerate even if cached |
+| `--model NAME` | claude default | Forward to `claude --model` (e.g. `sonnet`, `haiku`, full id) |
+| `-y, --yes` | off | Skip confirmation prompt |
+| `-o, --open` | off | Open the produced summary in OS default app |
+| `-I, --open-index` | off | Open `~/.agenthud/summaries/index.md` |
+
+**Behavior:**
+- Builds the markdown payload via `generateReport`. If the day has
+  zero activity, announces "no activity — skipping" and returns
+  exit 0 without spawning claude or writing a file (v0.12.2 /
+  v0.12.3).
+- Past days are cached at `~/.agenthud/summaries/YYYY-MM-DD.md`
+  and reused on subsequent runs. Today is always regenerated.
+- Prompt template comes from `~/.agenthud/summary-prompt.md`
+  (auto-created on first run from
+  `src/templates/summary-prompt.md`); `--prompt` overrides for
+  one run.
+- Token usage line printed at the end (`N in / M out · cache: A
+  read, B written · $X.XXXX`) parsed from claude's `result`
+  event.
+- Oversize reports (~300K tokens estimated) print a warning and,
+  interactively, prompt one more time before sending (v0.9.4).
+- `claude -p` is called with `--no-session-persistence` so the
+  summary call doesn't pollute the session tree (v0.9.2 / v0.9.3).
+- After a successful write, `regenerateIndex` updates
+  `~/.agenthud/summaries/index.md` and each summary's backlink
+  footer (v0.12.0).
+
+**Available since:** v0.8.5 (config-driven defaults v0.12.0,
+`--model` v0.9.4, `--open` / `--open-index` v0.12.0,
+`--no-session-persistence` v0.9.3).
+
+## Summary range
+
+Generate a cross-day synthesis from a date range. Per-day daily
+summaries are produced first (cached and reused), then meta-summarized
+into a single range markdown.
+
+**Invocation:**
+- `agenthud summary --last Nd` (last N days, ending today)
+- `agenthud summary --from YYYY-MM-DD --to YYYY-MM-DD`
+
+**Flags:** All daily summary flags except `--prompt` (range mode
+uses `~/.agenthud/summary-range-prompt.md` and does not accept an
+inline prompt). `-y/--yes` accepts per-day confirmation prompts in
+one go.
+
+**Behavior:**
+- Confirmation per missing daily prompts only *after* its scan
+  stats are shown (sessions/activities/commits/KB), so you decide
+  with concrete context (v0.9.2).
+- All-empty range returns exit 0 with a neutral skip message
+  (v0.12.3).
+- Range output cached at `~/.agenthud/summaries/range-FROM_TO.md`.
+- Cache is invalidated when today is in the range (v0.9.3 fix).
+
+**Meta-input format (v0.13.0):** Each daily summary is wrapped in
+`<day date="YYYY-MM-DD">…</day>` rather than the previous
+`# YYYY-MM-DD` heading + `---` separator. The date rides as a
+structured attribute (no conflation with date headings inside a
+summary) and tag boundaries can't be forged by content (avoids
+collision with markdown horizontal rules or yaml frontmatter
+inside a daily).
+
+**Available since:** v0.9.2 (XML meta-input v0.13.0).
+
+## Summary open
+
+Once a summary is written (or read back from cache), launch it in
+the OS default app — typically a browser with a markdown
+extension, or VS Code.
+
+**Invocation:** `agenthud summary -o` (or `--open`)
+
+**Behavior:**
+- Native spawn (`open` on macOS, `xdg-open` / `wslview` on Linux/WSL,
+  `cmd /c start` on Windows). No extra dependency.
+- WSL detection prefers `wslview` over `xdg-open` when both are on
+  PATH (v0.12.2).
+- Spawn errors and non-zero exit codes from the opener are
+  surfaced on stderr instead of failing silently (v0.12.2 fix).
+- Works across daily, range, and cache-hit paths.
+- Combinable with `-I`: `-oI` opens both the summary and the
+  index (POSIX short-flag clusters land in v0.12.3).
+
+**Available since:** v0.12.0.
+
+## Summaries index
+
+Auto-managed markdown hub at `~/.agenthud/summaries/index.md`
+listing every daily and range summary, grouped year → month →
+newest-first, with a one-line snippet and `(Sun)`-style weekday
+tag per row.
+
+**Invocation:** `agenthud summary -I` (or `--open-index`).
+Combinable with `-o`: `-oI` opens both.
+
+**Behavior:**
+- Regenerated automatically after every successful summary write
+  (daily, range, or cache hit).
+- Each summary file gets a backlink footer prepended:
+  `[← all summaries] · [← prev] · [next →]` wrapped in HTML
+  comment markers so re-runs replace cleanly.
+- `-I` works even on empty days (v0.12.3 fix) — the index hub is
+  meant for navigation, not gated on whether today produced new
+  content.
+
+**Available since:** v0.12.0.
+
+## Subagent reporting
+
+Task tool delegations to sub-agents are surfaced in `report` and
+`summary` output. Previously every Task call was silently dropped
+from the markdown report — meaning LLM summaries described a
+near-empty day whenever you delegated work.
+
+**Activation:** included by default in
+`DEFAULT_INCLUDE_TYPES = [user, response, bash, edit, thinking,
+task]`. Opt out per-run with `--include user,response,bash,edit`,
+or persistently by omitting `task` from `report.include` in
+`~/.agenthud/config.yaml`.
+
+**Output:** the parent's Task row shows the task description as
+usual. Below it, a `<task-result>…</task-result>` XML block
+contains the subagent's returned text (truncated by
+`--detail-limit`). The XML tag form survives subagent output that
+contains code fences, horizontal rules, or yaml frontmatter —
+content can't forge the boundary.
+
+**Other tools** (Edit, Write, Read) deliberately keep their
+`detailBody` *out* of the markdown report to keep payload size
+bounded. The TUI detail view still renders those bodies on `↵`.
+
+**Available since:** v0.13.0.
+
+## Config
+
+Global config at `~/.agenthud/config.yaml`. Auto-created on first
+run with sensible defaults. Hidden items (per-user UI state) live
+in a sibling `~/.agenthud/state.yaml`, app-managed (v0.9.0 split).
+
+**Resolution order for `report` / `summary` options:**
+`CLI flag → summary.<key> → report.<key> → built-in default`.
+Effective values are echoed to stderr at the start of each run.
+
+**Schema (current defaults shown):**
+
+```yaml
+refreshIntervalMs: 2000
+
+# Hidden from the tree (managed via 'h' key)
+hiddenProjects: []
+hiddenSessions: []
+hiddenSubAgents: []
+
+# Activity filter presets (cycle with 'f' key)
+# "all" / "*" / "any" / [] all mean unfiltered
+filterPresets:
+  - ["all"]
+  - ["response", "user"]
+  - ["commit"]
+
+# Defaults for `agenthud report` (CLI flags still win per-invocation)
+report:
+  include: [user, response, bash, edit, thinking, task]
+  detailLimit: 120
+  withGit: false
+  format: markdown
+
+# Defaults for `agenthud summary` (inherits from report.* when omitted)
+summary: {}
 ```
 
-## GitPanel Component
+**Allowed `include` types:** `user`, `response`, `bash`, `edit`,
+`thinking`, `read`, `glob`, `commit`, `task`.
 
-- **Added**: 2026-01-09
-- **Issue**: #3
-- **Status**: Complete
-- **Tests**: `tests/GitPanel.test.tsx`
-- **Source**: `src/ui/GitPanel.tsx`
+**Available since:** v0.9.0 in current shape; `report.*` /
+`summary.*` config-driven defaults v0.12.0; `task` type v0.13.0.
 
-### Usage
+## Effective options
 
-```tsx
-import { GitPanel } from "./ui/GitPanel.js";
-
-<GitPanel
-  branch="feat/1-git-data"
-  commits={commits}
-  stats={{ added: 142, deleted: 23 }}
-/>
-```
-
-### Display
+At the start of every `report` and `summary` run, agenthud writes
+a one-line summary of the effective options to stderr:
 
 ```
-┌─ Git ────────────────────────────────────┐
-│ Branch: feat/1-git-data                  │
-├──────────────────────────────────────────┤
-│ Today: +142 -23 (3 commits)              │
-│ • abc1234 Add login feature              │
-│ • def5678 Fix bug                        │
-│ • 890abcd Update docs                    │
-└──────────────────────────────────────────┘
+report → include=[user,response,bash,edit,thinking,task] detail-limit=120 with-git=off format=markdown
+prompt = ~/.agenthud/summary-prompt.md
 ```
 
-### Props
+Tells you what was actually used. No surprises about hidden
+hard-coded defaults.
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `branch` | `string \| null` | Current branch name |
-| `commits` | `Commit[]` | Today's commits (max 5 shown) |
-| `stats` | `GitStats` | Lines added/deleted |
+**Available since:** v0.12.0.
 
-## CLI Entry Point
+---
 
-- **Added**: 2026-01-09
-- **Issue**: #5
-- **Status**: Complete
-- **Tests**: `tests/cli.test.ts`, `tests/App.test.tsx`
-- **Source**: `src/cli.ts`, `src/index.ts`, `src/ui/App.tsx`
+## Keybindings
 
-### Usage
+Sourced from `src/ui/HelpPanel.tsx:SECTIONS` — the same content
+the `?` overlay renders in-app.
 
-```bash
-# Watch mode (default) - refreshes every 5 seconds
-agenthud
-agenthud --watch
-agenthud -w
-
-# One-shot mode - print and exit
-agenthud --once
-```
-
-### Keyboard Shortcuts (watch mode)
+### Project tree
 
 | Key | Action |
-|-----|--------|
-| `q` | Quit |
-| `r` | Refresh immediately |
-
-### Building
-
-```bash
-npm run build
-node dist/index.js --once
-```
-
-## PlanPanel Component
-
-- **Added**: 2026-01-09
-- **Issue**: #9
-- **Status**: Complete
-- **Tests**: `tests/plan.test.ts`, `tests/PlanPanel.test.tsx`
-- **Source**: `src/data/plan.ts`, `src/ui/PlanPanel.tsx`
-
-### Display
-
-```
-┌─ Plan ───────────────────────────────────┐
-│ Build agenthud CLI tool           │
-├──────────────────────────────────────────┤
-│ ✓ Set up project                         │
-│ ✓ Implement git data collection          │
-│ → Create GitPanel UI component           │
-│ ○ Add CLI entry point                    │
-├──────────────────────────────────────────┤
-│ 2/4 steps done                           │
-├─ Decisions ──────────────────────────────┤
-│ • Use Ink for terminal UI                │
-│ • Use dependency injection for testing   │
-└──────────────────────────────────────────┘
-```
-
-### Data Sources
-
-| File | Required | On Missing |
-|------|----------|------------|
-| `.agenthud/plan.json` | Yes | "No plan found" |
-| `.agenthud/decisions.json` | No | Hide section |
-
-### Status Icons
-
-| Status | Icon | Color |
-|--------|------|-------|
-| done | ✓ | green |
-| in-progress | → | yellow |
-| pending | ○ | dim |
-
-### Props
-
-| Prop | Type | Description |
-|------|------|-------------|
-| `plan` | `Plan \| null` | Plan data |
-| `decisions` | `Decision[]` | Recent decisions (max 3) |
-| `error` | `string?` | Error message |
-
-## TestPanel Component
-
-- **Added**: 2026-01-09
-- **Issue**: #11
-- **Status**: Complete
-- **Tests**: `tests/tests.test.ts`, `tests/TestPanel.test.tsx`
-- **Source**: `src/data/tests.ts`, `src/ui/TestPanel.tsx`, `scripts/save-test-results.ts`
-
-### Display
-
-```
-┌─ Tests ──────────────────────────────────┐
-│ ✓ 67 passed  ✗ 0 failed  · 860649e · 5m ago │
-└──────────────────────────────────────────┘
-```
-
-With failures:
-```
-┌─ Tests ──────────────────────────────────┐
-│ ✓ 30 passed  ✗ 2 failed  · abc1234 · 5m ago │
-├──────────────────────────────────────────┤
-│ ✗ tests/git.test.ts                      │
-│   • returns null                         │
-│ ✗ tests/App.test.tsx                     │
-│   • renders correctly                    │
-└──────────────────────────────────────────┘
-```
-
-Outdated (hash differs from HEAD):
-```
-│ ⚠ Outdated (3 commits behind)           │
-```
-
-### Saving Test Results
-
-```bash
-npm run test:save
-```
-
-Creates `.agenthud/test-results.json`:
-```json
-{
-  "hash": "abc1234",
-  "timestamp": "2026-01-09T16:00:00Z",
-  "passed": 67,
-  "failed": 0,
-  "skipped": 0,
-  "failures": []
-}
-```
-
-### Props
-
-| Prop | Type | Description |
-|------|------|-------------|
-| `results` | `TestResults \| null` | Test results data |
-| `isOutdated` | `boolean` | Hash differs from HEAD |
-| `commitsBehind` | `number` | Commits since test run |
-| `error` | `string?` | Error message |
-
-## Init Command
-
-- **Added**: 2026-01-10
-- **Issue**: #13
-- **Status**: Complete
-- **Tests**: `tests/init.test.ts`, `tests/WelcomePanel.test.tsx`
-- **Source**: `src/commands/init.ts`, `src/ui/WelcomePanel.tsx`
-
-### Usage
-
-```bash
-npx agenthud init
-```
-
-### Behavior
-
-1. **Welcome screen**: When running `agenthud` without `.agenthud/` directory:
-```
-┌─ Welcome to agenthud ────────────────────────────────────┐
-│                                                          │
-│   No .agenthud/ directory found.                            │
-│                                                          │
-│   Quick setup:                                           │
-│      npx agenthud init                                   │
-│                                                          │
-│   Or visit: github.com/neochoon/agenthud                 │
-│                                                          │
-│   Press q to quit                                        │
-└──────────────────────────────────────────────────────────┘
-```
-
-2. **Init command** creates:
-   - `.agenthud/plan.json`: `{}`
-   - `.agenthud/decisions.json`: `[]`
-   - `.agenthud/config.yaml`: Default config
-   - `.gitignore` with `.agenthud/` (or appends if exists)
-   - `CLAUDE.md` with Agent State section (or appends if exists)
-
-### Files Created
-
-| File | Content |
-|------|---------|
-| `.agenthud/plan.json` | `{}` |
-| `.agenthud/decisions.json` | `[]` |
-| `.agenthud/config.yaml` | Default config |
-| `.gitignore` | `.agenthud/` |
-| `CLAUDE.md` | Agent State section |
-
-### CLAUDE.md Section
-
-```markdown
-## Agent State
-
-Maintain `.agenthud/` directory:
-- Update `plan.json` when plan changes
-- Append to `decisions.json` for key decisions
-```
-
-## Config System
-
-- **Added**: 2026-01-10
-- **Issue**: #17, #19
-- **Status**: Complete
-- **Tests**: `tests/config.test.ts`, `tests/config-integration.test.tsx`, `tests/runner.test.ts`
-- **Source**: `src/config/parser.ts`, `src/runner/command.ts`, `src/data/git.ts`, `src/data/plan.ts`
-
-### Configuration File
-
-Create `.agenthud/config.yaml`:
-
-```yaml
-# agenthud configuration
-panels:
-  git:
-    enabled: true
-    interval: 30s
-    command:
-      branch: git branch --show-current
-      commits: git log --since=midnight --pretty=format:"%h|%aI|%s"
-      stats: git log --since=midnight --numstat --pretty=format:""
-
-  plan:
-    enabled: true
-    interval: 10s
-    source: .agenthud/plan.json
-
-  tests:
-    enabled: true
-    interval: manual
-    command: npm test -- --reporter=json
-```
-
-### Panel Options
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `enabled` | `boolean` | Show/hide panel |
-| `interval` | `string` | Refresh interval (`30s`, `5m`, `manual`) |
-| `command` | `string/object` | Shell command(s) to run |
-| `source` | `string` | (plan only) Path to plan.json |
-
-### Config-Driven Data
-
-| Panel | Data Source | Config Field |
-|-------|-------------|--------------|
-| Git | Shell commands | `git.command.{branch,commits,stats}` |
-| Plan | File read | `plan.source` |
-| Tests | Shell command | `tests.command` |
-
-### Interval Values
-
-| Value | Description |
-|-------|-------------|
-| `30s` | Refresh every 30 seconds |
-| `5m` | Refresh every 5 minutes |
-| `manual` | Only refresh on 'r' key press |
-
-### Per-Panel Refresh
-
-Each panel refreshes independently based on its `interval`:
-- Git: Default 30s (doesn't change often)
-- Plan: Default 10s (Claude updates it frequently)
-- Tests: Default manual (expensive to run)
-
-### Command Runner
-
-When `command` is specified for tests panel, agenthud will:
-1. Execute the command
-2. Parse JSON output (Vitest format)
-3. Display results in Tests panel
-
-```yaml
-panels:
-  tests:
-    enabled: true
-    interval: manual
-    command: npm test -- --reporter=json
-```
-
-### Default Behavior
-
-- No config.yaml: Uses hardcoded defaults
-- Missing field: Uses default silently
-- Invalid field: Shows warning, uses default
-
-## Generic Panel Component
-
-- **Added**: 2026-01-10
-- **Issue**: #21
-- **Status**: Complete
-- **Tests**: `tests/GenericPanel.test.tsx`, `tests/config.test.ts`
-- **Source**: `src/ui/GenericPanel.tsx`, `src/data/custom.ts`, `src/config/parser.ts`
-
-### Overview
-
-GenericPanel allows users to define custom panels in config.yaml that display data from shell commands or JSON files.
-
-### Configuration
-
-```yaml
-panels:
-  # Custom panel with shell command
-  docker:
-    enabled: true
-    command: docker ps --format '{"title":"Docker","items":[...]}'
-    renderer: list
-    interval: 30s
-
-  # Custom panel with file source
-  status:
-    enabled: true
-    source: .agenthud/status.json
-    renderer: status
-    interval: manual
-```
-
-### Renderer Types
-
-| Type | Use Case | Display |
-|------|----------|---------|
-| `list` | Default, bullet points | `• item 1`<br>`• item 2` |
-| `progress` | Checklist with progress bar | `┌─ Title ──── 7/10 ███████░░░ ─┐` |
-| `status` | Pass/fail summary | `✓ 10 passed  ✗ 2 failed` |
-
-### Data Format
-
-Commands and source files should output JSON in this format:
-
-```typescript
-interface GenericPanelData {
-  title: string;           // Panel title
-  summary?: string;        // One-line summary
-  items?: Array<{
-    text: string;
-    status?: "done" | "pending" | "failed";
-  }>;
-  progress?: {
-    done: number;
-    total: number;
-  };
-  stats?: {
-    passed: number;
-    failed: number;
-    skipped?: number;
-  };
-}
-```
-
-### Examples
-
-#### List Renderer
-```json
-{
-  "title": "Docker",
-  "summary": "3 containers running",
-  "items": [
-    { "text": "nginx:latest" },
-    { "text": "redis:alpine" },
-    { "text": "postgres:15" }
-  ]
-}
-```
-
-Display:
-```
-┌─ Docker ──────────────────────────────── ↻ 25s ─┐
-│ 3 containers running                            │
-│ • nginx:latest                                  │
-│ • redis:alpine                                  │
-│ • postgres:15                                   │
-└─────────────────────────────────────────────────┘
-```
-
-#### Progress Renderer
-```json
-{
-  "title": "Build",
-  "progress": { "done": 7, "total": 10 },
-  "items": [
-    { "text": "Compile", "status": "done" },
-    { "text": "Test", "status": "done" },
-    { "text": "Deploy", "status": "pending" }
-  ]
-}
-```
-
-Display:
-```
-┌─ Build ───────────────────── 7/10 ███████░░░ ─┐
-│ ✓ Compile                                      │
-│ ✓ Test                                         │
-│ ○ Deploy                                       │
-└────────────────────────────────────────────────┘
-```
-
-#### Status Renderer
-```json
-{
-  "title": "Lint",
-  "stats": { "passed": 100, "failed": 0 }
-}
-```
-
-Display:
-```
-┌─ Lint ──────────────────────────── just now ─┐
-│ ✓ 100 passed                                  │
-└───────────────────────────────────────────────┘
-```
-
-### Line-Separated Output
-
-If the command output is not valid JSON, each line becomes an item:
-
-```bash
-# Command output:
-nginx
-redis
-postgres
-
-# Displayed as:
-┌─ Containers ─────────────────────────────────┐
-│ • nginx                                       │
-│ • redis                                       │
-│ • postgres                                    │
-└───────────────────────────────────────────────┘
-```
-
-### Hotkeys for Manual Panels
-
-Custom panels with `interval: manual` get auto-assigned hotkeys:
-- First letter of panel name
-- Next letter if conflict
-
-Status bar shows: `d: run docker · t: run tests · r: refresh · q: quit`
-
-### Props
-
-| Prop | Type | Description |
-|------|------|-------------|
-| `data` | `GenericPanelData` | Panel data |
-| `renderer` | `"list" \| "progress" \| "status"` | Renderer type |
-| `countdown` | `number \| null` | Countdown seconds |
-| `relativeTime` | `string` | Relative time (for manual) |
-| `error` | `string` | Error message |
-
-## Visual Feedback for Refresh/Run
-
-- **Added**: 2026-01-10
-- **Issue**: #23
-- **Status**: Complete
-- **Tests**: `tests/GitPanel.test.tsx`, `tests/PlanPanel.test.tsx`, `tests/TestPanel.test.tsx`, `tests/GenericPanel.test.tsx`
-- **Source**: `src/ui/App.tsx`, `src/ui/GitPanel.tsx`, `src/ui/PlanPanel.tsx`, `src/ui/TestPanel.tsx`, `src/ui/GenericPanel.tsx`, `src/data/git.ts`, `src/data/custom.ts`
-
-### Overview
-
-Panels now provide visual feedback when refreshing or running commands:
-
-1. **"running..."** in yellow while command executes
-2. **"just now"** in green for 1.5s after completion
-3. **Countdown in green** for 1.5s when timer resets
-
-### Async Command Execution
-
-Commands now execute asynchronously, allowing the UI to remain responsive:
-- Git panel commands run in parallel
-- Custom panel commands run independently
-- UI updates immediately when command starts
-
-### Visual States
-
-| State | Display | Duration | Panels |
-|-------|---------|----------|--------|
-| Running | "running..." (yellow) | While executing | Git, Tests, Custom |
-| Just Completed | "just now" (green) | 1.5s | Tests |
-| Just Refreshed | Countdown in green | 1.5s | Git, Plan, Custom |
-
-### Props Added
-
-#### GitPanel
-| Prop | Type | Description |
-|------|------|-------------|
-| `isRunning` | `boolean` | Shows "running..." in title |
-| `justRefreshed` | `boolean` | Shows countdown in green |
-
-#### PlanPanel
-| Prop | Type | Description |
-|------|------|-------------|
-| `justRefreshed` | `boolean` | Shows "just now" in title |
-| `relativeTime` | `string` | Relative time display |
-
-#### TestPanel
-| Prop | Type | Description |
-|------|------|-------------|
-| `isRunning` | `boolean` | Shows "running..." in title |
-| `justCompleted` | `boolean` | Shows "just now" in title |
-
-#### GenericPanel
-| Prop | Type | Description |
-|------|------|-------------|
-| `isRunning` | `boolean` | Shows "running..." in title |
-| `justRefreshed` | `boolean` | Shows countdown in green |
-
-### Example Display
-
-Normal state:
-```
-┌─ Git ────────────────────────────────── ↻ 25s ─┐
-```
-
-Running:
-```
-┌─ Git ─────────────────────────────── running... ─┐
-```
-
-Just refreshed (countdown in green for 1.5s):
-```
-┌─ Git ────────────────────────────────── ↻ 30s ─┐
-```
-
-## ProjectPanel Component
-
-- **Added**: 2026-01-11
-- **Issue**: #25
-- **Status**: Complete
-- **Tests**: `tests/project.test.ts`, `tests/ProjectPanel.test.tsx`
-- **Source**: `src/data/project.ts`, `src/ui/ProjectPanel.tsx`
-
-### Overview
-
-ProjectPanel displays project information including name, language, license, stack, file/line counts, and dependency counts.
-
-### Display
-
-```
-┌─ Project ────────────────────────────── ↻ 300s ─┐
-│ agenthud · TypeScript · MIT                     │
-│ Stack: ink, react, vitest                       │
-│ Files: 44 ts · Lines: 3.5k                      │
-│ Deps: 3 prod · 8 dev                            │
-└─────────────────────────────────────────────────┘
-```
-
-For Python projects:
-```
-┌─ Project ────────────────────────────── ↻ 300s ─┐
-│ my-api · Python · MIT                           │
-│ Stack: fastapi, pytest, sqlalchemy              │
-│ Files: 28 py · Lines: 2.1k                      │
-│ Deps: 8                                         │
-└─────────────────────────────────────────────────┘
-```
-
-### Data Sources
-
-| Data | Source |
-|------|--------|
-| Name | `package.json`, `pyproject.toml`, or folder name |
-| Language | tsconfig.json, package.json, pyproject.toml, go.mod, etc. |
-| License | `package.json`, `pyproject.toml` |
-| Stack | Well-known dependencies (react, django, etc.) |
-| Files | `find` command on src/lib/app directories |
-| Lines | `wc -l` on source files |
-| Dependencies | `package.json`, `pyproject.toml` |
-
-### Language Detection
-
-First match wins:
-
-| Indicator File | Language |
-|----------------|----------|
-| `tsconfig.json` | TypeScript |
-| `package.json` | JavaScript |
-| `pyproject.toml` | Python |
-| `requirements.txt` | Python |
-| `setup.py` | Python |
-| `go.mod` | Go |
-| `Cargo.toml` | Rust |
-| `Gemfile` | Ruby |
-| `pom.xml` | Java |
-| `build.gradle` | Java |
-
-### Stack Detection
-
-Well-known frameworks and tools (max 5, frameworks prioritized):
-
-**JS/TS**: react, vue, angular, express, fastify, ink, vitest, jest, webpack, vite
-**Python**: django, flask, fastapi, pytest, pandas, numpy, tensorflow, pytorch
-
-### Configuration
-
-```yaml
-panels:
-  project:
-    enabled: true
-    interval: 5m  # doesn't change often
-```
-
-### Props
-
-| Prop | Type | Description |
-|------|------|-------------|
-| `data` | `ProjectData` | Project information |
-| `countdown` | `number \| null` | Countdown seconds |
-| `width` | `number` | Panel width |
-| `justRefreshed` | `boolean` | Shows countdown in green |
-
-## Panel-Based Folder Structure
-
-- **Added**: 2026-01-11
-- **Issue**: #27
-- **Status**: Complete
-- **Tests**: `tests/init.test.ts`, `tests/plan.test.ts`, `tests/tests.test.ts`
-- **Source**: `src/commands/init.ts`, `src/data/plan.ts`, `src/data/tests.ts`, `src/config/parser.ts`
-
-### Overview
-
-The `.agenthud/` folder now uses a panel-based structure:
-
-```
-.agenthud/
-├── config.yaml
-├── plan/
-│   ├── plan.json
-│   └── decisions.json
-└── tests/
-    └── results.json
-```
-
-### Backwards Compatibility
-
-- **New projects**: Get the new folder structure on `agenthud init`
-- **Old projects**: Keep working with old locations (`.agenthud/plan.json`, `.agenthud/decisions.json`)
-- **Fallback logic**: Checks new location first, falls back to old location
-- **No migration**: No auto-migration or warnings
-
-### Init Command
-
-Creates the new structure:
-
-| Path | Content |
-|------|---------|
-| `.agenthud/` | Root directory |
-| `.agenthud/plan/` | Plan panel directory |
-| `.agenthud/tests/` | Tests panel directory |
-| `.agenthud/config.yaml` | Configuration file |
-| `.agenthud/plan/plan.json` | Plan data |
-| `.agenthud/plan/decisions.json` | Decisions list |
-
-### Config Defaults
-
-```yaml
-panels:
-  plan:
-    enabled: true
-    interval: 10s
-    source: .agenthud/plan/plan.json  # New location
-
-  tests:
-    enabled: true
-    interval: manual
-    command: npx vitest run --reporter=json
-    # source: .agenthud/tests/results.json  # Optional
-```
-
-### Tests Panel Source Option
-
-The tests panel now supports both `command` and `source` options:
-
-| Option | Priority | Behavior |
-|--------|----------|----------|
-| `command` | 1 | Run command and parse output |
-| `source` | 2 | Read from JSON file |
-
-If both are set, `command` takes priority.
-
-### Plan Fallback Logic
-
-```
-1. Check .agenthud/plan/plan.json (new location)
-2. If not found, check .agenthud/plan.json (old location)
-3. Same fallback for decisions.json
-```
-
-## ClaudePanel Component
-
-- **Added**: 2026-01-12
-- **Issue**: #29
-- **Status**: Complete
-- **Tests**: `tests/claude.test.ts`
-- **Source**: `src/data/claude.ts`, `src/ui/ClaudePanel.tsx`
-
-### Overview
-
-ClaudePanel displays real-time status of Claude Code sessions running in the current project.
-
-### Display
-
-Active session (running):
-```
-┌─ Claude ─────────────────────────────────── 🔄 08:37 ─┐
-│ "Show me the dotfiles structure"                      │
-│ → Bash: find /Users/neochoon/dotfiles -maxdepth 3...  │
-└───────────────────────────────────────────────────────┘
-```
-
-Active session (completed):
-```
-┌─ Claude ─────────────────────────────────── ✅ 08:37 ─┐
-│ "Show me the dotfiles structure"                      │
-│ ✓ Completed · 305 tokens · 12s                        │
-└───────────────────────────────────────────────────────┘
-```
-
-No active session:
-```
-┌─ Claude ──────────────────────────────────────────────┐
-│ No active session                                     │
-└───────────────────────────────────────────────────────┘
-```
-
-### Data Source
-
-Claude Code stores session data in JSONL files:
-
-```
-~/.claude/projects/-{project-path-with-dashes}/*.jsonl
-```
-
-Example:
-- Project: `/Users/neochoon/agenthud`
-- Session files: `~/.claude/projects/-Users-neochoon-agenthud/*.jsonl`
-
-### Status Icons
-
-| Icon | Status | Description |
-|------|--------|-------------|
-| 🔄 | running | Activity within 30 seconds |
-| ✅ | completed | Activity within 30s-5min |
-| ⏳ | idle | No activity for 5+ minutes |
-| - | none | No session file found |
-
-### Configuration
-
-```yaml
-panels:
-  claude:
-    enabled: true
-    interval: 2s  # Fast refresh for real-time monitoring
-```
-
-### Functions
-
-| Function | Description | Return Type |
-|----------|-------------|-------------|
-| `getClaudeSessionPath(projectPath)` | Convert project path to session directory | `string` |
-| `findActiveSession(sessionDir)` | Find most recent active session file | `string \| null` |
-| `parseSessionState(sessionFile)` | Parse session state from JSONL | `ClaudeSessionState` |
-| `getClaudeData(projectPath)` | Get Claude session data for project | `ClaudeData` |
-
-### Types
-
-```typescript
-type ClaudeSessionStatus = "running" | "completed" | "idle" | "none";
-
-interface ClaudeSessionState {
-  status: ClaudeSessionStatus;
-  lastUserMessage: string | null;
-  currentAction: string | null;  // e.g., "Bash: npm run build"
-  lastTimestamp: Date | null;
-  tokenCount: number;
-}
-
-interface ClaudeData {
-  state: ClaudeSessionState;
-  error?: string;
-  timestamp: string;
-}
-```
-
-### Props
-
-| Prop | Type | Description |
-|------|------|-------------|
-| `data` | `ClaudeData` | Claude session data |
-| `countdown` | `number \| null` | Countdown seconds |
-| `width` | `number` | Panel width |
-| `justRefreshed` | `boolean` | Shows countdown in green |
-
-## Startup Experience and UI Improvements
-
-- **Added**: 2026-01-17
-- **Issue**: #71
-- **Status**: Complete
-- **Tests**: `tests/utils/nodeVersion.test.ts`, `tests/data/sessionAvailability.test.ts`
-- **Source**: `src/utils/nodeVersion.ts`, `src/data/sessionAvailability.ts`, `src/main.ts`, `src/index.ts`
-
-### Overview
-
-Improved the startup experience for new users and fixed various UI layout issues that occur in edge cases.
-
-### Node.js Version Check
-
-Shows a friendly error message and exits gracefully when Node.js version is below 20:
-
-```
-Error: Node.js 20+ is required (current: v18.17.0)
-
-Please upgrade Node.js:
-  https://nodejs.org/
-```
-
-### Session Availability Check
-
-When no Claude session exists in the current directory:
-
-**Other projects have sessions:**
-```
-No Claude Code session found in current directory.
-
-Projects with Claude Code sessions:
-  - agenthud
-  - pain-radar
-  - my-api
-
-Run agenthud from one of these project directories.
-```
-
-**No sessions exist anywhere:**
-```
-Could not find any projects with Claude Code sessions.
-
-Start a Claude Code session in a project directory first:
-  $ claude
-```
-
-### Startup Flow
-
-```
-1. Check Node.js version >= 20
-   → No: Show error, exit
-
-2. Check Claude session in current directory
-   → No: Check other projects
-      → Has sessions: Show project list, exit
-      → No sessions: Show "not found" message, exit
-
-3. Check .agenthud/ directory
-   → No: Show Welcome screen (init suggestion)
-   → Yes: Show dashboard
-```
-
-### Git Error Suppression
-
-Suppressed "fatal: not a git repository" error messages in non-git directories by adding `stdio: 'pipe'` to all `execSync` calls in git.ts.
-
-### Other Sessions Panel Fixes
-
-- Replaced ambiguous-width emojis with ASCII characters:
-  - `📁` → removed
-  - `⚡` → `*`
-  - `🔵` → `*` (active)
-  - `⚪` → `o` (inactive)
-- Removed `clearEOL` escape sequence that broke 2-column layout
-- Added conditional coloring:
-  - Cyan for project names (when count > 0)
-  - Yellow for active count (when count > 0)
-  - Dim when counts are 0
-
-### Functions
-
-| Function | Description | Return Type |
-|----------|-------------|-------------|
-| `checkNodeVersion()` | Check Node.js version and exit if < 20 | `void` |
-| `hasCurrentProjectSession(cwd)` | Check if current project has Claude session | `boolean` |
-| `getProjectsWithSessions(cwd)` | Get list of other projects with sessions | `string[]` |
-| `checkSessionAvailability(cwd)` | Combined session availability check | `SessionAvailabilityResult`
+|---|---|
+| `↑` `↓` / `k` `j` | Move selection |
+| `←` | Jump to parent (sub-agent → session, session → project) |
+| `PgUp` / `Ctrl+B` | Page up |
+| `PgDn` / `Ctrl+F` | Page down |
+| `↵` | Expand/collapse project, session, or summary |
+| `h` | Hide selected (project / session / sub-agent) |
+| `t` | Track: auto-follow the newest live sub-agent (any nav key turns it off) |
+| `Tab` | Switch focus to activity viewer |
+| `r` | Refresh now |
+
+### Activity viewer
+
+| Key | Action |
+|---|---|
+| `↑` `↓` / `k` `j` | Scroll one line |
+| `PgUp` / `PgDn` / `Ctrl+B` / `Ctrl+F` | Scroll one page |
+| `Ctrl+U` / `Ctrl+D` | Scroll half page |
+| `g` | Jump to top (oldest) |
+| `G` | Jump to live (newest, bottom) |
+| `↵` | Open detail view for selected activity |
+| `f` | Cycle filter preset (set in `config.yaml`) |
+| `Tab` | Switch focus to project tree |
+
+### Detail view
+
+| Key | Action |
+|---|---|
+| `↑` `↓` / `k` `j` | Scroll |
+| `↵` / `Esc` / `q` | Close |
+
+### Always available
+
+| Key | Action |
+|---|---|
+| `?` | Toggle this help |
+| `q` | Quit (or close detail/help) |
+
+### Session status badges
+
+| Badge | Meaning | Color |
+|---|---|---|
+| `[hot]` | Updated in the last 30 minutes | green |
+| `[warm]` | Updated in the last hour | yellow |
+| `[cool]` | Updated earlier today | cyan |
+| `[cold]` | Last updated yesterday or earlier (collapsed by default) | gray |
+| `[working]` | Claude is mid-turn (tool running or about to respond) | green |
+| `[waiting]` | Claude yielded; ball is in your court (incl. `AskUserQuestion`) | magenta |
+
+`[working]` / `[waiting]` replace `[hot]` within the 30-minute window
+(v0.10.0); `warm/cool/cold` stay time-based.
+
+## Files & directories
+
+| Path | Purpose |
+|---|---|
+| `~/.agenthud/config.yaml` | User settings (edit freely) |
+| `~/.agenthud/state.yaml` | Hidden items (app-managed) |
+| `~/.agenthud/summary-prompt.md` | Daily summary prompt template (auto-copied on first run) |
+| `~/.agenthud/summary-range-prompt.md` | Range summary prompt template |
+| `~/.agenthud/summaries/` | Cached daily and range summaries |
+| `~/.agenthud/summaries/index.md` | Auto-generated navigable index |
+| `~/.claude/projects/` | Claude Code session JSONL files (read-only to agenthud) |
+
+## Environment variables
+
+| Variable | Effect |
+|---|---|
+| `CLAUDE_PROJECTS_DIR` | Override the Claude projects directory (default: `~/.claude/projects`). Useful for backups or mounted volumes. (v0.8.2) |
+| `WSL_DISTRO_NAME`, `/proc/version` markers | WSL detection (cached for the process; v0.12.4). Affects `--open` opener preference (`wslview` over `xdg-open`) and the cwd-home protection in legacy-config migration. |
+| `NODE_ENV` | Set to `production` by default in the bundled binary to disable React dev-mode profiler accumulation (~12× memory-leak reduction; v0.9.0). |
+| `FORCE_COLOR` / `NO_COLOR` | Honored by Ink for color output. |
+
+---
+
+_For the change history per version, see [CHANGELOG.md](./CHANGELOG.md). To
+report a bug or request a feature, see the [issue
+tracker](https://github.com/neochoon/agenthud/issues)._

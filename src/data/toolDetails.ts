@@ -12,21 +12,25 @@
  *   we render specially?"
  * - `detailBody` is opt-in per tool: Edit gives a unified diff,
  *   Write gives the written content, Read gives line-numbered
- *   content, Task gives the subagent's returned text. Bash and
- *   everything else return null so the TUI just shows the
- *   one-liner.
+ *   content, Task gives the subagent's returned text, Bash gives
+ *   stdout / stderr / `[interrupted]` marker. Everything else
+ *   returns null so the TUI just shows the one-liner.
  * - Task's body is intentionally exposed to the markdown report
  *   (see `reportGenerator.ts:formatTaskBody`). Other tools'
  *   bodies stay TUI-only to keep LLM payload size bounded.
  *
- * Gotcha:
+ * Gotchas:
  * - Claude Code's JSONL stores tool results in a `toolUseResult`
  *   field with shape-per-tool. `Write` puts content on
  *   `result.content`, `Read` on `result.file.content`, `Task`
  *   also on `result.content`, `Edit` puts a structured patch on
- *   `result.structuredPatch`. Defensive null checks throughout
- *   because Claude Code's schema isn't versioned and this code
- *   runs against logs going back months.
+ *   `result.structuredPatch`, `Bash` uses `result.stdout` /
+ *   `result.stderr` / `result.interrupted`. Defensive null checks
+ *   throughout because Claude Code's schema isn't versioned and
+ *   this code runs against logs going back months.
+ * - Bash result has no `exitCode` field — verified by grepping
+ *   the user's actual session JSONL files. `interrupted` and
+ *   stderr presence are the only success/failure-ish signals.
  */
 
 import { basename } from "node:path";
@@ -60,6 +64,13 @@ export interface ToolUseResult {
   statusChange?: { from?: string; to?: string };
   updatedFields?: string[];
   taskId?: string;
+  // Bash result shape (verified from real session JSONL): stdout +
+  // stderr strings, `interrupted` flag for user-cancelled commands.
+  // No exitCode field is emitted by Claude Code for Bash — `interrupted`
+  // and stderr presence are the only success/failure-ish signals.
+  stdout?: string;
+  stderr?: string;
+  interrupted?: boolean;
 }
 
 function stripAnsi(text: string): string {
@@ -172,6 +183,30 @@ function numberLines(content: string, start: number): string {
     .join("\n");
 }
 
+/**
+ * Compose the Bash detail body from stdout / stderr / interrupted.
+ * Returns null when there's nothing to show. Sections are separated
+ * by a blank line; the `--- stderr ---` divider sits tight against
+ * the stderr block (no blank line between divider and content) and
+ * only appears when stdout is non-empty (otherwise stderr stands on
+ * its own). `[interrupted]` marker tags user-cancelled commands so
+ * they don't look like silent successes.
+ */
+function formatBashBody(
+  stdout: string | undefined,
+  stderr: string | undefined,
+  interrupted: boolean | undefined,
+): string | null {
+  const out = stdout?.replace(/\n+$/, "");
+  const err = stderr?.replace(/\n+$/, "");
+  const sections: string[] = [];
+  if (out) sections.push(out);
+  if (err) sections.push(out ? `--- stderr ---\n${err}` : err);
+  if (interrupted) sections.push("[interrupted]");
+  if (sections.length === 0) return null;
+  return sections.join("\n\n");
+}
+
 export function buildToolDetailBody(
   name: string,
   input: ToolInput | undefined,
@@ -189,6 +224,20 @@ export function buildToolDetailBody(
   if (name === "Task") {
     const content = result?.content;
     if (content) return { text: content, kind: "code" };
+  }
+  // Bash: stdout + stderr + interrupted marker. TUI-only — the body
+  // never flows into the markdown report path (see reportGenerator's
+  // formatTaskBody which is the only one that unrolls a body inline).
+  // Bash output is high-volume and noisy; the row's one-line command
+  // label is enough for the LLM summary, and the full output is one
+  // `↵` keystroke away in the TUI for the user.
+  if (name === "Bash") {
+    const text = formatBashBody(
+      result?.stdout,
+      result?.stderr,
+      result?.interrupted,
+    );
+    if (text) return { text, kind: "code" };
   }
   if (name === "Read") {
     const content = result?.file?.content;

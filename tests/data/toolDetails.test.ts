@@ -313,4 +313,98 @@ describe("buildToolDetailBody", () => {
   it("Task: null when result has no content", () => {
     expect(buildToolDetailBody("Task", { description: "x" }, {})).toBeNull();
   });
+
+  it("Bash: stdout only, not interrupted → trims trailing newline", () => {
+    expect(
+      buildToolDetailBody(
+        "Bash",
+        { command: "ls" },
+        { stdout: "file1.ts\nfile2.ts\n", stderr: "", interrupted: false },
+      ),
+    ).toEqual({ text: "file1.ts\nfile2.ts", kind: "code" });
+  });
+
+  it("Bash: stderr only → just the stderr text", () => {
+    expect(
+      buildToolDetailBody(
+        "Bash",
+        { command: "cat missing" },
+        {
+          stdout: "",
+          stderr: "cat: missing: No such file or directory\n",
+          interrupted: false,
+        },
+      ),
+    ).toEqual({
+      text: "cat: missing: No such file or directory",
+      kind: "code",
+    });
+  });
+
+  it("Bash: stdout + stderr → stdout, blank, --- stderr ---, blank, stderr", () => {
+    expect(
+      buildToolDetailBody(
+        "Bash",
+        { command: "npm test" },
+        {
+          stdout: "PASS test1\nFAIL test2",
+          stderr: "warning: deprecation",
+          interrupted: false,
+        },
+      ),
+    ).toEqual({
+      text: "PASS test1\nFAIL test2\n\n--- stderr ---\nwarning: deprecation",
+      kind: "code",
+    });
+  });
+
+  it("Bash: interrupted appends [interrupted] marker after output", () => {
+    expect(
+      buildToolDetailBody(
+        "Bash",
+        { command: "long-running-thing" },
+        { stdout: "started...", stderr: "", interrupted: true },
+      ),
+    ).toEqual({ text: "started...\n\n[interrupted]", kind: "code" });
+  });
+
+  it("Bash: interrupted only, no output → just the [interrupted] marker", () => {
+    expect(
+      buildToolDetailBody(
+        "Bash",
+        { command: "sleep 100" },
+        { stdout: "", stderr: "", interrupted: true },
+      ),
+    ).toEqual({ text: "[interrupted]", kind: "code" });
+  });
+
+  it("Bash: null when result is missing", () => {
+    expect(
+      buildToolDetailBody("Bash", { command: "ls" }, undefined),
+    ).toBeNull();
+  });
+
+  it("Bash: null when all three fields are absent or empty", () => {
+    expect(buildToolDetailBody("Bash", { command: "ls" }, {})).toBeNull();
+    expect(
+      buildToolDetailBody(
+        "Bash",
+        { command: "ls" },
+        { stdout: "", stderr: "", interrupted: false },
+      ),
+    ).toBeNull();
+  });
+
+  it("Bash branch does not affect non-Bash tools (Edit unaffected)", () => {
+    // Sanity — adding the Bash branch shouldn't accidentally swallow
+    // results that happen to carry stdout-shaped fields for unrelated
+    // tools (defensive against future shape drift).
+    expect(
+      buildToolDetailBody(
+        "Edit",
+        { file_path: "/x/a.ts" },
+        { stdout: "should not be used" } as unknown as never,
+      ),
+    ).toBeNull();
+  });
 });

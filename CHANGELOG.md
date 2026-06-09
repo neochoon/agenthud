@@ -2,6 +2,55 @@
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-06-09
+
+### Added
+- **Bash stdout / stderr in TUI detail view.** Pressing `↵` on a
+  Bash row now shows the command's stdout and stderr (with a
+  `--- stderr ---` divider when both are present), plus an
+  `[interrupted]` marker for user-cancelled commands. Previously
+  only the one-line command label was visible. TUI-only — Bash
+  output stays out of the `report` / `summary` markdown payload
+  so the LLM input doesn't balloon on `npm test`-style runs.
+
+### Fixed
+- **Activity viewer cursor stayed at the same screen row when new
+  entries arrived in LIVE mode, silently sliding the highlight to
+  a newer activity.** Now the cursor anchors to its activity:
+  walks up the screen as new entries push the live edge forward,
+  and when it would scroll off the top, auto-pauses and freezes
+  the view on the same snapshot (so `[PAUSED ↑N +M↓]` reflects
+  exactly where you are and how many you've missed). Per-render
+  scroll bump moved from `refresh` into a centralized useEffect
+  on `mergedActivities.length` so it fires regardless of which
+  code path updates activities.
+
+### Docs
+- **FEATURES.md rewritten from scratch for v0.13.0.** The
+  original was last touched in early January 2026 and every H2
+  section referenced code that no longer exists. Replaced with a
+  feature-centric reference matching what ships today: overview
+  matrix at the top, one H2 per user-facing feature, plus
+  cross-cutting sections for keybindings, files, and env vars.
+  954 lines → 451.
+- **README slimmed to a landing page; FEATURES.md is the
+  reference.** 314 lines → 94. README keeps the pitch, install,
+  platform note, quickstart, ASCII screenshot, and brief config
+  overview; everything else links to FEATURES.md anchors.
+- **File-header convention applied across all 31 source files**
+  (purpose / design decisions / gotchas). Convention itself
+  documented in global `~/.claude/CLAUDE.md`. Documents
+  non-obvious decisions in place so future-me / others don't
+  re-litigate them.
+- **`BACKLOG.md`** for items flagged or discussed but deliberately
+  deferred. Issues stay for actionable work; the file is for the
+  "noted but parked" pile.
+- **Daily summary prompt refined.** Explicit icon legend so the
+  LLM doesn't have to guess `○ ~ $ * @ » < > … ◆`, multi-project
+  awareness, first-person retro voice, light-day fallback to a
+  short paragraph instead of padding empty sections, sharper "do
+  NOT" list.
+
 ## [0.13.0] - 2026-06-08
 
 ### Added

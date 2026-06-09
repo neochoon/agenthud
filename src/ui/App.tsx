@@ -69,6 +69,7 @@ import { useHotkeys } from "./hooks/useHotkeys.js";
 import { useSpinner } from "./hooks/useSpinner.js";
 import { useTick } from "./hooks/useTick.js";
 import { SessionTreePanel } from "./SessionTreePanel.js";
+import { adjustViewerCursorOnNewActivities } from "./viewerCursor.js";
 
 const VIEWER_HEIGHT_FRACTION = 0.55;
 
@@ -451,12 +452,23 @@ export function App({
     allFlatRef.current = allFlat;
   }, [allFlat]);
 
-  const activitiesLengthRef = useRef(0);
   const activitiesRef = useRef<ActivityEntry[]>(activities);
   useEffect(() => {
-    activitiesLengthRef.current = activities.length;
     activitiesRef.current = activities;
   }, [activities]);
+
+  // Snapshot of the previous merged-activity count, used by the
+  // cursor-anchor effect below. Refs (not state) because the value
+  // changes per render but never needs to trigger one.
+  const prevMergedCountRef = useRef(0);
+
+  // Snapshot of the previous merged-activity count specifically for
+  // the PAUSED-mode scrollOffset/newCount bump. Separate from
+  // `prevMergedCountRef` because the cursor-anchor effect and the
+  // paused-bump effect process the same delta from different angles
+  // and at different times — sharing one ref creates a missed-update
+  // race when both fire in the same render cycle.
+  const prevPausedCountRef = useRef(0);
 
   // Load activities whenever selected session changes.
   // Only resets cursor/scroll when the loaded FILE changes (selection moved or
@@ -589,13 +601,13 @@ export function App({
     setSessionTree(tree);
     if (!node || !node.filePath) return;
     const newActivities = parseSessionHistory(node.filePath);
-    const delta = newActivities.length - activitiesLengthRef.current;
     setActivities(newActivities);
-    if (!isLive && delta > 0) {
-      setScrollOffset((o) => o + delta);
-      setNewCount((n) => n + delta);
-    }
-  }, [selectedId, isLive, expandedIds, tracking, discoverOptions]);
+    // The PAUSED-mode delta bump for scrollOffset / newCount lives
+    // in a centralized useEffect below — see `prevPausedCountRef`.
+    // Keeping it out of here ensures the bump fires regardless of
+    // which path updates activities (refresh or the redundant
+    // useEffect 488 reparse on every sessionTree change).
+  }, [selectedId, expandedIds, tracking, discoverOptions]);
 
   // Keep a stable ref so the watcher callback always calls the latest refresh
   const refreshRef = useRef(refresh);
@@ -682,6 +694,70 @@ export function App({
   const treeRows = Math.max(1, Math.min(naturalTreeRows, maxTreeRows));
   // statusBar(1) + margin(1) + tree(treeRows+2) + margin(1) + viewer(viewerRows+2) = height
   const viewerRows = Math.max(5, height - 7 - treeRows);
+
+  // Keep the viewer cursor anchored to its activity when new entries
+  // arrive in LIVE mode. Without this, the visible window auto-scrolls
+  // to show new content but cursorLine stays at the same screen row —
+  // the highlighted activity silently slides forward. When the cursor
+  // would scroll off the top, the helper switches to PAUSED so the
+  // view freezes on the same snapshot and the cursor's activity stays
+  // put. Math is in viewerCursor.ts; this effect just feeds it the
+  // current snapshot and applies the resulting state changes.
+  //
+  // State updates intentionally live at the top of the effect body
+  // (not inside `setViewerCursorLine`'s functional updater) — mixing
+  // side-effect setStates inside an updater can fire twice in Strict
+  // Mode and double-count the auto-pause scroll/badge delta.
+  useEffect(() => {
+    const prev = prevMergedCountRef.current;
+    prevMergedCountRef.current = mergedActivities.length;
+    const result = adjustViewerCursorOnNewActivities({
+      prevCursorLine: viewerCursorLine,
+      prevActivityCount: prev,
+      newActivityCount: mergedActivities.length,
+      isLive,
+      viewerRows,
+    });
+    if (result.cursorLine !== viewerCursorLine) {
+      setViewerCursorLine(result.cursorLine);
+    }
+    if (result.autoPause) {
+      setIsLive(false);
+      setScrollOffset((o) => o + result.scrollDelta);
+      setNewCount((n) => n + result.scrollDelta);
+    }
+  }, [mergedActivities.length, isLive, viewerRows, viewerCursorLine]);
+
+  // While PAUSED, keep the view frozen on its current snapshot as new
+  // entries arrive — bump `scrollOffset` and `newCount` by the delta
+  // so (a) `activities.slice(end - rows, end)` keeps showing the same
+  // window, and (b) the `+N↓` badge reflects how many new entries the
+  // user has yet to catch up to.
+  //
+  // This used to live inline in `refresh` as the
+  // `if (!isLive && delta > 0)` block, but that missed updates from
+  // useEffect 488's "redundant" re-parse of the JSONL on every
+  // sessionTree change. Hoisting it here means any source that grows
+  // mergedActivities triggers the bump correctly.
+  //
+  // Coordination with the auto-PAUSE useEffect above:
+  // - On the LIVE→PAUSED transition, auto-PAUSE bumps by the overflow
+  //   amount and `prevPausedCountRef` was 0 (or the merged count
+  //   before the transition). This effect runs in the SAME render
+  //   with isLive still true (state hasn't propagated yet), so the
+  //   `!isLive` guard skips the duplicate bump.
+  // - On the next render with isLive=false, prev === current →
+  //   delta=0, no bump. Auto-PAUSE noOps (cursor already at max).
+  // - From then on, only this effect bumps as new entries arrive.
+  useEffect(() => {
+    const prev = prevPausedCountRef.current;
+    prevPausedCountRef.current = mergedActivities.length;
+    if (!isLive && mergedActivities.length > prev) {
+      const delta = mergedActivities.length - prev;
+      setScrollOffset((o) => o + delta);
+      setNewCount((n) => n + delta);
+    }
+  }, [mergedActivities.length, isLive]);
 
   // Spinner and flashlight tick on the same cadence (150ms) so the entire
   // App re-renders ~6.7 times per second instead of 10 — measurably less

@@ -452,10 +452,8 @@ export function App({
     allFlatRef.current = allFlat;
   }, [allFlat]);
 
-  const activitiesLengthRef = useRef(0);
   const activitiesRef = useRef<ActivityEntry[]>(activities);
   useEffect(() => {
-    activitiesLengthRef.current = activities.length;
     activitiesRef.current = activities;
   }, [activities]);
 
@@ -464,16 +462,13 @@ export function App({
   // changes per render but never needs to trigger one.
   const prevMergedCountRef = useRef(0);
 
-  // Live mirror of `isLive` so the polling refresh callback below can
-  // read the current value rather than the stale one captured at the
-  // time `refresh` was last memoized by useCallback. Without this,
-  // the very first refresh fire after an auto-PAUSE transition keeps
-  // running the LIVE branch (skipping the scrollOffset/newCount bump)
-  // because the closure still has isLive=true.
-  const isLiveRef = useRef(isLive);
-  useEffect(() => {
-    isLiveRef.current = isLive;
-  }, [isLive]);
+  // Snapshot of the previous merged-activity count specifically for
+  // the PAUSED-mode scrollOffset/newCount bump. Separate from
+  // `prevMergedCountRef` because the cursor-anchor effect and the
+  // paused-bump effect process the same delta from different angles
+  // and at different times — sharing one ref creates a missed-update
+  // race when both fire in the same render cycle.
+  const prevPausedCountRef = useRef(0);
 
   // Load activities whenever selected session changes.
   // Only resets cursor/scroll when the loaded FILE changes (selection moved or
@@ -606,16 +601,12 @@ export function App({
     setSessionTree(tree);
     if (!node || !node.filePath) return;
     const newActivities = parseSessionHistory(node.filePath);
-    const delta = newActivities.length - activitiesLengthRef.current;
     setActivities(newActivities);
-    // Read isLive through the ref to avoid the stale-closure race that
-    // skips the PAUSED-mode delta bump on the first poll right after
-    // an auto-PAUSE transition (when the useCallback closure still has
-    // isLive=true even though state has flipped to false).
-    if (!isLiveRef.current && delta > 0) {
-      setScrollOffset((o) => o + delta);
-      setNewCount((n) => n + delta);
-    }
+    // The PAUSED-mode delta bump for scrollOffset / newCount lives
+    // in a centralized useEffect below — see `prevPausedCountRef`.
+    // Keeping it out of here ensures the bump fires regardless of
+    // which path updates activities (refresh or the redundant
+    // useEffect 488 reparse on every sessionTree change).
   }, [selectedId, expandedIds, tracking, discoverOptions]);
 
   // Keep a stable ref so the watcher callback always calls the latest refresh
@@ -736,6 +727,37 @@ export function App({
       setNewCount((n) => n + result.scrollDelta);
     }
   }, [mergedActivities.length, isLive, viewerRows, viewerCursorLine]);
+
+  // While PAUSED, keep the view frozen on its current snapshot as new
+  // entries arrive — bump `scrollOffset` and `newCount` by the delta
+  // so (a) `activities.slice(end - rows, end)` keeps showing the same
+  // window, and (b) the `+N↓` badge reflects how many new entries the
+  // user has yet to catch up to.
+  //
+  // This used to live inline in `refresh` as the
+  // `if (!isLive && delta > 0)` block, but that missed updates from
+  // useEffect 488's "redundant" re-parse of the JSONL on every
+  // sessionTree change. Hoisting it here means any source that grows
+  // mergedActivities triggers the bump correctly.
+  //
+  // Coordination with the auto-PAUSE useEffect above:
+  // - On the LIVE→PAUSED transition, auto-PAUSE bumps by the overflow
+  //   amount and `prevPausedCountRef` was 0 (or the merged count
+  //   before the transition). This effect runs in the SAME render
+  //   with isLive still true (state hasn't propagated yet), so the
+  //   `!isLive` guard skips the duplicate bump.
+  // - On the next render with isLive=false, prev === current →
+  //   delta=0, no bump. Auto-PAUSE noOps (cursor already at max).
+  // - From then on, only this effect bumps as new entries arrive.
+  useEffect(() => {
+    const prev = prevPausedCountRef.current;
+    prevPausedCountRef.current = mergedActivities.length;
+    if (!isLive && mergedActivities.length > prev) {
+      const delta = mergedActivities.length - prev;
+      setScrollOffset((o) => o + delta);
+      setNewCount((n) => n + delta);
+    }
+  }, [mergedActivities.length, isLive]);
 
   // Spinner and flashlight tick on the same cadence (150ms) so the entire
   // App re-renders ~6.7 times per second instead of 10 — measurably less

@@ -1,3 +1,34 @@
+/**
+ * Per-tool summarizers for activity rows: `summarizeToolDetail`
+ * returns the one-line detail string (the part after the colon in
+ * `[HH:MM] ⚙ Edit: foo.ts L10-12 +3 -1`), and `buildToolDetailBody`
+ * returns the optional multi-line body shown in the TUI detail view
+ * (and, for Task only, included in the markdown report).
+ *
+ * Design decisions:
+ * - All tool kinds live in this one file as switch-style branches.
+ *   Splitting per-tool would over-fragment for ~10 tools; the
+ *   centralized switch doubles as a checklist of "what tools do
+ *   we render specially?"
+ * - `detailBody` is opt-in per tool: Edit gives a unified diff,
+ *   Write gives the written content, Read gives line-numbered
+ *   content, Task gives the subagent's returned text. Bash and
+ *   everything else return null so the TUI just shows the
+ *   one-liner.
+ * - Task's body is intentionally exposed to the markdown report
+ *   (see `reportGenerator.ts:formatTaskBody`). Other tools'
+ *   bodies stay TUI-only to keep LLM payload size bounded.
+ *
+ * Gotcha:
+ * - Claude Code's JSONL stores tool results in a `toolUseResult`
+ *   field with shape-per-tool. `Write` puts content on
+ *   `result.content`, `Read` on `result.file.content`, `Task`
+ *   also on `result.content`, `Edit` puts a structured patch on
+ *   `result.structuredPatch`. Defensive null checks throughout
+ *   because Claude Code's schema isn't versioned and this code
+ *   runs against logs going back months.
+ */
+
 import { basename } from "node:path";
 
 export interface ToolInput {

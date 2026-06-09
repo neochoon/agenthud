@@ -1,3 +1,26 @@
+/**
+ * Single-source-of-truth Ink keyboard dispatcher. Receives a giant
+ * options bag of `onXxx` callbacks from `App.tsx` and routes the
+ * current keystroke to the right callback based on focus (`tree`
+ * vs `viewer`) and mode (help overlay open, detail overlay open).
+ *
+ * Design decisions:
+ * - Modes are exclusive and short-circuit: help > detail > main.
+ *   The input handler returns early after the first mode handles
+ *   the key. Otherwise typing `j` in the help overlay would also
+ *   scroll the tree underneath.
+ * - Vim keys (`j/k/g/G/Ctrl+B/F/U/D`) and arrow keys are both
+ *   accepted in parallel — users come from both terminal cultures
+ *   and having either work removes friction.
+ *
+ * Gotcha:
+ * - The plain `f` (filter cycle) handler MUST guard `!key.ctrl`.
+ *   Otherwise Ctrl+F (page-down) ALSO fires the filter cycle on
+ *   the same keystroke. Same for `b`/`u`/`d` vs their Ctrl
+ *   variants — vim's leader-style keys overlap with control
+ *   codes if the modifier isn't excluded.
+ */
+
 interface UseHotkeysOptions {
   focus: "tree" | "viewer";
   detailMode: boolean;

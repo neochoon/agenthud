@@ -1,3 +1,33 @@
+/**
+ * Launch the OS default app on a file path (drives `summary --open`
+ * and `--open-index`). Builds per-platform commands, sync-checks
+ * that the launcher exists on PATH, spawns it, waits a brief grace
+ * period, and bubbles failures to stderr so the caller's printed
+ * path remains a sensible fallback.
+ *
+ * Design decisions:
+ * - Per-platform command builders return `null` (not a default
+ *   fallback) on unrecognized platforms, so the caller decides
+ *   how to warn — silent fallback would mean the user wonders
+ *   why nothing opened.
+ * - On WSL prefer `wslview` (from the `wslu` package) — it routes
+ *   through to the Windows host's default app. `xdg-open` is the
+ *   linux fallback; on a headless WSL without a display it'll
+ *   fail, and the command-exists check below catches that before
+ *   the spawn even runs.
+ * - Failure detection waits a brief grace period after spawn,
+ *   then resolves. Fast-failing errors (no command, immediate
+ *   non-zero exit) get surfaced; long-running launches (the app
+ *   is starting up) succeed. The grace is intentionally short
+ *   (~200ms) so the parent process doesn't hang on the call.
+ *
+ * Gotcha:
+ * - Windows `start` quoting: the FIRST quoted argument to `start`
+ *   is the window title. A path with spaces would otherwise be
+ *   eaten as the title and the file would never open. The leading
+ *   empty-string title `""` in `start "" "path"` is intentional.
+ */
+
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";

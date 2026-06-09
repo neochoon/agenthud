@@ -1,12 +1,29 @@
 /**
- * Alternate screen buffer helper. Mirrors what htop/vim/btop/lazygit do:
- * on entry the terminal switches to a fresh buffer, on exit it restores
- * the user's pre-launch shell with no TUI residue. Without this, agenthud's
- * rendered tree stays on screen after `q` and viewers can't tell whether
- * the process is still running.
+ * Alternate screen buffer (`\x1b[?1049h` / `l`) entry, exit, and
+ * signal-handler installation. Mirrors what htop, vim, btop, and
+ * lazygit do: on entry the terminal switches to a fresh buffer; on
+ * exit the user's pre-launch shell is restored with no TUI residue.
  *
- * Idempotent: enter() / leave() each only fire once even if called multiple
- * times. leave() is auto-registered on the common exit paths.
+ * Design decisions:
+ * - Idempotent. `enterAltScreen()` / `leaveAltScreen()` each only
+ *   write once regardless of how many times they're called.
+ *   Otherwise duplicate handler registration (every Ink re-render
+ *   on hot module reload during dev) would write the escape
+ *   sequence repeatedly.
+ * - `installAltScreenCleanup` registers leave on every common
+ *   exit path: normal exit, SIGINT (Ctrl+C, exit 130), SIGTERM
+ *   (exit 143), and `uncaughtException`.
+ * - The uncaught-exception handler re-throws via `setImmediate`
+ *   after restoring the terminal. The async re-throw ensures node
+ *   still exits non-zero AND prints the trace itself — without
+ *   `setImmediate`, the trace would race the alt-screen restore
+ *   and land on the buried TUI underneath.
+ *
+ * Gotcha:
+ * - `process.on("exit")` handlers MUST be synchronous. A direct
+ *   `process.stdout.write` is fine; anything async (e.g. an
+ *   `await` or a `setTimeout`) silently no-ops because node is
+ *   already tearing down.
  */
 
 const ENTER = "\x1b[?1049h";

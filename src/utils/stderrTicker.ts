@@ -1,12 +1,27 @@
 /**
  * Live "still working" feedback on stderr while a long-running task
- * (LLM call, big build, etc.) blocks. Renders the same line repeatedly
- * using a carriage return so the spinner doesn't scroll past the
- * pre-line content.
+ * blocks. Used during `claude -p` summary calls, especially when
+ * `--open` suppresses the streamed LLM output and the user would
+ * otherwise stare at a frozen-looking terminal for 30–60+ seconds.
  *
- * Use case in agenthud: when --open suppresses the streamed claude
- * output, the user is otherwise staring at a frozen-looking terminal
- * for 30–60+ seconds. A ticking line tells them the process is alive.
+ * Design decisions:
+ * - Uses `\r` (carriage return) instead of newlines so the ticker
+ *   updates in place — doesn't scroll the pre-spinner content out
+ *   of view, doesn't fill the terminal with redraw lines.
+ * - Dot count is padded to 3 cells (`. `, `..`, `...`, `   `) so
+ *   the trailing elapsed-seconds text stays at the same column
+ *   regardless of which dot frame is current. Without the pad the
+ *   `12s` jitters left and right as dots cycle.
+ * - `stop()` only erases the line if the ticker actually wrote
+ *   anything. Safe to call `stop()` even when the task finished
+ *   before the first tick — no spurious blank line in stderr.
+ *
+ * Gotcha:
+ * - The erase sequence is `\r\x1b[K` (return to col 0, erase to
+ *   end-of-line). Without the `\x1b[K`, a long ticker line
+ *   (`"sending to claude... 47s"`) could leave trailing chars
+ *   behind the next stderr write if it's shorter than the
+ *   ticker's last frame.
  */
 
 /** Pure helper used to render the ticker line. Exported for testing. */

@@ -16,15 +16,21 @@ AgentHUD reads Claude Code's session files from `~/.claude/projects/` and gives 
 
 → **See [FEATURES.md](./FEATURES.md) for the full surface** — every flag, keybinding, config key, file path, and env var.
 
-## Install
+Requires Node.js 20+. Open agenthud in a separate terminal while using Claude Code; press `?` inside the TUI for in-app help.
 
-Requires Node.js 20+.
+## Try without installing
 
 ```bash
 npx agenthud
+# or: bunx agenthud
 ```
 
-Run this in a separate terminal while using Claude Code. Press `?` inside the TUI any time for in-app help.
+## Install for daily use
+
+```bash
+npm i -g agenthud
+# or: bun i -g agenthud
+```
 
 > **Platform support.** Primary development is on macOS and Linux; the full test suite runs on all three platforms in CI (including Windows). Windows runtime behavior is exercised by a manual smoke job but isn't daily-driven — issues there are valued bug reports.
 

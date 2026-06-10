@@ -18,7 +18,7 @@ AgentHUD reads Claude Code's session files from `~/.claude/projects/` and gives 
 
 ## Install
 
-Requires Node.js 20+.
+Requires Node.js 20+. No install step — run via `npx`:
 
 ```bash
 npx agenthud
@@ -26,25 +26,33 @@ npx agenthud
 
 Run this in a separate terminal while using Claude Code. Press `?` inside the TUI any time for in-app help.
 
+`npx` always pulls the latest version (auto-updates on every run) and doesn't touch your global PATH. If you use it often and prefer a shorter form, alias it in your shell rc:
+
+```bash
+alias agenthud='npx -y agenthud'
+```
+
+The Quickstart below uses `npx agenthud …` to stay copy-pasteable as-is.
+
 > **Platform support.** Primary development is on macOS and Linux; the full test suite runs on all three platforms in CI (including Windows). Windows runtime behavior is exercised by a manual smoke job but isn't daily-driven — issues there are valued bug reports.
 
 ## Quickstart
 
 ```bash
 # Live monitor
-agenthud                                  # all Claude projects
-agenthud --cwd                            # scope to the project containing $PWD
-agenthud --once                           # snapshot mode, no alt-screen
+npx agenthud                                  # all Claude projects
+npx agenthud --cwd                            # scope to the project containing $PWD
+npx agenthud --once                           # snapshot mode, no alt-screen
 
 # Activity report
-agenthud report --date today              # today's activity as markdown
-agenthud report --format json             # script-readable
-agenthud report --with-git                # merge git commits into the timeline
+npx agenthud report --date today              # today's activity as markdown
+npx agenthud report --format json             # script-readable
+npx agenthud report --with-git                # merge git commits into the timeline
 
 # LLM summary
-agenthud summary --date today             # daily summary via `claude -p`
-agenthud summary --last 7d                # cross-day synthesis of last 7 days
-agenthud summary -oI                      # open the summary + the summaries index
+npx agenthud summary --date today             # daily summary via `claude -p`
+npx agenthud summary --last 7d                # cross-day synthesis of last 7 days
+npx agenthud summary -oI                      # open the summary + the summaries index
 ```
 
 ## What you see

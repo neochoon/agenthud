@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [0.13.3] - 2026-06-10
+
+### Changed
+- **README install section split into "Try without installing" /
+  "Install for daily use", each showing both `npm` and `bun`.**
+  The previous structure mixed an `npx agenthud` install hint with
+  bare `agenthud …` Quickstart commands — copy-paste failed for
+  anyone who took the trial path. Two clearly-labeled H2 sections
+  now exist side-by-side; the Quickstart still targets the
+  daily-use form, and `bun` users are first-class instead of
+  "check the docs". Doc-only; no behavior changes.
+
 ## [0.13.2] - 2026-06-09
 
 ### Changed

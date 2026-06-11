@@ -892,8 +892,7 @@ describe("buildTitleSegments", () => {
     hidden: { total: 14, active: 1 },
   };
 
-  const concat = (segs: { text: string }[]) =>
-    segs.map((s) => s.text).join("");
+  const concat = (segs: { text: string }[]) => segs.map((s) => s.text).join("");
 
   it("returns just the label when no census provided", () => {
     const segs = buildTitleSegments("Projects", undefined, 80);

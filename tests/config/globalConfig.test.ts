@@ -66,19 +66,16 @@ describe("loadGlobalConfig", () => {
     ["*", []],
     ["any", []],
     ["ALL", []],
-  ])(
-    'normalizes "%s" preset keyword to empty array (= no filter)',
-    (keyword, expected) => {
-      vi.mocked(existsSync).mockImplementation((p) =>
-        String(p).endsWith("config.yaml"),
-      );
-      vi.mocked(readFileSync).mockReturnValue(
-        `filterPresets:\n  - ["${keyword}"]\n`,
-      );
-      const config = loadGlobalConfig();
-      expect(config.filterPresets[0]).toEqual(expected);
-    },
-  );
+  ])('normalizes "%s" preset keyword to empty array (= no filter)', (keyword, expected) => {
+    vi.mocked(existsSync).mockImplementation((p) =>
+      String(p).endsWith("config.yaml"),
+    );
+    vi.mocked(readFileSync).mockReturnValue(
+      `filterPresets:\n  - ["${keyword}"]\n`,
+    );
+    const config = loadGlobalConfig();
+    expect(config.filterPresets[0]).toEqual(expected);
+  });
 
   it("still treats [] preset as 'show all'", () => {
     vi.mocked(existsSync).mockImplementation((p) =>

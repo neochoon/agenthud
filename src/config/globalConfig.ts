@@ -233,11 +233,16 @@ export function loadGlobalConfig(): GlobalConfig {
       const cleaned = tokens.filter((t) => ALLOWED_INCLUDE_TYPES.has(t));
       if (cleaned.length > 0) config.report.include = cleaned;
     }
-    if (typeof r.detailLimit === "number" && Number.isInteger(r.detailLimit) && r.detailLimit >= 0) {
+    if (
+      typeof r.detailLimit === "number" &&
+      Number.isInteger(r.detailLimit) &&
+      r.detailLimit >= 0
+    ) {
       config.report.detailLimit = r.detailLimit;
     }
     if (typeof r.withGit === "boolean") config.report.withGit = r.withGit;
-    if (r.format === "markdown" || r.format === "json") config.report.format = r.format;
+    if (r.format === "markdown" || r.format === "json")
+      config.report.format = r.format;
   }
 
   if (configRaw.summary && typeof configRaw.summary === "object") {
@@ -249,11 +254,16 @@ export function loadGlobalConfig(): GlobalConfig {
       const cleaned = tokens.filter((t) => ALLOWED_INCLUDE_TYPES.has(t));
       if (cleaned.length > 0) config.summary.include = cleaned;
     }
-    if (typeof s.detailLimit === "number" && Number.isInteger(s.detailLimit) && s.detailLimit >= 0) {
+    if (
+      typeof s.detailLimit === "number" &&
+      Number.isInteger(s.detailLimit) &&
+      s.detailLimit >= 0
+    ) {
       config.summary.detailLimit = s.detailLimit;
     }
     if (typeof s.withGit === "boolean") config.summary.withGit = s.withGit;
-    if (s.format === "markdown" || s.format === "json") config.summary.format = s.format;
+    if (s.format === "markdown" || s.format === "json")
+      config.summary.format = s.format;
     if (typeof s.model === "string" && s.model.trim().length > 0) {
       config.summary.model = s.model.trim();
     }
@@ -336,7 +346,7 @@ function updateState(
   >,
 ): void {
   // Read existing state
-  let state: Pick<
+  const state: Pick<
     GlobalConfig,
     "hiddenSessions" | "hiddenSubAgents" | "hiddenProjects"
   > = {

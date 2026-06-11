@@ -31,9 +31,7 @@ vi.mock("node:child_process", () => ({
   spawn: vi.fn(() => {
     // Surfaces as a clear failure if any test ever lets the empty path
     // fall through to a real claude call.
-    throw new Error(
-      "spawn() should not be called for an empty-activity day",
-    );
+    throw new Error("spawn() should not be called for an empty-activity day");
   }),
 }));
 

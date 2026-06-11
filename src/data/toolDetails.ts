@@ -243,7 +243,11 @@ export function buildToolDetailBody(
     const content = result?.file?.content;
     if (content) {
       const start = result?.file?.startLine ?? input?.offset ?? 1;
-      return { text: numberLines(content, start), kind: "code", numbered: true };
+      return {
+        text: numberLines(content, start),
+        kind: "code",
+        numbered: true,
+      };
     }
   }
   if (name === "Edit" || name === "Write") {

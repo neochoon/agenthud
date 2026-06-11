@@ -271,10 +271,7 @@ function todayLocalMidnight(): Date {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
-export function parseArgs(
-  args: string[],
-  config?: GlobalConfig,
-): CliOptions {
+export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
   // `watch` is the explicit form of the default mode — strip it so the
   // rest of parsing sees the same shape it always has.
   if (args[0] === "watch") args = args.slice(1);
@@ -534,9 +531,7 @@ export function parseArgs(
     const summaryOpen =
       rest.includes("--open") || rest.includes("-o") || undefined;
     const summaryOpenIndex =
-      rest.includes("--open-index") ||
-      rest.includes("-I") ||
-      undefined;
+      rest.includes("--open-index") || rest.includes("-I") || undefined;
 
     // Resolve report-shaped options for summary:
     //   CLI flag → config.summary.X → config.report.X → built-in default.

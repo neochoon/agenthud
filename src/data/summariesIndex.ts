@@ -297,15 +297,11 @@ export function buildHeaderBlock(
     const idx = dailies.findIndex((e) => e.filename === currentFilename);
     if (idx > 0) {
       const prev = dailies[idx - 1];
-      parts.push(
-        `[← ${formatDateLabel(prev.date)}](./${prev.filename})`,
-      );
+      parts.push(`[← ${formatDateLabel(prev.date)}](./${prev.filename})`);
     }
     if (idx >= 0 && idx < dailies.length - 1) {
       const next = dailies[idx + 1];
-      parts.push(
-        `[${formatDateLabel(next.date)} →](./${next.filename})`,
-      );
+      parts.push(`[${formatDateLabel(next.date)} →](./${next.filename})`);
     }
   }
 
@@ -323,7 +319,10 @@ export function stripExistingHeaderBlock(content: string): string {
   // Cut from start through end marker, then chew one trailing newline-pair
   // we inserted ourselves.
   let cut = endIdx + BACKLINK_END_MARKER.length;
-  while (cut < content.length && (content[cut] === "\n" || content[cut] === "\r")) {
+  while (
+    cut < content.length &&
+    (content[cut] === "\n" || content[cut] === "\r")
+  ) {
     cut++;
   }
   return content.slice(cut);
@@ -393,11 +392,7 @@ export function regenerateIndex(summariesDir: string): void {
   // Write the hub last so its snippets reflect the final on-disk state.
   const indexPath = join(summariesDir, "index.md");
   try {
-    writeFileSync(
-      indexPath,
-      buildIndexMarkdown(entries, snippets),
-      "utf-8",
-    );
+    writeFileSync(indexPath, buildIndexMarkdown(entries, snippets), "utf-8");
   } catch (err) {
     process.stderr.write(
       `warning: cannot write summaries index (${(err as Error).message})\n`,

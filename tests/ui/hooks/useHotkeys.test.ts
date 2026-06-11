@@ -328,7 +328,6 @@ describe("useHotkeys", () => {
       act(() => result.current.handleInput("G", noopKey));
       expect(onScrollBottom).toHaveBeenCalledTimes(1);
     });
-
   });
 
   describe("ctrl key aliases", () => {
@@ -523,9 +522,7 @@ describe("useHotkeys", () => {
       const { result } = renderHook(() =>
         useHotkeys(makeOptions({ helpMode: true, onHelpScroll })),
       );
-      act(() =>
-        result.current.handleInput("", { ...noopKey, pageDown: true }),
-      );
+      act(() => result.current.handleInput("", { ...noopKey, pageDown: true }));
       expect(onHelpScroll).toHaveBeenLastCalledWith(10);
       act(() => result.current.handleInput(" ", noopKey));
       expect(onHelpScroll).toHaveBeenLastCalledWith(1);

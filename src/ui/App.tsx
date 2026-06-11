@@ -50,10 +50,10 @@ import {
   hideProject,
   hideSession,
   hideSubAgent,
+  loadGlobalConfig,
   unhideProject,
   unhideSession,
   unhideSubAgent,
-  loadGlobalConfig,
 } from "../config/globalConfig.js";
 import { getCommitDetail, parseGitCommits } from "../data/gitCommits.js";
 import { parseSessionHistory } from "../data/sessionHistory.js";
@@ -77,9 +77,16 @@ import { adjustViewerCursorOnNewActivities } from "./viewerCursor.js";
 
 const VIEWER_HEIGHT_FRACTION = 0.55;
 
-function subSummarySentinel(parentId: string): SessionNode {
+/**
+ * Construct a "sentinel" SessionNode used as a non-interactive
+ * placeholder row in the flattened tree (sub-agent summary,
+ * cold-sessions summary, cold-projects sentinel). Every sentinel
+ * carries the same all-blank shape; only its `id` differentiates
+ * downstream selection / dispatch.
+ */
+function makeSentinel(id: string): SessionNode {
   return {
-    id: `__sub-${parentId}__`,
+    id,
     hideKey: "",
     filePath: "",
     projectPath: "",
@@ -94,28 +101,17 @@ function subSummarySentinel(parentId: string): SessionNode {
   };
 }
 
+const subSummarySentinel = (parentId: string): SessionNode =>
+  makeSentinel(`__sub-${parentId}__`);
+
 /**
  * Sentinel row for "N cold sessions" inside an active project.
  * Default collapsed: cold sessions are historical context, not
  * what the user is working on right now. Press Enter on the
  * sentinel to expand and reveal the individual cold sessions.
  */
-function coldSessionsSummarySentinel(projectName: string): SessionNode {
-  return {
-    id: `__cold-sessions-${projectName}__`,
-    hideKey: "",
-    filePath: "",
-    projectPath: "",
-    projectName: "",
-    lastModifiedMs: 0,
-    status: "cold",
-    modelName: null,
-    subAgents: [],
-    nonInteractive: false,
-    firstUserPrompt: null,
-    liveState: null,
-  };
-}
+const coldSessionsSummarySentinel = (projectName: string): SessionNode =>
+  makeSentinel(`__cold-sessions-${projectName}__`);
 
 /**
  * Append the sub-agent rows for `session` onto `result` per the same
@@ -1019,10 +1015,7 @@ export function App({
           // mergedActivities, not raw activities).
           setIsLive(false);
           setScrollOffset((o) =>
-            Math.min(
-              o + 1,
-              Math.max(0, mergedActivities.length - viewerRows),
-            ),
+            Math.min(o + 1, Math.max(0, mergedActivities.length - viewerRows)),
           );
         }
       }
@@ -1244,9 +1237,15 @@ export function App({
             setSelectedId(parentId);
           } else {
             next.add(parentId);
-            // Expanding: move to first newly visible (cool/cold) sub-agent
-            const allSessions2 =
-              displayTree.projects?.flatMap((p) => p.sessions) ?? [];
+            // Expanding: move to first newly visible (cool/cold) sub-agent.
+            // Must search BOTH active and cold projects — a hot session
+            // can cool over the lifetime of the TUI and end up under
+            // `coldProjects`, but its `__sub-` sentinel stays
+            // selectable. Mirroring `allSessions3` below.
+            const allSessions2 = [
+              ...displayTree.projects.flatMap((p) => p.sessions),
+              ...displayTree.coldProjects.flatMap((p) => p.sessions),
+            ];
             const parent = allSessions2.find((s) => s.id === parentId);
             const firstNew = parent?.subAgents.find(
               (sa) => sa.status === "cool" || sa.status === "cold",
@@ -1318,21 +1317,39 @@ export function App({
         allFlat[selectedIndex - 1]?.id ??
         null;
 
+      // Shared shape for project/session/sub-agent toggle branches.
+      // On unhide the selection stays (item just un-dims in place).
+      // On hide we advance only when the item will actually disappear
+      // from the rendered tree — i.e. when `showHidden` is off. In
+      // show-hidden mode the row stays rendered (just dimmed with the
+      // `⊘` marker), so teleporting selection away would be wrong:
+      // the user just acted on this row and expects to still be on it.
+      const applyHideToggle = (params: {
+        isHidden: boolean;
+        hide: () => void;
+        unhide: () => void;
+      }) => {
+        if (params.isHidden) {
+          params.unhide();
+          refresh();
+          return;
+        }
+        params.hide();
+        refresh();
+        if (!showHidden) setSelectedId(nextAfterHide());
+      };
+
       // Project sentinel
       if (selectedId.startsWith("__proj-") && selectedId.endsWith("__")) {
         const projectName = selectedId.slice(7, -2);
         const proj =
           sessionTree.projects.find((p) => p.name === projectName) ??
           sessionTree.coldProjects.find((p) => p.name === projectName);
-        if (proj?.hidden) {
-          unhideProject(projectName);
-          refresh();
-          // Selection stays — the project just becomes un-dimmed.
-          return;
-        }
-        hideProject(projectName);
-        refresh();
-        setSelectedId(nextAfterHide());
+        applyHideToggle({
+          isHidden: !!proj?.hidden,
+          hide: () => hideProject(projectName),
+          unhide: () => unhideProject(projectName),
+        });
         return;
       }
 
@@ -1343,9 +1360,8 @@ export function App({
         const coldSessions =
           sessionTree.coldProjects?.flatMap((p) => p.sessions) ?? [];
         for (const s of coldSessions) hideSession(s.hideKey);
-        const nextId = allFlat[selectedIndex - 1]?.id ?? null;
         refresh();
-        setSelectedId(nextId);
+        setSelectedId(nextAfterHide());
         return;
       }
 
@@ -1355,18 +1371,13 @@ export function App({
         ...sessionTree.projects.flatMap((p) => p.sessions),
         ...sessionTree.coldProjects.flatMap((p) => p.sessions),
       ];
-      const selectedSession = allSessionsFull.find(
-        (s) => s.id === selectedId,
-      );
+      const selectedSession = allSessionsFull.find((s) => s.id === selectedId);
       if (selectedSession) {
-        if (selectedSession.hidden) {
-          unhideSession(selectedSession.hideKey);
-          refresh();
-          return;
-        }
-        hideSession(selectedSession.hideKey);
-        refresh();
-        setSelectedId(nextAfterHide());
+        applyHideToggle({
+          isHidden: !!selectedSession.hidden,
+          hide: () => hideSession(selectedSession.hideKey),
+          unhide: () => unhideSession(selectedSession.hideKey),
+        });
         return;
       }
 
@@ -1374,14 +1385,11 @@ export function App({
       for (const s of allSessionsFull) {
         const sa = s.subAgents.find((x) => x.id === selectedId);
         if (sa) {
-          if (sa.hidden) {
-            unhideSubAgent(sa.hideKey);
-            refresh();
-            return;
-          }
-          hideSubAgent(sa.hideKey);
-          refresh();
-          setSelectedId(nextAfterHide());
+          applyHideToggle({
+            isHidden: !!sa.hidden,
+            hide: () => hideSubAgent(sa.hideKey),
+            unhide: () => unhideSubAgent(sa.hideKey),
+          });
           return;
         }
       }

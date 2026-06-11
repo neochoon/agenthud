@@ -6,8 +6,8 @@ import {
   extractContextSnippet,
   parseSummaryFilename,
   prependHeaderBlock,
-  stripExistingHeaderBlock,
   type SummaryEntry,
+  stripExistingHeaderBlock,
 } from "../../src/data/summariesIndex.js";
 
 describe("parseSummaryFilename", () => {
@@ -25,9 +25,7 @@ describe("parseSummaryFilename", () => {
   });
 
   it("recognizes a range summary filename and parses both bounds", () => {
-    const entry = parseSummaryFilename(
-      "range-2026-06-01_2026-06-07.md",
-    );
+    const entry = parseSummaryFilename("range-2026-06-01_2026-06-07.md");
     expect(entry).not.toBeNull();
     expect(entry?.kind).toBe("range");
     if (entry?.kind === "range") {
@@ -104,9 +102,7 @@ describe("buildIndexMarkdown", () => {
   it("appends snippets when provided via the snippets map", () => {
     const md = buildIndexMarkdown(
       [mkDaily("2026-06-07")],
-      new Map([
-        ["2026-06-07.md", "Shipped --open / -o for summary."],
-      ]),
+      new Map([["2026-06-07.md", "Shipped --open / -o for summary."]]),
     );
     expect(md).toContain(
       "- [2026-06-07 (Sun)](./2026-06-07.md) — Shipped --open / -o for summary.",
@@ -161,15 +157,11 @@ describe("buildTitleLine", () => {
 
   it("renders a daily title with the long weekday for readability", () => {
     // 2026-06-07 is a Sunday.
-    expect(buildTitleLine(mkDaily("2026-06-07"))).toBe(
-      "# 2026-06-07 (Sunday)",
-    );
+    expect(buildTitleLine(mkDaily("2026-06-07"))).toBe("# 2026-06-07 (Sunday)");
   });
 
   it("renders a Friday daily as 'Friday'", () => {
-    expect(buildTitleLine(mkDaily("2026-05-15"))).toBe(
-      "# 2026-05-15 (Friday)",
-    );
+    expect(buildTitleLine(mkDaily("2026-05-15"))).toBe("# 2026-05-15 (Friday)");
   });
 
   it("renders a range title without the weekday (the span carries the meaning)", () => {
@@ -236,10 +228,7 @@ describe("buildHeaderBlock", () => {
       mkDaily("2026-06-07"),
       mkDaily("2026-06-06"),
     ];
-    const block = buildHeaderBlock(
-      "range-2026-06-01_2026-06-07.md",
-      entries,
-    );
+    const block = buildHeaderBlock("range-2026-06-01_2026-06-07.md", entries);
     expect(block).toContain("[← all summaries](./index.md)");
     expect(block).toContain("# Range: 2026-06-01 → 2026-06-07");
     expect(block).not.toContain("→](./");
@@ -274,8 +263,7 @@ describe("stripExistingHeaderBlock / prependHeaderBlock", () => {
   });
 
   it("strip-only on content with only the start marker is a no-op (defensive)", () => {
-    const body =
-      "<!-- agenthud-backlinks-start -->\norphan\n# title\n";
+    const body = "<!-- agenthud-backlinks-start -->\norphan\n# title\n";
     // No closing marker → leave alone, don't risk eating real content.
     expect(stripExistingHeaderBlock(body)).toBe(body);
   });

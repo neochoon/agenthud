@@ -344,9 +344,7 @@ function flattenSessions(
       const activeSessions = project.sessions.filter(
         (s) => s.status !== "cold",
       );
-      const coldSessions = project.sessions.filter(
-        (s) => s.status === "cold",
-      );
+      const coldSessions = project.sessions.filter((s) => s.status === "cold");
       for (const session of activeSessions) {
         result.push({ kind: "session", session, prefix: "    " });
         appendSessionRows(result, session, expandedIds);
@@ -417,8 +415,10 @@ function ProjectRow({
   // Per-project counts rendered between path and elapsed. Long
   // form when wide ("5 sessions · 142 sub-agents"), short form
   // when narrow ("5s · 142a"), dropped entirely when nothing fits.
-  // Counts include hidden items so the row tells the user about
-  // the project's actual size, not just what the tree shows.
+  // Counts reflect the visible tree — i.e. they exclude hidden
+  // items when `showHidden` is off, and include them (each marked
+  // with `⊘`) when it's on. The tree-wide census in the panel
+  // title is the source of truth for "actual size with hidden".
   const sessionCount = project.sessions.length;
   const subAgentCount = project.sessions.reduce(
     (n, s) => n + s.subAgents.length,
@@ -440,7 +440,10 @@ function ProjectRow({
 
   // Pick the widest counts form that fits with the rest of the row.
   const fitsCounts = (text: string) =>
-    leftWidth + COUNTS_GAP + getDisplayWidth(text) + PROJECT_RIGHT_GAP +
+    leftWidth +
+      COUNTS_GAP +
+      getDisplayWidth(text) +
+      PROJECT_RIGHT_GAP +
       elapsedWidth <=
     contentWidth;
   const countsText = fitsCounts(longCounts)
@@ -448,9 +451,7 @@ function ProjectRow({
     : fitsCounts(shortCounts)
       ? shortCounts
       : "";
-  const countsWidth = countsText
-    ? COUNTS_GAP + getDisplayWidth(countsText)
-    : 0;
+  const countsWidth = countsText ? COUNTS_GAP + getDisplayWidth(countsText) : 0;
 
   const rightGap = Math.max(
     PROJECT_RIGHT_GAP,
@@ -508,21 +509,24 @@ function SubagentSummaryRow({
   const parts: string[] = [];
   if (coolCount > 0) parts.push(`${coolCount} cool`);
   if (coldCount > 0) parts.push(`${coldCount} cold`);
+  const baseText = `        └─ ... ${parts.join("  ")}`;
   const hint = " +";
-  const text = `        └─ ... ${parts.join("  ")}`;
-  const padding = Math.max(
-    0,
-    contentWidth - getDisplayWidth(text) - getDisplayWidth(hint),
-  );
+  // Width-check the hint before appending so narrow terminals don't
+  // overflow. Only the focused row offers the expand affordance, so
+  // unfocused rows pad to width with spaces only.
   const focused = isSelected && hasFocus;
   const muted = isSelected && !hasFocus;
+  const showHint =
+    focused &&
+    getDisplayWidth(baseText) + getDisplayWidth(hint) <= contentWidth;
+  const text = showHint ? `${baseText}${hint}` : baseText;
+  const padding = Math.max(0, contentWidth - getDisplayWidth(text));
   return (
     <Text>
       {BOX.v}{" "}
       <Text dimColor={!focused} inverse={focused || muted}>
         {text}
         {" ".repeat(padding)}
-        {hint}
       </Text>
       {BOX.v}
     </Text>
@@ -581,9 +585,17 @@ function ColdSessionsSummaryRow({
   contentWidth: number;
 }): React.ReactElement {
   const prefix = "    ";
-  const label = `... ${count} cold`;
-  const hint = isSelected && hasFocus ? " +" : "";
-  const text = `${prefix}${label}${hint}`;
+  const baseLabel = `... ${count} cold`;
+  const hint = " +";
+  const baseText = `${prefix}${baseLabel}`;
+  // Width-check the hint before appending so a very narrow terminal
+  // doesn't get an overflowing row. Same pattern as
+  // ColdProjectsSummaryRow.
+  const showHint =
+    isSelected &&
+    hasFocus &&
+    getDisplayWidth(baseText) + getDisplayWidth(hint) <= contentWidth;
+  const text = showHint ? `${baseText}${hint}` : baseText;
   const padding = Math.max(0, contentWidth - getDisplayWidth(text));
   const focused = isSelected && hasFocus;
   const muted = isSelected && !hasFocus;
@@ -603,9 +615,18 @@ function ColdSessionsSummaryRow({
   );
 }
 
+/**
+ * Ink supports any color string, but the panel title + census line
+ * only ever paints "green" (visible active) or "yellow" (hidden
+ * active alert). Constraining the union catches typos
+ * (`"greem"`, `"yello"`) at compile time — `color: string` would
+ * accept them and silently render invisible text at runtime.
+ */
+type TitleSegmentColor = "green" | "yellow";
+
 interface TitleSegment {
   text: string;
-  color?: string;
+  color?: TitleSegmentColor;
   dim?: boolean;
   bold?: boolean;
 }
@@ -615,7 +636,7 @@ interface TitleSegment {
 // bold-yellow for hidden-active. The number alone carries the
 // signal; we used to spell out " active" but the color is already
 // the active indicator, and dropping the word saves width.
-function activeParen(count: number, color: string): TitleSegment[] {
+function activeParen(count: number, color: TitleSegmentColor): TitleSegment[] {
   if (count === 0) return [];
   return [
     { text: " (", dim: true },
@@ -629,9 +650,7 @@ function hiddenSeg(
   short: boolean,
 ): TitleSegment[] {
   if (hidden.total === 0) return [];
-  const segs: TitleSegment[] = [
-    { text: ` · ⊘ ${hidden.total}`, dim: true },
-  ];
+  const segs: TitleSegment[] = [{ text: ` · ⊘ ${hidden.total}`, dim: true }];
   if (!short) segs.push({ text: " hidden", dim: true });
   if (hidden.active > 0) {
     segs.push(...activeParen(hidden.active, "yellow"));
@@ -667,62 +686,79 @@ export function buildTitleSegments(
 
   const c = census;
 
-  // From most to least verbose. First candidate that fits wins.
-  // Each level keeps the noun ("projects" / "sessions" / etc.) so
-  // the count is unambiguous; only the active parenthetical uses
-  // a colored number with no word ("(3)" not "(3 active)") since
-  // the color itself signals "active".
-  const candidates: TitleSegment[][] = [
+  // Declarative table of fallback levels. Each row describes which
+  // counters to show (and the noun suffix per level), whether to
+  // include the project active count, and how the hidden segment
+  // formats. Picking the first level whose rendered width fits the
+  // available space gives us a graceful long → short → drop chain
+  // without seven near-identical array literals.
+  interface CensusLevel {
+    projectsSuffix?: string; // undefined → drop projects entirely
+    sessionsSuffix?: string;
+    subAgentsSuffix?: string;
+    showProjectActive?: boolean; // default true
+    hiddenShort?: boolean; // default false (long "hidden" word)
+    omitHidden?: boolean; // default false
+  }
+
+  const LEVELS: CensusLevel[] = [
     // L0: full long form
-    [
-      labelSeg,
-      { text: ` ${c.projects.total} projects`, dim: true },
-      ...activeParen(c.projects.active, "green"),
-      { text: ` · ${c.sessions.total} sessions`, dim: true },
-      ...activeParen(c.sessions.active, "green"),
-      { text: ` · ${c.subAgents.total} sub-agents`, dim: true },
-      ...activeParen(c.subAgents.active, "green"),
-      ...hiddenSeg(c.hidden, false),
-    ],
+    {
+      projectsSuffix: " projects",
+      sessionsSuffix: " sessions",
+      subAgentsSuffix: " sub-agents",
+    },
     // L1: short form (single-letter abbreviations)
-    [
-      labelSeg,
-      { text: ` ${c.projects.total}p`, dim: true },
-      ...activeParen(c.projects.active, "green"),
-      { text: ` · ${c.sessions.total}s`, dim: true },
-      ...activeParen(c.sessions.active, "green"),
-      { text: ` · ${c.subAgents.total}a`, dim: true },
-      ...activeParen(c.subAgents.active, "green"),
-      ...hiddenSeg(c.hidden, true),
-    ],
+    {
+      projectsSuffix: "p",
+      sessionsSuffix: "s",
+      subAgentsSuffix: "a",
+      hiddenShort: true,
+    },
     // L2: drop sub-agents
-    [
-      labelSeg,
-      { text: ` ${c.projects.total}p`, dim: true },
-      ...activeParen(c.projects.active, "green"),
-      { text: ` · ${c.sessions.total}s`, dim: true },
-      ...activeParen(c.sessions.active, "green"),
-      ...hiddenSeg(c.hidden, true),
-    ],
+    { projectsSuffix: "p", sessionsSuffix: "s", hiddenShort: true },
     // L3: drop sessions
-    [
-      labelSeg,
-      { text: ` ${c.projects.total}p`, dim: true },
-      ...activeParen(c.projects.active, "green"),
-      ...hiddenSeg(c.hidden, true),
-    ],
+    { projectsSuffix: "p", hiddenShort: true },
     // L4: drop project active counter
-    [
-      labelSeg,
-      { text: ` ${c.projects.total}p`, dim: true },
-      ...hiddenSeg(c.hidden, true),
-    ],
-    // L5: drop project total
-    [labelSeg, ...hiddenSeg(c.hidden, true)],
+    { projectsSuffix: "p", showProjectActive: false, hiddenShort: true },
+    // L5: just hidden alert
+    { hiddenShort: true },
     // L6: just the label
-    [labelSeg],
+    { hiddenShort: true, omitHidden: true },
   ];
 
+  const buildLevel = (level: CensusLevel): TitleSegment[] => {
+    const segs: TitleSegment[] = [labelSeg];
+    if (level.projectsSuffix !== undefined) {
+      segs.push({
+        text: ` ${c.projects.total}${level.projectsSuffix}`,
+        dim: true,
+      });
+      if (level.showProjectActive !== false) {
+        segs.push(...activeParen(c.projects.active, "green"));
+      }
+    }
+    if (level.sessionsSuffix !== undefined) {
+      segs.push({
+        text: ` · ${c.sessions.total}${level.sessionsSuffix}`,
+        dim: true,
+      });
+      segs.push(...activeParen(c.sessions.active, "green"));
+    }
+    if (level.subAgentsSuffix !== undefined) {
+      segs.push({
+        text: ` · ${c.subAgents.total}${level.subAgentsSuffix}`,
+        dim: true,
+      });
+      segs.push(...activeParen(c.subAgents.active, "green"));
+    }
+    if (!level.omitHidden) {
+      segs.push(...hiddenSeg(c.hidden, level.hiddenShort ?? false));
+    }
+    return segs;
+  };
+
+  const candidates = LEVELS.map(buildLevel);
   for (const cand of candidates) {
     if (widthOf(cand) <= availableWidth) return cand;
   }
@@ -889,9 +925,7 @@ export function SessionTreePanel({
             key={`cold-sessions-${row.projectName}`}
             count={row.count}
             projectName={row.projectName}
-            isSelected={
-              selectedId === `__cold-sessions-${row.projectName}__`
-            }
+            isSelected={selectedId === `__cold-sessions-${row.projectName}__`}
             hasFocus={hasFocus}
             contentWidth={contentWidth}
           />

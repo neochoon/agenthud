@@ -251,44 +251,53 @@ function buildSubAgents(
     return [];
   }
 
-  return files
-    .map((file): SessionNode | null => {
-      const id = file.replace(/\.jsonl$/, "");
-      const hideKey = `${projectName}/${id}`;
-      const filePath = join(subagentsDir, file);
-      try {
-        const stat = statSync(filePath);
-        const { agentId, taskDescription } = readSubAgentInfo(filePath);
-        const { modelName, liveState } = readSessionTail(
-          filePath,
-          stat.mtimeMs,
-          Date.now(),
-        );
-        return {
-          id,
-          hideKey,
-          filePath,
-          projectPath: "",
-          projectName: "",
-          lastModifiedMs: stat.mtimeMs,
-          status: getSessionStatus(stat.mtimeMs),
-          modelName,
-          subAgents: [],
-          agentId: agentId ?? undefined,
-          taskDescription: taskDescription ?? undefined,
-          nonInteractive: false,
-          firstUserPrompt: null,
-          liveState,
-        };
-      } catch {
-        return null;
-      }
-    })
-    .filter(
-      (n): n is SessionNode =>
-        n !== null && !config.hiddenSubAgents.includes(n.hideKey),
-    )
-    .sort((a, b) => b.lastModifiedMs - a.lastModifiedMs);
+  return (
+    files
+      .map((file): SessionNode | null => {
+        const id = file.replace(/\.jsonl$/, "");
+        const hideKey = `${projectName}/${id}`;
+        const filePath = join(subagentsDir, file);
+        try {
+          const stat = statSync(filePath);
+          const { agentId, taskDescription } = readSubAgentInfo(filePath);
+          const { modelName, liveState } = readSessionTail(
+            filePath,
+            stat.mtimeMs,
+            Date.now(),
+          );
+          return {
+            id,
+            hideKey,
+            filePath,
+            projectPath: "",
+            projectName: "",
+            lastModifiedMs: stat.mtimeMs,
+            status: getSessionStatus(stat.mtimeMs),
+            modelName,
+            subAgents: [],
+            agentId: agentId ?? undefined,
+            taskDescription: taskDescription ?? undefined,
+            nonInteractive: false,
+            firstUserPrompt: null,
+            liveState,
+          };
+        } catch {
+          return null;
+        }
+      })
+      .filter((n): n is SessionNode => n !== null)
+      // MARK hidden sub-agents (don't filter them out). The tree carries
+      // them with `hidden=true` so `computeCensus` sees them, the
+      // hidden-active alert in the panel title fires correctly, and the
+      // `a` show-hidden + `H` unhide round-trip works for sub-agents
+      // too. Mirrors the same refactor on top-level sessions and
+      // projects below.
+      .map((n) => {
+        if (config.hiddenSubAgents.includes(n.hideKey)) n.hidden = true;
+        return n;
+      })
+      .sort((a, b) => b.lastModifiedMs - a.lastModifiedMs)
+  );
 }
 
 // Returns the registered project whose path is the nearest ancestor of cwd
@@ -443,6 +452,16 @@ export function discoverSessions(
       hiddenTotal++;
       if (s.status === "hot" || s.status === "warm") hiddenActive++;
       s.hidden = true;
+    }
+    // Sub-agents are marked at parse time in `readSubAgents` (or here
+    // if their parent is project-hidden). Either way, count them so
+    // the hidden-active alarm fires when a hot sub-agent is hidden.
+    for (const sub of s.subAgents) {
+      if (sub.hidden || projectHidden) {
+        if (projectHidden) sub.hidden = true;
+        hiddenTotal++;
+        if (sub.status === "hot" || sub.status === "warm") hiddenActive++;
+      }
     }
     const arr = byProject.get(s.projectPath) ?? [];
     arr.push(s);

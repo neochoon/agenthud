@@ -94,10 +94,7 @@ describe("ActivityViewerPanel", () => {
   it("pads empty rows at the top when activities are sparse", () => {
     // Few activities + tall viewport → content sits at the bottom,
     // empty rows above. Verify the last content row is the newest.
-    const activities = [
-      makeActivity("First", 0),
-      makeActivity("Last", 1),
-    ];
+    const activities = [makeActivity("First", 0), makeActivity("Last", 1)];
     const { lastFrame } = render(
       <ActivityViewerPanel
         {...baseProps}

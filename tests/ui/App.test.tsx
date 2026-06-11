@@ -52,10 +52,7 @@ const emptyTree = (): SessionTree => ({
   hiddenStats: { total: 0, active: 0 },
 });
 
-const makeColdSession = (
-  projectName: string,
-  id: string,
-): SessionNode => ({
+const makeColdSession = (projectName: string, id: string): SessionNode => ({
   id,
   hideKey: `${projectName}/${id}`,
   filePath: `/tmp/${projectName}/${id}.jsonl`,
@@ -122,7 +119,6 @@ describe("App with only cold projects (post-vacation boot)", () => {
     expect(out).toContain("beta");
     expect(out).toContain("gamma");
   });
-
 });
 
 describe("initialSelectedId", () => {
@@ -242,11 +238,7 @@ describe("appendSubAgentRows", () => {
     ];
     const session = sessionWith("s1", "cold", subs);
     const result: SessionNode[] = [];
-    appendSubAgentRows(
-      result,
-      session,
-      new Set(["__expanded-session-s1"]),
-    );
+    appendSubAgentRows(result, session, new Set(["__expanded-session-s1"]));
     expect(result.map((n) => n.id)).toEqual(["a", "b", "c"]);
   });
 
@@ -277,11 +269,7 @@ describe("appendSubAgentRows", () => {
       baseSubAgent("b", "cold"),
     ]);
     const result: SessionNode[] = [];
-    appendSubAgentRows(
-      result,
-      session,
-      new Set(["__collapsed-session-s1"]),
-    );
+    appendSubAgentRows(result, session, new Set(["__collapsed-session-s1"]));
     expect(result).toEqual([]);
   });
 });
@@ -317,10 +305,7 @@ describe("findParentTarget", () => {
     liveState: null,
   });
 
-  const project = (
-    name: string,
-    sessions: SessionNode[],
-  ): ProjectNode => ({
+  const project = (name: string, sessions: SessionNode[]): ProjectNode => ({
     name,
     projectPath: `/tmp/${name}`,
     sessions,
@@ -632,9 +617,7 @@ describe("computeCensus", () => {
               node("visible-sa", "hot"),
               node("hidden-sa", "hot", true),
             ]),
-            node("hidden-parent", "warm", true, [
-              node("under-hidden", "hot"),
-            ]),
+            node("hidden-parent", "warm", true, [node("under-hidden", "hot")]),
           ],
           hotness: "hot",
         },

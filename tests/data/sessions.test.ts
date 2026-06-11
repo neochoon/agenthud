@@ -366,9 +366,7 @@ describe("discoverSessions", () => {
       ".claude",
       "projects",
     );
-    vi.mocked(existsSync).mockImplementation(
-      (p) => String(p) === projectsDir,
-    );
+    vi.mocked(existsSync).mockImplementation((p) => String(p) === projectsDir);
     vi.mocked(readdirSync).mockReturnValue(
       [] as unknown as ReturnType<typeof readdirSync>,
     );
@@ -639,6 +637,72 @@ describe("discoverSessions", () => {
     expect(tree.projects).toHaveLength(0);
     expect(tree.coldProjects).toHaveLength(1);
     expect(tree.coldProjects[0].sessions).toHaveLength(1);
+  });
+
+  it("marks hidden sub-agents but keeps them in the tree (for show-hidden + unhide)", () => {
+    const projectsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".claude",
+      "projects",
+    );
+    const projectDir = join(projectsDir, "-Users-neo-proj");
+    const subagentsDir = join(projectDir, "parent-id", "subagents");
+
+    vi.mocked(existsSync).mockImplementation((p) => {
+      const path = String(p);
+      return (
+        [projectsDir, projectDir, subagentsDir].includes(path) ||
+        path.endsWith(".jsonl")
+      );
+    });
+    vi.mocked(readdirSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === projectsDir)
+        return ["-Users-neo-proj"] as unknown as ReturnType<typeof readdirSync>;
+      if (path === projectDir)
+        return ["parent-id.jsonl", "parent-id"] as unknown as ReturnType<
+          typeof readdirSync
+        >;
+      if (path === subagentsDir)
+        return [
+          "hidden-child.jsonl",
+          "visible-child.jsonl",
+        ] as unknown as ReturnType<typeof readdirSync>;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(statSync).mockImplementation((p) => {
+      const path = String(p);
+      const isDir = !path.endsWith(".jsonl");
+      return {
+        isDirectory: () => isDir,
+        mtimeMs: NOW - 60_000, // hot
+        size: 500,
+      } as ReturnType<typeof statSync>;
+    });
+    vi.mocked(readFileSync).mockReturnValue("");
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const configHidden = {
+      ...mockConfig,
+      hiddenSubAgents: ["proj/hidden-child"],
+    };
+    const tree = discoverSessions(configHidden);
+
+    // Both sub-agents are kept in the tree so `H` (unhide) can find them.
+    expect(tree.projects).toHaveLength(1);
+    expect(tree.projects[0].sessions).toHaveLength(1);
+    const subs = tree.projects[0].sessions[0].subAgents;
+    expect(subs).toHaveLength(2);
+
+    const hidden = subs.find((s) => s.id === "hidden-child");
+    const visible = subs.find((s) => s.id === "visible-child");
+    expect(hidden?.hidden).toBe(true);
+    expect(visible?.hidden).toBeUndefined();
+
+    // Hidden hot sub-agent counts toward both totals so the alarm
+    // ("M active in N hidden") fires in the panel title.
+    expect(tree.hiddenStats.total).toBe(1);
+    expect(tree.hiddenStats.active).toBe(1);
   });
 
   it("marks hidden projects but keeps them in the tree (renderer filters)", () => {
@@ -1057,10 +1121,10 @@ describe("findContainingProject", () => {
   });
 
   it("accepts Windows-style backslash separators as boundary", () => {
-    const result = findContainingProject(
-      "C:\\Users\\me\\proj\\agenthud\\src",
-      ["C:\\Users\\me\\proj\\agenthud", "C:\\Users\\me\\proj\\other"],
-    );
+    const result = findContainingProject("C:\\Users\\me\\proj\\agenthud\\src", [
+      "C:\\Users\\me\\proj\\agenthud",
+      "C:\\Users\\me\\proj\\other",
+    ]);
     expect(result).toBe("C:\\Users\\me\\proj\\agenthud");
   });
 

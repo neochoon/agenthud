@@ -230,12 +230,7 @@ const ActivityRow = memo(function ActivityRow({
   // segment can render in the brightened variant of style.color.
   const SWEEP_WIDTH = 10;
   let labelNode: React.ReactNode = labelContent;
-  if (
-    isLiveRow &&
-    !isCursor &&
-    liveTick != null &&
-    labelContent.length > 0
-  ) {
+  if (isLiveRow && !isCursor && liveTick != null && labelContent.length > 0) {
     const period = labelContent.length + SWEEP_WIDTH;
     const offset = (liveTick % period) - SWEEP_WIDTH; // -W .. len-1
     const litStart = Math.max(0, offset);

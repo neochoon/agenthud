@@ -32,7 +32,7 @@ export interface SessionNode {
   agentId?: string; // short agent ID from JSONL (sub-agents only)
   taskDescription?: string; // extracted task summary from first message (sub-agents only)
   nonInteractive: boolean; // true when entrypoint === "sdk-cli"
-  firstUserPrompt: string | null; // First natural-language user message (system messages skipped)
+  firstUserPrompt: string | null; // Display description: latest substantial (≥10 chars, non-slash) user message, falling back to the first natural-language one. Name kept for backwards compat.
   liveState: LiveState | null; // working/waiting from JSONL tail; null = fall back to time-based status
   hidden?: boolean; // true when matched by hiddenSessions/hiddenSubAgents, or descendant of a hidden project
 }

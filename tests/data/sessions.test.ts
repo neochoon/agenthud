@@ -805,6 +805,128 @@ describe("discoverSessions", () => {
     );
   });
 
+  it("prefers the latest substantial user message over the first", () => {
+    const projectsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".claude",
+      "projects",
+    );
+    const projectDir = join(projectsDir, "-Users-neo-fp");
+    const sessionFile = join(projectDir, "fp2.jsonl");
+
+    vi.mocked(existsSync).mockImplementation((p) => {
+      const path = String(p);
+      return (
+        path === projectsDir || path === projectDir || path === sessionFile
+      );
+    });
+    vi.mocked(readdirSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === projectsDir)
+        return ["-Users-neo-fp"] as unknown as ReturnType<typeof readdirSync>;
+      if (path === projectDir)
+        return ["fp2.jsonl"] as unknown as ReturnType<typeof readdirSync>;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(statSync).mockImplementation(
+      (p) =>
+        ({
+          isDirectory: () => !String(p).endsWith(".jsonl"),
+          mtimeMs: NOW - 10_000,
+          size: 100,
+        }) as ReturnType<typeof statSync>,
+    );
+
+    const lines = [
+      JSON.stringify({
+        type: "user",
+        message: { content: "Look at the brainstorm doc" },
+      }),
+      JSON.stringify({
+        type: "user",
+        message: { content: "ok" }, // trivial follow-up, must NOT win
+      }),
+      JSON.stringify({
+        type: "user",
+        message: { content: "/compact" }, // slash command, must NOT win
+      }),
+      JSON.stringify({
+        type: "user",
+        message: { content: "Implement the OAuth2 callback handler" },
+      }),
+      JSON.stringify({
+        type: "user",
+        message: { content: "yes" }, // trivial, must NOT win
+      }),
+    ].join("\n");
+    vi.mocked(readFileSync).mockReturnValue(lines);
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const tree = discoverSessions(mockConfig);
+    expect(tree.projects[0].sessions[0].firstUserPrompt).toBe(
+      "Implement the OAuth2 callback handler",
+    );
+  });
+
+  it("falls back to first prompt when all later messages are trivial or slash commands", () => {
+    const projectsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".claude",
+      "projects",
+    );
+    const projectDir = join(projectsDir, "-Users-neo-fp");
+    const sessionFile = join(projectDir, "fp3.jsonl");
+
+    vi.mocked(existsSync).mockImplementation((p) => {
+      const path = String(p);
+      return (
+        path === projectsDir || path === projectDir || path === sessionFile
+      );
+    });
+    vi.mocked(readdirSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === projectsDir)
+        return ["-Users-neo-fp"] as unknown as ReturnType<typeof readdirSync>;
+      if (path === projectDir)
+        return ["fp3.jsonl"] as unknown as ReturnType<typeof readdirSync>;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(statSync).mockImplementation(
+      (p) =>
+        ({
+          isDirectory: () => !String(p).endsWith(".jsonl"),
+          mtimeMs: NOW - 10_000,
+          size: 100,
+        }) as ReturnType<typeof statSync>,
+    );
+
+    const lines = [
+      JSON.stringify({
+        type: "user",
+        message: { content: "Fix the auth bug in login flow" },
+      }),
+      JSON.stringify({
+        type: "user",
+        message: { content: "ok" },
+      }),
+      JSON.stringify({
+        type: "user",
+        message: { content: "/clear" },
+      }),
+      JSON.stringify({
+        type: "user",
+        message: { content: "go" },
+      }),
+    ].join("\n");
+    vi.mocked(readFileSync).mockReturnValue(lines);
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const tree = discoverSessions(mockConfig);
+    expect(tree.projects[0].sessions[0].firstUserPrompt).toBe(
+      "Fix the auth bug in login flow",
+    );
+  });
+
   it("returns null firstUserPrompt for sessions with no real user message", () => {
     const projectsDir = join(
       process.env.HOME ?? "/home/user",

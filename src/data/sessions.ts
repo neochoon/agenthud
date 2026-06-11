@@ -173,6 +173,24 @@ function isSystemNoise(text: string): boolean {
   return SYSTEM_PREFIXES.some((p) => trimmed.startsWith(p));
 }
 
+/**
+ * Walk the session JSONL and pick the best user message to surface
+ * as the session's row description. Preference order:
+ *
+ *   1. The LATEST "substantial" user message — long enough to carry
+ *      intent (≥ 10 chars after trim) and not a slash command
+ *      (`/compact`, `/clear`, …). For long sessions, this reflects
+ *      what the user is doing NOW, not just what they asked at
+ *      session start (which is often stale by hour 3).
+ *   2. The FIRST natural-language user message — fallback when no
+ *      later message qualifies as substantial. Preserves the
+ *      original "first user prompt" behavior so short / quick
+ *      sessions still show something meaningful.
+ *
+ * Returns null when neither exists (empty session, all system
+ * reminders, only tool results). The field is still named
+ * `firstUserPrompt` in `SessionNode` for backwards compatibility.
+ */
 function readFirstUserPrompt(filePath: string): string | null {
   if (!existsSync(filePath)) return null;
   let content: string;
@@ -181,6 +199,17 @@ function readFirstUserPrompt(filePath: string): string | null {
   } catch {
     return null;
   }
+
+  const MIN_SUBSTANTIAL_LEN = 10;
+  const isSubstantial = (text: string): boolean => {
+    const trimmed = text.trim();
+    if (trimmed.length < MIN_SUBSTANTIAL_LEN) return false;
+    if (trimmed.startsWith("/")) return false;
+    return true;
+  };
+
+  let first: string | null = null;
+  let latestSubstantial: string | null = null;
 
   for (const line of content.split("\n")) {
     if (!line.trim()) continue;
@@ -202,7 +231,6 @@ function readFirstUserPrompt(filePath: string): string | null {
     if (typeof raw === "string") {
       text = raw;
     } else if (Array.isArray(raw)) {
-      // content can be an array of blocks; find first text block
       const textBlock = raw.find(
         (b: { type?: string; text?: string }) =>
           b && b.type === "text" && typeof b.text === "string",
@@ -216,9 +244,12 @@ function readFirstUserPrompt(filePath: string): string | null {
 
     const firstLine = text.split("\n").find((l) => l.trim()) ?? "";
     if (!firstLine || isSystemNoise(firstLine)) continue;
-    return capWithEllipsis(firstLine);
+
+    const capped = capWithEllipsis(firstLine);
+    if (first === null) first = capped;
+    if (isSubstantial(firstLine)) latestSubstantial = capped;
   }
-  return null;
+  return latestSubstantial ?? first;
 }
 
 function readEntrypoint(filePath: string): string | null {

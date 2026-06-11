@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-06-12
+
+### Changed
+- **ProjectRow name renders dim when no session or sub-agent is
+  active.** Previously every non-hidden project name was bold
+  bright white regardless of activity, so a tree full of
+  cool/cold projects with one genuinely hot one all looked
+  equally "alive" at a glance. New rule: bold + bright only when
+  `isProjectAlive(project)` — at least one session or sub-agent
+  is hot or warm. Otherwise dim, non-bold. Hidden projects still
+  dim with `⊘`; selection background still wins.
+
 ## [0.14.0] - 2026-06-11
 
 ### Changed (BREAKING)

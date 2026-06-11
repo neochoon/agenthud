@@ -442,14 +442,14 @@ function ProjectRow({
       text: short ? `${sessionCount}s` : `${sessionCount} sessions`,
       dim: true,
     },
-    ...activeParen(activeSessionCount, "green", { bold: false, dim: true }),
+    ...activeParen(activeSessionCount, "green", { bold: false }),
     {
       text: short
         ? ` · ${subAgentCount}a`
         : ` · ${subAgentCount} sub-agents`,
       dim: true,
     },
-    ...activeParen(activeSubAgentCount, "green", { bold: false, dim: true }),
+    ...activeParen(activeSubAgentCount, "green", { bold: false }),
   ];
   const longSegs = buildCountsSegments(false);
   const shortSegs = buildCountsSegments(true);
@@ -674,10 +674,10 @@ interface TitleSegment {
 // `opts.bold` defaults to true (panel-title census use case — full
 // loudness so the tree-wide active number is unmissable) and
 // `opts.dim` defaults to false. ProjectRow passes
-// `{ bold: false, dim: true }` so per-project active counts read
-// as a softer "yes there's life here" signal — the row already
-// carries its own [hot]/[warm] badge, so a loud green next to the
-// total would compete with the badge instead of complementing it.
+// `{ bold: false }` so per-project active counts render as
+// non-bold green — a softer mid-tone that reads as "yes there's
+// life here" without competing with the row's own [hot]/[warm]
+// status badge.
 function activeParen(
   count: number,
   color: TitleSegmentColor,

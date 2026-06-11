@@ -105,6 +105,26 @@ export function formatElapsed(
   return "<1s";
 }
 
+/**
+ * "Alive" = at least one session OR one sub-agent on the project is
+ * hot or warm. Drives ProjectRow's name styling — alive projects
+ * read as bold-white, inert ones (everything cool/cold) render dim
+ * so the eye lands on the rows that actually have running activity.
+ * Sub-agents count because a hot sub-agent under a cool parent still
+ * makes the project genuinely alive — it's where the work is.
+ */
+export function isProjectAlive(project: ProjectNode): boolean {
+  const isActive = (status: SessionStatus): boolean =>
+    status === "hot" || status === "warm";
+  for (const s of project.sessions) {
+    if (isActive(s.status)) return true;
+    for (const sa of s.subAgents) {
+      if (isActive(sa.status)) return true;
+    }
+  }
+  return false;
+}
+
 function getStatusColor(status: SessionStatus): string {
   switch (status) {
     case "hot":
@@ -487,13 +507,17 @@ function ProjectRow({
   const focused = isSelected && hasFocus;
   const muted = isSelected && !hasFocus;
   const showBg = focused || muted;
-  const dim = muted || !!project.hidden;
+  // Bold + bright name only when the project has live activity.
+  // Cool/cold-only projects render dim so the eye lands on rows
+  // where there's actually work in flight.
+  const alive = isProjectAlive(project);
+  const dim = muted || !!project.hidden || !alive;
   return (
     <Text>
       {BOX.v}{" "}
       <Text
         backgroundColor={showBg ? "blue" : undefined}
-        bold={!showBg && !project.hidden}
+        bold={!showBg && !project.hidden && alive}
         dimColor={dim}
       >
         {nameText}

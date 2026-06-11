@@ -903,7 +903,11 @@ describe("buildTitleSegments", () => {
   it("emits the full long form at wide widths", () => {
     const segs = buildTitleSegments("Projects", census, 200);
     const text = concat(segs);
-    expect(text).toContain("12 projects");
+    // "Projects" label + project count (no redundant "projects"
+    // word — the label already says it). Sessions and sub-agents
+    // keep their nouns because the label doesn't disambiguate them.
+    expect(text).toContain("Projects 12 ");
+    expect(text).not.toContain("12 projects");
     expect(text).toContain("3 active");
     expect(text).toContain("68 sessions");
     expect(text).toContain("5 active");

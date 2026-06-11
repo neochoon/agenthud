@@ -558,11 +558,15 @@ export function buildTitleSegments(
   const c = census;
 
   // From most to least verbose. First candidate that fits wins.
+  // First segment drops the word "projects" because the panel label
+  // already says "Projects" — `Projects 12 (3 active)` reads
+  // naturally as "12 projects, 3 active". Sessions and sub-agents
+  // keep their words since the label doesn't disambiguate them.
   const candidates: TitleSegment[][] = [
     // L0: full long form
     [
       labelSeg,
-      { text: ` ${c.projects.total} projects`, dim: true, bold: true },
+      { text: ` ${c.projects.total}`, dim: true, bold: true },
       ...activeParen(c.projects.active, false),
       { text: ` · ${c.sessions.total} sessions`, dim: true, bold: true },
       ...activeParen(c.sessions.active, false),
@@ -637,13 +641,13 @@ export function SessionTreePanel({
   const titleSuffix = trackingOn ? `[LIVE ${spinner || "▼"}]` : "";
   const titleLabel = scopeLabel ? `Projects [${scopeLabel}]` : "Projects";
 
-  // Title structure: `┌─ <segments> <dashes> [<suffix> ─]┐`
-  // Reserved chars: 4 for `┌─ ` + ` ─┐` (3 outer + 1 inner space).
-  // Suffix occupies its own ` <suffix> ` chunk (space + suffix + space).
-  const suffixWidthWithPadding = titleSuffix
-    ? getDisplayWidth(titleSuffix) + 2
-    : 0;
-  const titleAvailable = Math.max(0, width - 4 - suffixWidthWithPadding);
+  // Title structure (no suffix): `┌─ <segments> <dashes>┐`
+  //   Overhead = 1 (┌) + 1 (─) + 1 ( ) + 1 ( ) + 1 (┐) = 5 chars
+  // With suffix:                 `┌─ <segments> <dashes> <suffix> ─┐`
+  //   Overhead = 5 + 1 ( ) + suffixLen + 1 ( ) + 1 (─) = 8 + suffixLen
+  const suffixLen = titleSuffix ? getDisplayWidth(titleSuffix) : 0;
+  const overhead = titleSuffix ? 8 + suffixLen : 5;
+  const titleAvailable = Math.max(0, width - overhead);
   const titleSegments = buildTitleSegments(
     titleLabel,
     census,
@@ -653,10 +657,7 @@ export function SessionTreePanel({
     (w, s) => w + getDisplayWidth(s.text),
     0,
   );
-  const titleDashCount = Math.max(
-    0,
-    titleAvailable - titleContentWidth + (titleSuffix ? 0 : 1),
-  );
+  const titleDashCount = Math.max(0, titleAvailable - titleContentWidth);
   const bottomLine = createBottomLine(width);
 
   const totalProjectCount = projects.length + coldProjects.length;

@@ -11,17 +11,16 @@
   mutation behind a deliberate keystroke.
 
 ### Added
-- **Status bar surfaces hidden-but-still-active items.** When any
-  hidden project/session is in `hot` or `warm` state, the
-  branding line shows ` · ⊘ N hidden (M active)`. A hidden
+- **Status bar surfaces hidden-but-still-active items.** A hidden
   session producing live activity used to be completely
   invisible — combined with the `h` footgun above, that broke
-  discovery in a way that took a state.yaml edit to recover.
-  Now the visual is always there: total count when any are
-  hidden, `(M active)` suffix only when any of them are hot or
-  warm. When `(M active)` is present, the indicator turns
-  **yellow** so it pops against the dim status bar — that's
-  the actionable case.
+  discovery in a way that took a `state.yaml` edit to recover.
+  Now the branding line shows the count:
+  - Nothing hot/warm: ` · ⊘ N hidden` (dim, informational)
+  - Something hot/warm: ` · ⊘ M active in N hidden` with the
+    `M active` segment in **yellow** so the actionable case
+    pops while the rest stays dim. Active count leads so the
+    eye lands on it first.
 
 ## [0.13.3] - 2026-06-10
 

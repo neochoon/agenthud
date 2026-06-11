@@ -1230,19 +1230,20 @@ export function App({
           // Surface hidden-items count so a hidden session that's still
           // producing live activity is never invisible (the failure
           // mode of `H` being one keystroke away). When any hidden
-          // item is hot/warm, the indicator turns yellow so it pops
-          // against the rest of the dim status line — that's the
-          // actionable case (something's happening you can't see).
-          // When nothing's active, the indicator stays dim/informational.
+          // item is hot/warm, the count of active ones leads ("N
+          // active in M hidden") and just THAT segment is yellow —
+          // the actionable signal pops while the rest of the
+          // indicator stays dim/informational.
           const hs = sessionTree.hiddenStats;
           const baseBranding = `${spinner} AgentHUD v${getVersion()}`;
-          const hiddenLabel =
-            hs.total > 0
-              ? hs.active > 0
-                ? ` · ⊘ ${hs.total} hidden (${hs.active} active)`
-                : ` · ⊘ ${hs.total} hidden`
-              : "";
-          const branding = `${baseBranding}${hiddenLabel}`;
+          const indicatorPrefix = " · ⊘ ";
+          const indicatorText =
+            hs.total === 0
+              ? ""
+              : hs.active > 0
+                ? `${indicatorPrefix}${hs.active} active in ${hs.total} hidden`
+                : `${indicatorPrefix}${hs.total} hidden`;
+          const branding = `${baseBranding}${indicatorText}`;
           const sep = " · ";
           // Trim shortcut items from the FRONT until they fit. Items at the
           // end (?: help, q: quit) are kept as long as possible.
@@ -1264,11 +1265,15 @@ export function App({
                 {showBranding && (
                   <>
                     <Text dimColor>{baseBranding}</Text>
-                    {hiddenLabel ? (
+                    {hs.total > 0 ? (
                       hs.active > 0 ? (
-                        <Text color="yellow">{hiddenLabel}</Text>
+                        <>
+                          <Text dimColor>{indicatorPrefix}</Text>
+                          <Text color="yellow">{`${hs.active} active`}</Text>
+                          <Text dimColor>{` in ${hs.total} hidden`}</Text>
+                        </>
                       ) : (
-                        <Text dimColor>{hiddenLabel}</Text>
+                        <Text dimColor>{indicatorText}</Text>
                       )
                     ) : null}
                   </>

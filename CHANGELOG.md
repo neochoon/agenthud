@@ -2,37 +2,9 @@
 
 ## [Unreleased]
 
-### Changed (layout)
-- **Census moved to the Projects panel title bar; branding +
-  keybindings moved to the bottom row.** The top status bar was
-  wasted space (just "AgentHUD vX · ⊘ N hidden …" floating
-  above the panels) and the Projects title was equally wasted
-  (just "Projects"). Both fixed: census now sits where it
-  belongs — directly above the tree it describes — and the
-  bottom row carries the brand + keys.
+## [0.14.0] - 2026-06-11
 
-### Added
-- **Tree-wide census in the Projects panel title.** Each level
-  shows total + visible active count:
-  `Projects 12 (3 active) · 68 sessions (5 active) · 142 sub-agents (2 active) · ⊘ 14 hidden (1 active)`.
-  The `(N active)` parentheticals are green so the eye lands on
-  the actionable count. The hidden `(M active)` is yellow — the
-  alert for content you can't see. Narrow terminals fall back
-  to short form (`68s (5)`, `142a (2)`), then drop segments from
-  the right; the hidden alert is the last thing to go.
-- **`a` key toggles "show hidden items" in the tree.** Hidden
-  projects and sessions render dim with a `⊘` marker so they're
-  recognizable at a glance. Combined with the `H` change below,
-  a full hide → toggle → unhide cycle now lives inside the TUI —
-  no more state.yaml editing to recover an accidentally-hidden
-  item.
-
-### Changed
-- **`H` is now a toggle, not just hide.** Pressing `H` on a
-  visible item hides it (same as before); pressing it on a
-  hidden item unhides it. Combine with `a` to reveal hidden
-  items in the tree, navigate to the one you want, and toggle
-  with `H`.
+### Changed (BREAKING)
 - **Hide moved from `h` to `Shift+H`. Lowercase `h` is now the
   vim-left alias for `←` (jump to parent).** The old binding
   (`h` = hide) was a footgun: vim users coming for navigation
@@ -41,16 +13,86 @@
   mutation behind a deliberate keystroke.
 
 ### Added
+- **Tree-wide census in the Projects panel title.** Each level
+  shows total + visible-active count:
+  `12p (3) · 68 sessions (5) · 142 sub-agents (2) · ⊘ 14 hidden (1)`.
+  The `(N)` parentheticals are green so the eye lands on the
+  actionable count. The hidden `(M)` is yellow — the alert for
+  content you can't see. Narrow terminals fall back to short
+  form (`68s (5)`, `142a (2)`), then drop segments from the
+  right; the hidden alert is the last thing to go.
+- **`a` key toggles "show hidden items" in the tree.** Hidden
+  projects and sessions render dim with a `⊘` marker so they're
+  recognizable at a glance. Combined with the `H` change below,
+  a full hide → toggle → unhide cycle now lives inside the TUI —
+  no more state.yaml editing to recover an accidentally-hidden
+  item.
+- **`H` is now a toggle, not just hide.** Pressing `H` on a
+  visible item hides it (same as before); pressing it on a
+  hidden item unhides it. Combine with `a` to reveal hidden
+  items in the tree, navigate to the one you want, and toggle
+  with `H`.
+- **Per-project session + sub-agent counts on the project row.**
+  `> myproj  ~/path   5 sessions (2) · 142 sub-agents (3)   3m`.
+  Totals are dim; active subset `(N)` is mid-tone green
+  (non-bold, softer than the panel-title census so it doesn't
+  compete with the row's own `[hot]`/`[warm]` badge). Width-
+  aware: short form `5s (2) · 142a (3)`, dropped entirely on
+  very narrow terminals.
 - **Status bar surfaces hidden-but-still-active items.** A hidden
   session producing live activity used to be completely
   invisible — combined with the `h` footgun above, that broke
   discovery in a way that took a `state.yaml` edit to recover.
-  Now the branding line shows the count:
-  - Nothing hot/warm: ` · ⊘ N hidden` (dim, informational)
-  - Something hot/warm: ` · ⊘ M active in N hidden` with the
-    `M active` segment in **yellow** so the actionable case
-    pops while the rest stays dim. Active count leads so the
-    eye lands on it first.
+  Now the title bar shows the count: ` · ⊘ N hidden` (dim) or
+  ` · ⊘ M active in N hidden` (yellow `M`) when something hot
+  or warm is hidden.
+- **Cold sessions under active projects collapse to a
+  `... N cold` sentinel.** Active projects often hold a long
+  tail of historical cold sessions that bury the live work;
+  pressing `↵` on the sentinel reveals them.
+
+### Changed (layout)
+- **Census moved to the Projects panel title bar; branding +
+  keybindings moved to a single bottom row.** The top status
+  bar was wasted space (just "AgentHUD vX · ⊘ N hidden …"
+  floating above the panels) and the Projects title was equally
+  wasted (just "Projects"). Both fixed: census now sits where
+  it belongs — directly above the tree it describes — and the
+  bottom row carries the brand + keys.
+- **Session row description = latest substantial user request.**
+  Was: first natural-language user prompt (often stale by hour
+  3 of a long session). Now: the most recent user message that
+  is ≥ 10 chars and doesn't start with `/` (so trivial
+  follow-ups like "ok", "go", "yes" and slash commands like
+  `/compact`, `/clear` are skipped). Falls back to first prompt
+  when no later message qualifies.
+- **`t` (toggle tracking) now requires tree focus.** It moves
+  the tree cursor — accidentally pressing it while reading the
+  viewer used to yank focus away. The `TRK ●` indicator still
+  appears on both tree and viewer banners while the mode is on.
+- **`t: track` and `r: refresh` hints dropped from the status
+  bar.** Tracking is a niche mode; refresh is automatic via the
+  2s poll + fs.watch. Both keys still work and are documented
+  in the `?` help.
+
+### Fixed
+- **Hidden sub-agents are now MARKED, not filtered, in the data
+  layer.** Previously hidden sub-agents were silently dropped
+  before the tree was built, so the panel-title census
+  undercounted sub-agent totals, the yellow hidden-active alarm
+  was silent for them, and the `a` (show hidden) + `H` (unhide)
+  round-trip couldn't reach them at all. Now they ride along
+  with `hidden: true` and the show-hidden/unhide flow works
+  end-to-end.
+- **`H` no longer teleports selection when `showHidden` is on.**
+  In show-hidden mode the row stays rendered (dimmed with `⊘`)
+  after hiding, so jumping selection away made no sense — the
+  user just acted on that row and expects to remain on it. Now
+  selection only advances when the row is about to disappear
+  (`showHidden` off).
+- **Cold session rows render dim instead of bold-bright.** The
+  cold IDs used to compete visually with the active rows in the
+  same project.
 
 ## [0.13.3] - 2026-06-10
 

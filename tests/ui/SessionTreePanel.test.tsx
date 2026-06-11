@@ -8,6 +8,7 @@ import type {
 import {
   buildTitleSegments,
   getBadge,
+  isProjectAlive,
   SessionTreePanel,
 } from "../../src/ui/SessionTreePanel.js";
 
@@ -934,6 +935,42 @@ describe("SessionTreePanel", () => {
       />,
     );
     expect(lastFrame()).not.toMatch(/Projects \[/);
+  });
+});
+
+describe("isProjectAlive", () => {
+  it("returns true when any session is hot or warm", () => {
+    const p = makeProject("p", [
+      makeSession({ status: "cool" }),
+      makeSession({ status: "warm" }),
+    ]);
+    expect(isProjectAlive(p)).toBe(true);
+  });
+
+  it("returns true when an inactive parent has a hot sub-agent", () => {
+    const parent = makeSession({
+      status: "cool",
+      subAgents: [makeSession({ status: "hot" })],
+    });
+    const p = makeProject("p", [parent]);
+    expect(isProjectAlive(p)).toBe(true);
+  });
+
+  it("returns false when everything is cool or cold", () => {
+    const parent = makeSession({
+      status: "cool",
+      subAgents: [
+        makeSession({ status: "cool" }),
+        makeSession({ status: "cold" }),
+      ],
+    });
+    const p = makeProject("p", [parent, makeSession({ status: "cold" })]);
+    expect(isProjectAlive(p)).toBe(false);
+  });
+
+  it("returns false for an empty project", () => {
+    const p = makeProject("p", []);
+    expect(isProjectAlive(p)).toBe(false);
   });
 });
 

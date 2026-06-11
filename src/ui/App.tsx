@@ -1378,6 +1378,34 @@ export function App({
 
   return (
     <Box flexDirection="column">
+      {isWatchMode &&
+        (() => {
+          // Branding + spinner on the left (liveness signal),
+          // keybindings on the right. The census moved to the
+          // Projects panel title where it sits directly above the
+          // tree it describes.
+          const branding = `${spinner} AgentHUD v${getVersion()}`;
+          const sep = " · ";
+          let items = statusBarItems;
+          let shortcuts = items.join(sep);
+          let showBranding = true;
+          const fits = () =>
+            (showBranding ? getDisplayWidth(branding) + 1 : 0) +
+              getDisplayWidth(shortcuts) <=
+            width;
+          if (!fits()) showBranding = false;
+          while (!fits() && items.length > 1) {
+            items = items.slice(1);
+            shortcuts = items.join(sep);
+          }
+          return (
+            <Box marginBottom={1} justifyContent="space-between" width={width}>
+              <Text dimColor>{showBranding ? branding : ""}</Text>
+              <Text dimColor>{shortcuts}</Text>
+            </Box>
+          );
+        })()}
+
       {helpMode ? (
         <HelpPanel
           width={width}
@@ -1438,42 +1466,6 @@ export function App({
               />
             )}
           </Box>
-
-          {isWatchMode && (
-            (() => {
-              // Bottom row: branding + spinner on the left (liveness
-              // signal), keybindings on the right. Census moved to
-              // the Projects panel title — the Projects title row is
-              // the natural home for "what's in the tree" info,
-              // since it's literally above the tree. This row keeps
-              // the shortcuts so they're always visible without
-              // hunting.
-              const branding = `${spinner} AgentHUD v${getVersion()}`;
-              const sep = " · ";
-              let items = statusBarItems;
-              let shortcuts = items.join(sep);
-              let showBranding = true;
-              const fits = () =>
-                (showBranding ? getDisplayWidth(branding) + 1 : 0) +
-                  getDisplayWidth(shortcuts) <=
-                width;
-              if (!fits()) showBranding = false;
-              while (!fits() && items.length > 1) {
-                items = items.slice(1);
-                shortcuts = items.join(sep);
-              }
-              return (
-                <Box
-                  marginTop={1}
-                  justifyContent="space-between"
-                  width={width}
-                >
-                  <Text dimColor>{showBranding ? branding : ""}</Text>
-                  <Text dimColor>{shortcuts}</Text>
-                </Box>
-              );
-            })()
-          )}
         </>
       )}
     </Box>

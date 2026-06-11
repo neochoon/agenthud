@@ -543,13 +543,20 @@ function hiddenSeg(
  * shorter, and returns the first one that fits. The hidden alert
  * (`(N active)` on the hidden segment) is preserved longest because
  * it's the most actionable signal.
+ *
+ * Style rule: only the **active counts** are bold + colored (green
+ * for visible, yellow for hidden alert). Everything else — label,
+ * totals, parens, separators, the `⊘` glyph, the word "hidden" —
+ * stays plain dim. This is what makes the actionable numbers pop
+ * visually; mixing bold into the non-alert parts blurs the signal
+ * and makes the dim parens look comparatively bright.
  */
 export function buildTitleSegments(
   label: string,
   census: TreeCensus | undefined,
   availableWidth: number,
 ): TitleSegment[] {
-  const labelSeg: TitleSegment = { text: label, dim: true, bold: true };
+  const labelSeg: TitleSegment = { text: label, dim: true };
   if (!census) return [labelSeg];
 
   const widthOf = (segs: TitleSegment[]) =>
@@ -566,45 +573,45 @@ export function buildTitleSegments(
     // L0: full long form
     [
       labelSeg,
-      { text: ` ${c.projects.total}`, dim: true, bold: true },
+      { text: ` ${c.projects.total}`, dim: true },
       ...activeParen(c.projects.active, false),
-      { text: ` · ${c.sessions.total} sessions`, dim: true, bold: true },
+      { text: ` · ${c.sessions.total} sessions`, dim: true },
       ...activeParen(c.sessions.active, false),
-      { text: ` · ${c.subAgents.total} sub-agents`, dim: true, bold: true },
+      { text: ` · ${c.subAgents.total} sub-agents`, dim: true },
       ...activeParen(c.subAgents.active, false),
       ...hiddenSeg(c.hidden, false),
     ],
     // L1: short form everywhere (s, a abbreviations; no "active" word)
     [
       labelSeg,
-      { text: ` ${c.projects.total}`, dim: true, bold: true },
+      { text: ` ${c.projects.total}`, dim: true },
       ...activeParen(c.projects.active, true),
-      { text: ` · ${c.sessions.total}s`, dim: true, bold: true },
+      { text: ` · ${c.sessions.total}s`, dim: true },
       ...activeParen(c.sessions.active, true),
-      { text: ` · ${c.subAgents.total}a`, dim: true, bold: true },
+      { text: ` · ${c.subAgents.total}a`, dim: true },
       ...activeParen(c.subAgents.active, true),
       ...hiddenSeg(c.hidden, true),
     ],
     // L2: drop sub-agents
     [
       labelSeg,
-      { text: ` ${c.projects.total}`, dim: true, bold: true },
+      { text: ` ${c.projects.total}`, dim: true },
       ...activeParen(c.projects.active, true),
-      { text: ` · ${c.sessions.total}s`, dim: true, bold: true },
+      { text: ` · ${c.sessions.total}s`, dim: true },
       ...activeParen(c.sessions.active, true),
       ...hiddenSeg(c.hidden, true),
     ],
     // L3: drop sessions
     [
       labelSeg,
-      { text: ` ${c.projects.total}`, dim: true, bold: true },
+      { text: ` ${c.projects.total}`, dim: true },
       ...activeParen(c.projects.active, true),
       ...hiddenSeg(c.hidden, true),
     ],
     // L4: drop project active counter
     [
       labelSeg,
-      { text: ` ${c.projects.total}`, dim: true, bold: true },
+      { text: ` ${c.projects.total}`, dim: true },
       ...hiddenSeg(c.hidden, true),
     ],
     // L5: drop project total

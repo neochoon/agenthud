@@ -414,6 +414,19 @@ function ProjectRow({
   );
   const elapsed = latestMtime > 0 ? formatElapsed(latestMtime) : "";
 
+  // Per-project counts rendered between path and elapsed. Long
+  // form when wide ("5 sessions · 142 sub-agents"), short form
+  // when narrow ("5s · 142a"), dropped entirely when nothing fits.
+  // Counts include hidden items so the row tells the user about
+  // the project's actual size, not just what the tree shows.
+  const sessionCount = project.sessions.length;
+  const subAgentCount = project.sessions.reduce(
+    (n, s) => n + s.subAgents.length,
+    0,
+  );
+  const longCounts = `${sessionCount} sessions · ${subAgentCount} sub-agents`;
+  const shortCounts = `${sessionCount}s · ${subAgentCount}a`;
+
   const nameWidth = getDisplayWidth(nameText);
   const pathWidth = pathText ? getDisplayWidth(pathText) : 0;
   const elapsedWidth = elapsed ? getDisplayWidth(elapsed) : 0;
@@ -423,11 +436,27 @@ function ProjectRow({
   // Min right gap mirrors SessionRow so the layout's right column has the
   // same breathing room across the tree.
   const PROJECT_RIGHT_GAP = 3;
+  const COUNTS_GAP = 2; // padding before counts when shown
+
+  // Pick the widest counts form that fits with the rest of the row.
+  const fitsCounts = (text: string) =>
+    leftWidth + COUNTS_GAP + getDisplayWidth(text) + PROJECT_RIGHT_GAP +
+      elapsedWidth <=
+    contentWidth;
+  const countsText = fitsCounts(longCounts)
+    ? longCounts
+    : fitsCounts(shortCounts)
+      ? shortCounts
+      : "";
+  const countsWidth = countsText
+    ? COUNTS_GAP + getDisplayWidth(countsText)
+    : 0;
+
   const rightGap = Math.max(
     PROJECT_RIGHT_GAP,
-    contentWidth - leftWidth - elapsedWidth,
+    contentWidth - leftWidth - countsWidth - elapsedWidth,
   );
-  const totalWidth = leftWidth + rightGap + elapsedWidth;
+  const totalWidth = leftWidth + countsWidth + rightGap + elapsedWidth;
   const padding = Math.max(0, contentWidth - totalWidth);
   const focused = isSelected && hasFocus;
   const muted = isSelected && !hasFocus;
@@ -446,6 +475,12 @@ function ProjectRow({
           <>
             {"  "}
             <Text dimColor>{pathText}</Text>
+          </>
+        ) : null}
+        {countsText ? (
+          <>
+            {" ".repeat(COUNTS_GAP)}
+            <Text dimColor>{countsText}</Text>
           </>
         ) : null}
         {" ".repeat(rightGap)}

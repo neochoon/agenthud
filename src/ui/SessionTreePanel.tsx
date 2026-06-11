@@ -610,15 +610,16 @@ interface TitleSegment {
   bold?: boolean;
 }
 
-function activeParen(count: number, short: boolean): TitleSegment[] {
+// Active count rendered as a colored number inside dim parens —
+// e.g. ` (3)` where the `3` is bold-green for visible-active and
+// bold-yellow for hidden-active. The number alone carries the
+// signal; we used to spell out " active" but the color is already
+// the active indicator, and dropping the word saves width.
+function activeParen(count: number, color: string): TitleSegment[] {
   if (count === 0) return [];
   return [
     { text: " (", dim: true },
-    {
-      text: short ? `${count}` : `${count} active`,
-      color: "green",
-      bold: true,
-    },
+    { text: `${count}`, color, bold: true },
     { text: ")", dim: true },
   ];
 }
@@ -633,13 +634,7 @@ function hiddenSeg(
   ];
   if (!short) segs.push({ text: " hidden", dim: true });
   if (hidden.active > 0) {
-    segs.push({ text: " (", dim: true });
-    segs.push({
-      text: short ? `${hidden.active}` : `${hidden.active} active`,
-      color: "yellow",
-      bold: true,
-    });
-    segs.push({ text: ")", dim: true });
+    segs.push(...activeParen(hidden.active, "yellow"));
   }
   return segs;
 }
@@ -673,53 +668,53 @@ export function buildTitleSegments(
   const c = census;
 
   // From most to least verbose. First candidate that fits wins.
-  // First segment drops the word "projects" because the panel label
-  // already says "Projects" — `Projects 12 (3 active)` reads
-  // naturally as "12 projects, 3 active". Sessions and sub-agents
-  // keep their words since the label doesn't disambiguate them.
+  // Each level keeps the noun ("projects" / "sessions" / etc.) so
+  // the count is unambiguous; only the active parenthetical uses
+  // a colored number with no word ("(3)" not "(3 active)") since
+  // the color itself signals "active".
   const candidates: TitleSegment[][] = [
     // L0: full long form
     [
       labelSeg,
-      { text: ` ${c.projects.total}`, dim: true },
-      ...activeParen(c.projects.active, false),
+      { text: ` ${c.projects.total} projects`, dim: true },
+      ...activeParen(c.projects.active, "green"),
       { text: ` · ${c.sessions.total} sessions`, dim: true },
-      ...activeParen(c.sessions.active, false),
+      ...activeParen(c.sessions.active, "green"),
       { text: ` · ${c.subAgents.total} sub-agents`, dim: true },
-      ...activeParen(c.subAgents.active, false),
+      ...activeParen(c.subAgents.active, "green"),
       ...hiddenSeg(c.hidden, false),
     ],
-    // L1: short form everywhere (s, a abbreviations; no "active" word)
+    // L1: short form (single-letter abbreviations)
     [
       labelSeg,
-      { text: ` ${c.projects.total}`, dim: true },
-      ...activeParen(c.projects.active, true),
+      { text: ` ${c.projects.total}p`, dim: true },
+      ...activeParen(c.projects.active, "green"),
       { text: ` · ${c.sessions.total}s`, dim: true },
-      ...activeParen(c.sessions.active, true),
+      ...activeParen(c.sessions.active, "green"),
       { text: ` · ${c.subAgents.total}a`, dim: true },
-      ...activeParen(c.subAgents.active, true),
+      ...activeParen(c.subAgents.active, "green"),
       ...hiddenSeg(c.hidden, true),
     ],
     // L2: drop sub-agents
     [
       labelSeg,
-      { text: ` ${c.projects.total}`, dim: true },
-      ...activeParen(c.projects.active, true),
+      { text: ` ${c.projects.total}p`, dim: true },
+      ...activeParen(c.projects.active, "green"),
       { text: ` · ${c.sessions.total}s`, dim: true },
-      ...activeParen(c.sessions.active, true),
+      ...activeParen(c.sessions.active, "green"),
       ...hiddenSeg(c.hidden, true),
     ],
     // L3: drop sessions
     [
       labelSeg,
-      { text: ` ${c.projects.total}`, dim: true },
-      ...activeParen(c.projects.active, true),
+      { text: ` ${c.projects.total}p`, dim: true },
+      ...activeParen(c.projects.active, "green"),
       ...hiddenSeg(c.hidden, true),
     ],
     // L4: drop project active counter
     [
       labelSeg,
-      { text: ` ${c.projects.total}`, dim: true },
+      { text: ` ${c.projects.total}p`, dim: true },
       ...hiddenSeg(c.hidden, true),
     ],
     // L5: drop project total

@@ -901,20 +901,22 @@ describe("buildTitleSegments", () => {
   });
 
   it("emits the full long form at wide widths", () => {
-    const segs = buildTitleSegments("Projects", census, 200);
+    const segs = buildTitleSegments("", census, 200);
     const text = concat(segs);
-    // "Projects" label + project count (no redundant "projects"
-    // word — the label already says it). Sessions and sub-agents
-    // keep their nouns because the label doesn't disambiguate them.
-    expect(text).toContain("Projects 12 ");
-    expect(text).not.toContain("12 projects");
-    expect(text).toContain("3 active");
+    // Every level keeps its noun ("projects" / "sessions" /
+    // "sub-agents"); only the active count is dropped down to a
+    // colored number inside parens with no " active" word — the
+    // color carries that signal.
+    expect(text).toContain("12 projects");
     expect(text).toContain("68 sessions");
-    expect(text).toContain("5 active");
     expect(text).toContain("142 sub-agents");
-    expect(text).toContain("2 active");
     expect(text).toContain("⊘ 14 hidden");
-    expect(text).toContain("1 active");
+    expect(text).not.toContain("active");
+    // Active counts present as bare numbers inside parens.
+    expect(text).toMatch(/12 projects \(3\)/);
+    expect(text).toMatch(/68 sessions \(5\)/);
+    expect(text).toMatch(/142 sub-agents \(2\)/);
+    expect(text).toMatch(/⊘ 14 hidden \(1\)/);
   });
 
   it("falls back to short form at medium widths", () => {

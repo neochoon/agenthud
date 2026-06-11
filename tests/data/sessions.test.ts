@@ -307,9 +307,14 @@ describe("discoverSessions", () => {
     };
 
     const tree = discoverSessions(configWithHidden);
-    expect(tree.projects).toHaveLength(0);
-    expect(tree.coldProjects).toHaveLength(0);
-    expect(tree.totalCount).toBe(0);
+    // The session is now KEPT in the tree with `hidden: true` rather
+    // than filtered out — the App.tsx render layer decides whether
+    // to display it based on the `showHidden` toggle. The tree
+    // counts it; only the renderer filters.
+    expect(tree.projects).toHaveLength(1);
+    expect(tree.projects[0].sessions).toHaveLength(1);
+    expect(tree.projects[0].sessions[0].hidden).toBe(true);
+    expect(tree.totalCount).toBe(1);
     // Hidden session was hot (mtime 5s ago) — counts toward both
     // total and active so the status bar can flag it.
     expect(tree.hiddenStats).toEqual({ total: 1, active: 1 });
@@ -412,8 +417,12 @@ describe("discoverSessions", () => {
     });
     // Both sessions in the hidden project count.
     expect(tree.hiddenStats).toEqual({ total: 2, active: 2 });
-    expect(tree.projects).toHaveLength(0);
-    expect(tree.coldProjects).toHaveLength(0);
+    // The project is kept in the tree, marked hidden — the renderer
+    // filters it based on `showHidden`.
+    expect(tree.projects).toHaveLength(1);
+    expect(tree.projects[0].hidden).toBe(true);
+    expect(tree.projects[0].sessions).toHaveLength(2);
+    expect(tree.projects[0].sessions[0].hidden).toBe(true);
   });
 
   it("marks session non-interactive when entrypoint is sdk-cli", () => {
@@ -632,7 +641,7 @@ describe("discoverSessions", () => {
     expect(tree.coldProjects[0].sessions).toHaveLength(1);
   });
 
-  it("filters out hidden projects entirely", () => {
+  it("marks hidden projects but keeps them in the tree (renderer filters)", () => {
     const projectsDir = join(
       process.env.HOME ?? "/home/user",
       ".claude",
@@ -667,7 +676,10 @@ describe("discoverSessions", () => {
 
     const configWithHidden = { ...mockConfig, hiddenProjects: ["secret"] };
     const tree = discoverSessions(configWithHidden);
-    expect(tree.projects).toHaveLength(0);
+    // mtime 10s ago → hot → goes to projects (not coldProjects),
+    // marked hidden=true. The render layer decides whether to show.
+    expect(tree.projects).toHaveLength(1);
+    expect(tree.projects[0].hidden).toBe(true);
     expect(tree.coldProjects).toHaveLength(0);
   });
 

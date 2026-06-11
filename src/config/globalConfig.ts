@@ -396,6 +396,30 @@ export function hideProject(name: string): void {
   updateState({ hiddenProjects: [...config.hiddenProjects, name] });
 }
 
+export function unhideSession(id: string): void {
+  const config = loadGlobalConfig();
+  if (!config.hiddenSessions.includes(id)) return;
+  updateState({
+    hiddenSessions: config.hiddenSessions.filter((s) => s !== id),
+  });
+}
+
+export function unhideSubAgent(id: string): void {
+  const config = loadGlobalConfig();
+  if (!config.hiddenSubAgents.includes(id)) return;
+  updateState({
+    hiddenSubAgents: config.hiddenSubAgents.filter((s) => s !== id),
+  });
+}
+
+export function unhideProject(name: string): void {
+  const config = loadGlobalConfig();
+  if (!config.hiddenProjects.includes(name)) return;
+  updateState({
+    hiddenProjects: config.hiddenProjects.filter((p) => p !== name),
+  });
+}
+
 export function hasProjectLevelConfig(): boolean {
   const candidate = join(process.cwd(), ".agenthud", "config.yaml");
   // When cwd is the user's home directory, candidate resolves to the global

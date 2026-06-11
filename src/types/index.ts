@@ -34,6 +34,7 @@ export interface SessionNode {
   nonInteractive: boolean; // true when entrypoint === "sdk-cli"
   firstUserPrompt: string | null; // First natural-language user message (system messages skipped)
   liveState: LiveState | null; // working/waiting from JSONL tail; null = fall back to time-based status
+  hidden?: boolean; // true when matched by hiddenSessions/hiddenSubAgents, or descendant of a hidden project
 }
 
 // Project node grouping sessions
@@ -42,6 +43,7 @@ export interface ProjectNode {
   projectPath: string; // decoded full path
   sessions: SessionNode[]; // sorted: interactive→non-interactive, then status→mtime
   hotness: SessionStatus; // hottest session's status
+  hidden?: boolean; // true when name is in `hiddenProjects` config
 }
 
 // Full session tree returned by discoverSessions()

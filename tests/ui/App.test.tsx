@@ -40,6 +40,7 @@ const {
   findParentTarget,
   initialSelectedId,
   initialExpandedIds,
+  filterTreeByHidden,
 } = await import("../../src/ui/App.js");
 
 const emptyTree = (): SessionTree => ({
@@ -414,5 +415,108 @@ describe("findParentTarget", () => {
       { ...s1, id: "__cold__" } as SessionNode,
     ];
     expect(findParentTarget("__cold__", tree, flat)).toBe("s1");
+  });
+});
+
+describe("filterTreeByHidden", () => {
+  // Helper to build a minimal SessionNode for tree shape tests.
+  const sn = (id: string, hidden = false): SessionNode => ({
+    id,
+    hideKey: `proj/${id}`,
+    filePath: "",
+    projectPath: "/path/proj",
+    projectName: "proj",
+    lastModifiedMs: 1,
+    status: "hot",
+    modelName: null,
+    subAgents: [],
+    nonInteractive: false,
+    firstUserPrompt: null,
+    liveState: null,
+    hidden,
+  });
+
+  it("strips sessions marked hidden", () => {
+    const tree: SessionTree = {
+      projects: [
+        {
+          name: "proj",
+          projectPath: "/path/proj",
+          sessions: [sn("a"), sn("b", true), sn("c")],
+          hotness: "hot",
+        },
+      ],
+      coldProjects: [],
+      totalCount: 3,
+      timestamp: "",
+      hiddenStats: { total: 1, active: 1 },
+    };
+    const out = filterTreeByHidden(tree);
+    expect(out.projects[0].sessions.map((s) => s.id)).toEqual(["a", "c"]);
+  });
+
+  it("strips entire projects marked hidden", () => {
+    const tree: SessionTree = {
+      projects: [
+        {
+          name: "visible",
+          projectPath: "/v",
+          sessions: [sn("a")],
+          hotness: "hot",
+        },
+        {
+          name: "secret",
+          projectPath: "/s",
+          sessions: [sn("b"), sn("c")],
+          hotness: "hot",
+          hidden: true,
+        },
+      ],
+      coldProjects: [],
+      totalCount: 3,
+      timestamp: "",
+      hiddenStats: { total: 2, active: 2 },
+    };
+    const out = filterTreeByHidden(tree);
+    expect(out.projects.map((p) => p.name)).toEqual(["visible"]);
+  });
+
+  it("strips hidden sub-agents from kept sessions", () => {
+    const parent: SessionNode = {
+      ...sn("p"),
+      subAgents: [sn("s1"), sn("s2", true)],
+    };
+    const tree: SessionTree = {
+      projects: [
+        {
+          name: "proj",
+          projectPath: "/p",
+          sessions: [parent],
+          hotness: "hot",
+        },
+      ],
+      coldProjects: [],
+      totalCount: 3,
+      timestamp: "",
+      hiddenStats: { total: 1, active: 1 },
+    };
+    const out = filterTreeByHidden(tree);
+    expect(out.projects[0].sessions[0].subAgents.map((s) => s.id)).toEqual([
+      "s1",
+    ]);
+  });
+
+  it("preserves hiddenStats so the status bar still reflects them", () => {
+    const tree: SessionTree = {
+      projects: [],
+      coldProjects: [],
+      totalCount: 0,
+      timestamp: "",
+      hiddenStats: { total: 5, active: 2 },
+    };
+    expect(filterTreeByHidden(tree).hiddenStats).toEqual({
+      total: 5,
+      active: 2,
+    });
   });
 });

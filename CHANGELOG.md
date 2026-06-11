@@ -2,7 +2,20 @@
 
 ## [Unreleased]
 
+### Added
+- **`a` key toggles "show hidden items" in the tree.** Hidden
+  projects and sessions render dim with a `⊘` marker so they're
+  recognizable at a glance. Combined with the `H` change below,
+  a full hide → toggle → unhide cycle now lives inside the TUI —
+  no more state.yaml editing to recover an accidentally-hidden
+  item.
+
 ### Changed
+- **`H` is now a toggle, not just hide.** Pressing `H` on a
+  visible item hides it (same as before); pressing it on a
+  hidden item unhides it. Combine with `a` to reveal hidden
+  items in the tree, navigate to the one you want, and toggle
+  with `H`.
 - **Hide moved from `h` to `Shift+H`. Lowercase `h` is now the
   vim-left alias for `←` (jump to parent).** The old binding
   (`h` = hide) was a footgun: vim users coming for navigation

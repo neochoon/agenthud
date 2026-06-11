@@ -425,11 +425,14 @@ export function discoverSessions(
     }
   }
 
-  // Group by projectPath, and tally hidden items so the status bar
-  // can surface "N hidden, M active" — a hidden session that's still
-  // producing live activity is one of the things the user is most
-  // likely to want to know about (it's the failure mode of the `h`
-  // key being too easy to hit by accident).
+  // Group by projectPath. Hidden items used to be filtered out here,
+  // but now they're MARKED and kept in the tree — the App.tsx render
+  // layer decides whether to show them based on the `showHidden`
+  // toggle (`a` key). Tally hidden items as we go so the status bar
+  // can surface "M active in N hidden" — a hidden session that's
+  // still producing live activity is one of the things the user is
+  // most likely to want to know about (the failure mode of `H` being
+  // one keystroke away).
   const byProject = new Map<string, SessionNode[]>();
   let hiddenTotal = 0;
   let hiddenActive = 0;
@@ -439,8 +442,8 @@ export function discoverSessions(
     if (sessionHidden || projectHidden) {
       hiddenTotal++;
       if (s.status === "hot" || s.status === "warm") hiddenActive++;
+      s.hidden = true;
     }
-    if (sessionHidden) continue;
     const arr = byProject.get(s.projectPath) ?? [];
     arr.push(s);
     byProject.set(s.projectPath, arr);
@@ -457,7 +460,7 @@ export function discoverSessions(
   for (const [projectPath, sessions] of byProject) {
     if (sessions.length === 0) continue;
     const projectName = sessions[0].projectName;
-    if (config.hiddenProjects.includes(projectName)) continue;
+    const projectHidden = config.hiddenProjects.includes(projectName);
 
     // Sort: interactive first, then by status, then by mtime desc
     sessions.sort((a, b) => {
@@ -471,7 +474,13 @@ export function discoverSessions(
 
     const hotness = sessions[0].status; // hottest = first after sort
 
-    allProjects.push({ name: projectName, projectPath, sessions, hotness });
+    allProjects.push({
+      name: projectName,
+      projectPath,
+      sessions,
+      hotness,
+      hidden: projectHidden || undefined,
+    });
   }
 
   // Partition cold vs active

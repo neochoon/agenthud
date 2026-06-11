@@ -212,6 +212,24 @@ describe("useHotkeys", () => {
       act(() => result.current.handleInput("H", noopKey));
       expect(onHide).not.toHaveBeenCalled();
     });
+
+    it("calls onToggleShowHidden when `a` is pressed in tree focus", () => {
+      const onToggleShowHidden = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ focus: "tree", onToggleShowHidden })),
+      );
+      act(() => result.current.handleInput("a", noopKey));
+      expect(onToggleShowHidden).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not call onToggleShowHidden when `a` is pressed in viewer focus", () => {
+      const onToggleShowHidden = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ focus: "viewer", onToggleShowHidden })),
+      );
+      act(() => result.current.handleInput("a", noopKey));
+      expect(onToggleShowHidden).not.toHaveBeenCalled();
+    });
   });
 
   describe("tree focus", () => {

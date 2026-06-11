@@ -51,6 +51,8 @@ interface UseHotkeysOptions {
   /** Tree only: jump to the parent of the current row (sub-agent →
    * session, session → project, project → previous row). */
   onJumpToParent?: () => void;
+  /** Tree only: toggle whether hidden items appear in the tree. */
+  onToggleShowHidden?: () => void;
   filterLabel: string; // e.g. "all", "response", "commit"
   trackingOn?: boolean;
 }
@@ -102,6 +104,7 @@ export function useHotkeys({
   onHelpScrollToTop,
   onToggleTracking,
   onJumpToParent,
+  onToggleShowHidden,
   filterLabel,
   trackingOn = false,
 }: UseHotkeysOptions): UseHotkeysResult {
@@ -242,8 +245,13 @@ export function useHotkeys({
       // parent), aliased to `←`. Old behavior (`h` = hide) was a
       // footgun: users coming from vim hit `h` for navigation and
       // accidentally hid sessions they were actively monitoring.
+      // `a` toggles whether hidden items show in the tree.
       if (input === "H") {
         onHide();
+        return;
+      }
+      if (input === "a" && onToggleShowHidden) {
+        onToggleShowHidden();
         return;
       }
       if ((input === "h" || key.leftArrow) && onJumpToParent) {

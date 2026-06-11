@@ -167,7 +167,10 @@ function SessionRow({
   if (model) rightParts.push(model);
   const rightSide = rightParts.join(" ");
 
-  const leftCoreBase = `${prefix}${rawName}${shortIdDisplay} ${badge}`;
+  // `⊘ ` marker (2 cells) precedes the badge for hidden items so
+  // they're recognizable at a glance when `showHidden` is on.
+  const hiddenMarker = session.hidden ? "⊘ " : "";
+  const leftCoreBase = `${prefix}${rawName}${shortIdDisplay} ${hiddenMarker}${badge}`;
   const leftCoreWidth = getDisplayWidth(leftCoreBase);
   const rightWidth = getDisplayWidth(rightSide);
 
@@ -207,7 +210,7 @@ function SessionRow({
   const focused = isSelected && hasFocus;
   const muted = isSelected && !hasFocus;
   const showBg = focused || muted;
-  const shouldDim = isNonInteractive || muted;
+  const shouldDim = isNonInteractive || muted || !!session.hidden;
 
   return (
     <Text>
@@ -221,6 +224,7 @@ function SessionRow({
         <Text bold={!shouldDim}>{rawName}</Text>
         {shortIdDisplay ? <Text dimColor>{shortIdDisplay}</Text> : null}
         <Text> </Text>
+        {session.hidden ? <Text dimColor>{"⊘ "}</Text> : null}
         <Text color={badgeColor}>{badge}</Text>
         {middleText ? <Text dimColor>{middleSection}</Text> : null}
         <Text>{gap}</Text>
@@ -354,7 +358,7 @@ function ProjectRow({
   hasFocus: boolean;
   contentWidth: number;
 }): React.ReactElement {
-  const nameText = `> ${project.name}`;
+  const nameText = `> ${project.hidden ? "⊘ " : ""}${project.name}`;
   const pathText = project.projectPath
     ? formatProjectPath(project.projectPath)
     : "";
@@ -386,13 +390,14 @@ function ProjectRow({
   const focused = isSelected && hasFocus;
   const muted = isSelected && !hasFocus;
   const showBg = focused || muted;
+  const dim = muted || !!project.hidden;
   return (
     <Text>
       {BOX.v}{" "}
       <Text
         backgroundColor={showBg ? "blue" : undefined}
-        bold={!showBg}
-        dimColor={muted}
+        bold={!showBg && !project.hidden}
+        dimColor={dim}
       >
         {nameText}
         {pathText ? (

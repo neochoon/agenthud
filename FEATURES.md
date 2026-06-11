@@ -373,14 +373,16 @@ the `?` overlay renders in-app.
 | Key | Action |
 |---|---|
 | `↑` `↓` / `k` `j` | Move selection |
-| `←` | Jump to parent (sub-agent → session, session → project) |
+| `←` / `h` | Jump to parent (sub-agent → session, session → project) |
 | `PgUp` / `Ctrl+B` | Page up |
 | `PgDn` / `Ctrl+F` | Page down |
 | `↵` | Expand/collapse project, session, or summary |
-| `h` | Hide selected (project / session / sub-agent) |
+| `H` (Shift+H) | Hide selected (project / session / sub-agent). Mutates — case matters. |
 | `t` | Track: auto-follow the newest live sub-agent (any nav key turns it off) |
 | `Tab` | Switch focus to activity viewer |
 | `r` | Refresh now |
+
+> **Note (v0.14.0):** Hide moved from `h` to `Shift+H`. The lowercase `h` is now the vim-left alias for `←` (jump to parent). Before, vim users hitting `h` for navigation would silently hide whichever item was selected. A status-bar indicator now also surfaces hidden-but-still-active items so an accidentally-hidden hot session never becomes invisible.
 
 ### Activity viewer
 

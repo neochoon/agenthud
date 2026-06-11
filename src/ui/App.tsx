@@ -1227,7 +1227,19 @@ export function App({
     <Box flexDirection="column">
       {isWatchMode &&
         (() => {
-          const branding = `${spinner} AgentHUD v${getVersion()}`;
+          // Surface hidden-items count so a hidden session that's still
+          // producing live activity is never invisible (the failure
+          // mode of `H` being one keystroke away). Glyph stays the same
+          // regardless of count so the visual is stable; the active
+          // suffix appears only when something hidden is actually hot.
+          const hs = sessionTree.hiddenStats;
+          const hiddenLabel =
+            hs.total > 0
+              ? hs.active > 0
+                ? ` · ⊘ ${hs.total} hidden (${hs.active} active)`
+                : ` · ⊘ ${hs.total} hidden`
+              : "";
+          const branding = `${spinner} AgentHUD v${getVersion()}${hiddenLabel}`;
           const sep = " · ";
           // Trim shortcut items from the FRONT until they fit. Items at the
           // end (?: help, q: quit) are kept as long as possible.

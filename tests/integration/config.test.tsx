@@ -22,6 +22,7 @@ vi.mock("../../src/data/sessions.js", () => ({
     coldProjects: [],
     totalCount: 0,
     timestamp: new Date().toISOString(),
+    hiddenStats: { total: 0, active: 0 },
   }),
   getProjectsDir: () => "/tmp/nonexistent-projects-dir",
 }));

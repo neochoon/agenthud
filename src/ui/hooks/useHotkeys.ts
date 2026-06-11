@@ -237,11 +237,16 @@ export function useHotkeys({
     }
 
     if (focus === "tree") {
-      if (input === "h") {
+      // `H` (Shift+H) is hide — uppercase keeps the mutation behind a
+      // deliberate keystroke. Lowercase `h` is vim-left (jump to
+      // parent), aliased to `←`. Old behavior (`h` = hide) was a
+      // footgun: users coming from vim hit `h` for navigation and
+      // accidentally hid sessions they were actively monitoring.
+      if (input === "H") {
         onHide();
         return;
       }
-      if (key.leftArrow && onJumpToParent) {
+      if ((input === "h" || key.leftArrow) && onJumpToParent) {
         onJumpToParent();
         return;
       }

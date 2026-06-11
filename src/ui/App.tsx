@@ -95,6 +95,29 @@ function subSummarySentinel(parentId: string): SessionNode {
 }
 
 /**
+ * Sentinel row for "N cold sessions" inside an active project.
+ * Default collapsed: cold sessions are historical context, not
+ * what the user is working on right now. Press Enter on the
+ * sentinel to expand and reveal the individual cold sessions.
+ */
+function coldSessionsSummarySentinel(projectName: string): SessionNode {
+  return {
+    id: `__cold-sessions-${projectName}__`,
+    hideKey: "",
+    filePath: "",
+    projectPath: "",
+    projectName: "",
+    lastModifiedMs: 0,
+    status: "cold",
+    modelName: null,
+    subAgents: [],
+    nonInteractive: false,
+    firstUserPrompt: null,
+    liveState: null,
+  };
+}
+
+/**
  * Append the sub-agent rows for `session` onto `result` per the same
  * expand-state rules the renderer uses. Exported for unit testing.
  *
@@ -271,9 +294,38 @@ function flattenSessions(
       : !expandedIds.has(`__collapsed-${sentinelId}`);
 
     if (shouldShowSessions) {
-      for (const session of project.sessions) {
-        result.push(session);
-        appendSubAgentRows(result, session, expandedIds);
+      // Active sessions are always shown. Cold sessions under an
+      // ACTIVE project (isCold=false) get collapsed under a
+      // `... N cold` sentinel by default — same pattern as
+      // cold-projects-summary and cold-sub-agents-summary. When
+      // the whole project is cold (isCold=true) the user has
+      // already opted in to expanding it, so show everything.
+      if (isCold) {
+        for (const session of project.sessions) {
+          result.push(session);
+          appendSubAgentRows(result, session, expandedIds);
+        }
+      } else {
+        const activeSessions = project.sessions.filter(
+          (s) => s.status !== "cold",
+        );
+        const coldSessions = project.sessions.filter(
+          (s) => s.status === "cold",
+        );
+        for (const session of activeSessions) {
+          result.push(session);
+          appendSubAgentRows(result, session, expandedIds);
+        }
+        if (coldSessions.length > 0) {
+          const coldKey = `__cold-sessions-${project.name}__`;
+          result.push(coldSessionsSummarySentinel(project.name));
+          if (expandedIds.has(coldKey)) {
+            for (const session of coldSessions) {
+              result.push(session);
+              appendSubAgentRows(result, session, expandedIds);
+            }
+          }
+        }
       }
     }
   };
@@ -1160,6 +1212,22 @@ export function App({
           } else {
             next.add("__cold__");
           }
+          return next;
+        });
+        return;
+      }
+
+      // Cold-sessions summary sentinel: __cold-sessions-{projectName}__
+      // Expand → reveal the individual cold sessions inline; collapse
+      // → fold them back under the summary.
+      if (
+        selectedId.startsWith("__cold-sessions-") &&
+        selectedId.endsWith("__")
+      ) {
+        setExpandedIds((prev) => {
+          const next = new Set(prev);
+          if (next.has(selectedId)) next.delete(selectedId);
+          else next.add(selectedId);
           return next;
         });
         return;

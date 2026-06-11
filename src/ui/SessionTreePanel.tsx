@@ -263,7 +263,8 @@ type FlatRow =
       coolCount: number;
       coldCount: number;
     }
-  | { kind: "cold-projects-summary"; count: number };
+  | { kind: "cold-projects-summary"; count: number }
+  | { kind: "cold-sessions-summary"; projectName: string; count: number };
 
 function appendSessionRows(
   result: FlatRow[],
@@ -336,9 +337,33 @@ function flattenSessions(
     // Projects default EXPANDED. Collapse only when explicitly collapsed.
     const collapsed = expandedIds.has(`__collapsed-${sentinelId}`);
     if (!collapsed) {
-      for (const session of project.sessions) {
+      // Cold sessions under an ACTIVE project get collapsed under
+      // a `... N cold` sentinel by default — same pattern as
+      // cold-projects and cold-sub-agents. Active sessions
+      // (non-cold) always show.
+      const activeSessions = project.sessions.filter(
+        (s) => s.status !== "cold",
+      );
+      const coldSessions = project.sessions.filter(
+        (s) => s.status === "cold",
+      );
+      for (const session of activeSessions) {
         result.push({ kind: "session", session, prefix: "    " });
         appendSessionRows(result, session, expandedIds);
+      }
+      if (coldSessions.length > 0) {
+        const coldKey = `__cold-sessions-${project.name}__`;
+        result.push({
+          kind: "cold-sessions-summary",
+          projectName: project.name,
+          count: coldSessions.length,
+        });
+        if (expandedIds.has(coldKey)) {
+          for (const session of coldSessions) {
+            result.push({ kind: "session", session, prefix: "    " });
+            appendSessionRows(result, session, expandedIds);
+          }
+        }
       }
     }
   }
@@ -497,6 +522,48 @@ function ColdProjectsSummaryRow({
       dimColor={!focused}
     >
       {line}
+    </Text>
+  );
+}
+
+/**
+ * "... N cold" row inserted under an active project to collapse
+ * its cold-status sessions. Indented to match session row depth so
+ * the visual hierarchy reads as "this is part of the project
+ * above, but folded down to save vertical space". Press Enter to
+ * expand into individual cold session rows.
+ */
+function ColdSessionsSummaryRow({
+  count,
+  isSelected,
+  hasFocus,
+  contentWidth,
+}: {
+  count: number;
+  projectName: string;
+  isSelected: boolean;
+  hasFocus: boolean;
+  contentWidth: number;
+}): React.ReactElement {
+  const prefix = "    ";
+  const label = `... ${count} cold`;
+  const hint = isSelected && hasFocus ? " +" : "";
+  const text = `${prefix}${label}${hint}`;
+  const padding = Math.max(0, contentWidth - getDisplayWidth(text));
+  const focused = isSelected && hasFocus;
+  const muted = isSelected && !hasFocus;
+  return (
+    <Text>
+      {BOX.v}{" "}
+      <Text
+        backgroundColor={focused || muted ? "blue" : undefined}
+        bold={focused}
+        dimColor={!focused}
+      >
+        {text}
+      </Text>
+      {" ".repeat(padding)}
+      {BOX.v}
     </Text>
   );
 }
@@ -725,6 +792,8 @@ export function SessionTreePanel({
     if (row.kind === "subagent-summary")
       return selectedId === `__sub-${row.parentId}__`;
     if (row.kind === "cold-projects-summary") return selectedId === "__cold__";
+    if (row.kind === "cold-sessions-summary")
+      return selectedId === `__cold-sessions-${row.projectName}__`;
     return false;
   });
 
@@ -777,13 +846,24 @@ export function SessionTreePanel({
             isSelected={selectedId === `__sub-${row.parentId}__`}
             hasFocus={hasFocus}
           />
-        ) : (
+        ) : row.kind === "cold-projects-summary" ? (
           <ColdProjectsSummaryRow
             key="cold-summary"
             count={row.count}
             isSelected={selectedId === "__cold__"}
             hasFocus={hasFocus}
             width={width}
+          />
+        ) : (
+          <ColdSessionsSummaryRow
+            key={`cold-sessions-${row.projectName}`}
+            count={row.count}
+            projectName={row.projectName}
+            isSelected={
+              selectedId === `__cold-sessions-${row.projectName}__`
+            }
+            hasFocus={hasFocus}
+            contentWidth={contentWidth}
           />
         ),
       )}

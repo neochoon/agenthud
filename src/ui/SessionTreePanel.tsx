@@ -442,14 +442,14 @@ function ProjectRow({
       text: short ? `${sessionCount}s` : `${sessionCount} sessions`,
       dim: true,
     },
-    ...activeParen(activeSessionCount, "green"),
+    ...activeParen(activeSessionCount, "green", { bold: false, dim: true }),
     {
       text: short
         ? ` · ${subAgentCount}a`
         : ` · ${subAgentCount} sub-agents`,
       dim: true,
     },
-    ...activeParen(activeSubAgentCount, "green"),
+    ...activeParen(activeSubAgentCount, "green", { bold: false, dim: true }),
   ];
   const longSegs = buildCountsSegments(false);
   const shortSegs = buildCountsSegments(true);
@@ -670,11 +670,24 @@ interface TitleSegment {
 // bold-yellow for hidden-active. The number alone carries the
 // signal; we used to spell out " active" but the color is already
 // the active indicator, and dropping the word saves width.
-function activeParen(count: number, color: TitleSegmentColor): TitleSegment[] {
+//
+// `opts.bold` defaults to true (panel-title census use case — full
+// loudness so the tree-wide active number is unmissable) and
+// `opts.dim` defaults to false. ProjectRow passes
+// `{ bold: false, dim: true }` so per-project active counts read
+// as a softer "yes there's life here" signal — the row already
+// carries its own [hot]/[warm] badge, so a loud green next to the
+// total would compete with the badge instead of complementing it.
+function activeParen(
+  count: number,
+  color: TitleSegmentColor,
+  opts: { bold?: boolean; dim?: boolean } = {},
+): TitleSegment[] {
   if (count === 0) return [];
+  const { bold = true, dim = false } = opts;
   return [
     { text: " (", dim: true },
-    { text: `${count}`, color, bold: true },
+    { text: `${count}`, color, bold, dim },
     { text: ")", dim: true },
   ];
 }

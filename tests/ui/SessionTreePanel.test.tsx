@@ -1,7 +1,15 @@
 import { render } from "ink-testing-library";
 import { describe, expect, it } from "vitest";
-import type { ProjectNode, SessionNode } from "../../src/types/index.js";
-import { getBadge, SessionTreePanel } from "../../src/ui/SessionTreePanel.js";
+import type {
+  ProjectNode,
+  SessionNode,
+  TreeCensus,
+} from "../../src/types/index.js";
+import {
+  buildTitleSegments,
+  getBadge,
+  SessionTreePanel,
+} from "../../src/ui/SessionTreePanel.js";
 
 const makeSession = (overrides: Partial<SessionNode> = {}): SessionNode => ({
   id: "abc123",
@@ -873,5 +881,98 @@ describe("SessionTreePanel", () => {
       />,
     );
     expect(lastFrame()).not.toMatch(/Projects \[/);
+  });
+});
+
+describe("buildTitleSegments", () => {
+  const census: TreeCensus = {
+    projects: { total: 12, active: 3 },
+    sessions: { total: 68, active: 5 },
+    subAgents: { total: 142, active: 2 },
+    hidden: { total: 14, active: 1 },
+  };
+
+  const concat = (segs: { text: string }[]) =>
+    segs.map((s) => s.text).join("");
+
+  it("returns just the label when no census provided", () => {
+    const segs = buildTitleSegments("Projects", undefined, 80);
+    expect(concat(segs)).toBe("Projects");
+  });
+
+  it("emits the full long form at wide widths", () => {
+    const segs = buildTitleSegments("Projects", census, 200);
+    const text = concat(segs);
+    expect(text).toContain("12 projects");
+    expect(text).toContain("3 active");
+    expect(text).toContain("68 sessions");
+    expect(text).toContain("5 active");
+    expect(text).toContain("142 sub-agents");
+    expect(text).toContain("2 active");
+    expect(text).toContain("⊘ 14 hidden");
+    expect(text).toContain("1 active");
+  });
+
+  it("falls back to short form at medium widths", () => {
+    // Tight enough that long form doesn't fit but everything in
+    // short form does.
+    const segs = buildTitleSegments("Projects", census, 60);
+    const text = concat(segs);
+    // Short form uses "s" / "a" instead of "sessions" / "sub-agents"
+    // and drops the " active" word.
+    expect(text).not.toContain("sessions");
+    expect(text).not.toContain("sub-agents");
+    expect(text).toContain("68s");
+    expect(text).toContain("142a");
+    expect(text).toContain("⊘");
+  });
+
+  it("drops segments from the right, keeping the hidden alert longest", () => {
+    const segs = buildTitleSegments("Projects", census, 30);
+    const text = concat(segs);
+    // Hidden segment (including the (N active) alert) should
+    // survive even when sub-agents and sessions are dropped.
+    expect(text).toContain("⊘");
+    expect(text).toContain("1"); // hidden active
+  });
+
+  it("falls back to just the label when too narrow for anything", () => {
+    const segs = buildTitleSegments("Projects", census, 8);
+    expect(concat(segs)).toBe("Projects");
+  });
+
+  it("colors active counts green and hidden active yellow", () => {
+    const segs = buildTitleSegments("Projects", census, 200);
+    const greenSegs = segs.filter((s) => s.color === "green");
+    const yellowSegs = segs.filter((s) => s.color === "yellow");
+    // Three green active segments (projects, sessions, sub-agents)
+    // and one yellow (hidden active).
+    expect(greenSegs).toHaveLength(3);
+    expect(yellowSegs).toHaveLength(1);
+    expect(yellowSegs[0].text).toContain("1");
+  });
+
+  it("omits the active parenthetical when count is zero", () => {
+    const flatCensus: TreeCensus = {
+      projects: { total: 5, active: 0 },
+      sessions: { total: 10, active: 0 },
+      subAgents: { total: 0, active: 0 },
+      hidden: { total: 0, active: 0 },
+    };
+    const segs = buildTitleSegments("Projects", flatCensus, 200);
+    const text = concat(segs);
+    expect(text).not.toContain("(");
+    expect(text).not.toContain("⊘");
+  });
+
+  it("omits the hidden segment entirely when nothing is hidden", () => {
+    const noHidden: TreeCensus = {
+      projects: { total: 5, active: 2 },
+      sessions: { total: 10, active: 3 },
+      subAgents: { total: 4, active: 1 },
+      hidden: { total: 0, active: 0 },
+    };
+    const segs = buildTitleSegments("Projects", noHidden, 200);
+    expect(concat(segs)).not.toContain("⊘");
   });
 });

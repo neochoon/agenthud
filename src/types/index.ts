@@ -56,6 +56,17 @@ export interface HiddenStats {
   active: number;
 }
 
+// Tree-wide census rendered in the Projects panel title bar.
+// Per-level (projects / sessions / sub-agents) totals + visible
+// active subset, plus a separate hidden bucket. See
+// `computeCensus` in App.tsx for the counting rules.
+export interface TreeCensus {
+  projects: { total: number; active: number };
+  sessions: { total: number; active: number };
+  subAgents: { total: number; active: number };
+  hidden: { total: number; active: number };
+}
+
 export interface SessionTree {
   projects: ProjectNode[]; // active projects (hotness !== "cold")
   coldProjects: ProjectNode[]; // projects where all sessions are cold

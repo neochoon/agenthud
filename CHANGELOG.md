@@ -2,7 +2,24 @@
 
 ## [Unreleased]
 
+### Changed (layout)
+- **Census moved to the Projects panel title bar; branding +
+  keybindings moved to the bottom row.** The top status bar was
+  wasted space (just "AgentHUD vX · ⊘ N hidden …" floating
+  above the panels) and the Projects title was equally wasted
+  (just "Projects"). Both fixed: census now sits where it
+  belongs — directly above the tree it describes — and the
+  bottom row carries the brand + keys.
+
 ### Added
+- **Tree-wide census in the Projects panel title.** Each level
+  shows total + visible active count:
+  `Projects 12 (3 active) · 68 sessions (5 active) · 142 sub-agents (2 active) · ⊘ 14 hidden (1 active)`.
+  The `(N active)` parentheticals are green so the eye lands on
+  the actionable count. The hidden `(M active)` is yellow — the
+  alert for content you can't see. Narrow terminals fall back
+  to short form (`68s (5)`, `142a (2)`), then drop segments from
+  the right; the hidden alert is the last thing to go.
 - **`a` key toggles "show hidden items" in the tree.** Hidden
   projects and sessions render dim with a `⊘` marker so they're
   recognizable at a glance. Combined with the `H` change below,

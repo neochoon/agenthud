@@ -41,6 +41,7 @@ const {
   initialSelectedId,
   initialExpandedIds,
   filterTreeByHidden,
+  computeCensus,
 } = await import("../../src/ui/App.js");
 
 const emptyTree = (): SessionTree => ({
@@ -517,6 +518,154 @@ describe("filterTreeByHidden", () => {
     expect(filterTreeByHidden(tree).hiddenStats).toEqual({
       total: 5,
       active: 2,
+    });
+  });
+});
+
+describe("computeCensus", () => {
+  // Compact helper to build a SessionNode for census tests.
+  const node = (
+    id: string,
+    status: SessionNode["status"] = "hot",
+    hidden = false,
+    subAgents: SessionNode[] = [],
+  ): SessionNode => ({
+    id,
+    hideKey: `proj/${id}`,
+    filePath: "",
+    projectPath: "/path/proj",
+    projectName: "proj",
+    lastModifiedMs: 1,
+    status,
+    modelName: null,
+    subAgents,
+    nonInteractive: false,
+    firstUserPrompt: null,
+    liveState: null,
+    hidden,
+  });
+
+  it("counts per level: projects, sessions, sub-agents", () => {
+    const tree: SessionTree = {
+      projects: [
+        {
+          name: "p1",
+          projectPath: "/p1",
+          sessions: [node("s1", "hot", false, [node("sa1", "hot")])],
+          hotness: "hot",
+        },
+        {
+          name: "p2",
+          projectPath: "/p2",
+          sessions: [node("s2", "cold")],
+          hotness: "cold",
+        },
+      ],
+      coldProjects: [],
+      totalCount: 3,
+      timestamp: "",
+      hiddenStats: { total: 0, active: 0 },
+    };
+    const c = computeCensus(tree);
+    expect(c.projects).toEqual({ total: 2, active: 1 });
+    expect(c.sessions).toEqual({ total: 2, active: 1 });
+    expect(c.subAgents).toEqual({ total: 1, active: 1 });
+    expect(c.hidden).toEqual({ total: 0, active: 0 });
+  });
+
+  it("hidden sessions count toward hidden, not visible active", () => {
+    const tree: SessionTree = {
+      projects: [
+        {
+          name: "p1",
+          projectPath: "/p1",
+          sessions: [
+            node("visible", "hot"),
+            node("hidden-hot", "hot", true),
+            node("hidden-cold", "cold", true),
+          ],
+          hotness: "hot",
+        },
+      ],
+      coldProjects: [],
+      totalCount: 3,
+      timestamp: "",
+      hiddenStats: { total: 2, active: 1 },
+    };
+    const c = computeCensus(tree);
+    expect(c.sessions.total).toBe(3);
+    expect(c.sessions.active).toBe(1); // only the visible hot one
+    expect(c.hidden.total).toBe(2); // both hidden sessions
+    expect(c.hidden.active).toBe(1); // only the hidden hot
+  });
+
+  it("sessions under a hidden project all count as hidden", () => {
+    const tree: SessionTree = {
+      projects: [],
+      coldProjects: [
+        {
+          name: "secret",
+          projectPath: "/secret",
+          sessions: [node("a", "hot"), node("b", "warm"), node("c", "cold")],
+          hotness: "hot",
+          hidden: true,
+        },
+      ],
+      totalCount: 3,
+      timestamp: "",
+      hiddenStats: { total: 3, active: 2 },
+    };
+    const c = computeCensus(tree);
+    expect(c.projects).toEqual({ total: 1, active: 0 });
+    expect(c.sessions).toEqual({ total: 3, active: 0 });
+    expect(c.hidden).toEqual({ total: 3, active: 2 });
+  });
+
+  it("sub-agents inherit hidden state from their parent session", () => {
+    const tree: SessionTree = {
+      projects: [
+        {
+          name: "p1",
+          projectPath: "/p1",
+          sessions: [
+            node("visible-parent", "hot", false, [
+              node("visible-sa", "hot"),
+              node("hidden-sa", "hot", true),
+            ]),
+            node("hidden-parent", "warm", true, [
+              node("under-hidden", "hot"),
+            ]),
+          ],
+          hotness: "hot",
+        },
+      ],
+      coldProjects: [],
+      totalCount: 5,
+      timestamp: "",
+      hiddenStats: { total: 1, active: 1 },
+    };
+    const c = computeCensus(tree);
+    expect(c.subAgents.total).toBe(3);
+    // Only "visible-sa" is visible+active. "hidden-sa" is marked,
+    // "under-hidden" is under a hidden parent session.
+    expect(c.subAgents.active).toBe(1);
+    expect(c.hidden.total).toBe(3); // hidden-sa, hidden-parent, under-hidden
+    expect(c.hidden.active).toBe(3); // all three are hot/warm
+  });
+
+  it("empty tree returns zeros", () => {
+    const tree: SessionTree = {
+      projects: [],
+      coldProjects: [],
+      totalCount: 0,
+      timestamp: "",
+      hiddenStats: { total: 0, active: 0 },
+    };
+    expect(computeCensus(tree)).toEqual({
+      projects: { total: 0, active: 0 },
+      sessions: { total: 0, active: 0 },
+      subAgents: { total: 0, active: 0 },
+      hidden: { total: 0, active: 0 },
     });
   });
 });

@@ -63,6 +63,7 @@ import type {
   ProjectNode,
   SessionNode,
   SessionTree,
+  TreeCensus,
 } from "../types/index.js";
 import { ActivityViewerPanel } from "./ActivityViewerPanel.js";
 import { getDisplayWidth } from "./constants.js";
@@ -170,6 +171,74 @@ export function filterTreeByHidden(tree: SessionTree): SessionTree {
     coldProjects: tree.coldProjects
       .filter((p) => !p.hidden)
       .map(visibleProject),
+  };
+}
+
+/**
+ * Walk the full session tree and tally per-level totals + active
+ * counts (hot/warm) plus a hidden subset. Drives the Projects-panel
+ * title census line ("12 projects (3 active) · 68 sessions
+ * (5 active) · 142 sub-agents (2 active) · ⊘ 14 hidden (1 active)").
+ *
+ * Counting rules:
+ * - **Totals** include hidden items so the user sees their actual
+ *   inventory regardless of `showHidden`.
+ * - **Active counts** are *visible* only. A hidden hot session is
+ *   not counted toward `sessions.active` — it belongs in the
+ *   `hidden.active` bucket so the actionable signals stay
+ *   separate.
+ * - **Project active** = visible project with at least one visible
+ *   hot/warm session.
+ * - **Hidden** = any item (session or sub-agent) marked hidden, or
+ *   any item under a hidden project.
+ */
+export function computeCensus(tree: SessionTree): TreeCensus {
+  let projectsTotal = 0;
+  let projectsActive = 0;
+  let sessionsTotal = 0;
+  let sessionsActive = 0;
+  let subAgentsTotal = 0;
+  let subAgentsActive = 0;
+  let hiddenTotal = 0;
+  let hiddenActive = 0;
+
+  const isActive = (n: SessionNode) =>
+    n.status === "hot" || n.status === "warm";
+
+  for (const p of [...tree.projects, ...tree.coldProjects]) {
+    projectsTotal++;
+    let projectHasVisibleActive = false;
+    for (const s of p.sessions) {
+      sessionsTotal++;
+      const sessionVisible = !s.hidden && !p.hidden;
+      if (sessionVisible) {
+        if (isActive(s)) {
+          sessionsActive++;
+          projectHasVisibleActive = true;
+        }
+      } else {
+        hiddenTotal++;
+        if (isActive(s)) hiddenActive++;
+      }
+      for (const sa of s.subAgents) {
+        subAgentsTotal++;
+        const saVisible = !sa.hidden && !s.hidden && !p.hidden;
+        if (saVisible) {
+          if (isActive(sa)) subAgentsActive++;
+        } else {
+          hiddenTotal++;
+          if (isActive(sa)) hiddenActive++;
+        }
+      }
+    }
+    if (projectHasVisibleActive) projectsActive++;
+  }
+
+  return {
+    projects: { total: projectsTotal, active: projectsActive },
+    sessions: { total: sessionsTotal, active: sessionsActive },
+    subAgents: { total: subAgentsTotal, active: subAgentsActive },
+    hidden: { total: hiddenTotal, active: hiddenActive },
   };
 }
 
@@ -488,6 +557,10 @@ export function App({
     () => (showHidden ? sessionTree : filterTreeByHidden(sessionTree)),
     [sessionTree, showHidden],
   );
+
+  // Per-level census of the FULL source tree (counts hidden items).
+  // Rendered inside the Projects panel title bar.
+  const census = useMemo(() => computeCensus(sessionTree), [sessionTree]);
 
   const allFlat = useMemo(
     () => flattenSessions(displayTree, expandedIds),
@@ -1305,65 +1378,6 @@ export function App({
 
   return (
     <Box flexDirection="column">
-      {isWatchMode &&
-        (() => {
-          // Surface hidden-items count so a hidden session that's still
-          // producing live activity is never invisible (the failure
-          // mode of `H` being one keystroke away). When any hidden
-          // item is hot/warm, the count of active ones leads ("N
-          // active in M hidden") and just THAT segment is yellow —
-          // the actionable signal pops while the rest of the
-          // indicator stays dim/informational.
-          const hs = sessionTree.hiddenStats;
-          const baseBranding = `${spinner} AgentHUD v${getVersion()}`;
-          const indicatorPrefix = " · ⊘ ";
-          const indicatorText =
-            hs.total === 0
-              ? ""
-              : hs.active > 0
-                ? `${indicatorPrefix}${hs.active} active in ${hs.total} hidden`
-                : `${indicatorPrefix}${hs.total} hidden`;
-          const branding = `${baseBranding}${indicatorText}`;
-          const sep = " · ";
-          // Trim shortcut items from the FRONT until they fit. Items at the
-          // end (?: help, q: quit) are kept as long as possible.
-          let items = statusBarItems;
-          let shortcuts = items.join(sep);
-          let showBranding = true;
-          const fits = () =>
-            (showBranding ? getDisplayWidth(branding) + 1 : 0) +
-              getDisplayWidth(shortcuts) <=
-            width;
-          if (!fits()) showBranding = false;
-          while (!fits() && items.length > 1) {
-            items = items.slice(1);
-            shortcuts = items.join(sep);
-          }
-          return (
-            <Box marginBottom={1} justifyContent="space-between" width={width}>
-              <Text>
-                {showBranding && (
-                  <>
-                    <Text dimColor>{baseBranding}</Text>
-                    {hs.total > 0 ? (
-                      hs.active > 0 ? (
-                        <>
-                          <Text dimColor>{indicatorPrefix}</Text>
-                          <Text color="yellow">{`${hs.active} active`}</Text>
-                          <Text dimColor>{` in ${hs.total} hidden`}</Text>
-                        </>
-                      ) : (
-                        <Text dimColor>{indicatorText}</Text>
-                      )
-                    ) : null}
-                  </>
-                )}
-              </Text>
-              <Text dimColor>{shortcuts}</Text>
-            </Box>
-          );
-        })()}
-
       {helpMode ? (
         <HelpPanel
           width={width}
@@ -1394,6 +1408,7 @@ export function App({
             trackingOn={tracking}
             spinner={spinner}
             scopeLabel={scopeToProject ? basename(scopeToProject) : undefined}
+            census={census}
           />
 
           <Box marginTop={1}>
@@ -1423,6 +1438,42 @@ export function App({
               />
             )}
           </Box>
+
+          {isWatchMode && (
+            (() => {
+              // Bottom row: branding + spinner on the left (liveness
+              // signal), keybindings on the right. Census moved to
+              // the Projects panel title — the Projects title row is
+              // the natural home for "what's in the tree" info,
+              // since it's literally above the tree. This row keeps
+              // the shortcuts so they're always visible without
+              // hunting.
+              const branding = `${spinner} AgentHUD v${getVersion()}`;
+              const sep = " · ";
+              let items = statusBarItems;
+              let shortcuts = items.join(sep);
+              let showBranding = true;
+              const fits = () =>
+                (showBranding ? getDisplayWidth(branding) + 1 : 0) +
+                  getDisplayWidth(shortcuts) <=
+                width;
+              if (!fits()) showBranding = false;
+              while (!fits() && items.length > 1) {
+                items = items.slice(1);
+                shortcuts = items.join(sep);
+              }
+              return (
+                <Box
+                  marginTop={1}
+                  justifyContent="space-between"
+                  width={width}
+                >
+                  <Text dimColor>{showBranding ? branding : ""}</Text>
+                  <Text dimColor>{shortcuts}</Text>
+                </Box>
+              );
+            })()
+          )}
         </>
       )}
     </Box>

@@ -32,6 +32,7 @@ import type {
   ProjectNode,
   SessionNode,
   SessionStatus,
+  TreeCensus,
 } from "../types/index.js";
 import {
   BOX,
@@ -64,6 +65,16 @@ export interface SessionTreePanelProps {
    * that the view is filtered to a single project (typically by --cwd).
    */
   scopeLabel?: string;
+  /**
+   * Tree-wide counts rendered inside the title bar — projects /
+   * sessions / sub-agents totals with their visible-active subset,
+   * plus hidden total + hidden active. When the panel is wide
+   * enough the full long form is shown; when it isn't, the title
+   * falls back to short form (e.g. `68s (5)`) and finally drops
+   * segments from the right until only `Projects` is left. The
+   * `(N active)` hidden alert is preserved as long as possible.
+   */
+  census?: TreeCensus;
 }
 
 /**
@@ -484,6 +495,126 @@ function ColdProjectsSummaryRow({
   );
 }
 
+interface TitleSegment {
+  text: string;
+  color?: string;
+  dim?: boolean;
+  bold?: boolean;
+}
+
+function activeParen(count: number, short: boolean): TitleSegment[] {
+  if (count === 0) return [];
+  return [
+    { text: " (", dim: true },
+    {
+      text: short ? `${count}` : `${count} active`,
+      color: "green",
+      bold: true,
+    },
+    { text: ")", dim: true },
+  ];
+}
+
+function hiddenSeg(
+  hidden: { total: number; active: number },
+  short: boolean,
+): TitleSegment[] {
+  if (hidden.total === 0) return [];
+  const segs: TitleSegment[] = [
+    { text: ` · ⊘ ${hidden.total}`, dim: true },
+  ];
+  if (!short) segs.push({ text: " hidden", dim: true });
+  if (hidden.active > 0) {
+    segs.push({ text: " (", dim: true });
+    segs.push({
+      text: short ? `${hidden.active}` : `${hidden.active} active`,
+      color: "yellow",
+      bold: true,
+    });
+    segs.push({ text: ")", dim: true });
+  }
+  return segs;
+}
+
+/**
+ * Build the styled segment list for the Projects panel title under
+ * a target available width. Produces a list of candidates from
+ * "full long form" down to "just the label", each progressively
+ * shorter, and returns the first one that fits. The hidden alert
+ * (`(N active)` on the hidden segment) is preserved longest because
+ * it's the most actionable signal.
+ */
+export function buildTitleSegments(
+  label: string,
+  census: TreeCensus | undefined,
+  availableWidth: number,
+): TitleSegment[] {
+  const labelSeg: TitleSegment = { text: label, dim: true, bold: true };
+  if (!census) return [labelSeg];
+
+  const widthOf = (segs: TitleSegment[]) =>
+    segs.reduce((w, s) => w + getDisplayWidth(s.text), 0);
+
+  const c = census;
+
+  // From most to least verbose. First candidate that fits wins.
+  const candidates: TitleSegment[][] = [
+    // L0: full long form
+    [
+      labelSeg,
+      { text: ` ${c.projects.total} projects`, dim: true, bold: true },
+      ...activeParen(c.projects.active, false),
+      { text: ` · ${c.sessions.total} sessions`, dim: true, bold: true },
+      ...activeParen(c.sessions.active, false),
+      { text: ` · ${c.subAgents.total} sub-agents`, dim: true, bold: true },
+      ...activeParen(c.subAgents.active, false),
+      ...hiddenSeg(c.hidden, false),
+    ],
+    // L1: short form everywhere (s, a abbreviations; no "active" word)
+    [
+      labelSeg,
+      { text: ` ${c.projects.total}`, dim: true, bold: true },
+      ...activeParen(c.projects.active, true),
+      { text: ` · ${c.sessions.total}s`, dim: true, bold: true },
+      ...activeParen(c.sessions.active, true),
+      { text: ` · ${c.subAgents.total}a`, dim: true, bold: true },
+      ...activeParen(c.subAgents.active, true),
+      ...hiddenSeg(c.hidden, true),
+    ],
+    // L2: drop sub-agents
+    [
+      labelSeg,
+      { text: ` ${c.projects.total}`, dim: true, bold: true },
+      ...activeParen(c.projects.active, true),
+      { text: ` · ${c.sessions.total}s`, dim: true, bold: true },
+      ...activeParen(c.sessions.active, true),
+      ...hiddenSeg(c.hidden, true),
+    ],
+    // L3: drop sessions
+    [
+      labelSeg,
+      { text: ` ${c.projects.total}`, dim: true, bold: true },
+      ...activeParen(c.projects.active, true),
+      ...hiddenSeg(c.hidden, true),
+    ],
+    // L4: drop project active counter
+    [
+      labelSeg,
+      { text: ` ${c.projects.total}`, dim: true, bold: true },
+      ...hiddenSeg(c.hidden, true),
+    ],
+    // L5: drop project total
+    [labelSeg, ...hiddenSeg(c.hidden, true)],
+    // L6: just the label
+    [labelSeg],
+  ];
+
+  for (const cand of candidates) {
+    if (widthOf(cand) <= availableWidth) return cand;
+  }
+  return candidates[candidates.length - 1];
+}
+
 export function SessionTreePanel({
   projects,
   coldProjects,
@@ -495,6 +626,7 @@ export function SessionTreePanel({
   trackingOn = false,
   spinner = "",
   scopeLabel,
+  census,
 }: SessionTreePanelProps): React.ReactElement {
   const innerWidth = getInnerWidth(width);
   const contentWidth = innerWidth - 1; // account for space after │
@@ -503,8 +635,28 @@ export function SessionTreePanel({
   // the tree's title shows `[LIVE ⠧]` so the user knows the selection is
   // moving on its own.
   const titleSuffix = trackingOn ? `[LIVE ${spinner || "▼"}]` : "";
-  const titleText = scopeLabel ? `Projects [${scopeLabel}]` : "Projects";
-  const titleLine = createTitleLine(titleText, titleSuffix, width);
+  const titleLabel = scopeLabel ? `Projects [${scopeLabel}]` : "Projects";
+
+  // Title structure: `┌─ <segments> <dashes> [<suffix> ─]┐`
+  // Reserved chars: 4 for `┌─ ` + ` ─┐` (3 outer + 1 inner space).
+  // Suffix occupies its own ` <suffix> ` chunk (space + suffix + space).
+  const suffixWidthWithPadding = titleSuffix
+    ? getDisplayWidth(titleSuffix) + 2
+    : 0;
+  const titleAvailable = Math.max(0, width - 4 - suffixWidthWithPadding);
+  const titleSegments = buildTitleSegments(
+    titleLabel,
+    census,
+    titleAvailable,
+  );
+  const titleContentWidth = titleSegments.reduce(
+    (w, s) => w + getDisplayWidth(s.text),
+    0,
+  );
+  const titleDashCount = Math.max(
+    0,
+    titleAvailable - titleContentWidth + (titleSuffix ? 0 : 1),
+  );
   const bottomLine = createBottomLine(width);
 
   const totalProjectCount = projects.length + coldProjects.length;
@@ -514,7 +666,22 @@ export function SessionTreePanel({
     const emptyPadding = Math.max(0, contentWidth - emptyText.length);
     return (
       <Box flexDirection="column" width={width}>
-        <Text>{titleLine}</Text>
+        <Text>
+          {`${BOX.tl}${BOX.h} `}
+          {titleSegments.map((seg, i) => (
+            <Text
+              key={`title-${i}`}
+              color={seg.color}
+              dimColor={seg.dim}
+              bold={seg.bold}
+            >
+              {seg.text}
+            </Text>
+          ))}
+          <Text>{` ${BOX.h.repeat(titleDashCount)}`}</Text>
+          {titleSuffix ? <Text>{` ${titleSuffix} `}</Text> : null}
+          {BOX.tr}
+        </Text>
         <Text>
           {BOX.v} <Text dimColor>{emptyText}</Text>
           {" ".repeat(emptyPadding)}
@@ -552,7 +719,22 @@ export function SessionTreePanel({
 
   return (
     <Box flexDirection="column" width={width}>
-      <Text>{titleLine}</Text>
+      <Text>
+        {`${BOX.tl}${BOX.h} `}
+        {titleSegments.map((seg, i) => (
+          <Text
+            key={`title-${i}`}
+            color={seg.color}
+            dimColor={seg.dim}
+            bold={seg.bold}
+          >
+            {seg.text}
+          </Text>
+        ))}
+        <Text>{` ${BOX.h.repeat(titleDashCount)}`}</Text>
+        {titleSuffix ? <Text>{` ${titleSuffix} `}</Text> : null}
+        {BOX.tr}
+      </Text>
       {displayRows.map((row, idx) =>
         row.kind === "project" ? (
           <ProjectRow

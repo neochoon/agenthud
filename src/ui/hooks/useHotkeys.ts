@@ -206,7 +206,12 @@ export function useHotkeys({
       onFilter();
       return;
     }
-    if (input === "t" && !key.ctrl && onToggleTracking) {
+    // `t` toggles tracking, which moves the TREE cursor. Restrict to
+    // tree focus so an accidental `t` in the viewer doesn't yank the
+    // tree away while the user is reading activity. The TRK ●
+    // indicator still surfaces on the viewer side so the user knows
+    // the mode is on after tabbing over.
+    if (input === "t" && !key.ctrl && focus === "tree" && onToggleTracking) {
       onToggleTracking();
       return;
     }
@@ -288,9 +293,11 @@ export function useHotkeys({
     }
   };
 
-  // Leading item shown when tracking mode is on, so users can always tell
-  // at a glance that selection will move on its own.
-  const trackingItems = trackingOn ? ["TRK ●"] : ["t: track"];
+  // Tracking is a low-frequency mode toggle so its `t: track` hint
+  // doesn't earn a slot in the status bar by default — discoverable
+  // via `?` help instead. When the mode IS on, surface `TRK ●` on
+  // both tree and viewer so the active state is unmissable.
+  const trackingItems = trackingOn ? ["TRK ●"] : [];
 
   const statusBarItems = helpMode
     ? ["↑↓/jk: scroll", "PgDn/Space: page", "↵/Esc/q/?: close"]
@@ -306,7 +313,6 @@ export function useHotkeys({
             "↵: expand",
             "H: hide",
             "a: show hidden",
-            "r: refresh",
             "?: help",
             "q: quit",
           ]

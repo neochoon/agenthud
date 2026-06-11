@@ -19,7 +19,9 @@
   discovery in a way that took a state.yaml edit to recover.
   Now the visual is always there: total count when any are
   hidden, `(M active)` suffix only when any of them are hot or
-  warm.
+  warm. When `(M active)` is present, the indicator turns
+  **yellow** so it pops against the dim status bar — that's
+  the actionable case.
 
 ## [0.13.3] - 2026-06-10
 

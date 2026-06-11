@@ -1229,17 +1229,20 @@ export function App({
         (() => {
           // Surface hidden-items count so a hidden session that's still
           // producing live activity is never invisible (the failure
-          // mode of `H` being one keystroke away). Glyph stays the same
-          // regardless of count so the visual is stable; the active
-          // suffix appears only when something hidden is actually hot.
+          // mode of `H` being one keystroke away). When any hidden
+          // item is hot/warm, the indicator turns yellow so it pops
+          // against the rest of the dim status line — that's the
+          // actionable case (something's happening you can't see).
+          // When nothing's active, the indicator stays dim/informational.
           const hs = sessionTree.hiddenStats;
+          const baseBranding = `${spinner} AgentHUD v${getVersion()}`;
           const hiddenLabel =
             hs.total > 0
               ? hs.active > 0
                 ? ` · ⊘ ${hs.total} hidden (${hs.active} active)`
                 : ` · ⊘ ${hs.total} hidden`
               : "";
-          const branding = `${spinner} AgentHUD v${getVersion()}${hiddenLabel}`;
+          const branding = `${baseBranding}${hiddenLabel}`;
           const sep = " · ";
           // Trim shortcut items from the FRONT until they fit. Items at the
           // end (?: help, q: quit) are kept as long as possible.
@@ -1257,7 +1260,20 @@ export function App({
           }
           return (
             <Box marginBottom={1} justifyContent="space-between" width={width}>
-              <Text dimColor>{showBranding ? branding : ""}</Text>
+              <Text>
+                {showBranding && (
+                  <>
+                    <Text dimColor>{baseBranding}</Text>
+                    {hiddenLabel ? (
+                      hs.active > 0 ? (
+                        <Text color="yellow">{hiddenLabel}</Text>
+                      ) : (
+                        <Text dimColor>{hiddenLabel}</Text>
+                      )
+                    ) : null}
+                  </>
+                )}
+              </Text>
               <Text dimColor>{shortcuts}</Text>
             </Box>
           );

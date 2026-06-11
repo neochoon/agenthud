@@ -221,7 +221,13 @@ function SessionRow({
   const focused = isSelected && hasFocus;
   const muted = isSelected && !hasFocus;
   const showBg = focused || muted;
-  const shouldDim = isNonInteractive || muted || !!session.hidden;
+  // Cold sessions are dimmed alongside non-interactive/hidden/muted
+  // ones — they're sub-rows under an active project but represent
+  // historical work. Without this, the session id rendered bold and
+  // visually competed with the active session at the top of the
+  // same project ("[cold]" badge alone wasn't enough signal).
+  const shouldDim =
+    isNonInteractive || muted || !!session.hidden || session.status === "cold";
 
   return (
     <Text>

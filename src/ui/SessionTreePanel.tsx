@@ -637,11 +637,7 @@ export function SessionTreePanel({
   trackingOn = false,
   spinner = "",
   scopeLabel,
-  // `census` is accepted but no longer rendered here — the
-  // census line lives on its own row above the panels in App.tsx
-  // so the panel title can keep its clean dash-filled boundary.
-  // Kept on the props so consumers don't have to reshuffle.
-  census: _census,
+  census,
 }: SessionTreePanelProps): React.ReactElement {
   const innerWidth = getInnerWidth(width);
   const contentWidth = innerWidth - 1; // account for space after │
@@ -654,6 +650,46 @@ export function SessionTreePanel({
   const titleLine = createTitleLine(titleText, titleSuffix, width);
   const bottomLine = createBottomLine(width);
 
+  // Census row: rendered as the first content row inside the panel
+  // when `census` is provided. Styled distinctly from session rows
+  // (no selection background, no bold) so it reads as
+  // panel-meta-info rather than another selectable entry. The same
+  // long/short/drop logic from `buildTitleSegments` is reused (with
+  // an empty label, which we strip from the rendered output).
+  const censusSegments = census
+    ? (() => {
+        const segs = buildTitleSegments("", census, contentWidth);
+        const withoutLabel = segs[0]?.text === "" ? segs.slice(1) : segs;
+        return withoutLabel.map((seg, i) =>
+          i === 0 ? { ...seg, text: seg.text.replace(/^ /, "") } : seg,
+        );
+      })()
+    : null;
+  const censusWidth = censusSegments
+    ? censusSegments.reduce((w, s) => w + getDisplayWidth(s.text), 0)
+    : 0;
+  const censusPadding = censusSegments
+    ? Math.max(0, contentWidth - censusWidth)
+    : 0;
+  const renderCensusRow = () =>
+    censusSegments ? (
+      <Text>
+        {BOX.v}{" "}
+        {censusSegments.map((seg, i) => (
+          <Text
+            key={`census-${i}`}
+            color={seg.color}
+            dimColor={seg.dim}
+            bold={seg.bold}
+          >
+            {seg.text}
+          </Text>
+        ))}
+        {" ".repeat(censusPadding)}
+        {BOX.v}
+      </Text>
+    ) : null;
+
   const totalProjectCount = projects.length + coldProjects.length;
 
   if (totalProjectCount === 0) {
@@ -662,6 +698,7 @@ export function SessionTreePanel({
     return (
       <Box flexDirection="column" width={width}>
         <Text>{titleLine}</Text>
+        {renderCensusRow()}
         <Text>
           {BOX.v} <Text dimColor>{emptyText}</Text>
           {" ".repeat(emptyPadding)}
@@ -685,9 +722,15 @@ export function SessionTreePanel({
     return false;
   });
 
-  // Compute scrollTop so the selected row stays visible
-  const needsOverflow = maxRows !== undefined && totalRows > maxRows;
-  const visibleCount = needsOverflow ? maxRows - 1 : totalRows;
+  // Compute scrollTop so the selected row stays visible. Census
+  // takes one row inside the panel content area when present, so
+  // the effective row budget shrinks by 1 in that case.
+  const censusRowCost = censusSegments ? 1 : 0;
+  const effectiveMaxRows =
+    maxRows !== undefined ? Math.max(1, maxRows - censusRowCost) : undefined;
+  const needsOverflow =
+    effectiveMaxRows !== undefined && totalRows > effectiveMaxRows;
+  const visibleCount = needsOverflow ? effectiveMaxRows - 1 : totalRows;
   let scrollTop = 0;
   if (needsOverflow && selectedFlatIndex >= 0) {
     scrollTop = Math.max(0, selectedFlatIndex - visibleCount + 1);
@@ -700,6 +743,7 @@ export function SessionTreePanel({
   return (
     <Box flexDirection="column" width={width}>
       <Text>{titleLine}</Text>
+      {renderCensusRow()}
       {displayRows.map((row, idx) =>
         row.kind === "project" ? (
           <ProjectRow

@@ -72,7 +72,7 @@ import { HelpPanel } from "./HelpPanel.js";
 import { useHotkeys } from "./hooks/useHotkeys.js";
 import { useSpinner } from "./hooks/useSpinner.js";
 import { useTick } from "./hooks/useTick.js";
-import { SessionTreePanel } from "./SessionTreePanel.js";
+import { buildTitleSegments, SessionTreePanel } from "./SessionTreePanel.js";
 import { adjustViewerCursorOnNewActivities } from "./viewerCursor.js";
 
 const VIEWER_HEIGHT_FRACTION = 0.55;
@@ -1380,27 +1380,78 @@ export function App({
     <Box flexDirection="column">
       {isWatchMode &&
         (() => {
-          // Branding + spinner on the left (liveness signal),
-          // keybindings on the right. The census moved to the
-          // Projects panel title where it sits directly above the
-          // tree it describes.
-          const branding = `${spinner} AgentHUD v${getVersion()}`;
+          // Top row layout:
+          //   ⠧ <census segments>                         ?: help · q: quit
+          //
+          // Census left, keybindings right. The spinner glyph
+          // doubles as the liveness signal — branding ("AgentHUD
+          // vX.Y.Z") is dropped from this row because (a) it
+          // wastes width that the census needs and (b) the panel
+          // title still says "Projects" so users always know what
+          // they're looking at. Branding lives in the npm package
+          // metadata and the help overlay instead.
+          //
+          // The census is rendered via the same `buildTitleSegments`
+          // builder the panel title used to use, so the long /
+          // short / drop logic is shared. Putting census on its own
+          // row keeps the Projects panel title's dash-fill intact —
+          // that horizontal rule is what visually delimits the
+          // panel boundary, and crowding it with census broke the
+          // "this is a panel" affordance.
           const sep = " · ";
           let items = statusBarItems;
           let shortcuts = items.join(sep);
-          let showBranding = true;
-          const fits = () =>
-            (showBranding ? getDisplayWidth(branding) + 1 : 0) +
-              getDisplayWidth(shortcuts) <=
-            width;
-          if (!fits()) showBranding = false;
-          while (!fits() && items.length > 1) {
+          // Census takes whatever width is left after the
+          // shortcuts. Reserve at least 1 char for the gap.
+          const spinnerWidth = getDisplayWidth(`${spinner} `);
+          const censusAvailable = Math.max(
+            0,
+            width - spinnerWidth - getDisplayWidth(shortcuts) - 1,
+          );
+          const segments = buildTitleSegments(
+            "",
+            census,
+            censusAvailable,
+          );
+          // buildTitleSegments returns the label as first segment
+          // (here empty string), then ` <count>` with a leading
+          // space etc. Drop the empty label and strip the leading
+          // space from what's now the first segment.
+          const withoutLabel =
+            segments[0]?.text === "" ? segments.slice(1) : segments;
+          const censusSegments = withoutLabel.map((seg, i) =>
+            i === 0 ? { ...seg, text: seg.text.replace(/^ /, "") } : seg,
+          );
+          const censusWidth = censusSegments.reduce(
+            (w, s) => w + getDisplayWidth(s.text),
+            0,
+          );
+          // If even the minimal census doesn't fit alongside the
+          // shortcuts, trim shortcuts from the front (most-spammy
+          // first; ?: help and q: quit always survive).
+          while (
+            censusWidth + spinnerWidth + getDisplayWidth(shortcuts) + 1 >
+              width &&
+            items.length > 1
+          ) {
             items = items.slice(1);
             shortcuts = items.join(sep);
           }
           return (
             <Box marginBottom={1} justifyContent="space-between" width={width}>
-              <Text dimColor>{showBranding ? branding : ""}</Text>
+              <Text>
+                <Text dimColor>{`${spinner} `}</Text>
+                {censusSegments.map((seg, i) => (
+                  <Text
+                    key={`census-${i}`}
+                    color={seg.color}
+                    dimColor={seg.dim}
+                    bold={seg.bold}
+                  >
+                    {seg.text}
+                  </Text>
+                ))}
+              </Text>
               <Text dimColor>{shortcuts}</Text>
             </Box>
           );

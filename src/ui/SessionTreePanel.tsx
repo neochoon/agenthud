@@ -637,7 +637,11 @@ export function SessionTreePanel({
   trackingOn = false,
   spinner = "",
   scopeLabel,
-  census,
+  // `census` is accepted but no longer rendered here — the
+  // census line lives on its own row above the panels in App.tsx
+  // so the panel title can keep its clean dash-filled boundary.
+  // Kept on the props so consumers don't have to reshuffle.
+  census: _census,
 }: SessionTreePanelProps): React.ReactElement {
   const innerWidth = getInnerWidth(width);
   const contentWidth = innerWidth - 1; // account for space after │
@@ -646,25 +650,8 @@ export function SessionTreePanel({
   // the tree's title shows `[LIVE ⠧]` so the user knows the selection is
   // moving on its own.
   const titleSuffix = trackingOn ? `[LIVE ${spinner || "▼"}]` : "";
-  const titleLabel = scopeLabel ? `Projects [${scopeLabel}]` : "Projects";
-
-  // Title structure (no suffix): `┌─ <segments> <dashes>┐`
-  //   Overhead = 1 (┌) + 1 (─) + 1 ( ) + 1 ( ) + 1 (┐) = 5 chars
-  // With suffix:                 `┌─ <segments> <dashes> <suffix> ─┐`
-  //   Overhead = 5 + 1 ( ) + suffixLen + 1 ( ) + 1 (─) = 8 + suffixLen
-  const suffixLen = titleSuffix ? getDisplayWidth(titleSuffix) : 0;
-  const overhead = titleSuffix ? 8 + suffixLen : 5;
-  const titleAvailable = Math.max(0, width - overhead);
-  const titleSegments = buildTitleSegments(
-    titleLabel,
-    census,
-    titleAvailable,
-  );
-  const titleContentWidth = titleSegments.reduce(
-    (w, s) => w + getDisplayWidth(s.text),
-    0,
-  );
-  const titleDashCount = Math.max(0, titleAvailable - titleContentWidth);
+  const titleText = scopeLabel ? `Projects [${scopeLabel}]` : "Projects";
+  const titleLine = createTitleLine(titleText, titleSuffix, width);
   const bottomLine = createBottomLine(width);
 
   const totalProjectCount = projects.length + coldProjects.length;
@@ -674,22 +661,7 @@ export function SessionTreePanel({
     const emptyPadding = Math.max(0, contentWidth - emptyText.length);
     return (
       <Box flexDirection="column" width={width}>
-        <Text>
-          {`${BOX.tl}${BOX.h} `}
-          {titleSegments.map((seg, i) => (
-            <Text
-              key={`title-${i}`}
-              color={seg.color}
-              dimColor={seg.dim}
-              bold={seg.bold}
-            >
-              {seg.text}
-            </Text>
-          ))}
-          <Text>{` ${BOX.h.repeat(titleDashCount)}`}</Text>
-          {titleSuffix ? <Text>{` ${titleSuffix} `}</Text> : null}
-          {BOX.tr}
-        </Text>
+        <Text>{titleLine}</Text>
         <Text>
           {BOX.v} <Text dimColor>{emptyText}</Text>
           {" ".repeat(emptyPadding)}
@@ -727,22 +699,7 @@ export function SessionTreePanel({
 
   return (
     <Box flexDirection="column" width={width}>
-      <Text>
-        {`${BOX.tl}${BOX.h} `}
-        {titleSegments.map((seg, i) => (
-          <Text
-            key={`title-${i}`}
-            color={seg.color}
-            dimColor={seg.dim}
-            bold={seg.bold}
-          >
-            {seg.text}
-          </Text>
-        ))}
-        <Text>{` ${BOX.h.repeat(titleDashCount)}`}</Text>
-        {titleSuffix ? <Text>{` ${titleSuffix} `}</Text> : null}
-        {BOX.tr}
-      </Text>
+      <Text>{titleLine}</Text>
       {displayRows.map((row, idx) =>
         row.kind === "project" ? (
           <ProjectRow

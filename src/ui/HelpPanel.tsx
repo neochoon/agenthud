@@ -45,8 +45,15 @@ const SECTIONS: HelpSection[] = [
       ["PgUp / Ctrl+B", "Page up"],
       ["PgDn / Ctrl+F", "Page down"],
       ["↵", "Expand/collapse project, session, or summary"],
-      ["H", "Hide selected (project/session/sub-agent) — capital H"],
-      ["t", "Track: auto-follow the newest live sub-agent (any nav key turns it off)"],
+      [
+        "H",
+        "Toggle hide on selected — hides if visible, unhides if hidden (Shift+H)",
+      ],
+      ["a", "Toggle show hidden items in the tree (dim ⊘ marker)"],
+      [
+        "t",
+        "Track: auto-follow the newest live sub-agent (any nav key turns it off)",
+      ],
       ["Tab", "Switch focus to activity viewer"],
       ["r", "Refresh now"],
     ],

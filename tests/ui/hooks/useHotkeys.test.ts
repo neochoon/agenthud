@@ -212,6 +212,24 @@ describe("useHotkeys", () => {
       act(() => result.current.handleInput("H", noopKey));
       expect(onHide).not.toHaveBeenCalled();
     });
+
+    it("calls onToggleShowHidden when `a` is pressed in tree focus", () => {
+      const onToggleShowHidden = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ focus: "tree", onToggleShowHidden })),
+      );
+      act(() => result.current.handleInput("a", noopKey));
+      expect(onToggleShowHidden).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not call onToggleShowHidden when `a` is pressed in viewer focus", () => {
+      const onToggleShowHidden = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ focus: "viewer", onToggleShowHidden })),
+      );
+      act(() => result.current.handleInput("a", noopKey));
+      expect(onToggleShowHidden).not.toHaveBeenCalled();
+    });
   });
 
   describe("tree focus", () => {
@@ -310,7 +328,6 @@ describe("useHotkeys", () => {
       act(() => result.current.handleInput("G", noopKey));
       expect(onScrollBottom).toHaveBeenCalledTimes(1);
     });
-
   });
 
   describe("ctrl key aliases", () => {
@@ -357,20 +374,19 @@ describe("useHotkeys", () => {
         useHotkeys(makeOptions({ focus: "tree" })),
       );
       expect(result.current.statusBarItems).toEqual([
-        "t: track",
         "Tab: viewer",
         "↑↓/jk: select",
-        "←: parent",
+        "h/←: parent",
         "PgUp/Dn: page",
         "↵: expand",
-        "h: hide",
-        "r: refresh",
+        "H: hide",
+        "a: show hidden",
         "?: help",
         "q: quit",
       ]);
     });
 
-    it("shows TRK ● when tracking is on instead of the t: track hint", () => {
+    it("shows TRK ● first when tracking is on (no `t: track` hint when off)", () => {
       const { result } = renderHook(() =>
         useHotkeys(makeOptions({ focus: "tree", trackingOn: true })),
       );
@@ -383,7 +399,6 @@ describe("useHotkeys", () => {
         useHotkeys(makeOptions({ focus: "viewer" })),
       );
       expect(result.current.statusBarItems).toEqual([
-        "t: track",
         "Tab: projects",
         "↑↓/jk: scroll",
         "PgUp/Dn: page",
@@ -394,6 +409,37 @@ describe("useHotkeys", () => {
         "?: help",
         "q: quit",
       ]);
+    });
+
+    it("shows TRK ● in viewer banner too when tracking is on", () => {
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ focus: "viewer", trackingOn: true })),
+      );
+      // Tracking moves the TREE cursor but the viewer follows it, so
+      // surface the indicator on the viewer side too — otherwise
+      // tabbing into the viewer hides the only signal that tracking
+      // is on.
+      expect(result.current.statusBarItems[0]).toBe("TRK ●");
+    });
+  });
+
+  describe("t (tracking) handler", () => {
+    it("fires onToggleTracking when t is pressed in tree focus", () => {
+      const onToggleTracking = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ focus: "tree", onToggleTracking })),
+      );
+      act(() => result.current.handleInput("t", noopKey));
+      expect(onToggleTracking).toHaveBeenCalledTimes(1);
+    });
+
+    it("does NOT fire onToggleTracking when t is pressed in viewer focus", () => {
+      const onToggleTracking = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ focus: "viewer", onToggleTracking })),
+      );
+      act(() => result.current.handleInput("t", noopKey));
+      expect(onToggleTracking).not.toHaveBeenCalled();
     });
 
     it("returns detail mode status bar items when detailMode is true", () => {
@@ -504,9 +550,7 @@ describe("useHotkeys", () => {
       const { result } = renderHook(() =>
         useHotkeys(makeOptions({ helpMode: true, onHelpScroll })),
       );
-      act(() =>
-        result.current.handleInput("", { ...noopKey, pageDown: true }),
-      );
+      act(() => result.current.handleInput("", { ...noopKey, pageDown: true }));
       expect(onHelpScroll).toHaveBeenLastCalledWith(10);
       act(() => result.current.handleInput(" ", noopKey));
       expect(onHelpScroll).toHaveBeenLastCalledWith(1);

@@ -32,8 +32,9 @@ export interface SessionNode {
   agentId?: string; // short agent ID from JSONL (sub-agents only)
   taskDescription?: string; // extracted task summary from first message (sub-agents only)
   nonInteractive: boolean; // true when entrypoint === "sdk-cli"
-  firstUserPrompt: string | null; // First natural-language user message (system messages skipped)
+  firstUserPrompt: string | null; // Display description: latest substantial (≥10 chars, non-slash) user message, falling back to the first natural-language one. Name kept for backwards compat.
   liveState: LiveState | null; // working/waiting from JSONL tail; null = fall back to time-based status
+  hidden?: boolean; // true when matched by hiddenSessions/hiddenSubAgents, or descendant of a hidden project
 }
 
 // Project node grouping sessions
@@ -42,6 +43,7 @@ export interface ProjectNode {
   projectPath: string; // decoded full path
   sessions: SessionNode[]; // sorted: interactive→non-interactive, then status→mtime
   hotness: SessionStatus; // hottest session's status
+  hidden?: boolean; // true when name is in `hiddenProjects` config
 }
 
 // Full session tree returned by discoverSessions()
@@ -52,6 +54,17 @@ export interface ProjectNode {
 export interface HiddenStats {
   total: number;
   active: number;
+}
+
+// Tree-wide census rendered in the Projects panel title bar.
+// Per-level (projects / sessions / sub-agents) totals + visible
+// active subset, plus a separate hidden bucket. See
+// `computeCensus` in App.tsx for the counting rules.
+export interface TreeCensus {
+  projects: { total: number; active: number };
+  sessions: { total: number; active: number };
+  subAgents: { total: number; active: number };
+  hidden: { total: number; active: number };
 }
 
 export interface SessionTree {

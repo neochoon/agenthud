@@ -28,7 +28,7 @@ describe("buildOpenCommand", () => {
     ).toEqual({ command: "wslview", args: ["/mnt/c/Users/me/foo.md"] });
   });
 
-  it("uses `cmd /c start \"\" <path>` on Windows", () => {
+  it('uses `cmd /c start "" <path>` on Windows', () => {
     // The empty-string first arg to `start` is the window title — required
     // because Windows treats the first quoted argument as the title.
     expect(buildOpenCommand("win32", "C:/tmp/foo.md")).toEqual({

@@ -252,7 +252,11 @@ describe("buildToolDetailBody", () => {
         { file_path: "/x/a.ts" },
         { file: { content: "fn() {\n    x = 1;", startLine: 1, numLines: 2 } },
       ),
-    ).toEqual({ text: "1: fn() {\n2:     x = 1;", kind: "code", numbered: true });
+    ).toEqual({
+      text: "1: fn() {\n2:     x = 1;",
+      kind: "code",
+      numbered: true,
+    });
   });
 
   it("Read: drops the phantom trailing line from a final newline", () => {
@@ -400,11 +404,9 @@ describe("buildToolDetailBody", () => {
     // results that happen to carry stdout-shaped fields for unrelated
     // tools (defensive against future shape drift).
     expect(
-      buildToolDetailBody(
-        "Edit",
-        { file_path: "/x/a.ts" },
-        { stdout: "should not be used" } as unknown as never,
-      ),
+      buildToolDetailBody("Edit", { file_path: "/x/a.ts" }, {
+        stdout: "should not be used",
+      } as unknown as never),
     ).toBeNull();
   });
 });

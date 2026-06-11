@@ -307,9 +307,14 @@ describe("discoverSessions", () => {
     };
 
     const tree = discoverSessions(configWithHidden);
-    expect(tree.projects).toHaveLength(0);
-    expect(tree.coldProjects).toHaveLength(0);
-    expect(tree.totalCount).toBe(0);
+    // The session is now KEPT in the tree with `hidden: true` rather
+    // than filtered out — the App.tsx render layer decides whether
+    // to display it based on the `showHidden` toggle. The tree
+    // counts it; only the renderer filters.
+    expect(tree.projects).toHaveLength(1);
+    expect(tree.projects[0].sessions).toHaveLength(1);
+    expect(tree.projects[0].sessions[0].hidden).toBe(true);
+    expect(tree.totalCount).toBe(1);
     // Hidden session was hot (mtime 5s ago) — counts toward both
     // total and active so the status bar can flag it.
     expect(tree.hiddenStats).toEqual({ total: 1, active: 1 });
@@ -361,9 +366,7 @@ describe("discoverSessions", () => {
       ".claude",
       "projects",
     );
-    vi.mocked(existsSync).mockImplementation(
-      (p) => String(p) === projectsDir,
-    );
+    vi.mocked(existsSync).mockImplementation((p) => String(p) === projectsDir);
     vi.mocked(readdirSync).mockReturnValue(
       [] as unknown as ReturnType<typeof readdirSync>,
     );
@@ -412,8 +415,12 @@ describe("discoverSessions", () => {
     });
     // Both sessions in the hidden project count.
     expect(tree.hiddenStats).toEqual({ total: 2, active: 2 });
-    expect(tree.projects).toHaveLength(0);
-    expect(tree.coldProjects).toHaveLength(0);
+    // The project is kept in the tree, marked hidden — the renderer
+    // filters it based on `showHidden`.
+    expect(tree.projects).toHaveLength(1);
+    expect(tree.projects[0].hidden).toBe(true);
+    expect(tree.projects[0].sessions).toHaveLength(2);
+    expect(tree.projects[0].sessions[0].hidden).toBe(true);
   });
 
   it("marks session non-interactive when entrypoint is sdk-cli", () => {
@@ -632,7 +639,73 @@ describe("discoverSessions", () => {
     expect(tree.coldProjects[0].sessions).toHaveLength(1);
   });
 
-  it("filters out hidden projects entirely", () => {
+  it("marks hidden sub-agents but keeps them in the tree (for show-hidden + unhide)", () => {
+    const projectsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".claude",
+      "projects",
+    );
+    const projectDir = join(projectsDir, "-Users-neo-proj");
+    const subagentsDir = join(projectDir, "parent-id", "subagents");
+
+    vi.mocked(existsSync).mockImplementation((p) => {
+      const path = String(p);
+      return (
+        [projectsDir, projectDir, subagentsDir].includes(path) ||
+        path.endsWith(".jsonl")
+      );
+    });
+    vi.mocked(readdirSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === projectsDir)
+        return ["-Users-neo-proj"] as unknown as ReturnType<typeof readdirSync>;
+      if (path === projectDir)
+        return ["parent-id.jsonl", "parent-id"] as unknown as ReturnType<
+          typeof readdirSync
+        >;
+      if (path === subagentsDir)
+        return [
+          "hidden-child.jsonl",
+          "visible-child.jsonl",
+        ] as unknown as ReturnType<typeof readdirSync>;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(statSync).mockImplementation((p) => {
+      const path = String(p);
+      const isDir = !path.endsWith(".jsonl");
+      return {
+        isDirectory: () => isDir,
+        mtimeMs: NOW - 60_000, // hot
+        size: 500,
+      } as ReturnType<typeof statSync>;
+    });
+    vi.mocked(readFileSync).mockReturnValue("");
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const configHidden = {
+      ...mockConfig,
+      hiddenSubAgents: ["proj/hidden-child"],
+    };
+    const tree = discoverSessions(configHidden);
+
+    // Both sub-agents are kept in the tree so `H` (unhide) can find them.
+    expect(tree.projects).toHaveLength(1);
+    expect(tree.projects[0].sessions).toHaveLength(1);
+    const subs = tree.projects[0].sessions[0].subAgents;
+    expect(subs).toHaveLength(2);
+
+    const hidden = subs.find((s) => s.id === "hidden-child");
+    const visible = subs.find((s) => s.id === "visible-child");
+    expect(hidden?.hidden).toBe(true);
+    expect(visible?.hidden).toBeUndefined();
+
+    // Hidden hot sub-agent counts toward both totals so the alarm
+    // ("M active in N hidden") fires in the panel title.
+    expect(tree.hiddenStats.total).toBe(1);
+    expect(tree.hiddenStats.active).toBe(1);
+  });
+
+  it("marks hidden projects but keeps them in the tree (renderer filters)", () => {
     const projectsDir = join(
       process.env.HOME ?? "/home/user",
       ".claude",
@@ -667,7 +740,10 @@ describe("discoverSessions", () => {
 
     const configWithHidden = { ...mockConfig, hiddenProjects: ["secret"] };
     const tree = discoverSessions(configWithHidden);
-    expect(tree.projects).toHaveLength(0);
+    // mtime 10s ago → hot → goes to projects (not coldProjects),
+    // marked hidden=true. The render layer decides whether to show.
+    expect(tree.projects).toHaveLength(1);
+    expect(tree.projects[0].hidden).toBe(true);
     expect(tree.coldProjects).toHaveLength(0);
   });
 
@@ -718,6 +794,128 @@ describe("discoverSessions", () => {
       JSON.stringify({
         type: "user",
         message: { content: "Fix the auth bug in login flow" },
+      }),
+    ].join("\n");
+    vi.mocked(readFileSync).mockReturnValue(lines);
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const tree = discoverSessions(mockConfig);
+    expect(tree.projects[0].sessions[0].firstUserPrompt).toBe(
+      "Fix the auth bug in login flow",
+    );
+  });
+
+  it("prefers the latest substantial user message over the first", () => {
+    const projectsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".claude",
+      "projects",
+    );
+    const projectDir = join(projectsDir, "-Users-neo-fp");
+    const sessionFile = join(projectDir, "fp2.jsonl");
+
+    vi.mocked(existsSync).mockImplementation((p) => {
+      const path = String(p);
+      return (
+        path === projectsDir || path === projectDir || path === sessionFile
+      );
+    });
+    vi.mocked(readdirSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === projectsDir)
+        return ["-Users-neo-fp"] as unknown as ReturnType<typeof readdirSync>;
+      if (path === projectDir)
+        return ["fp2.jsonl"] as unknown as ReturnType<typeof readdirSync>;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(statSync).mockImplementation(
+      (p) =>
+        ({
+          isDirectory: () => !String(p).endsWith(".jsonl"),
+          mtimeMs: NOW - 10_000,
+          size: 100,
+        }) as ReturnType<typeof statSync>,
+    );
+
+    const lines = [
+      JSON.stringify({
+        type: "user",
+        message: { content: "Look at the brainstorm doc" },
+      }),
+      JSON.stringify({
+        type: "user",
+        message: { content: "ok" }, // trivial follow-up, must NOT win
+      }),
+      JSON.stringify({
+        type: "user",
+        message: { content: "/compact" }, // slash command, must NOT win
+      }),
+      JSON.stringify({
+        type: "user",
+        message: { content: "Implement the OAuth2 callback handler" },
+      }),
+      JSON.stringify({
+        type: "user",
+        message: { content: "yes" }, // trivial, must NOT win
+      }),
+    ].join("\n");
+    vi.mocked(readFileSync).mockReturnValue(lines);
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const tree = discoverSessions(mockConfig);
+    expect(tree.projects[0].sessions[0].firstUserPrompt).toBe(
+      "Implement the OAuth2 callback handler",
+    );
+  });
+
+  it("falls back to first prompt when all later messages are trivial or slash commands", () => {
+    const projectsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".claude",
+      "projects",
+    );
+    const projectDir = join(projectsDir, "-Users-neo-fp");
+    const sessionFile = join(projectDir, "fp3.jsonl");
+
+    vi.mocked(existsSync).mockImplementation((p) => {
+      const path = String(p);
+      return (
+        path === projectsDir || path === projectDir || path === sessionFile
+      );
+    });
+    vi.mocked(readdirSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === projectsDir)
+        return ["-Users-neo-fp"] as unknown as ReturnType<typeof readdirSync>;
+      if (path === projectDir)
+        return ["fp3.jsonl"] as unknown as ReturnType<typeof readdirSync>;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(statSync).mockImplementation(
+      (p) =>
+        ({
+          isDirectory: () => !String(p).endsWith(".jsonl"),
+          mtimeMs: NOW - 10_000,
+          size: 100,
+        }) as ReturnType<typeof statSync>,
+    );
+
+    const lines = [
+      JSON.stringify({
+        type: "user",
+        message: { content: "Fix the auth bug in login flow" },
+      }),
+      JSON.stringify({
+        type: "user",
+        message: { content: "ok" },
+      }),
+      JSON.stringify({
+        type: "user",
+        message: { content: "/clear" },
+      }),
+      JSON.stringify({
+        type: "user",
+        message: { content: "go" },
       }),
     ].join("\n");
     vi.mocked(readFileSync).mockReturnValue(lines);
@@ -1045,10 +1243,10 @@ describe("findContainingProject", () => {
   });
 
   it("accepts Windows-style backslash separators as boundary", () => {
-    const result = findContainingProject(
-      "C:\\Users\\me\\proj\\agenthud\\src",
-      ["C:\\Users\\me\\proj\\agenthud", "C:\\Users\\me\\proj\\other"],
-    );
+    const result = findContainingProject("C:\\Users\\me\\proj\\agenthud\\src", [
+      "C:\\Users\\me\\proj\\agenthud",
+      "C:\\Users\\me\\proj\\other",
+    ]);
     expect(result).toBe("C:\\Users\\me\\proj\\agenthud");
   });
 

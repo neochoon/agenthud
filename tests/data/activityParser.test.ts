@@ -218,12 +218,20 @@ describe("parseActivitiesFromLines", () => {
         type: "user",
         message: {
           role: "user",
-          content: [{ type: "tool_result", tool_use_id: "tool_1", content: "ok" }],
+          content: [
+            { type: "tool_result", tool_use_id: "tool_1", content: "ok" },
+          ],
         },
         toolUseResult: {
           filePath: "/src/App.tsx",
           structuredPatch: [
-            { oldStart: 45, oldLines: 3, newStart: 45, newLines: 3, lines: [" ctx", "-old", "+new"] },
+            {
+              oldStart: 45,
+              oldLines: 3,
+              newStart: 45,
+              newLines: 3,
+              lines: [" ctx", "-old", "+new"],
+            },
           ],
         },
         timestamp: "2025-01-15T10:00:01.000Z",
@@ -243,7 +251,12 @@ describe("parseActivitiesFromLines", () => {
         type: "assistant",
         message: {
           content: [
-            { type: "tool_use", id: "tool_x", name: "Edit", input: { file_path: "/src/App.tsx" } },
+            {
+              type: "tool_use",
+              id: "tool_x",
+              name: "Edit",
+              input: { file_path: "/src/App.tsx" },
+            },
           ],
         },
         timestamp: "2025-01-15T10:00:00.000Z",

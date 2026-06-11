@@ -81,8 +81,8 @@ export function commandExists(command: string): boolean {
   const sep = process.platform === "win32" ? ";" : ":";
   const exts =
     process.platform === "win32"
-      ? (process.env.PATHEXT?.split(";") ?? [".EXE", ".CMD", ".BAT"]).map(
-          (e) => e.toLowerCase(),
+      ? (process.env.PATHEXT?.split(";") ?? [".EXE", ".CMD", ".BAT"]).map((e) =>
+          e.toLowerCase(),
         )
       : [""];
   for (const dir of PATH.split(sep)) {

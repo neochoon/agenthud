@@ -51,6 +51,9 @@ import {
   hideSession,
   hideSubAgent,
   loadGlobalConfig,
+  unhideProject,
+  unhideSession,
+  unhideSubAgent,
 } from "../config/globalConfig.js";
 import { getCommitDetail, parseGitCommits } from "../data/gitCommits.js";
 import { parseSessionHistory } from "../data/sessionHistory.js";
@@ -60,6 +63,7 @@ import type {
   ProjectNode,
   SessionNode,
   SessionTree,
+  TreeCensus,
 } from "../types/index.js";
 import { ActivityViewerPanel } from "./ActivityViewerPanel.js";
 import { getDisplayWidth } from "./constants.js";
@@ -73,9 +77,16 @@ import { adjustViewerCursorOnNewActivities } from "./viewerCursor.js";
 
 const VIEWER_HEIGHT_FRACTION = 0.55;
 
-function subSummarySentinel(parentId: string): SessionNode {
+/**
+ * Construct a "sentinel" SessionNode used as a non-interactive
+ * placeholder row in the flattened tree (sub-agent summary,
+ * cold-sessions summary, cold-projects sentinel). Every sentinel
+ * carries the same all-blank shape; only its `id` differentiates
+ * downstream selection / dispatch.
+ */
+function makeSentinel(id: string): SessionNode {
   return {
-    id: `__sub-${parentId}__`,
+    id,
     hideKey: "",
     filePath: "",
     projectPath: "",
@@ -89,6 +100,18 @@ function subSummarySentinel(parentId: string): SessionNode {
     liveState: null,
   };
 }
+
+const subSummarySentinel = (parentId: string): SessionNode =>
+  makeSentinel(`__sub-${parentId}__`);
+
+/**
+ * Sentinel row for "N cold sessions" inside an active project.
+ * Default collapsed: cold sessions are historical context, not
+ * what the user is working on right now. Press Enter on the
+ * sentinel to expand and reveal the individual cold sessions.
+ */
+const coldSessionsSummarySentinel = (projectName: string): SessionNode =>
+  makeSentinel(`__cold-sessions-${projectName}__`);
 
 /**
  * Append the sub-agent rows for `session` onto `result` per the same
@@ -141,6 +164,103 @@ export function appendSubAgentRows(
   }
 }
 
+/**
+ * Strip hidden items out of a `SessionTree` for the default render
+ * path (when `showHidden` is off). Hidden items are KEPT in the
+ * source tree from `discoverSessions` — this function produces the
+ * "as visible to the user" view that the panel and the flatten/nav
+ * list both consume. Pressing `a` toggles which side is shown.
+ *
+ * Cheap shallow copy — the nested arrays are filtered + spread but
+ * leaf SessionNodes are reused by reference (immutable from our
+ * perspective).
+ */
+export function filterTreeByHidden(tree: SessionTree): SessionTree {
+  const visibleSession = (s: SessionNode): SessionNode => ({
+    ...s,
+    subAgents: s.subAgents.filter((sa) => !sa.hidden),
+  });
+  const visibleProject = (p: ProjectNode): ProjectNode => ({
+    ...p,
+    sessions: p.sessions.filter((s) => !s.hidden).map(visibleSession),
+  });
+  return {
+    ...tree,
+    projects: tree.projects.filter((p) => !p.hidden).map(visibleProject),
+    coldProjects: tree.coldProjects
+      .filter((p) => !p.hidden)
+      .map(visibleProject),
+  };
+}
+
+/**
+ * Walk the full session tree and tally per-level totals + active
+ * counts (hot/warm) plus a hidden subset. Drives the Projects-panel
+ * title census line ("12 projects (3 active) · 68 sessions
+ * (5 active) · 142 sub-agents (2 active) · ⊘ 14 hidden (1 active)").
+ *
+ * Counting rules:
+ * - **Totals** include hidden items so the user sees their actual
+ *   inventory regardless of `showHidden`.
+ * - **Active counts** are *visible* only. A hidden hot session is
+ *   not counted toward `sessions.active` — it belongs in the
+ *   `hidden.active` bucket so the actionable signals stay
+ *   separate.
+ * - **Project active** = visible project with at least one visible
+ *   hot/warm session.
+ * - **Hidden** = any item (session or sub-agent) marked hidden, or
+ *   any item under a hidden project.
+ */
+export function computeCensus(tree: SessionTree): TreeCensus {
+  let projectsTotal = 0;
+  let projectsActive = 0;
+  let sessionsTotal = 0;
+  let sessionsActive = 0;
+  let subAgentsTotal = 0;
+  let subAgentsActive = 0;
+  let hiddenTotal = 0;
+  let hiddenActive = 0;
+
+  const isActive = (n: SessionNode) =>
+    n.status === "hot" || n.status === "warm";
+
+  for (const p of [...tree.projects, ...tree.coldProjects]) {
+    projectsTotal++;
+    let projectHasVisibleActive = false;
+    for (const s of p.sessions) {
+      sessionsTotal++;
+      const sessionVisible = !s.hidden && !p.hidden;
+      if (sessionVisible) {
+        if (isActive(s)) {
+          sessionsActive++;
+          projectHasVisibleActive = true;
+        }
+      } else {
+        hiddenTotal++;
+        if (isActive(s)) hiddenActive++;
+      }
+      for (const sa of s.subAgents) {
+        subAgentsTotal++;
+        const saVisible = !sa.hidden && !s.hidden && !p.hidden;
+        if (saVisible) {
+          if (isActive(sa)) subAgentsActive++;
+        } else {
+          hiddenTotal++;
+          if (isActive(sa)) hiddenActive++;
+        }
+      }
+    }
+    if (projectHasVisibleActive) projectsActive++;
+  }
+
+  return {
+    projects: { total: projectsTotal, active: projectsActive },
+    sessions: { total: sessionsTotal, active: sessionsActive },
+    subAgents: { total: subAgentsTotal, active: subAgentsActive },
+    hidden: { total: hiddenTotal, active: hiddenActive },
+  };
+}
+
 function flattenSessions(
   tree: SessionTree,
   expandedIds: Set<string>,
@@ -170,9 +290,38 @@ function flattenSessions(
       : !expandedIds.has(`__collapsed-${sentinelId}`);
 
     if (shouldShowSessions) {
-      for (const session of project.sessions) {
-        result.push(session);
-        appendSubAgentRows(result, session, expandedIds);
+      // Active sessions are always shown. Cold sessions under an
+      // ACTIVE project (isCold=false) get collapsed under a
+      // `... N cold` sentinel by default — same pattern as
+      // cold-projects-summary and cold-sub-agents-summary. When
+      // the whole project is cold (isCold=true) the user has
+      // already opted in to expanding it, so show everything.
+      if (isCold) {
+        for (const session of project.sessions) {
+          result.push(session);
+          appendSubAgentRows(result, session, expandedIds);
+        }
+      } else {
+        const activeSessions = project.sessions.filter(
+          (s) => s.status !== "cold",
+        );
+        const coldSessions = project.sessions.filter(
+          (s) => s.status === "cold",
+        );
+        for (const session of activeSessions) {
+          result.push(session);
+          appendSubAgentRows(result, session, expandedIds);
+        }
+        if (coldSessions.length > 0) {
+          const coldKey = `__cold-sessions-${project.name}__`;
+          result.push(coldSessionsSummarySentinel(project.name));
+          if (expandedIds.has(coldKey)) {
+            for (const session of coldSessions) {
+              result.push(session);
+              appendSubAgentRows(result, session, expandedIds);
+            }
+          }
+        }
       }
     }
   };
@@ -442,9 +591,28 @@ export function App({
   // between two equally-active sub-agents.
   const seenIdsRef = useRef<Set<string>>(new Set());
 
+  // Show-hidden toggle (`a` key). When OFF (default), hidden items
+  // are filtered out by `filterTreeByHidden` before render. When ON,
+  // hidden items appear dimmed with a `⊘` marker and `H` on them
+  // unhides instead of hiding. The full source tree from
+  // `discoverSessions` always carries hidden items + their `hidden`
+  // marks so toggling can flip the view instantly without a refetch.
+  const [showHidden, setShowHidden] = useState(false);
+
+  // Tree as the renderer sees it. Defaults to the hidden-stripped
+  // view; flips to the full source tree when `showHidden` is on.
+  const displayTree = useMemo(
+    () => (showHidden ? sessionTree : filterTreeByHidden(sessionTree)),
+    [sessionTree, showHidden],
+  );
+
+  // Per-level census of the FULL source tree (counts hidden items).
+  // Rendered inside the Projects panel title bar.
+  const census = useMemo(() => computeCensus(sessionTree), [sessionTree]);
+
   const allFlat = useMemo(
-    () => flattenSessions(sessionTree, expandedIds),
-    [sessionTree, expandedIds],
+    () => flattenSessions(displayTree, expandedIds),
+    [displayTree, expandedIds],
   );
 
   const allFlatRef = useRef<SessionNode[]>(allFlat);
@@ -567,14 +735,19 @@ export function App({
   const refresh = useCallback(() => {
     const freshConfig = loadGlobalConfig();
     const tree = discoverSessions(freshConfig, discoverOptions);
-    const updatedFlat = flattenSessions(tree, expandedIds);
+    // Tracking and flatten work on the *visible* slice so an
+    // auto-jump doesn't land on a hidden hot session the user can't
+    // see. The full tree (with hidden items) is still stored via
+    // `setSessionTree` so `showHidden` can flip the view instantly.
+    const trackingTree = showHidden ? tree : filterTreeByHidden(tree);
+    const updatedFlat = flattenSessions(trackingTree, expandedIds);
 
     // Tracking mode: pick the next jump target with the new-id-aware
     // algorithm so we don't oscillate between two equally-active sub-agents.
     let nextSelected: string | null = selectedId;
     if (tracking) {
       const { target, ids } = pickTrackingTarget(
-        tree,
+        trackingTree,
         selectedId,
         seenIdsRef.current,
       );
@@ -607,7 +780,7 @@ export function App({
     // Keeping it out of here ensures the bump fires regardless of
     // which path updates activities (refresh or the redundant
     // useEffect 488 reparse on every sessionTree change).
-  }, [selectedId, expandedIds, tracking, discoverOptions]);
+  }, [selectedId, expandedIds, tracking, discoverOptions, showHidden]);
 
   // Keep a stable ref so the watcher callback always calls the latest refresh
   const refreshRef = useRef(refresh);
@@ -803,9 +976,9 @@ export function App({
           // so the next refresh only treats genuinely-new sessions/sub-agents
           // as triggers. Then snap to the current newest live target so the
           // user sees tracking take effect immediately.
-          seenIdsRef.current = collectAllIds(sessionTree);
+          seenIdsRef.current = collectAllIds(displayTree);
           const { target } = pickTrackingTarget(
-            sessionTree,
+            displayTree,
             selectedId,
             seenIdsRef.current,
           );
@@ -819,7 +992,7 @@ export function App({
       if (focus !== "tree") return;
       stopTracking();
       if (!selectedId) return;
-      const target = findParentTarget(selectedId, sessionTree, allFlat);
+      const target = findParentTarget(selectedId, displayTree, allFlat);
       if (target && target !== selectedId) setSelectedId(target);
     },
     onSwitchFocus: () => setFocus((f) => (f === "tree" ? "viewer" : "tree")),
@@ -842,10 +1015,7 @@ export function App({
           // mergedActivities, not raw activities).
           setIsLive(false);
           setScrollOffset((o) =>
-            Math.min(
-              o + 1,
-              Math.max(0, mergedActivities.length - viewerRows),
-            ),
+            Math.min(o + 1, Math.max(0, mergedActivities.length - viewerRows)),
           );
         }
       }
@@ -1009,7 +1179,7 @@ export function App({
       // Project sentinel: __proj-{projectName}__
       if (selectedId.startsWith("__proj-") && selectedId.endsWith("__")) {
         const projectName = selectedId.slice(7, -2);
-        const isCold = sessionTree.coldProjects.some(
+        const isCold = displayTree.coldProjects.some(
           (p) => p.name === projectName,
         );
         const toggleKey = isCold
@@ -1040,6 +1210,22 @@ export function App({
         return;
       }
 
+      // Cold-sessions summary sentinel: __cold-sessions-{projectName}__
+      // Expand → reveal the individual cold sessions inline; collapse
+      // → fold them back under the summary.
+      if (
+        selectedId.startsWith("__cold-sessions-") &&
+        selectedId.endsWith("__")
+      ) {
+        setExpandedIds((prev) => {
+          const next = new Set(prev);
+          if (next.has(selectedId)) next.delete(selectedId);
+          else next.add(selectedId);
+          return next;
+        });
+        return;
+      }
+
       // Sub-agent summary sentinel: __sub-{parentId}__
       if (selectedId.startsWith("__sub-") && selectedId.endsWith("__")) {
         const parentId = selectedId.slice(6, -2);
@@ -1051,9 +1237,15 @@ export function App({
             setSelectedId(parentId);
           } else {
             next.add(parentId);
-            // Expanding: move to first newly visible (cool/cold) sub-agent
-            const allSessions2 =
-              sessionTree.projects?.flatMap((p) => p.sessions) ?? [];
+            // Expanding: move to first newly visible (cool/cold) sub-agent.
+            // Must search BOTH active and cold projects — a hot session
+            // can cool over the lifetime of the TUI and end up under
+            // `coldProjects`, but its `__sub-` sentinel stays
+            // selectable. Mirroring `allSessions3` below.
+            const allSessions2 = [
+              ...displayTree.projects.flatMap((p) => p.sessions),
+              ...displayTree.coldProjects.flatMap((p) => p.sessions),
+            ];
             const parent = allSessions2.find((s) => s.id === parentId);
             const firstNew = parent?.subAgents.find(
               (sa) => sa.status === "cool" || sa.status === "cold",
@@ -1067,8 +1259,8 @@ export function App({
 
       // Parent session: toggle whole-session collapse (alive) or expand (cold)
       const allSessions3 = [
-        ...sessionTree.projects.flatMap((p) => p.sessions),
-        ...sessionTree.coldProjects.flatMap((p) => p.sessions),
+        ...displayTree.projects.flatMap((p) => p.sessions),
+        ...displayTree.coldProjects.flatMap((p) => p.sessions),
       ];
       const selectedSessionObj = allSessions3.find((s) => s.id === selectedId);
 
@@ -1114,58 +1306,95 @@ export function App({
       if (focus !== "tree" || !selectedId) return;
       stopTracking();
 
-      // Project sentinel: hide entire project
-      if (selectedId.startsWith("__proj-") && selectedId.endsWith("__")) {
-        const projectName = selectedId.slice(7, -2); // strip __proj- and trailing __
-        hideProject(projectName);
+      // `H` toggles hidden state of the selected item: hide if
+      // currently visible, unhide if currently hidden (only
+      // reachable when `showHidden` is on). The full
+      // `sessionTree` is consulted for lookups because the
+      // displayed tree might have stripped the very item we want
+      // to unhide.
+      const nextAfterHide = () =>
+        allFlat[selectedIndex + 1]?.id ??
+        allFlat[selectedIndex - 1]?.id ??
+        null;
+
+      // Shared shape for project/session/sub-agent toggle branches.
+      // On unhide the selection stays (item just un-dims in place).
+      // On hide we advance only when the item will actually disappear
+      // from the rendered tree — i.e. when `showHidden` is off. In
+      // show-hidden mode the row stays rendered (just dimmed with the
+      // `⊘` marker), so teleporting selection away would be wrong:
+      // the user just acted on this row and expects to still be on it.
+      const applyHideToggle = (params: {
+        isHidden: boolean;
+        hide: () => void;
+        unhide: () => void;
+      }) => {
+        if (params.isHidden) {
+          params.unhide();
+          refresh();
+          return;
+        }
+        params.hide();
         refresh();
-        const nextId =
-          allFlat[selectedIndex + 1]?.id ??
-          allFlat[selectedIndex - 1]?.id ??
-          null;
-        setSelectedId(nextId);
+        if (!showHidden) setSelectedId(nextAfterHide());
+      };
+
+      // Project sentinel
+      if (selectedId.startsWith("__proj-") && selectedId.endsWith("__")) {
+        const projectName = selectedId.slice(7, -2);
+        const proj =
+          sessionTree.projects.find((p) => p.name === projectName) ??
+          sessionTree.coldProjects.find((p) => p.name === projectName);
+        applyHideToggle({
+          isHidden: !!proj?.hidden,
+          hide: () => hideProject(projectName),
+          unhide: () => unhideProject(projectName),
+        });
         return;
       }
 
       if (selectedId === "__cold__") {
+        // Mass-hide the cold group as a convenience (no toggle on
+        // the cold sentinel — to unhide cold sessions, expand
+        // them with `a` and toggle each one individually).
         const coldSessions =
           sessionTree.coldProjects?.flatMap((p) => p.sessions) ?? [];
         for (const s of coldSessions) hideSession(s.hideKey);
-        // __cold__ and everything below it disappears — move up
-        const nextId = allFlat[selectedIndex - 1]?.id ?? null;
         refresh();
-        setSelectedId(nextId);
+        setSelectedId(nextAfterHide());
         return;
       }
 
-      const allSessions4 =
-        sessionTree.projects?.flatMap((p) => p.sessions) ?? [];
-      const selectedSession = allSessions4.find((s) => s.id === selectedId);
+      // Sessions across active + cold (lookup in the FULL tree so
+      // hidden items selected via show-hidden are findable).
+      const allSessionsFull = [
+        ...sessionTree.projects.flatMap((p) => p.sessions),
+        ...sessionTree.coldProjects.flatMap((p) => p.sessions),
+      ];
+      const selectedSession = allSessionsFull.find((s) => s.id === selectedId);
       if (selectedSession) {
-        hideSession(selectedSession.hideKey);
-        const nextId =
-          allFlat[selectedIndex + 1]?.id ??
-          allFlat[selectedIndex - 1]?.id ??
-          null;
-        refresh();
-        setSelectedId(nextId);
+        applyHideToggle({
+          isHidden: !!selectedSession.hidden,
+          hide: () => hideSession(selectedSession.hideKey),
+          unhide: () => unhideSession(selectedSession.hideKey),
+        });
         return;
       }
 
-      for (const s of allSessions4) {
-        const selectedSubAgent = s.subAgents.find((sa) => sa.id === selectedId);
-        if (selectedSubAgent) {
-          hideSubAgent(selectedSubAgent.hideKey);
-          const nextId =
-            allFlat[selectedIndex + 1]?.id ??
-            allFlat[selectedIndex - 1]?.id ??
-            null;
-          refresh();
-          setSelectedId(nextId);
+      // Sub-agents
+      for (const s of allSessionsFull) {
+        const sa = s.subAgents.find((x) => x.id === selectedId);
+        if (sa) {
+          applyHideToggle({
+            isHidden: !!sa.hidden,
+            hide: () => hideSubAgent(sa.hideKey),
+            unhide: () => unhideSubAgent(sa.hideKey),
+          });
           return;
         }
       }
     },
+    onToggleShowHidden: () => setShowHidden((on) => !on),
     onRefresh: refresh,
     onQuit: exit,
     onFilter: () => setFilterIndex((i) => (i + 1) % filterPresets.length),
@@ -1185,8 +1414,8 @@ export function App({
   if (isProjectSentinel && selectedId) {
     const projectName = selectedId.slice(7, -2);
     const project =
-      sessionTree.projects.find((p) => p.name === projectName) ??
-      sessionTree.coldProjects.find((p) => p.name === projectName);
+      displayTree.projects.find((p) => p.name === projectName) ??
+      displayTree.coldProjects.find((p) => p.name === projectName);
     if (project && project.sessions.length > 0) {
       selectedSession = project.sessions[0];
     }
@@ -1227,26 +1456,11 @@ export function App({
     <Box flexDirection="column">
       {isWatchMode &&
         (() => {
-          // Surface hidden-items count so a hidden session that's still
-          // producing live activity is never invisible (the failure
-          // mode of `H` being one keystroke away). When any hidden
-          // item is hot/warm, the count of active ones leads ("N
-          // active in M hidden") and just THAT segment is yellow —
-          // the actionable signal pops while the rest of the
-          // indicator stays dim/informational.
-          const hs = sessionTree.hiddenStats;
-          const baseBranding = `${spinner} AgentHUD v${getVersion()}`;
-          const indicatorPrefix = " · ⊘ ";
-          const indicatorText =
-            hs.total === 0
-              ? ""
-              : hs.active > 0
-                ? `${indicatorPrefix}${hs.active} active in ${hs.total} hidden`
-                : `${indicatorPrefix}${hs.total} hidden`;
-          const branding = `${baseBranding}${indicatorText}`;
+          // Top row: branding + spinner on the left, keybindings
+          // on the right. Census moved into the Projects panel as
+          // a non-selectable first content row.
+          const branding = `${spinner} AgentHUD v${getVersion()}`;
           const sep = " · ";
-          // Trim shortcut items from the FRONT until they fit. Items at the
-          // end (?: help, q: quit) are kept as long as possible.
           let items = statusBarItems;
           let shortcuts = items.join(sep);
           let showBranding = true;
@@ -1261,24 +1475,7 @@ export function App({
           }
           return (
             <Box marginBottom={1} justifyContent="space-between" width={width}>
-              <Text>
-                {showBranding && (
-                  <>
-                    <Text dimColor>{baseBranding}</Text>
-                    {hs.total > 0 ? (
-                      hs.active > 0 ? (
-                        <>
-                          <Text dimColor>{indicatorPrefix}</Text>
-                          <Text color="yellow">{`${hs.active} active`}</Text>
-                          <Text dimColor>{` in ${hs.total} hidden`}</Text>
-                        </>
-                      ) : (
-                        <Text dimColor>{indicatorText}</Text>
-                      )
-                    ) : null}
-                  </>
-                )}
-              </Text>
+              <Text dimColor>{showBranding ? branding : ""}</Text>
               <Text dimColor>{shortcuts}</Text>
             </Box>
           );
@@ -1304,8 +1501,8 @@ export function App({
           )}
 
           <SessionTreePanel
-            projects={sessionTree.projects ?? []}
-            coldProjects={sessionTree.coldProjects ?? []}
+            projects={displayTree.projects ?? []}
+            coldProjects={displayTree.coldProjects ?? []}
             selectedId={selectedId}
             hasFocus={focus === "tree"}
             width={width}
@@ -1314,6 +1511,7 @@ export function App({
             trackingOn={tracking}
             spinner={spinner}
             scopeLabel={scopeToProject ? basename(scopeToProject) : undefined}
+            census={isWatchMode ? census : undefined}
           />
 
           <Box marginTop={1}>

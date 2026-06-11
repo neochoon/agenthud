@@ -16,6 +16,9 @@ const {
   hideSession,
   hideSubAgent,
   hideProject,
+  unhideSession,
+  unhideSubAgent,
+  unhideProject,
   hasProjectLevelConfig,
 } = await import("../../src/config/globalConfig.js");
 
@@ -63,19 +66,16 @@ describe("loadGlobalConfig", () => {
     ["*", []],
     ["any", []],
     ["ALL", []],
-  ])(
-    'normalizes "%s" preset keyword to empty array (= no filter)',
-    (keyword, expected) => {
-      vi.mocked(existsSync).mockImplementation((p) =>
-        String(p).endsWith("config.yaml"),
-      );
-      vi.mocked(readFileSync).mockReturnValue(
-        `filterPresets:\n  - ["${keyword}"]\n`,
-      );
-      const config = loadGlobalConfig();
-      expect(config.filterPresets[0]).toEqual(expected);
-    },
-  );
+  ])('normalizes "%s" preset keyword to empty array (= no filter)', (keyword, expected) => {
+    vi.mocked(existsSync).mockImplementation((p) =>
+      String(p).endsWith("config.yaml"),
+    );
+    vi.mocked(readFileSync).mockReturnValue(
+      `filterPresets:\n  - ["${keyword}"]\n`,
+    );
+    const config = loadGlobalConfig();
+    expect(config.filterPresets[0]).toEqual(expected);
+  });
 
   it("still treats [] preset as 'show all'", () => {
     vi.mocked(existsSync).mockImplementation((p) =>
@@ -295,6 +295,97 @@ describe("hideProject", () => {
       .mocked(writeFileSync)
       .mock.calls.find(([p]) => String(p).endsWith("state.yaml"));
     expect(stateWrite).toBeUndefined();
+  });
+});
+
+describe("unhide functions", () => {
+  it("unhideSession removes the id from hiddenSessions", () => {
+    vi.mocked(existsSync).mockImplementation(
+      (p) =>
+        String(p).endsWith("state.yaml") || String(p).endsWith("config.yaml"),
+    );
+    vi.mocked(readFileSync).mockImplementation((p) =>
+      String(p).endsWith("state.yaml")
+        ? "hiddenSessions:\n  - proj/keep\n  - proj/remove\n"
+        : "refreshInterval: 2s\n",
+    );
+    vi.mocked(writeFileSync).mockImplementation(() => {});
+
+    unhideSession("proj/remove");
+
+    const stateWrite = vi
+      .mocked(writeFileSync)
+      .mock.calls.find(([p]) => String(p).endsWith("state.yaml"));
+    expect(stateWrite).toBeDefined();
+    const written = String(stateWrite![1]);
+    expect(written).toContain("proj/keep");
+    expect(written).not.toContain("proj/remove");
+  });
+
+  it("unhideSession is a no-op when id is not hidden", () => {
+    vi.mocked(existsSync).mockImplementation(
+      (p) =>
+        String(p).endsWith("state.yaml") || String(p).endsWith("config.yaml"),
+    );
+    vi.mocked(readFileSync).mockImplementation((p) =>
+      String(p).endsWith("state.yaml")
+        ? "hiddenSessions:\n  - proj/keep\n"
+        : "refreshInterval: 2s\n",
+    );
+    vi.mocked(writeFileSync).mockImplementation(() => {});
+
+    unhideSession("proj/not-here");
+
+    const stateWrite = vi
+      .mocked(writeFileSync)
+      .mock.calls.find(([p]) => String(p).endsWith("state.yaml"));
+    expect(stateWrite).toBeUndefined();
+  });
+
+  it("unhideProject removes the name from hiddenProjects", () => {
+    vi.mocked(existsSync).mockImplementation(
+      (p) =>
+        String(p).endsWith("state.yaml") || String(p).endsWith("config.yaml"),
+    );
+    vi.mocked(readFileSync).mockImplementation((p) =>
+      String(p).endsWith("state.yaml")
+        ? "hiddenProjects:\n  - launcher\n  - secrets\n"
+        : "refreshInterval: 2s\n",
+    );
+    vi.mocked(writeFileSync).mockImplementation(() => {});
+
+    unhideProject("launcher");
+
+    const stateWrite = vi
+      .mocked(writeFileSync)
+      .mock.calls.find(([p]) => String(p).endsWith("state.yaml"));
+    expect(stateWrite).toBeDefined();
+    const written = String(stateWrite![1]);
+    expect(written).not.toContain("launcher");
+    expect(written).toContain("secrets");
+  });
+
+  it("unhideSubAgent removes the id from hiddenSubAgents", () => {
+    vi.mocked(existsSync).mockImplementation(
+      (p) =>
+        String(p).endsWith("state.yaml") || String(p).endsWith("config.yaml"),
+    );
+    vi.mocked(readFileSync).mockImplementation((p) =>
+      String(p).endsWith("state.yaml")
+        ? "hiddenSubAgents:\n  - agent-keep\n  - agent-remove\n"
+        : "refreshInterval: 2s\n",
+    );
+    vi.mocked(writeFileSync).mockImplementation(() => {});
+
+    unhideSubAgent("agent-remove");
+
+    const stateWrite = vi
+      .mocked(writeFileSync)
+      .mock.calls.find(([p]) => String(p).endsWith("state.yaml"));
+    expect(stateWrite).toBeDefined();
+    const written = String(stateWrite![1]);
+    expect(written).toContain("agent-keep");
+    expect(written).not.toContain("agent-remove");
   });
 });
 

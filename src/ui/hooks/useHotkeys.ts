@@ -51,6 +51,8 @@ interface UseHotkeysOptions {
   /** Tree only: jump to the parent of the current row (sub-agent →
    * session, session → project, project → previous row). */
   onJumpToParent?: () => void;
+  /** Tree only: toggle whether hidden items appear in the tree. */
+  onToggleShowHidden?: () => void;
   filterLabel: string; // e.g. "all", "response", "commit"
   trackingOn?: boolean;
 }
@@ -102,6 +104,7 @@ export function useHotkeys({
   onHelpScrollToTop,
   onToggleTracking,
   onJumpToParent,
+  onToggleShowHidden,
   filterLabel,
   trackingOn = false,
 }: UseHotkeysOptions): UseHotkeysResult {
@@ -203,7 +206,12 @@ export function useHotkeys({
       onFilter();
       return;
     }
-    if (input === "t" && !key.ctrl && onToggleTracking) {
+    // `t` toggles tracking, which moves the TREE cursor. Restrict to
+    // tree focus so an accidental `t` in the viewer doesn't yank the
+    // tree away while the user is reading activity. The TRK ●
+    // indicator still surfaces on the viewer side so the user knows
+    // the mode is on after tabbing over.
+    if (input === "t" && !key.ctrl && focus === "tree" && onToggleTracking) {
       onToggleTracking();
       return;
     }
@@ -242,8 +250,13 @@ export function useHotkeys({
       // parent), aliased to `←`. Old behavior (`h` = hide) was a
       // footgun: users coming from vim hit `h` for navigation and
       // accidentally hid sessions they were actively monitoring.
+      // `a` toggles whether hidden items show in the tree.
       if (input === "H") {
         onHide();
+        return;
+      }
+      if (input === "a" && onToggleShowHidden) {
+        onToggleShowHidden();
         return;
       }
       if ((input === "h" || key.leftArrow) && onJumpToParent) {
@@ -280,9 +293,11 @@ export function useHotkeys({
     }
   };
 
-  // Leading item shown when tracking mode is on, so users can always tell
-  // at a glance that selection will move on its own.
-  const trackingItems = trackingOn ? ["TRK ●"] : ["t: track"];
+  // Tracking is a low-frequency mode toggle so its `t: track` hint
+  // doesn't earn a slot in the status bar by default — discoverable
+  // via `?` help instead. When the mode IS on, surface `TRK ●` on
+  // both tree and viewer so the active state is unmissable.
+  const trackingItems = trackingOn ? ["TRK ●"] : [];
 
   const statusBarItems = helpMode
     ? ["↑↓/jk: scroll", "PgDn/Space: page", "↵/Esc/q/?: close"]
@@ -293,11 +308,11 @@ export function useHotkeys({
             ...trackingItems,
             "Tab: viewer",
             "↑↓/jk: select",
-            "←: parent",
+            "h/←: parent",
             "PgUp/Dn: page",
             "↵: expand",
-            "h: hide",
-            "r: refresh",
+            "H: hide",
+            "a: show hidden",
             "?: help",
             "q: quit",
           ]

@@ -173,6 +173,24 @@ function isSystemNoise(text: string): boolean {
   return SYSTEM_PREFIXES.some((p) => trimmed.startsWith(p));
 }
 
+/**
+ * Walk the session JSONL and pick the best user message to surface
+ * as the session's row description. Preference order:
+ *
+ *   1. The LATEST "substantial" user message — long enough to carry
+ *      intent (≥ 10 chars after trim) and not a slash command
+ *      (`/compact`, `/clear`, …). For long sessions, this reflects
+ *      what the user is doing NOW, not just what they asked at
+ *      session start (which is often stale by hour 3).
+ *   2. The FIRST natural-language user message — fallback when no
+ *      later message qualifies as substantial. Preserves the
+ *      original "first user prompt" behavior so short / quick
+ *      sessions still show something meaningful.
+ *
+ * Returns null when neither exists (empty session, all system
+ * reminders, only tool results). The field is still named
+ * `firstUserPrompt` in `SessionNode` for backwards compatibility.
+ */
 function readFirstUserPrompt(filePath: string): string | null {
   if (!existsSync(filePath)) return null;
   let content: string;
@@ -181,6 +199,17 @@ function readFirstUserPrompt(filePath: string): string | null {
   } catch {
     return null;
   }
+
+  const MIN_SUBSTANTIAL_LEN = 10;
+  const isSubstantial = (text: string): boolean => {
+    const trimmed = text.trim();
+    if (trimmed.length < MIN_SUBSTANTIAL_LEN) return false;
+    if (trimmed.startsWith("/")) return false;
+    return true;
+  };
+
+  let first: string | null = null;
+  let latestSubstantial: string | null = null;
 
   for (const line of content.split("\n")) {
     if (!line.trim()) continue;
@@ -202,7 +231,6 @@ function readFirstUserPrompt(filePath: string): string | null {
     if (typeof raw === "string") {
       text = raw;
     } else if (Array.isArray(raw)) {
-      // content can be an array of blocks; find first text block
       const textBlock = raw.find(
         (b: { type?: string; text?: string }) =>
           b && b.type === "text" && typeof b.text === "string",
@@ -216,9 +244,12 @@ function readFirstUserPrompt(filePath: string): string | null {
 
     const firstLine = text.split("\n").find((l) => l.trim()) ?? "";
     if (!firstLine || isSystemNoise(firstLine)) continue;
-    return capWithEllipsis(firstLine);
+
+    const capped = capWithEllipsis(firstLine);
+    if (first === null) first = capped;
+    if (isSubstantial(firstLine)) latestSubstantial = capped;
   }
-  return null;
+  return latestSubstantial ?? first;
 }
 
 function readEntrypoint(filePath: string): string | null {
@@ -251,44 +282,53 @@ function buildSubAgents(
     return [];
   }
 
-  return files
-    .map((file): SessionNode | null => {
-      const id = file.replace(/\.jsonl$/, "");
-      const hideKey = `${projectName}/${id}`;
-      const filePath = join(subagentsDir, file);
-      try {
-        const stat = statSync(filePath);
-        const { agentId, taskDescription } = readSubAgentInfo(filePath);
-        const { modelName, liveState } = readSessionTail(
-          filePath,
-          stat.mtimeMs,
-          Date.now(),
-        );
-        return {
-          id,
-          hideKey,
-          filePath,
-          projectPath: "",
-          projectName: "",
-          lastModifiedMs: stat.mtimeMs,
-          status: getSessionStatus(stat.mtimeMs),
-          modelName,
-          subAgents: [],
-          agentId: agentId ?? undefined,
-          taskDescription: taskDescription ?? undefined,
-          nonInteractive: false,
-          firstUserPrompt: null,
-          liveState,
-        };
-      } catch {
-        return null;
-      }
-    })
-    .filter(
-      (n): n is SessionNode =>
-        n !== null && !config.hiddenSubAgents.includes(n.hideKey),
-    )
-    .sort((a, b) => b.lastModifiedMs - a.lastModifiedMs);
+  return (
+    files
+      .map((file): SessionNode | null => {
+        const id = file.replace(/\.jsonl$/, "");
+        const hideKey = `${projectName}/${id}`;
+        const filePath = join(subagentsDir, file);
+        try {
+          const stat = statSync(filePath);
+          const { agentId, taskDescription } = readSubAgentInfo(filePath);
+          const { modelName, liveState } = readSessionTail(
+            filePath,
+            stat.mtimeMs,
+            Date.now(),
+          );
+          return {
+            id,
+            hideKey,
+            filePath,
+            projectPath: "",
+            projectName: "",
+            lastModifiedMs: stat.mtimeMs,
+            status: getSessionStatus(stat.mtimeMs),
+            modelName,
+            subAgents: [],
+            agentId: agentId ?? undefined,
+            taskDescription: taskDescription ?? undefined,
+            nonInteractive: false,
+            firstUserPrompt: null,
+            liveState,
+          };
+        } catch {
+          return null;
+        }
+      })
+      .filter((n): n is SessionNode => n !== null)
+      // MARK hidden sub-agents (don't filter them out). The tree carries
+      // them with `hidden=true` so `computeCensus` sees them, the
+      // hidden-active alert in the panel title fires correctly, and the
+      // `a` show-hidden + `H` unhide round-trip works for sub-agents
+      // too. Mirrors the same refactor on top-level sessions and
+      // projects below.
+      .map((n) => {
+        if (config.hiddenSubAgents.includes(n.hideKey)) n.hidden = true;
+        return n;
+      })
+      .sort((a, b) => b.lastModifiedMs - a.lastModifiedMs)
+  );
 }
 
 // Returns the registered project whose path is the nearest ancestor of cwd
@@ -425,11 +465,14 @@ export function discoverSessions(
     }
   }
 
-  // Group by projectPath, and tally hidden items so the status bar
-  // can surface "N hidden, M active" — a hidden session that's still
-  // producing live activity is one of the things the user is most
-  // likely to want to know about (it's the failure mode of the `h`
-  // key being too easy to hit by accident).
+  // Group by projectPath. Hidden items used to be filtered out here,
+  // but now they're MARKED and kept in the tree — the App.tsx render
+  // layer decides whether to show them based on the `showHidden`
+  // toggle (`a` key). Tally hidden items as we go so the status bar
+  // can surface "M active in N hidden" — a hidden session that's
+  // still producing live activity is one of the things the user is
+  // most likely to want to know about (the failure mode of `H` being
+  // one keystroke away).
   const byProject = new Map<string, SessionNode[]>();
   let hiddenTotal = 0;
   let hiddenActive = 0;
@@ -439,8 +482,18 @@ export function discoverSessions(
     if (sessionHidden || projectHidden) {
       hiddenTotal++;
       if (s.status === "hot" || s.status === "warm") hiddenActive++;
+      s.hidden = true;
     }
-    if (sessionHidden) continue;
+    // Sub-agents are marked at parse time in `readSubAgents` (or here
+    // if their parent is project-hidden). Either way, count them so
+    // the hidden-active alarm fires when a hot sub-agent is hidden.
+    for (const sub of s.subAgents) {
+      if (sub.hidden || projectHidden) {
+        if (projectHidden) sub.hidden = true;
+        hiddenTotal++;
+        if (sub.status === "hot" || sub.status === "warm") hiddenActive++;
+      }
+    }
     const arr = byProject.get(s.projectPath) ?? [];
     arr.push(s);
     byProject.set(s.projectPath, arr);
@@ -457,7 +510,7 @@ export function discoverSessions(
   for (const [projectPath, sessions] of byProject) {
     if (sessions.length === 0) continue;
     const projectName = sessions[0].projectName;
-    if (config.hiddenProjects.includes(projectName)) continue;
+    const projectHidden = config.hiddenProjects.includes(projectName);
 
     // Sort: interactive first, then by status, then by mtime desc
     sessions.sort((a, b) => {
@@ -471,7 +524,13 @@ export function discoverSessions(
 
     const hotness = sessions[0].status; // hottest = first after sort
 
-    allProjects.push({ name: projectName, projectPath, sessions, hotness });
+    allProjects.push({
+      name: projectName,
+      projectPath,
+      sessions,
+      hotness,
+      hidden: projectHidden || undefined,
+    });
   }
 
   // Partition cold vs active

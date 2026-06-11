@@ -32,6 +32,7 @@ import type {
   ProjectNode,
   SessionNode,
   SessionStatus,
+  TreeCensus,
 } from "../types/index.js";
 import {
   BOX,
@@ -64,6 +65,16 @@ export interface SessionTreePanelProps {
    * that the view is filtered to a single project (typically by --cwd).
    */
   scopeLabel?: string;
+  /**
+   * Tree-wide counts rendered inside the title bar — projects /
+   * sessions / sub-agents totals with their visible-active subset,
+   * plus hidden total + hidden active. When the panel is wide
+   * enough the full long form is shown; when it isn't, the title
+   * falls back to short form (e.g. `68s (5)`) and finally drops
+   * segments from the right until only `Projects` is left. The
+   * `(N active)` hidden alert is preserved as long as possible.
+   */
+  census?: TreeCensus;
 }
 
 /**
@@ -167,7 +178,10 @@ function SessionRow({
   if (model) rightParts.push(model);
   const rightSide = rightParts.join(" ");
 
-  const leftCoreBase = `${prefix}${rawName}${shortIdDisplay} ${badge}`;
+  // `⊘ ` marker (2 cells) precedes the badge for hidden items so
+  // they're recognizable at a glance when `showHidden` is on.
+  const hiddenMarker = session.hidden ? "⊘ " : "";
+  const leftCoreBase = `${prefix}${rawName}${shortIdDisplay} ${hiddenMarker}${badge}`;
   const leftCoreWidth = getDisplayWidth(leftCoreBase);
   const rightWidth = getDisplayWidth(rightSide);
 
@@ -207,7 +221,13 @@ function SessionRow({
   const focused = isSelected && hasFocus;
   const muted = isSelected && !hasFocus;
   const showBg = focused || muted;
-  const shouldDim = isNonInteractive || muted;
+  // Cold sessions are dimmed alongside non-interactive/hidden/muted
+  // ones — they're sub-rows under an active project but represent
+  // historical work. Without this, the session id rendered bold and
+  // visually competed with the active session at the top of the
+  // same project ("[cold]" badge alone wasn't enough signal).
+  const shouldDim =
+    isNonInteractive || muted || !!session.hidden || session.status === "cold";
 
   return (
     <Text>
@@ -221,6 +241,7 @@ function SessionRow({
         <Text bold={!shouldDim}>{rawName}</Text>
         {shortIdDisplay ? <Text dimColor>{shortIdDisplay}</Text> : null}
         <Text> </Text>
+        {session.hidden ? <Text dimColor>{"⊘ "}</Text> : null}
         <Text color={badgeColor}>{badge}</Text>
         {middleText ? <Text dimColor>{middleSection}</Text> : null}
         <Text>{gap}</Text>
@@ -242,7 +263,8 @@ type FlatRow =
       coolCount: number;
       coldCount: number;
     }
-  | { kind: "cold-projects-summary"; count: number };
+  | { kind: "cold-projects-summary"; count: number }
+  | { kind: "cold-sessions-summary"; projectName: string; count: number };
 
 function appendSessionRows(
   result: FlatRow[],
@@ -315,9 +337,31 @@ function flattenSessions(
     // Projects default EXPANDED. Collapse only when explicitly collapsed.
     const collapsed = expandedIds.has(`__collapsed-${sentinelId}`);
     if (!collapsed) {
-      for (const session of project.sessions) {
+      // Cold sessions under an ACTIVE project get collapsed under
+      // a `... N cold` sentinel by default — same pattern as
+      // cold-projects and cold-sub-agents. Active sessions
+      // (non-cold) always show.
+      const activeSessions = project.sessions.filter(
+        (s) => s.status !== "cold",
+      );
+      const coldSessions = project.sessions.filter((s) => s.status === "cold");
+      for (const session of activeSessions) {
         result.push({ kind: "session", session, prefix: "    " });
         appendSessionRows(result, session, expandedIds);
+      }
+      if (coldSessions.length > 0) {
+        const coldKey = `__cold-sessions-${project.name}__`;
+        result.push({
+          kind: "cold-sessions-summary",
+          projectName: project.name,
+          count: coldSessions.length,
+        });
+        if (expandedIds.has(coldKey)) {
+          for (const session of coldSessions) {
+            result.push({ kind: "session", session, prefix: "    " });
+            appendSessionRows(result, session, expandedIds);
+          }
+        }
       }
     }
   }
@@ -354,7 +398,7 @@ function ProjectRow({
   hasFocus: boolean;
   contentWidth: number;
 }): React.ReactElement {
-  const nameText = `> ${project.name}`;
+  const nameText = `> ${project.hidden ? "⊘ " : ""}${project.name}`;
   const pathText = project.projectPath
     ? formatProjectPath(project.projectPath)
     : "";
@@ -368,6 +412,21 @@ function ProjectRow({
   );
   const elapsed = latestMtime > 0 ? formatElapsed(latestMtime) : "";
 
+  // Per-project counts rendered between path and elapsed. Long
+  // form when wide ("5 sessions · 142 sub-agents"), short form
+  // when narrow ("5s · 142a"), dropped entirely when nothing fits.
+  // Counts reflect the visible tree — i.e. they exclude hidden
+  // items when `showHidden` is off, and include them (each marked
+  // with `⊘`) when it's on. The tree-wide census in the panel
+  // title is the source of truth for "actual size with hidden".
+  const sessionCount = project.sessions.length;
+  const subAgentCount = project.sessions.reduce(
+    (n, s) => n + s.subAgents.length,
+    0,
+  );
+  const longCounts = `${sessionCount} sessions · ${subAgentCount} sub-agents`;
+  const shortCounts = `${sessionCount}s · ${subAgentCount}a`;
+
   const nameWidth = getDisplayWidth(nameText);
   const pathWidth = pathText ? getDisplayWidth(pathText) : 0;
   const elapsedWidth = elapsed ? getDisplayWidth(elapsed) : 0;
@@ -377,28 +436,52 @@ function ProjectRow({
   // Min right gap mirrors SessionRow so the layout's right column has the
   // same breathing room across the tree.
   const PROJECT_RIGHT_GAP = 3;
+  const COUNTS_GAP = 2; // padding before counts when shown
+
+  // Pick the widest counts form that fits with the rest of the row.
+  const fitsCounts = (text: string) =>
+    leftWidth +
+      COUNTS_GAP +
+      getDisplayWidth(text) +
+      PROJECT_RIGHT_GAP +
+      elapsedWidth <=
+    contentWidth;
+  const countsText = fitsCounts(longCounts)
+    ? longCounts
+    : fitsCounts(shortCounts)
+      ? shortCounts
+      : "";
+  const countsWidth = countsText ? COUNTS_GAP + getDisplayWidth(countsText) : 0;
+
   const rightGap = Math.max(
     PROJECT_RIGHT_GAP,
-    contentWidth - leftWidth - elapsedWidth,
+    contentWidth - leftWidth - countsWidth - elapsedWidth,
   );
-  const totalWidth = leftWidth + rightGap + elapsedWidth;
+  const totalWidth = leftWidth + countsWidth + rightGap + elapsedWidth;
   const padding = Math.max(0, contentWidth - totalWidth);
   const focused = isSelected && hasFocus;
   const muted = isSelected && !hasFocus;
   const showBg = focused || muted;
+  const dim = muted || !!project.hidden;
   return (
     <Text>
       {BOX.v}{" "}
       <Text
         backgroundColor={showBg ? "blue" : undefined}
-        bold={!showBg}
-        dimColor={muted}
+        bold={!showBg && !project.hidden}
+        dimColor={dim}
       >
         {nameText}
         {pathText ? (
           <>
             {"  "}
             <Text dimColor>{pathText}</Text>
+          </>
+        ) : null}
+        {countsText ? (
+          <>
+            {" ".repeat(COUNTS_GAP)}
+            <Text dimColor>{countsText}</Text>
           </>
         ) : null}
         {" ".repeat(rightGap)}
@@ -426,21 +509,24 @@ function SubagentSummaryRow({
   const parts: string[] = [];
   if (coolCount > 0) parts.push(`${coolCount} cool`);
   if (coldCount > 0) parts.push(`${coldCount} cold`);
+  const baseText = `        └─ ... ${parts.join("  ")}`;
   const hint = " +";
-  const text = `        └─ ... ${parts.join("  ")}`;
-  const padding = Math.max(
-    0,
-    contentWidth - getDisplayWidth(text) - getDisplayWidth(hint),
-  );
+  // Width-check the hint before appending so narrow terminals don't
+  // overflow. Only the focused row offers the expand affordance, so
+  // unfocused rows pad to width with spaces only.
   const focused = isSelected && hasFocus;
   const muted = isSelected && !hasFocus;
+  const showHint =
+    focused &&
+    getDisplayWidth(baseText) + getDisplayWidth(hint) <= contentWidth;
+  const text = showHint ? `${baseText}${hint}` : baseText;
+  const padding = Math.max(0, contentWidth - getDisplayWidth(text));
   return (
     <Text>
       {BOX.v}{" "}
       <Text dimColor={!focused} inverse={focused || muted}>
         {text}
         {" ".repeat(padding)}
-        {hint}
       </Text>
       {BOX.v}
     </Text>
@@ -479,6 +565,206 @@ function ColdProjectsSummaryRow({
   );
 }
 
+/**
+ * "... N cold" row inserted under an active project to collapse
+ * its cold-status sessions. Indented to match session row depth so
+ * the visual hierarchy reads as "this is part of the project
+ * above, but folded down to save vertical space". Press Enter to
+ * expand into individual cold session rows.
+ */
+function ColdSessionsSummaryRow({
+  count,
+  isSelected,
+  hasFocus,
+  contentWidth,
+}: {
+  count: number;
+  projectName: string;
+  isSelected: boolean;
+  hasFocus: boolean;
+  contentWidth: number;
+}): React.ReactElement {
+  const prefix = "    ";
+  const baseLabel = `... ${count} cold`;
+  const hint = " +";
+  const baseText = `${prefix}${baseLabel}`;
+  // Width-check the hint before appending so a very narrow terminal
+  // doesn't get an overflowing row. Same pattern as
+  // ColdProjectsSummaryRow.
+  const showHint =
+    isSelected &&
+    hasFocus &&
+    getDisplayWidth(baseText) + getDisplayWidth(hint) <= contentWidth;
+  const text = showHint ? `${baseText}${hint}` : baseText;
+  const padding = Math.max(0, contentWidth - getDisplayWidth(text));
+  const focused = isSelected && hasFocus;
+  const muted = isSelected && !hasFocus;
+  return (
+    <Text>
+      {BOX.v}{" "}
+      <Text
+        backgroundColor={focused || muted ? "blue" : undefined}
+        bold={focused}
+        dimColor={!focused}
+      >
+        {text}
+      </Text>
+      {" ".repeat(padding)}
+      {BOX.v}
+    </Text>
+  );
+}
+
+/**
+ * Ink supports any color string, but the panel title + census line
+ * only ever paints "green" (visible active) or "yellow" (hidden
+ * active alert). Constraining the union catches typos
+ * (`"greem"`, `"yello"`) at compile time — `color: string` would
+ * accept them and silently render invisible text at runtime.
+ */
+type TitleSegmentColor = "green" | "yellow";
+
+interface TitleSegment {
+  text: string;
+  color?: TitleSegmentColor;
+  dim?: boolean;
+  bold?: boolean;
+}
+
+// Active count rendered as a colored number inside dim parens —
+// e.g. ` (3)` where the `3` is bold-green for visible-active and
+// bold-yellow for hidden-active. The number alone carries the
+// signal; we used to spell out " active" but the color is already
+// the active indicator, and dropping the word saves width.
+function activeParen(count: number, color: TitleSegmentColor): TitleSegment[] {
+  if (count === 0) return [];
+  return [
+    { text: " (", dim: true },
+    { text: `${count}`, color, bold: true },
+    { text: ")", dim: true },
+  ];
+}
+
+function hiddenSeg(
+  hidden: { total: number; active: number },
+  short: boolean,
+): TitleSegment[] {
+  if (hidden.total === 0) return [];
+  const segs: TitleSegment[] = [{ text: ` · ⊘ ${hidden.total}`, dim: true }];
+  if (!short) segs.push({ text: " hidden", dim: true });
+  if (hidden.active > 0) {
+    segs.push(...activeParen(hidden.active, "yellow"));
+  }
+  return segs;
+}
+
+/**
+ * Build the styled segment list for the Projects panel title under
+ * a target available width. Produces a list of candidates from
+ * "full long form" down to "just the label", each progressively
+ * shorter, and returns the first one that fits. The hidden alert
+ * (`(N active)` on the hidden segment) is preserved longest because
+ * it's the most actionable signal.
+ *
+ * Style rule: only the **active counts** are bold + colored (green
+ * for visible, yellow for hidden alert). Everything else — label,
+ * totals, parens, separators, the `⊘` glyph, the word "hidden" —
+ * stays plain dim. This is what makes the actionable numbers pop
+ * visually; mixing bold into the non-alert parts blurs the signal
+ * and makes the dim parens look comparatively bright.
+ */
+export function buildTitleSegments(
+  label: string,
+  census: TreeCensus | undefined,
+  availableWidth: number,
+): TitleSegment[] {
+  const labelSeg: TitleSegment = { text: label, dim: true };
+  if (!census) return [labelSeg];
+
+  const widthOf = (segs: TitleSegment[]) =>
+    segs.reduce((w, s) => w + getDisplayWidth(s.text), 0);
+
+  const c = census;
+
+  // Declarative table of fallback levels. Each row describes which
+  // counters to show (and the noun suffix per level), whether to
+  // include the project active count, and how the hidden segment
+  // formats. Picking the first level whose rendered width fits the
+  // available space gives us a graceful long → short → drop chain
+  // without seven near-identical array literals.
+  interface CensusLevel {
+    projectsSuffix?: string; // undefined → drop projects entirely
+    sessionsSuffix?: string;
+    subAgentsSuffix?: string;
+    showProjectActive?: boolean; // default true
+    hiddenShort?: boolean; // default false (long "hidden" word)
+    omitHidden?: boolean; // default false
+  }
+
+  const LEVELS: CensusLevel[] = [
+    // L0: full long form
+    {
+      projectsSuffix: " projects",
+      sessionsSuffix: " sessions",
+      subAgentsSuffix: " sub-agents",
+    },
+    // L1: short form (single-letter abbreviations)
+    {
+      projectsSuffix: "p",
+      sessionsSuffix: "s",
+      subAgentsSuffix: "a",
+      hiddenShort: true,
+    },
+    // L2: drop sub-agents
+    { projectsSuffix: "p", sessionsSuffix: "s", hiddenShort: true },
+    // L3: drop sessions
+    { projectsSuffix: "p", hiddenShort: true },
+    // L4: drop project active counter
+    { projectsSuffix: "p", showProjectActive: false, hiddenShort: true },
+    // L5: just hidden alert
+    { hiddenShort: true },
+    // L6: just the label
+    { hiddenShort: true, omitHidden: true },
+  ];
+
+  const buildLevel = (level: CensusLevel): TitleSegment[] => {
+    const segs: TitleSegment[] = [labelSeg];
+    if (level.projectsSuffix !== undefined) {
+      segs.push({
+        text: ` ${c.projects.total}${level.projectsSuffix}`,
+        dim: true,
+      });
+      if (level.showProjectActive !== false) {
+        segs.push(...activeParen(c.projects.active, "green"));
+      }
+    }
+    if (level.sessionsSuffix !== undefined) {
+      segs.push({
+        text: ` · ${c.sessions.total}${level.sessionsSuffix}`,
+        dim: true,
+      });
+      segs.push(...activeParen(c.sessions.active, "green"));
+    }
+    if (level.subAgentsSuffix !== undefined) {
+      segs.push({
+        text: ` · ${c.subAgents.total}${level.subAgentsSuffix}`,
+        dim: true,
+      });
+      segs.push(...activeParen(c.subAgents.active, "green"));
+    }
+    if (!level.omitHidden) {
+      segs.push(...hiddenSeg(c.hidden, level.hiddenShort ?? false));
+    }
+    return segs;
+  };
+
+  const candidates = LEVELS.map(buildLevel);
+  for (const cand of candidates) {
+    if (widthOf(cand) <= availableWidth) return cand;
+  }
+  return candidates[candidates.length - 1];
+}
+
 export function SessionTreePanel({
   projects,
   coldProjects,
@@ -490,6 +776,7 @@ export function SessionTreePanel({
   trackingOn = false,
   spinner = "",
   scopeLabel,
+  census,
 }: SessionTreePanelProps): React.ReactElement {
   const innerWidth = getInnerWidth(width);
   const contentWidth = innerWidth - 1; // account for space after │
@@ -502,6 +789,46 @@ export function SessionTreePanel({
   const titleLine = createTitleLine(titleText, titleSuffix, width);
   const bottomLine = createBottomLine(width);
 
+  // Census row: rendered as the first content row inside the panel
+  // when `census` is provided. Styled distinctly from session rows
+  // (no selection background, no bold) so it reads as
+  // panel-meta-info rather than another selectable entry. The same
+  // long/short/drop logic from `buildTitleSegments` is reused (with
+  // an empty label, which we strip from the rendered output).
+  const censusSegments = census
+    ? (() => {
+        const segs = buildTitleSegments("", census, contentWidth);
+        const withoutLabel = segs[0]?.text === "" ? segs.slice(1) : segs;
+        return withoutLabel.map((seg, i) =>
+          i === 0 ? { ...seg, text: seg.text.replace(/^ /, "") } : seg,
+        );
+      })()
+    : null;
+  const censusWidth = censusSegments
+    ? censusSegments.reduce((w, s) => w + getDisplayWidth(s.text), 0)
+    : 0;
+  const censusPadding = censusSegments
+    ? Math.max(0, contentWidth - censusWidth)
+    : 0;
+  const renderCensusRow = () =>
+    censusSegments ? (
+      <Text>
+        {BOX.v}{" "}
+        {censusSegments.map((seg, i) => (
+          <Text
+            key={`census-${i}`}
+            color={seg.color}
+            dimColor={seg.dim}
+            bold={seg.bold}
+          >
+            {seg.text}
+          </Text>
+        ))}
+        {" ".repeat(censusPadding)}
+        {BOX.v}
+      </Text>
+    ) : null;
+
   const totalProjectCount = projects.length + coldProjects.length;
 
   if (totalProjectCount === 0) {
@@ -510,6 +837,7 @@ export function SessionTreePanel({
     return (
       <Box flexDirection="column" width={width}>
         <Text>{titleLine}</Text>
+        {renderCensusRow()}
         <Text>
           {BOX.v} <Text dimColor>{emptyText}</Text>
           {" ".repeat(emptyPadding)}
@@ -530,12 +858,20 @@ export function SessionTreePanel({
     if (row.kind === "subagent-summary")
       return selectedId === `__sub-${row.parentId}__`;
     if (row.kind === "cold-projects-summary") return selectedId === "__cold__";
+    if (row.kind === "cold-sessions-summary")
+      return selectedId === `__cold-sessions-${row.projectName}__`;
     return false;
   });
 
-  // Compute scrollTop so the selected row stays visible
-  const needsOverflow = maxRows !== undefined && totalRows > maxRows;
-  const visibleCount = needsOverflow ? maxRows - 1 : totalRows;
+  // Compute scrollTop so the selected row stays visible. Census
+  // takes one row inside the panel content area when present, so
+  // the effective row budget shrinks by 1 in that case.
+  const censusRowCost = censusSegments ? 1 : 0;
+  const effectiveMaxRows =
+    maxRows !== undefined ? Math.max(1, maxRows - censusRowCost) : undefined;
+  const needsOverflow =
+    effectiveMaxRows !== undefined && totalRows > effectiveMaxRows;
+  const visibleCount = needsOverflow ? effectiveMaxRows - 1 : totalRows;
   let scrollTop = 0;
   if (needsOverflow && selectedFlatIndex >= 0) {
     scrollTop = Math.max(0, selectedFlatIndex - visibleCount + 1);
@@ -548,6 +884,7 @@ export function SessionTreePanel({
   return (
     <Box flexDirection="column" width={width}>
       <Text>{titleLine}</Text>
+      {renderCensusRow()}
       {displayRows.map((row, idx) =>
         row.kind === "project" ? (
           <ProjectRow
@@ -575,13 +912,22 @@ export function SessionTreePanel({
             isSelected={selectedId === `__sub-${row.parentId}__`}
             hasFocus={hasFocus}
           />
-        ) : (
+        ) : row.kind === "cold-projects-summary" ? (
           <ColdProjectsSummaryRow
             key="cold-summary"
             count={row.count}
             isSelected={selectedId === "__cold__"}
             hasFocus={hasFocus}
             width={width}
+          />
+        ) : (
+          <ColdSessionsSummaryRow
+            key={`cold-sessions-${row.projectName}`}
+            count={row.count}
+            projectName={row.projectName}
+            isSelected={selectedId === `__cold-sessions-${row.projectName}__`}
+            hasFocus={hasFocus}
+            contentWidth={contentWidth}
           />
         ),
       )}

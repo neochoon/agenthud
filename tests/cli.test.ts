@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { formatEffectiveOptionsLine, getHelp, parseArgs } from "../src/cli.js";
 import { DEFAULT_GLOBAL_CONFIG } from "../src/config/globalConfig.js";
-import {
-  formatEffectiveOptionsLine,
-  getHelp,
-  parseArgs,
-} from "../src/cli.js";
 import type { GlobalConfig } from "../src/types/index.js";
 
 function makeConfig(overrides: Partial<GlobalConfig> = {}): GlobalConfig {

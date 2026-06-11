@@ -170,6 +170,7 @@ export function truncateByWidth(text: string, maxWidth: number): string {
 // expensive — and we call it with the same icons/labels thousands of times per
 // second during re-renders. CPU profiling showed it at ~17% of total runtime.
 import stringWidth from "string-width";
+
 const widthCache = new Map<string, number>();
 export function getDisplayWidth(s: string): number {
   const cached = widthCache.get(s);

@@ -59,10 +59,10 @@ import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { loadGlobalConfig } from "../config/globalConfig.js";
 import { openInDefaultApp } from "../utils/openInDefaultApp.js";
-import { regenerateIndex } from "./summariesIndex.js";
 import { startStderrTicker } from "../utils/stderrTicker.js";
 import { generateReport } from "./reportGenerator.js";
 import { discoverSessions } from "./sessions.js";
+import { regenerateIndex } from "./summariesIndex.js";
 
 export interface SummaryOptions {
   date: Date;
@@ -332,14 +332,10 @@ function spawnClaude(opts: SpawnClaudeOpts): Promise<SpawnClaudeResult> {
     ];
     if (opts.model) args.push("--model", opts.model);
     args.push(opts.prompt);
-    const proc = spawn(
-      "claude",
-      args,
-      {
-        stdio: ["pipe", "pipe", "pipe"],
-        cwd: agenthudHomeDir(),
-      },
-    );
+    const proc = spawn("claude", args, {
+      stdio: ["pipe", "pipe", "pipe"],
+      cwd: agenthudHomeDir(),
+    });
 
     let cacheStream: ReturnType<typeof createWriteStream> | null = null;
     if (opts.cachePath) {
@@ -745,9 +741,7 @@ export async function runRangeSummary(
   ) {
     try {
       const content = readFileSync(rangeCache, "utf-8");
-      process.stderr.write(
-        `cached range summary from ${rangeCache}\n`,
-      );
+      process.stderr.write(`cached range summary from ${rangeCache}\n`);
       if (!options.open) {
         process.stdout.write(content);
         if (!content.endsWith("\n")) process.stdout.write("\n");
@@ -779,9 +773,7 @@ export async function runRangeSummary(
   process.stderr.write(
     `range ${fromLabel} → ${toLabel} (${dates.length} days)\n`,
   );
-  process.stderr.write(
-    `${cachedCount} cached, ${missingCount} to generate\n`,
-  );
+  process.stderr.write(`${cachedCount} cached, ${missingCount} to generate\n`);
 
   // Generate dailies sequentially. Confirm just-in-time after scan (when --yes is off).
   // Each prompt comes with concrete context (session/activity/commit counts).
@@ -792,12 +784,11 @@ export async function runRangeSummary(
     const isToday = isSameLocalDay(d, options.today);
     process.stderr.write(`\n--- ${label} ---\n`);
 
-    const willPrompt = !options.assumeYes && (isToday || !existsSync(dailyCachePath(d)));
+    const willPrompt =
+      !options.assumeYes && (isToday || !existsSync(dailyCachePath(d)));
     const confirmer = willPrompt
       ? async () => {
-          const hint = isToday
-            ? " (today — regenerated every time)"
-            : "";
+          const hint = isToday ? " (today — regenerated every time)" : "";
           return ask(`Generate this summary${hint}? [Y/n] `, true);
         }
       : undefined;

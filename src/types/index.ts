@@ -45,11 +45,21 @@ export interface ProjectNode {
 }
 
 // Full session tree returned by discoverSessions()
+// Counts of items filtered out by `hiddenProjects` / `hiddenSessions`.
+// Surfaced in the status bar so a hidden session producing live
+// activity is never invisible. `active` covers hot + warm (anything
+// the user would care about losing sight of).
+export interface HiddenStats {
+  total: number;
+  active: number;
+}
+
 export interface SessionTree {
   projects: ProjectNode[]; // active projects (hotness !== "cold")
   coldProjects: ProjectNode[]; // projects where all sessions are cold
   totalCount: number; // total sessions across both arrays + sub-agents
   timestamp: string; // ISO timestamp of discovery
+  hiddenStats: HiddenStats; // counts of hidden items (status bar uses this)
 }
 
 // Global config (~/.agenthud/config.yaml)

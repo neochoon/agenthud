@@ -41,11 +41,11 @@ const SECTIONS: HelpSection[] = [
     title: "Project tree",
     rows: [
       ["↑ ↓ / k j", "Move selection"],
-      ["←", "Jump to parent (sub-agent → session, session → project)"],
+      ["← / h", "Jump to parent (sub-agent → session, session → project)"],
       ["PgUp / Ctrl+B", "Page up"],
       ["PgDn / Ctrl+F", "Page down"],
       ["↵", "Expand/collapse project, session, or summary"],
-      ["h", "Hide selected (project/session/sub-agent)"],
+      ["H", "Hide selected (project/session/sub-agent) — capital H"],
       ["t", "Track: auto-follow the newest live sub-agent (any nav key turns it off)"],
       ["Tab", "Switch focus to activity viewer"],
       ["r", "Refresh now"],

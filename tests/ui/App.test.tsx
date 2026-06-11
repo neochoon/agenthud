@@ -22,6 +22,7 @@ let mockTree: SessionTree = {
   coldProjects: [],
   totalCount: 0,
   timestamp: new Date().toISOString(),
+  hiddenStats: { total: 0, active: 0 },
 };
 
 vi.mock("../../src/data/sessions.js", () => ({
@@ -46,6 +47,7 @@ const emptyTree = (): SessionTree => ({
   coldProjects: [],
   totalCount: 0,
   timestamp: new Date().toISOString(),
+  hiddenStats: { total: 0, active: 0 },
 });
 
 const makeColdSession = (
@@ -105,6 +107,7 @@ describe("App with only cold projects (post-vacation boot)", () => {
       ],
       totalCount: 3,
       timestamp: new Date().toISOString(),
+      hiddenStats: { total: 0, active: 0 },
     };
   });
 
@@ -127,6 +130,7 @@ describe("initialSelectedId", () => {
       coldProjects: [makeColdProject("cold1")],
       totalCount: 2,
       timestamp: new Date().toISOString(),
+      hiddenStats: { total: 0, active: 0 },
     };
     expect(initialSelectedId(tree)).toBe("__proj-hot1__");
   });
@@ -137,6 +141,7 @@ describe("initialSelectedId", () => {
       coldProjects: [makeColdProject("cold1"), makeColdProject("cold2")],
       totalCount: 2,
       timestamp: new Date().toISOString(),
+      hiddenStats: { total: 0, active: 0 },
     };
     expect(initialSelectedId(tree)).toBe("__cold__");
   });
@@ -153,6 +158,7 @@ describe("initialExpandedIds", () => {
       coldProjects: [makeColdProject("cold1")],
       totalCount: 1,
       timestamp: new Date().toISOString(),
+      hiddenStats: { total: 0, active: 0 },
     };
     expect(initialExpandedIds(tree).has("__cold__")).toBe(true);
   });
@@ -163,6 +169,7 @@ describe("initialExpandedIds", () => {
       coldProjects: [makeColdProject("cold1")],
       totalCount: 2,
       timestamp: new Date().toISOString(),
+      hiddenStats: { total: 0, active: 0 },
     };
     expect(initialExpandedIds(tree).has("__cold__")).toBe(false);
   });
@@ -326,6 +333,7 @@ describe("findParentTarget", () => {
       coldProjects: [],
       totalCount: 1,
       timestamp: new Date().toISOString(),
+      hiddenStats: { total: 0, active: 0 },
     };
     expect(findParentTarget("a1", tree, [])).toBe("s1");
   });
@@ -336,6 +344,7 @@ describe("findParentTarget", () => {
       coldProjects: [],
       totalCount: 0,
       timestamp: new Date().toISOString(),
+      hiddenStats: { total: 0, active: 0 },
     };
     expect(findParentTarget("__sub-s1__", tree, [])).toBe("s1");
   });
@@ -347,6 +356,7 @@ describe("findParentTarget", () => {
       coldProjects: [],
       totalCount: 1,
       timestamp: new Date().toISOString(),
+      hiddenStats: { total: 0, active: 0 },
     };
     expect(findParentTarget("s1", tree, [])).toBe("__proj-myproj__");
   });
@@ -359,6 +369,7 @@ describe("findParentTarget", () => {
       coldProjects: [],
       totalCount: 2,
       timestamp: new Date().toISOString(),
+      hiddenStats: { total: 0, active: 0 },
     };
     const flat: SessionNode[] = [
       // Skip the synthetic sentinel struct details — only id is used.
@@ -377,6 +388,7 @@ describe("findParentTarget", () => {
       coldProjects: [],
       totalCount: 1,
       timestamp: new Date().toISOString(),
+      hiddenStats: { total: 0, active: 0 },
     };
     const flat: SessionNode[] = [
       { ...s1, id: "__proj-alpha__" } as SessionNode,
@@ -394,6 +406,7 @@ describe("findParentTarget", () => {
       coldProjects: [project("oldproj", [session("old1")])],
       totalCount: 2,
       timestamp: new Date().toISOString(),
+      hiddenStats: { total: 0, active: 0 },
     };
     const flat: SessionNode[] = [
       { ...s1, id: "__proj-alpha__" } as SessionNode,

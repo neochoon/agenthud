@@ -352,6 +352,7 @@ export function discoverSessions(
       coldProjects: [],
       totalCount: 0,
       timestamp: new Date().toISOString(),
+      hiddenStats: { total: 0, active: 0 },
     };
   }
 
@@ -370,6 +371,7 @@ export function discoverSessions(
       coldProjects: [],
       totalCount: 0,
       timestamp: new Date().toISOString(),
+      hiddenStats: { total: 0, active: 0 },
     };
   }
 
@@ -423,10 +425,22 @@ export function discoverSessions(
     }
   }
 
-  // Group by projectPath
+  // Group by projectPath, and tally hidden items so the status bar
+  // can surface "N hidden, M active" — a hidden session that's still
+  // producing live activity is one of the things the user is most
+  // likely to want to know about (it's the failure mode of the `h`
+  // key being too easy to hit by accident).
   const byProject = new Map<string, SessionNode[]>();
+  let hiddenTotal = 0;
+  let hiddenActive = 0;
   for (const s of allSessions) {
-    if (config.hiddenSessions.includes(s.hideKey)) continue;
+    const sessionHidden = config.hiddenSessions.includes(s.hideKey);
+    const projectHidden = config.hiddenProjects.includes(s.projectName);
+    if (sessionHidden || projectHidden) {
+      hiddenTotal++;
+      if (s.status === "hot" || s.status === "warm") hiddenActive++;
+    }
+    if (sessionHidden) continue;
     const arr = byProject.get(s.projectPath) ?? [];
     arr.push(s);
     byProject.set(s.projectPath, arr);
@@ -488,5 +502,6 @@ export function discoverSessions(
     coldProjects,
     totalCount,
     timestamp: new Date().toISOString(),
+    hiddenStats: { total: hiddenTotal, active: hiddenActive },
   };
 }

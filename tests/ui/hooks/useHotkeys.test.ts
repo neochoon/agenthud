@@ -174,21 +174,42 @@ describe("useHotkeys", () => {
       expect(onEnter).toHaveBeenCalledTimes(1);
     });
 
-    it("calls onHide when h is pressed in tree focus", () => {
+    it("calls onHide when SHIFT+H is pressed in tree focus", () => {
+      const onHide = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ focus: "tree", onHide })),
+      );
+      act(() => result.current.handleInput("H", noopKey));
+      expect(onHide).toHaveBeenCalledTimes(1);
+    });
+
+    it("does NOT call onHide when lowercase h is pressed (h is vim-left)", () => {
+      // Hide is `H` only. `h` is the vim-left navigation alias for
+      // `←` (jump to parent). Earlier `h` = hide was a footgun for
+      // vim users — they hit it for navigation and lost sessions.
       const onHide = vi.fn();
       const { result } = renderHook(() =>
         useHotkeys(makeOptions({ focus: "tree", onHide })),
       );
       act(() => result.current.handleInput("h", noopKey));
-      expect(onHide).toHaveBeenCalledTimes(1);
+      expect(onHide).not.toHaveBeenCalled();
     });
 
-    it("does not call onHide when h is pressed in viewer focus", () => {
+    it("calls onJumpToParent when lowercase h is pressed in tree focus", () => {
+      const onJumpToParent = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ focus: "tree", onJumpToParent })),
+      );
+      act(() => result.current.handleInput("h", noopKey));
+      expect(onJumpToParent).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not call onHide when SHIFT+H is pressed in viewer focus", () => {
       const onHide = vi.fn();
       const { result } = renderHook(() =>
         useHotkeys(makeOptions({ focus: "viewer", onHide })),
       );
-      act(() => result.current.handleInput("h", noopKey));
+      act(() => result.current.handleInput("H", noopKey));
       expect(onHide).not.toHaveBeenCalled();
     });
   });

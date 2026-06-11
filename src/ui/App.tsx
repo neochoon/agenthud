@@ -1227,7 +1227,23 @@ export function App({
     <Box flexDirection="column">
       {isWatchMode &&
         (() => {
-          const branding = `${spinner} AgentHUD v${getVersion()}`;
+          // Surface hidden-items count so a hidden session that's still
+          // producing live activity is never invisible (the failure
+          // mode of `H` being one keystroke away). When any hidden
+          // item is hot/warm, the count of active ones leads ("N
+          // active in M hidden") and just THAT segment is yellow —
+          // the actionable signal pops while the rest of the
+          // indicator stays dim/informational.
+          const hs = sessionTree.hiddenStats;
+          const baseBranding = `${spinner} AgentHUD v${getVersion()}`;
+          const indicatorPrefix = " · ⊘ ";
+          const indicatorText =
+            hs.total === 0
+              ? ""
+              : hs.active > 0
+                ? `${indicatorPrefix}${hs.active} active in ${hs.total} hidden`
+                : `${indicatorPrefix}${hs.total} hidden`;
+          const branding = `${baseBranding}${indicatorText}`;
           const sep = " · ";
           // Trim shortcut items from the FRONT until they fit. Items at the
           // end (?: help, q: quit) are kept as long as possible.
@@ -1245,7 +1261,24 @@ export function App({
           }
           return (
             <Box marginBottom={1} justifyContent="space-between" width={width}>
-              <Text dimColor>{showBranding ? branding : ""}</Text>
+              <Text>
+                {showBranding && (
+                  <>
+                    <Text dimColor>{baseBranding}</Text>
+                    {hs.total > 0 ? (
+                      hs.active > 0 ? (
+                        <>
+                          <Text dimColor>{indicatorPrefix}</Text>
+                          <Text color="yellow">{`${hs.active} active`}</Text>
+                          <Text dimColor>{` in ${hs.total} hidden`}</Text>
+                        </>
+                      ) : (
+                        <Text dimColor>{indicatorText}</Text>
+                      )
+                    ) : null}
+                  </>
+                )}
+              </Text>
               <Text dimColor>{shortcuts}</Text>
             </Box>
           );

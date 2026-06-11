@@ -310,6 +310,110 @@ describe("discoverSessions", () => {
     expect(tree.projects).toHaveLength(0);
     expect(tree.coldProjects).toHaveLength(0);
     expect(tree.totalCount).toBe(0);
+    // Hidden session was hot (mtime 5s ago) — counts toward both
+    // total and active so the status bar can flag it.
+    expect(tree.hiddenStats).toEqual({ total: 1, active: 1 });
+  });
+
+  it("hiddenStats: cool/cold hidden sessions count total but not active", () => {
+    const projectsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".claude",
+      "projects",
+    );
+    const projectDir = join(projectsDir, "-Users-neo-myproject");
+    vi.mocked(existsSync).mockImplementation((p) => {
+      const path = String(p);
+      return path === projectsDir || path.includes("myproject");
+    });
+    vi.mocked(readdirSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === projectsDir)
+        return ["-Users-neo-myproject"] as unknown as ReturnType<
+          typeof readdirSync
+        >;
+      if (path === projectDir)
+        return ["cool.jsonl"] as unknown as ReturnType<typeof readdirSync>;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(statSync).mockImplementation((p) => {
+      const path = String(p);
+      return {
+        isDirectory: () => !path.endsWith(".jsonl"),
+        // 2 hours ago → cool (within the same day but past warm window)
+        mtimeMs: NOW - 2 * 60 * 60 * 1000,
+        size: 100,
+      } as ReturnType<typeof statSync>;
+    });
+    vi.mocked(readFileSync).mockReturnValue("");
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const tree = discoverSessions({
+      ...mockConfig,
+      hiddenSessions: ["myproject/cool"],
+    });
+    expect(tree.hiddenStats).toEqual({ total: 1, active: 0 });
+  });
+
+  it("hiddenStats: zero when nothing is hidden", () => {
+    const projectsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".claude",
+      "projects",
+    );
+    vi.mocked(existsSync).mockImplementation(
+      (p) => String(p) === projectsDir,
+    );
+    vi.mocked(readdirSync).mockReturnValue(
+      [] as unknown as ReturnType<typeof readdirSync>,
+    );
+    vi.mocked(readFileSync).mockReturnValue("");
+    const tree = discoverSessions(mockConfig);
+    expect(tree.hiddenStats).toEqual({ total: 0, active: 0 });
+  });
+
+  it("hiddenStats: hidden project's sessions all count toward total", () => {
+    const projectsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".claude",
+      "projects",
+    );
+    const projectDir = join(projectsDir, "-Users-neo-launcher");
+    vi.mocked(existsSync).mockImplementation((p) => {
+      const path = String(p);
+      return path === projectsDir || path.includes("launcher");
+    });
+    vi.mocked(readdirSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === projectsDir)
+        return ["-Users-neo-launcher"] as unknown as ReturnType<
+          typeof readdirSync
+        >;
+      if (path === projectDir)
+        return ["s1.jsonl", "s2.jsonl"] as unknown as ReturnType<
+          typeof readdirSync
+        >;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(statSync).mockImplementation((p) => {
+      const path = String(p);
+      return {
+        isDirectory: () => !path.endsWith(".jsonl"),
+        mtimeMs: NOW - 5_000, // both hot
+        size: 100,
+      } as ReturnType<typeof statSync>;
+    });
+    vi.mocked(readFileSync).mockReturnValue("");
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const tree = discoverSessions({
+      ...mockConfig,
+      hiddenProjects: ["launcher"],
+    });
+    // Both sessions in the hidden project count.
+    expect(tree.hiddenStats).toEqual({ total: 2, active: 2 });
+    expect(tree.projects).toHaveLength(0);
+    expect(tree.coldProjects).toHaveLength(0);
   });
 
   it("marks session non-interactive when entrypoint is sdk-cli", () => {

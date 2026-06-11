@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+### Changed
+- **Hide moved from `h` to `Shift+H`. Lowercase `h` is now the
+  vim-left alias for `←` (jump to parent).** The old binding
+  (`h` = hide) was a footgun: vim users coming for navigation
+  hit `h` and silently hid whichever item was selected. The
+  user wouldn't even remember pressing it. Capital `H` keeps the
+  mutation behind a deliberate keystroke.
+
+### Added
+- **Status bar surfaces hidden-but-still-active items.** A hidden
+  session producing live activity used to be completely
+  invisible — combined with the `h` footgun above, that broke
+  discovery in a way that took a `state.yaml` edit to recover.
+  Now the branding line shows the count:
+  - Nothing hot/warm: ` · ⊘ N hidden` (dim, informational)
+  - Something hot/warm: ` · ⊘ M active in N hidden` with the
+    `M active` segment in **yellow** so the actionable case
+    pops while the rest stays dim. Active count leads so the
+    eye lands on it first.
+
 ## [0.13.3] - 2026-06-10
 
 ### Changed

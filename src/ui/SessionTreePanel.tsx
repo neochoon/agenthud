@@ -412,46 +412,71 @@ function ProjectRow({
   );
   const elapsed = latestMtime > 0 ? formatElapsed(latestMtime) : "";
 
-  // Per-project counts rendered between path and elapsed. Long
-  // form when wide ("5 sessions · 142 sub-agents"), short form
-  // when narrow ("5s · 142a"), dropped entirely when nothing fits.
-  // Counts reflect the visible tree — i.e. they exclude hidden
-  // items when `showHidden` is off, and include them (each marked
-  // with `⊘`) when it's on. The tree-wide census in the panel
-  // title is the source of truth for "actual size with hidden".
+  // Per-project counts rendered between path and elapsed. Two forms,
+  // both with green `(N)` active-subset parens (hot+warm) matching
+  // the panel-title census style: long ("5 sessions (2) · 142
+  // sub-agents (3)") when wide enough, short ("5s (2) · 142a (3)")
+  // when narrow, dropped entirely when nothing fits. The active
+  // parens are omitted when the count is zero (same rule as
+  // `activeParen` in the census). Totals reflect the visible tree —
+  // hidden items are excluded when `showHidden` is off and included
+  // (with `⊘`) when it's on; the panel-title census is the source of
+  // truth for "actual size with hidden".
   const sessionCount = project.sessions.length;
   const subAgentCount = project.sessions.reduce(
     (n, s) => n + s.subAgents.length,
     0,
   );
-  const longCounts = `${sessionCount} sessions · ${subAgentCount} sub-agents`;
-  const shortCounts = `${sessionCount}s · ${subAgentCount}a`;
+  const isActive = (status: SessionStatus) =>
+    status === "hot" || status === "warm";
+  const activeSessionCount = project.sessions.filter((s) =>
+    isActive(s.status),
+  ).length;
+  const activeSubAgentCount = project.sessions.reduce(
+    (n, s) => n + s.subAgents.filter((sa) => isActive(sa.status)).length,
+    0,
+  );
+
+  const buildCountsSegments = (short: boolean): TitleSegment[] => [
+    {
+      text: short ? `${sessionCount}s` : `${sessionCount} sessions`,
+      dim: true,
+    },
+    ...activeParen(activeSessionCount, "green"),
+    {
+      text: short
+        ? ` · ${subAgentCount}a`
+        : ` · ${subAgentCount} sub-agents`,
+      dim: true,
+    },
+    ...activeParen(activeSubAgentCount, "green"),
+  ];
+  const longSegs = buildCountsSegments(false);
+  const shortSegs = buildCountsSegments(true);
+  const segWidth = (segs: TitleSegment[]) =>
+    segs.reduce((n, s) => n + getDisplayWidth(s.text), 0);
 
   const nameWidth = getDisplayWidth(nameText);
   const pathWidth = pathText ? getDisplayWidth(pathText) : 0;
   const elapsedWidth = elapsed ? getDisplayWidth(elapsed) : 0;
-  // 2 spaces between name and path; gap pushes elapsed to the right edge.
   const middleGap = pathText ? 2 : 0;
   const leftWidth = nameWidth + middleGap + pathWidth;
-  // Min right gap mirrors SessionRow so the layout's right column has the
-  // same breathing room across the tree.
   const PROJECT_RIGHT_GAP = 3;
-  const COUNTS_GAP = 2; // padding before counts when shown
+  const COUNTS_GAP = 2;
 
-  // Pick the widest counts form that fits with the rest of the row.
-  const fitsCounts = (text: string) =>
+  const fitsCounts = (segs: TitleSegment[]) =>
     leftWidth +
       COUNTS_GAP +
-      getDisplayWidth(text) +
+      segWidth(segs) +
       PROJECT_RIGHT_GAP +
       elapsedWidth <=
     contentWidth;
-  const countsText = fitsCounts(longCounts)
-    ? longCounts
-    : fitsCounts(shortCounts)
-      ? shortCounts
-      : "";
-  const countsWidth = countsText ? COUNTS_GAP + getDisplayWidth(countsText) : 0;
+  const countsSegs: TitleSegment[] | null = fitsCounts(longSegs)
+    ? longSegs
+    : fitsCounts(shortSegs)
+      ? shortSegs
+      : null;
+  const countsWidth = countsSegs ? COUNTS_GAP + segWidth(countsSegs) : 0;
 
   const rightGap = Math.max(
     PROJECT_RIGHT_GAP,
@@ -478,10 +503,19 @@ function ProjectRow({
             <Text dimColor>{pathText}</Text>
           </>
         ) : null}
-        {countsText ? (
+        {countsSegs ? (
           <>
             {" ".repeat(COUNTS_GAP)}
-            <Text dimColor>{countsText}</Text>
+            {countsSegs.map((seg, i) => (
+              <Text
+                key={`pcnt-${i}`}
+                color={seg.color}
+                dimColor={seg.dim}
+                bold={seg.bold}
+              >
+                {seg.text}
+              </Text>
+            ))}
           </>
         ) : null}
         {" ".repeat(rightGap)}

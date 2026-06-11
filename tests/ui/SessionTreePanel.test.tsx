@@ -631,6 +631,59 @@ describe("SessionTreePanel", () => {
     expect(out).toContain("#abc1");
   });
 
+  it("renders ProjectRow with active count in green parens next to each total", () => {
+    // 3 sessions total: 2 hot, 1 cool. Hot session has 2 active sub-agents.
+    const hot1 = makeSession({
+      id: "h1",
+      status: "hot",
+      subAgents: [
+        makeSession({ id: "sa1", status: "hot", subAgents: [] }),
+        makeSession({ id: "sa2", status: "warm", subAgents: [] }),
+        makeSession({ id: "sa3", status: "cool", subAgents: [] }),
+      ],
+    });
+    const hot2 = makeSession({ id: "h2", status: "hot", subAgents: [] });
+    const cool1 = makeSession({ id: "c1", status: "cool", subAgents: [] });
+    const project = makeProject("myproj", [hot1, hot2, cool1]);
+
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[project]}
+        coldProjects={[]}
+        selectedId={null}
+        hasFocus={false}
+        width={120}
+      />,
+    );
+    const text = lastFrame() ?? "";
+    // Sessions row: 3 sessions, 2 active (hot+hot) → "(2)" after "sessions"
+    expect(text).toMatch(/3 sessions \(2\)/);
+    // Sub-agents: 3 total under hot1, 2 active (hot+warm) → "(2)" after "sub-agents"
+    expect(text).toMatch(/3 sub-agents \(2\)/);
+  });
+
+  it("omits active parens entirely when nothing is active", () => {
+    const cool1 = makeSession({ id: "c1", status: "cool", subAgents: [] });
+    const cool2 = makeSession({ id: "c2", status: "cool", subAgents: [] });
+    const project = makeProject("myproj", [cool1, cool2], { hotness: "cool" });
+
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[project]}
+        coldProjects={[]}
+        selectedId={null}
+        hasFocus={false}
+        width={120}
+      />,
+    );
+    const text = lastFrame() ?? "";
+    expect(text).toContain("2 sessions");
+    expect(text).toContain("0 sub-agents");
+    // No "(N)" segments anywhere on the project row's counts area.
+    expect(text).not.toMatch(/2 sessions \(\d+\)/);
+    expect(text).not.toMatch(/0 sub-agents \(\d+\)/);
+  });
+
   it("dims and parenthesizes non-interactive sessions", () => {
     const session = makeSession({ id: "ndi", nonInteractive: true });
     const project: ProjectNode = {

@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+## [0.18.2] - 2026-06-13
+
+### Fixed
+- **No more `--trust-tools` warning on Kiro summaries.** `kiro-cli`
+  documents `--trust-tools=` as "trust no tools" (the guard that keeps a
+  headless summary run from silently executing filesystem/shell tools)
+  but then warns that the empty value looks like a custom MCP tool. That
+  benign stderr line is now stripped from the passed-through output while
+  real diagnostics still surface.
+
+### Changed
+- **CI actions moved off the deprecated Node 20 runtime.**
+  `actions/checkout` v4→v6, `actions/setup-node` v4→v6, and
+  `softprops/action-gh-release` v2→v3 — all now on Node 24, ahead of
+  GitHub forcing the switch on 2026-06-16. No user-facing change.
+
 ## [0.18.1] - 2026-06-12
 
 ### Fixed

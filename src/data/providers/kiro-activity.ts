@@ -32,6 +32,7 @@
 
 import type { ActivityEntry } from "../../types/index.js";
 import { ICONS } from "../../types/index.js";
+import { canonicalKiroToolLabel } from "./toolLabels.js";
 import type { ParseResult } from "./types.js";
 
 interface KiroContentBlock {
@@ -55,23 +56,12 @@ interface KiroRecord {
   };
 }
 
-function getToolIcon(name: string): string {
-  // Kiro tool names → existing ICONS table. Unknown tools fall back
-  // to ICONS.Default. Names observed: `read`, `write`, `bash`,
-  // `grep`, `glob`, `web_fetch`, `web_search`, `task`.
-  const lower = name.toLowerCase();
-  if (lower.includes("read")) return ICONS.Read;
-  if (lower.includes("write") || lower.includes("edit")) return ICONS.Write;
-  if (lower.includes("bash") || lower.includes("shell")) return ICONS.Bash;
-  if (lower.includes("grep")) return ICONS.Grep;
-  if (lower.includes("glob")) return ICONS.Glob;
-  if (lower.includes("web_fetch") || lower.includes("fetch"))
-    return ICONS.WebFetch;
-  if (lower.includes("web_search") || lower.includes("search"))
-    return ICONS.WebSearch;
-  if (lower.includes("task") || lower.includes("agent")) return ICONS.Task;
-  if (lower.includes("todo")) return ICONS.TodoWrite;
-  return ICONS.Default;
+function iconForCanonicalLabel(label: string): string {
+  // Canonical labels match the keys of the shared ICONS table, so
+  // this is a straight lookup. Anything we don't recognize falls
+  // back to ICONS.Default (still a printable glyph, not blank).
+  const known = (ICONS as Record<string, string>)[label];
+  return known ?? ICONS.Default;
 }
 
 function summarizeToolInput(input: Record<string, unknown> | undefined): string {
@@ -160,13 +150,14 @@ export function parseKiroActivitiesFromLines(lines: string[]): ParseResult {
           });
         } else if (block.kind === "toolUse") {
           const tu = block.data as KiroToolUseData;
-          const name = typeof tu?.name === "string" ? tu.name : "tool";
+          const rawName = typeof tu?.name === "string" ? tu.name : "tool";
+          const label = canonicalKiroToolLabel(rawName);
           const summary = summarizeToolInput(tu?.input);
           activities.push({
             timestamp: ts,
             type: "tool",
-            icon: getToolIcon(name),
-            label: name,
+            icon: iconForCanonicalLabel(label),
+            label,
             detail: summary,
           });
         }

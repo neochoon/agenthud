@@ -76,13 +76,70 @@ describe("parseKiroActivitiesFromLines", () => {
     expect(activities[0].detailBody).toBe("프로젝트 구조를 살펴봤습니다.");
   });
 
-  it("maps AssistantMessage toolUse → tool activity with summarized input", () => {
+  it("maps AssistantMessage toolUse → tool activity with canonical label and summarized input", () => {
     const { activities } = parseKiroActivitiesFromLines([assistantToolLine]);
     expect(activities).toHaveLength(1);
     expect(activities[0].type).toBe("tool");
-    expect(activities[0].label).toBe("read");
+    // Raw Kiro name is `read` (lowercase); normalized to canonical `Read`.
+    expect(activities[0].label).toBe("Read");
     // Path from operations[0].path; __tool_use_purpose stripped.
     expect(activities[0].detail).toBe("/Users/neo/myproject");
+  });
+
+  it("normalizes Kiro tool names to canonical Claude-style labels", () => {
+    const make = (name: string, input: Record<string, unknown> = {}) =>
+      JSON.stringify({
+        version: "v1",
+        kind: "AssistantMessage",
+        data: {
+          message_id: `m-${name}`,
+          content: [
+            {
+              kind: "toolUse",
+              data: { toolUseId: `t-${name}`, name, input },
+            },
+          ],
+        },
+      });
+
+    const { activities } = parseKiroActivitiesFromLines([
+      make("shell", { command: "npm test" }),
+      make("subagent", { task: "do thing" }),
+      make("introspect", { path: "/src" }),
+      make("web_fetch", { url: "https://example.com" }),
+      make("write", { path: "/a.ts" }),
+      make("edit", { path: "/b.ts" }),
+    ]);
+    expect(activities.map((a) => a.label)).toEqual([
+      "Bash",
+      "Task",
+      "Read",
+      "WebFetch",
+      "Write",
+      "Edit",
+    ]);
+  });
+
+  it("passes through unknown raw tool names unchanged so they stay visible", () => {
+    const line = JSON.stringify({
+      version: "v1",
+      kind: "AssistantMessage",
+      data: {
+        message_id: "m1",
+        content: [
+          {
+            kind: "toolUse",
+            data: {
+              toolUseId: "t1",
+              name: "some_future_kiro_tool",
+              input: {},
+            },
+          },
+        ],
+      },
+    });
+    const { activities } = parseKiroActivitiesFromLines([line]);
+    expect(activities[0].label).toBe("some_future_kiro_tool");
   });
 
   it("skips ToolResults records (handled by preceding tool entry)", () => {

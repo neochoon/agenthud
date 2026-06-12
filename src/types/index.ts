@@ -127,6 +127,19 @@ export interface SummaryConfig {
   withGit?: boolean;
   format?: "markdown" | "json";
   model?: string;
+  /** Which agent CLI synthesizes the summary: claude / codex / kiro,
+   * or "auto" (first on PATH, claude→codex→kiro). */
+  engine?: string;
+}
+
+/** Token usage reported by a summary engine (only claude provides
+ * it today; others leave it null). */
+export interface UsageSummary {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  costUsd: number | null;
 }
 
 export interface GlobalConfig {

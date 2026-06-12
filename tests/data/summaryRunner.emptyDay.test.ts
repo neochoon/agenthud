@@ -35,6 +35,15 @@ vi.mock("node:child_process", () => ({
   }),
 }));
 
+// resolveSummaryEngine does a real PATH lookup for the agent CLI,
+// absent in test/CI. Force it to the claude engine (the empty-day
+// path never spawns it anyway).
+vi.mock("../../src/data/summaryEngines.js", async (importActual) => {
+  const actual =
+    await importActual<typeof import("../../src/data/summaryEngines.js")>();
+  return { ...actual, resolveSummaryEngine: () => actual.claudeEngine };
+});
+
 vi.mock("../../src/data/sessions.js", () => ({
   discoverSessions: vi.fn(() => ({
     projects: [],

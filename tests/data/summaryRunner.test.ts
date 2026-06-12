@@ -23,6 +23,17 @@ vi.mock("node:fs", () => ({
 vi.mock("node:child_process", () => ({
   spawn: vi.fn(),
 }));
+
+// resolveSummaryEngine does a real PATH lookup for the agent CLI,
+// which isn't present in the test/CI environment. Keep the real
+// engines (their stream-json parser matches the mocked spawn output)
+// but force resolution to the claude engine.
+vi.mock("../../src/data/summaryEngines.js", async (importActual) => {
+  const actual =
+    await importActual<typeof import("../../src/data/summaryEngines.js")>();
+  return { ...actual, resolveSummaryEngine: () => actual.claudeEngine };
+});
+
 vi.mock("../../src/data/sessions.js", () => ({
   discoverSessions: vi.fn(() => ({
     projects: [],
@@ -46,8 +57,13 @@ vi.mock("../../src/config/globalConfig.js", () => ({
   })),
 }));
 
-const { existsSync, readFileSync, createWriteStream, copyFileSync } =
-  await import("node:fs");
+const {
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  createWriteStream,
+  copyFileSync,
+} = await import("node:fs");
 const { spawn } = await import("node:child_process");
 const { runSummary } = await import("../../src/data/summaryRunner.js");
 
@@ -59,14 +75,25 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-function mockClaudeProcess(stdout = "OK", exitCode = 0, stderr = "") {
+// Emits `text` wrapped in a claude stream-json assistant event (what
+// the claude engine's parser consumes), followed by a result event.
+function mockClaudeProcess(text = "OK", exitCode = 0, stderr = "") {
   const proc = new EventEmitter() as EventEmitter & {
     stdin: PassThrough;
     stdout: Readable;
     stderr: Readable;
   };
   proc.stdin = new PassThrough();
-  proc.stdout = Readable.from([stdout]);
+  const streamJson =
+    `${JSON.stringify({
+      type: "assistant",
+      message: { content: [{ type: "text", text }] },
+    })}\n` +
+    `${JSON.stringify({
+      type: "result",
+      usage: { input_tokens: 1, output_tokens: 1 },
+    })}\n`;
+  proc.stdout = Readable.from([streamJson]);
   proc.stderr = Readable.from([stderr]);
   setImmediate(() => proc.emit("close", exitCode));
   return proc;
@@ -277,25 +304,14 @@ describe("runSummary spawn options", () => {
 });
 
 describe("runSummary cache write error", () => {
-  it("emits warning to stderr and continues when cache stream errors", async () => {
+  it("emits a warning and still succeeds when the cache write fails", async () => {
     vi.mocked(existsSync).mockReturnValue(false);
-
-    const writeFn = vi.fn();
-    const endFn = vi.fn((cb?: () => void) => {
-      if (cb) cb();
+    // The summary text is assembled fine, but the atomic cache write
+    // (writeFileSync) throws — a permissions / disk issue. The run
+    // should warn and still return 0 (the user got their summary).
+    vi.mocked(writeFileSync).mockImplementation(() => {
+      throw new Error("EACCES");
     });
-    let errorHandler: ((err: Error) => void) | undefined;
-    const fakeStream = {
-      write: writeFn,
-      end: endFn,
-      on: (ev: string, fn: (err: Error) => void) => {
-        if (ev === "error") errorHandler = fn;
-        return fakeStream;
-      },
-    };
-    vi.mocked(createWriteStream).mockReturnValue(
-      fakeStream as unknown as ReturnType<typeof createWriteStream>,
-    );
 
     const stderrChunks: string[] = [];
     const origErr = process.stderr.write.bind(process.stderr);
@@ -308,24 +324,14 @@ describe("runSummary cache write error", () => {
       mockClaudeProcess() as unknown as ReturnType<typeof spawn>,
     );
 
-    const promise = runSummary({
+    const code = await runSummary({
       date: new Date(2026, 4, 15),
       force: false,
       today: new Date(2026, 4, 15),
     });
 
-    // Trigger error before stream operations complete
-    await new Promise((resolve) => setImmediate(resolve));
-    errorHandler?.(new Error("EACCES"));
-    await new Promise((resolve) => setImmediate(resolve));
-
-    const code = await promise;
-
-    // Check stderr output contains the error warning
-    const output = stderrChunks.join("");
-    expect(output).toContain("cannot write cache");
-    expect(code).toBe(0);
-
     process.stderr.write = origErr;
+    expect(stderrChunks.join("")).toContain("cannot write cache");
+    expect(code).toBe(0);
   });
 });

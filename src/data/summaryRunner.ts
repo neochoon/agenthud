@@ -1,6 +1,7 @@
 /**
- * Daily and range summary orchestrators. Activity report →
- * `claude -p` → cache write → index regeneration.
+ * Daily and range summary orchestrators. Activity report → the
+ * resolved summary engine (claude / codex / kiro, see
+ * summaryEngines.ts) → cache write → index regeneration.
  *
  * Design decisions:
  * - Daily and range share state intentionally — `runRangeSummary`
@@ -47,31 +48,42 @@
 import { spawn } from "node:child_process";
 import {
   copyFileSync,
-  createWriteStream,
   existsSync,
   mkdirSync,
   readFileSync,
   renameSync,
   unlinkSync,
+  writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { loadGlobalConfig } from "../config/globalConfig.js";
+import type { UsageSummary } from "../types/index.js";
 import { agenthudHome } from "../utils/agenthudHome.js";
 import { openInDefaultApp } from "../utils/openInDefaultApp.js";
 import { startStderrTicker } from "../utils/stderrTicker.js";
 import { generateReport } from "./reportGenerator.js";
 import { discoverSessions } from "./sessions.js";
 import { regenerateIndex } from "./summariesIndex.js";
+import type { SummaryEngine } from "./summaryEngines.js";
+import {
+  cacheMatchesEngine,
+  engineMarker,
+  resolveSummaryEngine,
+} from "./summaryEngines.js";
 
 export interface SummaryOptions {
   date: Date;
   force: boolean;
   prompt?: string;
   today: Date;
-  /** Forwarded to `claude --model` (e.g. "sonnet", "haiku", or full model ID). */
+  /** Resolved summary engine name / "auto", from `--engine` or
+   * `summary.engine` config. Resolved to a concrete engine here. */
+  engine?: string;
+  engineFlag?: string;
+  /** Forwarded to the engine's model flag (e.g. "sonnet", "gpt-5"). */
   model?: string;
   /** Activity types fed into the LLM payload (resolved by CLI + config). */
   include: string[];
@@ -91,6 +103,8 @@ export interface RangeSummaryOptions {
   today: Date;
   force: boolean;
   assumeYes: boolean;
+  engine?: string;
+  engineFlag?: string;
   model?: string;
   /** Activity types fed into the per-day LLM payload. */
   include: string[];
@@ -282,14 +296,6 @@ async function ask(
   });
 }
 
-interface UsageSummary {
-  inputTokens: number;
-  outputTokens: number;
-  cacheReadTokens: number;
-  cacheCreationTokens: number;
-  costUsd: number | null;
-}
-
 function formatUsage(u: UsageSummary): string {
   const fmt = (n: number) => n.toLocaleString("en-US");
   const parts = [`${fmt(u.inputTokens)} in / ${fmt(u.outputTokens)} out`];
@@ -302,70 +308,72 @@ function formatUsage(u: UsageSummary): string {
   return parts.join("  ·  ");
 }
 
-interface SpawnClaudeOpts {
+interface SpawnEngineOpts {
+  engine: SummaryEngine;
   prompt: string;
   stdin: string;
   cachePath?: string;
   streamToStdout: boolean;
-  /** Forwarded to `claude --model` if set. */
+  /** Forwarded to the engine's model flag if set. */
   model?: string;
   /**
-   * Fires once, when the first chunk of LLM output arrives. The caller
-   * uses this to stop any "waiting on claude" stderr ticker so it
-   * doesn't fight the streaming output for the same row.
+   * Fires once, when the first chunk of summary text arrives. The
+   * caller uses this to stop the "sending to <engine>" stderr ticker
+   * so it doesn't fight the streaming output for the same row.
    */
   onFirstChunk?: () => void;
 }
 
-interface SpawnClaudeResult {
+interface SpawnEngineResult {
   code: number;
   text: string;
   usage: UsageSummary | null;
 }
 
-function spawnClaude(opts: SpawnClaudeOpts): Promise<SpawnClaudeResult> {
+/**
+ * Spawn the resolved summary engine, feed it the report on stdin,
+ * collect the summary text (streamed from stdout, or read from the
+ * engine's output file for "file"-mode engines like Codex), and
+ * atomically write it to the cache. Engine-agnostic: all
+ * command/arg/parse specifics come from `opts.engine`.
+ */
+function spawnEngine(opts: SpawnEngineOpts): Promise<SpawnEngineResult> {
   return new Promise((resolve) => {
-    const args = [
-      "-p",
-      "--no-session-persistence",
-      "--output-format",
-      "stream-json",
-      "--verbose",
-    ];
-    if (opts.model) args.push("--model", opts.model);
-    args.push(opts.prompt);
-    const proc = spawn("claude", args, {
+    const engine = opts.engine;
+    // For "file"-mode engines the final answer lands in a temp file
+    // we then read; for "stream"-mode it's parsed from stdout.
+    const outFile =
+      engine.outputMode === "file" && opts.cachePath
+        ? `${opts.cachePath}.engine-out`
+        : undefined;
+    const args = engine.buildArgs({
+      prompt: opts.prompt,
+      model: opts.model,
+      outFile,
+    });
+    const proc = spawn(engine.command, args, {
       stdio: ["pipe", "pipe", "pipe"],
       cwd: agenthudHomeDir(),
     });
 
-    // Stream to a temp file and rename into place on success. A
-    // direct stream to the final path leaves a PARTIAL summary
-    // behind if the process dies mid-generation (SIGKILL, crash,
-    // power loss) — and a partial file at the cache path is
-    // indistinguishable from a complete summary on the next run.
-    let cacheStream: ReturnType<typeof createWriteStream> | null = null;
-    const cacheTmpPath = opts.cachePath ? `${opts.cachePath}.tmp` : null;
-    if (cacheTmpPath) {
-      cacheStream = createWriteStream(cacheTmpPath, { encoding: "utf-8" });
-      cacheStream.on("error", (err: Error) => {
-        process.stderr.write(
-          `agenthud: warning: cannot write cache (${err.message})\n`,
-        );
-        cacheStream = null;
-      });
-    }
-
+    const parser = engine.makeParser();
     let stderrBuf = "";
-    let stdoutErrBuf = "";
-    let lineBuf = "";
     let assembledText = "";
-    let usage: UsageSummary | null = null;
+    let firstChunkFired = false;
+
+    const emit = (text: string) => {
+      if (!firstChunkFired) {
+        firstChunkFired = true;
+        opts.onFirstChunk?.();
+      }
+      assembledText += text;
+      if (opts.streamToStdout) process.stdout.write(text);
+    };
 
     proc.on("error", (err: NodeJS.ErrnoException) => {
       if (err.code === "ENOENT") {
         process.stderr.write(
-          "Error: claude CLI not found. Install: npm i -g @anthropic-ai/claude-code\n",
+          `Error: ${engine.command} not found. Install: ${engine.installHint}\n`,
         );
         resolve({ code: 1, text: "", usage: null });
       } else {
@@ -374,65 +382,8 @@ function spawnClaude(opts: SpawnClaudeOpts): Promise<SpawnClaudeResult> {
       }
     });
 
-    let firstChunkFired = false;
-    const writeText = (text: string) => {
-      if (!firstChunkFired) {
-        firstChunkFired = true;
-        opts.onFirstChunk?.();
-      }
-      assembledText += text;
-      if (opts.streamToStdout) process.stdout.write(text);
-      cacheStream?.write(text);
-    };
-
-    const handleEvent = (event: Record<string, unknown>) => {
-      const type = event.type as string | undefined;
-      if (type === "assistant") {
-        const msg = event.message as
-          | { content?: Array<{ type?: string; text?: string }> }
-          | undefined;
-        for (const block of msg?.content ?? []) {
-          if (block.type === "text" && typeof block.text === "string") {
-            writeText(block.text);
-          }
-        }
-      } else if (type === "result") {
-        const u = event.usage as
-          | {
-              input_tokens?: number;
-              output_tokens?: number;
-              cache_read_input_tokens?: number;
-              cache_creation_input_tokens?: number;
-            }
-          | undefined;
-        const cost = event.total_cost_usd as number | undefined;
-        if (u) {
-          usage = {
-            inputTokens: u.input_tokens ?? 0,
-            outputTokens: u.output_tokens ?? 0,
-            cacheReadTokens: u.cache_read_input_tokens ?? 0,
-            cacheCreationTokens: u.cache_creation_input_tokens ?? 0,
-            costUsd: cost ?? null,
-          };
-        }
-      }
-    };
-
     proc.stdout.on("data", (chunk: Buffer) => {
-      lineBuf += chunk.toString();
-      let nl = lineBuf.indexOf("\n");
-      while (nl !== -1) {
-        const line = lineBuf.slice(0, nl).trim();
-        lineBuf = lineBuf.slice(nl + 1);
-        if (line.length > 0) {
-          try {
-            handleEvent(JSON.parse(line));
-          } catch {
-            if (stdoutErrBuf.length < 1024) stdoutErrBuf += `${line}\n`;
-          }
-        }
-        nl = lineBuf.indexOf("\n");
-      }
+      parser.feed(chunk.toString(), emit);
     });
 
     proc.stderr.on("data", (chunk: Buffer) => {
@@ -441,18 +392,33 @@ function spawnClaude(opts: SpawnClaudeOpts): Promise<SpawnClaudeResult> {
     });
 
     proc.on("close", (code) => {
-      if (lineBuf.trim().length > 0) {
+      parser.flush?.(emit);
+
+      // "file"-mode engines (Codex) wrote the answer to a temp file.
+      if (engine.outputMode === "file" && outFile && code === 0) {
         try {
-          handleEvent(JSON.parse(lineBuf.trim()));
+          assembledText = readFileSync(outFile, "utf-8");
+          if (opts.streamToStdout) process.stdout.write(assembledText);
         } catch {
-          if (stdoutErrBuf.length < 1024) stdoutErrBuf += lineBuf;
+          // leave assembledText empty; treated as a failed run below
         }
-        lineBuf = "";
+        try {
+          unlinkSync(outFile);
+        } catch {
+          // ignore
+        }
+      } else if (outFile) {
+        try {
+          unlinkSync(outFile);
+        } catch {
+          // ignore
+        }
       }
+
       if (opts.streamToStdout) process.stdout.write("\n");
 
       if (code !== 0) {
-        const combined = (stderrBuf + stdoutErrBuf).toLowerCase();
+        const combined = stderrBuf.toLowerCase();
         if (
           combined.includes("not logged in") ||
           combined.includes("not authenticated") ||
@@ -460,37 +426,37 @@ function spawnClaude(opts: SpawnClaudeOpts): Promise<SpawnClaudeResult> {
           combined.includes(" auth")
         ) {
           process.stderr.write(
-            "\nHint: claude appears to be unauthenticated. Run: claude /login\n",
+            `\nHint: ${engine.command} appears to be unauthenticated. Re-run its login.\n`,
           );
         }
       }
 
-      // Promote the temp cache into place (success) or discard it
-      // (failure) BEFORE resolving — callers read the cache path
-      // right after this promise settles.
-      const finishCache = () => {
-        if (cacheTmpPath && opts.cachePath) {
-          if (code === 0) {
-            try {
-              renameSync(cacheTmpPath, opts.cachePath);
-            } catch {
-              // best-effort — worst case the cache is just absent
-            }
-          } else {
-            try {
-              unlinkSync(cacheTmpPath);
-            } catch {
-              // ignore
-            }
-          }
+      // Atomically write the assembled summary to the cache: temp
+      // file + rename on success, so a crash mid-generation never
+      // leaves a partial file that later reads as a complete summary.
+      const noText = assembledText.trim().length === 0;
+      const failed = code !== 0 || noText;
+      if (opts.cachePath && !failed) {
+        const tmp = `${opts.cachePath}.tmp`;
+        // Stamp the cache with which (engine, model) produced it, so a
+        // later run with a different engine/model regenerates rather
+        // than serving stale text. The marker is an HTML comment, inert
+        // in rendered markdown and ignored by the index/backlink layer.
+        const cacheBody = `${engineMarker(engine.name, opts.model)}\n\n${assembledText}`;
+        try {
+          writeFileSync(tmp, cacheBody, "utf-8");
+          renameSync(tmp, opts.cachePath);
+        } catch (err) {
+          process.stderr.write(
+            `agenthud: warning: cannot write cache (${(err as Error).message})\n`,
+          );
         }
-        resolve({ code: code ?? 1, text: assembledText, usage });
-      };
-      if (cacheStream) {
-        cacheStream.end(() => finishCache());
-      } else {
-        finishCache();
       }
+      resolve({
+        code: failed ? (code ?? 1) || 1 : 0,
+        text: assembledText,
+        usage: parser.usage(),
+      });
     });
 
     proc.stdin.end(opts.stdin);
@@ -507,7 +473,9 @@ interface DailyGenOpts {
   confirmBeforeSpawn?: () => Promise<boolean>;
   /** When true, skip the interactive size-warning confirmation. */
   assumeYes?: boolean;
-  /** Forwarded to `claude --model`. */
+  /** The resolved summary engine (claude / codex / kiro). */
+  engine: SummaryEngine;
+  /** Forwarded to the engine's model flag. */
   model?: string;
   /** Activity types fed into the LLM payload. */
   include: string[];
@@ -544,20 +512,30 @@ async function generateDailySummary(
   if (!isToday && !opts.force && existsSync(cached)) {
     try {
       const content = readFileSync(cached, "utf-8");
+      // Only reuse the cache if it was produced by the same engine and
+      // model now being requested; otherwise fall through to regenerate
+      // so a switched engine/model doesn't serve another's stale text.
+      if (cacheMatchesEngine(content, opts.engine.name, opts.model)) {
+        if (opts.announce) {
+          process.stderr.write(`cached summary from ${cached}\n`);
+        }
+        if (opts.streamToStdout) {
+          process.stdout.write(content);
+          if (!content.endsWith("\n")) process.stdout.write("\n");
+        }
+        return {
+          code: 0,
+          markdown: content,
+          fromCache: true,
+          skipped: false,
+          usage: null,
+        };
+      }
       if (opts.announce) {
-        process.stderr.write(`cached summary from ${cached}\n`);
+        process.stderr.write(
+          `cache from a different engine/model — regenerating ${dateLabel}...\n`,
+        );
       }
-      if (opts.streamToStdout) {
-        process.stdout.write(content);
-        if (!content.endsWith("\n")) process.stdout.write("\n");
-      }
-      return {
-        code: 0,
-        markdown: content,
-        fromCache: true,
-        skipped: false,
-        usage: null,
-      };
     } catch {
       // fall through to regenerate
     }
@@ -666,17 +644,18 @@ async function generateDailySummary(
     }
   }
 
-  // Live "still waiting on claude" ticker on stderr — gives the user
-  // a visible heartbeat through the (typically 30–60s) latency before
-  // claude starts streaming. The ticker auto-stops on the first chunk
-  // (see onFirstChunk below) so it doesn't fight the streaming output
-  // for the same terminal row.
+  // Live "still waiting on <engine>" ticker on stderr — gives the
+  // user a visible heartbeat through the (typically 30–60s) latency
+  // before the engine starts producing output. The ticker auto-stops
+  // on the first chunk (see onFirstChunk) so it doesn't fight the
+  // streaming output for the same terminal row.
   const stopTicker = opts.announce
-    ? startStderrTicker("sending to claude")
+    ? startStderrTicker(`sending to ${opts.engine.name}`)
     : null;
 
   const prompt = resolvePrompt("daily", opts.promptOverride);
-  const result = await spawnClaude({
+  const result = await spawnEngine({
+    engine: opts.engine,
     prompt,
     stdin: reportMarkdown,
     cachePath: cached,
@@ -707,6 +686,16 @@ async function generateDailySummary(
 }
 
 export async function runSummary(options: SummaryOptions): Promise<number> {
+  let engine: SummaryEngine;
+  try {
+    engine = resolveSummaryEngine({
+      engine: options.engine,
+      flag: options.engineFlag,
+    });
+  } catch (err) {
+    process.stderr.write(`agenthud: ${(err as Error).message}\n`);
+    return 1;
+  }
   // With --open the user is going to read the rendered file in their
   // default app anyway, so streaming the same markdown to the terminal
   // is duplicate noise (and breaks downstream piping). Suppress.
@@ -717,6 +706,7 @@ export async function runSummary(options: SummaryOptions): Promise<number> {
     promptOverride: options.prompt,
     streamToStdout: !options.open,
     announce: true,
+    engine,
     model: options.model,
     include: options.include,
     detailLimit: options.detailLimit,
@@ -752,6 +742,16 @@ export async function runSummary(options: SummaryOptions): Promise<number> {
 export async function runRangeSummary(
   options: RangeSummaryOptions,
 ): Promise<number> {
+  let engine: SummaryEngine;
+  try {
+    engine = resolveSummaryEngine({
+      engine: options.engine,
+      flag: options.engineFlag,
+    });
+  } catch (err) {
+    process.stderr.write(`agenthud: ${(err as Error).message}\n`);
+    return 1;
+  }
   const dates = enumerateDates(options.from, options.to);
   const fromLabel = dateKey(options.from);
   const toLabel = dateKey(options.to);
@@ -767,21 +767,28 @@ export async function runRangeSummary(
   ) {
     try {
       const content = readFileSync(rangeCache, "utf-8");
-      process.stderr.write(`cached range summary from ${rangeCache}\n`);
-      if (!options.open) {
-        process.stdout.write(content);
-        if (!content.endsWith("\n")) process.stdout.write("\n");
+      // Reuse only when the same engine/model produced it; a switched
+      // engine/model falls through to regenerate.
+      if (cacheMatchesEngine(content, engine.name, options.model)) {
+        process.stderr.write(`cached range summary from ${rangeCache}\n`);
+        if (!options.open) {
+          process.stdout.write(content);
+          if (!content.endsWith("\n")) process.stdout.write("\n");
+        }
+        try {
+          regenerateIndex(summariesDir());
+        } catch {
+          /* best-effort */
+        }
+        if (options.open) await openInDefaultApp(rangeCache);
+        if (options.openIndex) {
+          await openInDefaultApp(join(summariesDir(), "index.md"));
+        }
+        return 0;
       }
-      try {
-        regenerateIndex(summariesDir());
-      } catch {
-        /* best-effort */
-      }
-      if (options.open) await openInDefaultApp(rangeCache);
-      if (options.openIndex) {
-        await openInDefaultApp(join(summariesDir(), "index.md"));
-      }
-      return 0;
+      process.stderr.write(
+        `range cache from a different engine/model — regenerating\n`,
+      );
     } catch {
       // fall through to regenerate
     }
@@ -838,6 +845,7 @@ export async function runRangeSummary(
       announce: true,
       confirmBeforeSpawn: confirmer,
       assumeYes: options.assumeYes,
+      engine,
       model: options.model,
       include: options.include,
       detailLimit: options.detailLimit,
@@ -894,10 +902,11 @@ export async function runRangeSummary(
   const metaStreams = !options.open;
   // Same approach as the daily call: ticker always-on, auto-stops on
   // first chunk so it doesn't fight streamed output for the same row.
-  const stopMetaTicker = startStderrTicker("sending to claude");
+  const stopMetaTicker = startStderrTicker(`sending to ${engine.name}`);
 
   const metaPrompt = resolvePrompt("range");
-  const metaResult = await spawnClaude({
+  const metaResult = await spawnEngine({
+    engine,
     prompt: metaPrompt,
     stdin: metaInput,
     cachePath: rangeCache,

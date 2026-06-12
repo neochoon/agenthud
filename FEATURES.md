@@ -156,7 +156,8 @@ config-driven defaults v0.12.0).
 ## Summary daily
 
 Generate an LLM summary of a single day's activity by piping the
-activity report (markdown) into `claude -p`.
+activity report (markdown) into an agent CLI (the **summary
+engine**: Claude / Codex / Kiro — see `--engine` below).
 
 **Invocation:** `agenthud summary [--date ...] [flags]`
 
@@ -166,9 +167,10 @@ activity report (markdown) into `claude -p`.
 | Flag | Default | Description |
 |---|---|---|
 | `--date YYYY-MM-DD \| today \| yesterday \| -Nd` | `today` | Date to summarize |
+| `--engine NAME` | `auto` | Which agent CLI synthesizes the summary: `auto` (first installed of claude → codex → kiro), `claude`, `codex`, `kiro`. Also set via `summary.engine` in config. |
 | `--prompt TEXT` | (template file) | Override prompt inline (daily only) |
 | `--force` | off | Regenerate even if cached |
-| `--model NAME` | claude default | Forward to `claude --model` (e.g. `sonnet`, `haiku`, full id) |
+| `--model NAME` | engine default | Forward to the engine's model flag (e.g. `sonnet`, `gpt-5`, full id) |
 | `-y, --yes` | off | Skip confirmation prompt |
 | `-o, --open` | off | Open the produced summary in OS default app |
 | `-I, --open-index` | off | Open `~/.agenthud/summaries/index.md` |
@@ -176,7 +178,7 @@ activity report (markdown) into `claude -p`.
 **Behavior:**
 - Builds the markdown payload via `generateReport`. If the day has
   zero activity, announces "no activity — skipping" and returns
-  exit 0 without spawning claude or writing a file (v0.12.2 /
+  exit 0 without spawning the engine or writing a file (v0.12.2 /
   v0.12.3).
 - Past days are cached at `~/.agenthud/summaries/YYYY-MM-DD.md`
   and reused on subsequent runs. Today is always regenerated.
@@ -185,12 +187,14 @@ activity report (markdown) into `claude -p`.
   `src/templates/summary-prompt.md`); `--prompt` overrides for
   one run.
 - Token usage line printed at the end (`N in / M out · cache: A
-  read, B written · $X.XXXX`) parsed from claude's `result`
-  event.
+  read, B written · $X.XXXX`) — Claude engine only; Codex/Kiro
+  omit it.
 - Oversize reports (~300K tokens estimated) print a warning and,
   interactively, prompt one more time before sending (v0.9.4).
-- `claude -p` is called with `--no-session-persistence` so the
-  summary call doesn't pollute the session tree (v0.9.2 / v0.9.3).
+- The Claude engine runs `claude -p --no-session-persistence` so
+  the summary call doesn't pollute the session tree (v0.9.2 /
+  v0.9.3). Codex uses `codex exec -o <file>`; Kiro uses
+  `kiro-cli chat --no-interactive`.
 - After a successful write, `regenerateIndex` updates
   `~/.agenthud/summaries/index.md` and each summary's backlink
   footer (v0.12.0).

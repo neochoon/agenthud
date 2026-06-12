@@ -59,6 +59,9 @@ export interface CliOptions {
   summaryPrompt?: string;
   summaryForce?: boolean;
   summaryModel?: string;
+  summaryEngine?: string; // from config (summary.engine)
+  summaryEngineFlag?: string; // from --engine
+
   // Report-shaped options on summary. Resolved as
   // CLI flag → config.summary.X → config.report.X → built-in default.
   summaryInclude?: string[];
@@ -98,6 +101,7 @@ const KNOWN_SUMMARY_FLAGS = new Set([
   "--prompt",
   "--force",
   "--model",
+  "--engine",
   "-y",
   "--yes",
   "--include",
@@ -161,8 +165,10 @@ Commands:
     --with-git                  Merge git commits into the LLM payload
     --prompt TEXT               Override prompt for this run (daily only)
     --force                     Regenerate even if cached
-    --model NAME                Pass --model to claude (e.g. "sonnet",
-                                "haiku", or a full model id)
+    --model NAME                Forward to the engine's model flag
+                                (e.g. "sonnet", "gpt-5", or a full id)
+    --engine NAME               Which agent CLI synthesizes the summary:
+                                auto (default) | claude | codex | kiro
     -y, --yes                   Skip confirmation prompts for new daily
                                 summaries
     -o, --open                  Launch the resulting summary in your OS
@@ -411,6 +417,7 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
     let summaryForce = false;
     let summaryAssumeYes = false;
     let summaryModel: string | undefined;
+    let summaryEngineFlag: string | undefined;
     let summaryError: string | undefined;
 
     const FLAGS_WITH_VALUE = new Set([
@@ -420,6 +427,7 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
       "--to",
       "--prompt",
       "--model",
+      "--engine",
       "--include",
       "--format",
       "--detail-limit",
@@ -537,6 +545,20 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
       }
     }
 
+    const engineIdx = rest.indexOf("--engine");
+    if (engineIdx !== -1) {
+      const val = rest[engineIdx + 1];
+      const valid = ["auto", "claude", "codex", "kiro"];
+      if (!val) {
+        summaryError =
+          "Invalid --engine: missing value (auto | claude | codex | kiro).";
+      } else if (!valid.includes(val.toLowerCase())) {
+        summaryError = `Invalid --engine "${val}". Valid: auto, claude, codex, kiro.`;
+      } else {
+        summaryEngineFlag = val.toLowerCase();
+      }
+    }
+
     if (rest.includes("--force")) summaryForce = true;
     if (rest.includes("-y") || rest.includes("--yes")) summaryAssumeYes = true;
     const summaryOpen =
@@ -623,6 +645,8 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
       summaryForce,
       summaryAssumeYes,
       summaryModel,
+      summaryEngine: config?.summary.engine,
+      summaryEngineFlag,
       summaryInclude,
       summaryFormat,
       summaryDetailLimit,

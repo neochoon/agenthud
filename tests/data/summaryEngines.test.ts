@@ -1,0 +1,214 @@
+import { join } from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("node:fs", () => ({
+  existsSync: vi.fn(() => false),
+}));
+
+const { existsSync } = await import("node:fs");
+const {
+  claudeEngine,
+  codexEngine,
+  kiroEngine,
+  resolveSummaryEngine,
+  ENGINES,
+  engineMarker,
+  parseEngineMarker,
+  cacheMatchesEngine,
+} = await import("../../src/data/summaryEngines.js");
+
+const origPath = process.env.PATH;
+
+afterEach(() => {
+  vi.resetAllMocks();
+  process.env.PATH = origPath;
+});
+
+// Make `isAvailable()` deterministic. Takes engine NAMES and maps to
+// the actual CLI binaries (kiro → kiro-cli), stubbing existsSync to
+// report only those present under a single fake PATH dir. The expected
+// lookup paths are built with the SAME `path.join` + extension logic as
+// commandExists, so the comparison holds on Windows (backslash
+// separators, `.exe`/`.cmd`/`.bat`) as well as POSIX.
+const NAME_TO_CMD: Record<string, string> = {
+  claude: "claude",
+  codex: "codex",
+  kiro: "kiro-cli",
+};
+const FAKE_BIN = "/fakebin";
+const EXTS = process.platform === "win32" ? ["", ".exe", ".cmd", ".bat"] : [""];
+function onlyAvailable(...names: string[]): void {
+  process.env.PATH = FAKE_BIN;
+  const present = new Set<string>();
+  for (const n of names) {
+    const cmd = NAME_TO_CMD[n] ?? n;
+    for (const ext of EXTS) present.add(join(FAKE_BIN, cmd + ext));
+  }
+  vi.mocked(existsSync).mockImplementation((p) => present.has(String(p)));
+}
+
+describe("engine arg building", () => {
+  it("claude: stream-json with optional model", () => {
+    expect(claudeEngine.buildArgs({ prompt: "P" })).toEqual([
+      "-p",
+      "--no-session-persistence",
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "P",
+    ]);
+    expect(claudeEngine.buildArgs({ prompt: "P", model: "sonnet" })).toContain(
+      "--model",
+    );
+  });
+
+  it("codex: exec with output file and optional model", () => {
+    const args = codexEngine.buildArgs({ prompt: "P", outFile: "/tmp/out" });
+    expect(args[0]).toBe("exec");
+    expect(args).toContain("--skip-git-repo-check");
+    expect(args).toContain("-o");
+    expect(args).toContain("/tmp/out");
+    expect(args[args.length - 1]).toBe("P");
+    expect(
+      codexEngine.buildArgs({ prompt: "P", model: "gpt-5", outFile: "/x" }),
+    ).toContain("-m");
+  });
+
+  it("kiro: non-interactive chat, no tools, prompt as input arg", () => {
+    const args = kiroEngine.buildArgs({ prompt: "P" });
+    expect(args[0]).toBe("chat");
+    expect(args).toContain("--no-interactive");
+    expect(args).toContain("--trust-tools=");
+    expect(args[args.length - 1]).toBe("P");
+  });
+});
+
+describe("resolveSummaryEngine", () => {
+  it("explicit config name wins and must be available", () => {
+    onlyAvailable("codex");
+    expect(resolveSummaryEngine({ engine: "codex" }).name).toBe("codex");
+  });
+
+  it("flag overrides config", () => {
+    onlyAvailable("claude", "kiro");
+    expect(resolveSummaryEngine({ engine: "claude", flag: "kiro" }).name).toBe(
+      "kiro",
+    );
+  });
+
+  it("auto picks the first available in claude → codex → kiro order", () => {
+    onlyAvailable("codex", "kiro");
+    expect(resolveSummaryEngine({ engine: "auto" }).name).toBe("codex");
+    onlyAvailable("kiro");
+    expect(resolveSummaryEngine({ engine: "auto" }).name).toBe("kiro");
+    onlyAvailable("claude", "codex", "kiro");
+    expect(resolveSummaryEngine({ engine: "auto" }).name).toBe("claude");
+  });
+
+  it("auto with nothing installed throws a helpful error", () => {
+    onlyAvailable();
+    expect(() => resolveSummaryEngine({ engine: "auto" })).toThrow(
+      /no .*agent CLI/i,
+    );
+  });
+
+  it("explicit but unavailable engine throws naming the missing CLI", () => {
+    onlyAvailable("claude");
+    expect(() => resolveSummaryEngine({ engine: "codex" })).toThrow(/codex/i);
+  });
+
+  it("ENGINES lists all three in preference order", () => {
+    expect(ENGINES.map((e) => e.name)).toEqual(["claude", "codex", "kiro"]);
+  });
+});
+
+describe("engine output parsing", () => {
+  it("claude parser extracts assistant text and usage from stream-json", () => {
+    const parser = claudeEngine.makeParser();
+    const out: string[] = [];
+    parser.feed(
+      `${JSON.stringify({
+        type: "assistant",
+        message: { content: [{ type: "text", text: "Hello " }] },
+      })}\n`,
+      (t) => out.push(t),
+    );
+    parser.feed(
+      `${JSON.stringify({
+        type: "assistant",
+        message: { content: [{ type: "text", text: "world" }] },
+      })}\n`,
+      (t) => out.push(t),
+    );
+    parser.feed(
+      `${JSON.stringify({
+        type: "result",
+        usage: { input_tokens: 100, output_tokens: 20 },
+        total_cost_usd: 0.01,
+      })}\n`,
+      (t) => out.push(t),
+    );
+    expect(out.join("")).toBe("Hello world");
+    const usage = parser.usage();
+    expect(usage?.inputTokens).toBe(100);
+    expect(usage?.outputTokens).toBe(20);
+    expect(usage?.costUsd).toBe(0.01);
+  });
+
+  it("kiro parser passes text through and strips ANSI", () => {
+    const parser = kiroEngine.makeParser();
+    const out: string[] = [];
+    const esc = "\u001b";
+    parser.feed(`${esc}[32mgreen${esc}[0m text`, (t) => out.push(t));
+    expect(out.join("")).toBe("green text");
+    expect(parser.usage()).toBeNull();
+  });
+});
+
+describe("engine provenance marker", () => {
+  it("round-trips engine + model through the marker", () => {
+    const marker = engineMarker("codex", "gpt-5");
+    expect(marker).toContain("codex");
+    expect(marker).toContain("gpt-5");
+    const parsed = parseEngineMarker(`${marker}\n\n## Summary body`);
+    expect(parsed).toEqual({ engine: "codex", model: "gpt-5" });
+  });
+
+  it("records 'default' when no model is given", () => {
+    const parsed = parseEngineMarker(engineMarker("claude"));
+    expect(parsed).toEqual({ engine: "claude", model: "default" });
+  });
+
+  it("returns null when the content has no marker", () => {
+    expect(parseEngineMarker("## just a body, no marker")).toBeNull();
+  });
+
+  describe("cacheMatchesEngine", () => {
+    it("matches when marker engine + model equal the request", () => {
+      const c = `${engineMarker("codex", "gpt-5")}\nbody`;
+      expect(cacheMatchesEngine(c, "codex", "gpt-5")).toBe(true);
+    });
+
+    it("misses on a different engine", () => {
+      const c = `${engineMarker("claude", "opus")}\nbody`;
+      expect(cacheMatchesEngine(c, "codex", undefined)).toBe(false);
+    });
+
+    it("misses on a different model", () => {
+      const c = `${engineMarker("claude", "opus")}\nbody`;
+      expect(cacheMatchesEngine(c, "claude", "sonnet")).toBe(false);
+    });
+
+    it("treats `undefined` request model as 'default'", () => {
+      const c = `${engineMarker("claude")}\nbody`;
+      expect(cacheMatchesEngine(c, "claude", undefined)).toBe(true);
+    });
+
+    it("legacy cache (no marker) counts as a claude summary, model-agnostic", () => {
+      const c = "## old summary written before provenance markers";
+      expect(cacheMatchesEngine(c, "claude", "anything")).toBe(true);
+      expect(cacheMatchesEngine(c, "codex", undefined)).toBe(false);
+      expect(cacheMatchesEngine(c, "kiro", undefined)).toBe(false);
+    });
+  });
+});

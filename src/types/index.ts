@@ -35,7 +35,7 @@ export interface SessionNode {
   firstUserPrompt: string | null; // Display description: latest substantial (≥10 chars, non-slash) user message, falling back to the first natural-language one. Name kept for backwards compat.
   liveState: LiveState | null; // working/waiting from JSONL tail; null = fall back to time-based status
   hidden?: boolean; // true when matched by hiddenSessions/hiddenSubAgents, or descendant of a hidden project
-  provider?: "claude" | "kiro"; // origin source of this node. Renderer uses it for a small per-row label so users can tell at a glance which CLI created the session.
+  provider?: "claude" | "kiro" | "kiro-ide"; // origin source of this node. Renderer uses it for a small per-row label so users can tell at a glance which CLI created the session.
   /**
    * Most-recent context-window usage observed for this session.
    * `percent` is the fraction-of-window (0..100) the renderer shows

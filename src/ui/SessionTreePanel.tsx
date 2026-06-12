@@ -200,12 +200,13 @@ function SessionRow({
   // CLI created the session. Claude rows get a gold tint (Anthropic
   // brand), Kiro rows magenta.
   const providerTag = isParent && session.provider ? session.provider : "";
-  const providerColor =
-    session.provider === "kiro"
-      ? "magenta"
-      : session.provider === "claude"
-        ? "yellow"
-        : undefined;
+  // Both Kiro surfaces share magenta — the label text (`kiro` vs
+  // `kiro-ide`) carries the distinction.
+  const providerColor = session.provider?.startsWith("kiro")
+    ? "magenta"
+    : session.provider === "claude"
+      ? "yellow"
+      : undefined;
 
   // Context-window usage gauge. Shown on BOTH top-level sessions and
   // sub-agents (they have independent contexts). Color encodes
@@ -296,9 +297,7 @@ function SessionRow({
         {middleText ? <Text dimColor>{middleSection}</Text> : null}
         <Text>{gap}</Text>
         <Text dimColor>{elapsed}</Text>
-        {ctxTag ? (
-          <Text color={ctxColor}>{` ${ctxTag}`}</Text>
-        ) : null}
+        {ctxTag ? <Text color={ctxColor}>{` ${ctxTag}`}</Text> : null}
         {providerTag ? (
           <Text color={providerColor} dimColor>
             {` ${providerTag}`}
@@ -487,9 +486,7 @@ function ProjectRow({
   const isActive = (status: SessionStatus) =>
     status === "hot" || status === "warm";
   const entry = census?.perProject.get(project.projectPath);
-  const sessionCount = entry
-    ? entry.sessions.total
-    : project.sessions.length;
+  const sessionCount = entry ? entry.sessions.total : project.sessions.length;
   const activeSessionCount = entry
     ? entry.sessions.active
     : project.sessions.filter((s) => isActive(s.status)).length;
@@ -510,9 +507,7 @@ function ProjectRow({
     },
     ...activeParen(activeSessionCount, "green", { bold: false }),
     {
-      text: short
-        ? ` · ${subAgentCount}a`
-        : ` · ${subAgentCount} sub-agents`,
+      text: short ? ` · ${subAgentCount}a` : ` · ${subAgentCount} sub-agents`,
       dim: true,
     },
     ...activeParen(activeSubAgentCount, "green", { bold: false }),

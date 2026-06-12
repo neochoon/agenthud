@@ -64,7 +64,9 @@ function iconForCanonicalLabel(label: string): string {
   return known ?? ICONS.Default;
 }
 
-function summarizeToolInput(input: Record<string, unknown> | undefined): string {
+function summarizeToolInput(
+  input: Record<string, unknown> | undefined,
+): string {
   if (!input) return "";
   const filtered = { ...input };
   delete filtered.__tool_use_purpose;
@@ -91,10 +93,10 @@ function summarizeToolInput(input: Record<string, unknown> | undefined): string 
 
 export function parseKiroActivitiesFromLines(lines: string[]): ParseResult {
   const activities: ActivityEntry[] = [];
-  let modelName: string | null = null;
+  const modelName: string | null = null;
   let sessionStartTime: Date | null = null;
   let lastTimestamp: Date | null = null;
-  let tokenCount = 0;
+  const tokenCount = 0;
 
   for (const line of lines) {
     if (!line.trim()) continue;

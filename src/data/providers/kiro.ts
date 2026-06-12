@@ -52,8 +52,7 @@ import type { DiscoverOptions, SessionProvider } from "./types.js";
 
 export function getKiroSessionsDir(): string {
   return (
-    process.env.KIRO_SESSIONS_DIR ??
-    join(homedir(), ".kiro", "sessions", "cli")
+    process.env.KIRO_SESSIONS_DIR ?? join(homedir(), ".kiro", "sessions", "cli")
   );
 }
 
@@ -227,7 +226,16 @@ function readRawSessions(
 }
 
 function toSessionNode(raw: RawSession, hidden: boolean): SessionNode {
-  const liveState: LiveState | null = raw.hasLock ? "waiting" : null;
+  // `.lock` means the Kiro process is alive, NOT that the
+  // conversation is active — a terminal left open for hours keeps
+  // its lock. Gate the live badge by the same 30-minute recency
+  // rule Claude's detectLiveState uses, so idle-but-open sessions
+  // fall back to the time-based [cool]/[cold] badge instead of
+  // showing [waiting] forever.
+  const recentlyActive =
+    Date.now() - raw.lastModifiedMs < THIRTY_MINUTES_MS;
+  const liveState: LiveState | null =
+    raw.hasLock && recentlyActive ? "waiting" : null;
   const node: SessionNode = {
     id: raw.id,
     hideKey: raw.hideKey,

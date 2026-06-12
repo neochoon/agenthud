@@ -28,7 +28,7 @@ import type {
   SessionTree,
 } from "../../types/index.js";
 
-export type ProviderName = "claude" | "kiro";
+export type ProviderName = "claude" | "kiro" | "kiro-ide";
 
 export interface DiscoverOptions {
   // When set, drop every project whose decoded path is not exactly this
@@ -42,6 +42,14 @@ export interface ParseResult {
   tokenCount: number;
   modelName: string | null;
   sessionStartTime: Date | null;
+}
+
+/** Optional out-of-band context for parsers whose record format
+ * lacks information the activities need. Kiro IDE history entries
+ * carry no timestamps, so the caller supplies the session file's
+ * mtime as the best available stand-in. */
+export interface ParseContext {
+  mtimeMs?: number;
 }
 
 export interface SessionProvider {
@@ -58,6 +66,8 @@ export interface SessionProvider {
   ): SessionTree;
   /** Parse the given JSONL lines into the canonical activity list.
    * Lines are passed in instead of a file path so the caller can
-   * reuse a single read for both tail and full-history use cases. */
-  parseActivities(lines: string[]): ParseResult;
+   * reuse a single read for both tail and full-history use cases.
+   * `context` carries out-of-band info (e.g. file mtime) for
+   * formats that lack it inline; providers may ignore it. */
+  parseActivities(lines: string[], context?: ParseContext): ParseResult;
 }

@@ -12,6 +12,9 @@ const { existsSync, readdirSync, statSync, readFileSync } = await import(
   "node:fs"
 );
 const { discoverSessions } = await import("../../src/data/sessions.js");
+const { clearClaudeFileCaches } = await import(
+  "../../src/data/providers/claude.js"
+);
 
 const NOW = 1_700_000_000_000;
 
@@ -25,6 +28,7 @@ const mockConfig = {
 
 afterEach(() => {
   vi.resetAllMocks();
+  clearClaudeFileCaches();
 });
 
 describe("discoverSessions orchestrator", () => {

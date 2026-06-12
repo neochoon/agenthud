@@ -108,7 +108,61 @@ function extractTaskDescription(content: string): string {
   return capWithEllipsis(firstLine ?? "");
 }
 
-function readSubAgentInfo(filePath: string): {
+// Per-file derived-data caches keyed by `${path}:${mtimeMs}`.
+// Discovery runs on every ~2s poll and re-reads each session +
+// sub-agent file for model / liveState / context / prompt. With
+// hundreds of (mostly cold) sub-agent files that uncached re-read
+// dominated discovery wall time (~1.4s, blocking navigation). Cold
+// files never change mtime, so they read once and stay cached.
+//
+// Caveat: `liveState` is cached with the file's structural verdict
+// at read time. The 30-minute recency boundary can therefore lag by
+// up to one poll for a file that goes idle without any further
+// write (same mtime → cache hit). Acceptable: a ~2s delay on a
+// hot→cool transition, invisible in practice.
+const tailCache = new Map<
+  string,
+  {
+    modelName: string | null;
+    liveState: LiveState | null;
+    contextUsage: { used: number; total: number; percent: number } | null;
+  }
+>();
+const promptCache = new Map<string, string | null>();
+const entrypointCache = new Map<string, string | null>();
+const subAgentInfoCache = new Map<
+  string,
+  { agentId: string | null; taskDescription: string | null }
+>();
+
+function mtimeKey(filePath: string, mtimeMs: number): string {
+  return `${filePath}:${mtimeMs}`;
+}
+
+/** Test/maintenance hook: drop all per-file derived caches. */
+export function clearClaudeFileCaches(): void {
+  tailCache.clear();
+  promptCache.clear();
+  entrypointCache.clear();
+  subAgentInfoCache.clear();
+}
+
+function readSubAgentInfo(
+  filePath: string,
+  mtimeMs: number,
+): {
+  agentId: string | null;
+  taskDescription: string | null;
+} {
+  const key = mtimeKey(filePath, mtimeMs);
+  const cached = subAgentInfoCache.get(key);
+  if (cached) return cached;
+  const value = computeSubAgentInfo(filePath);
+  subAgentInfoCache.set(key, value);
+  return value;
+}
+
+function computeSubAgentInfo(filePath: string): {
   agentId: string | null;
   taskDescription: string | null;
 } {
@@ -151,6 +205,23 @@ function inferClaudeWindow(usedTokens: number): number {
 }
 
 function readSessionTail(
+  filePath: string,
+  mtimeMs: number,
+  now: number,
+): {
+  modelName: string | null;
+  liveState: LiveState | null;
+  contextUsage: { used: number; total: number; percent: number } | null;
+} {
+  const key = mtimeKey(filePath, mtimeMs);
+  const cached = tailCache.get(key);
+  if (cached) return cached;
+  const value = computeSessionTail(filePath, mtimeMs, now);
+  tailCache.set(key, value);
+  return value;
+}
+
+function computeSessionTail(
   filePath: string,
   mtimeMs: number,
   now: number,
@@ -251,7 +322,16 @@ function isSystemNoise(text: string): boolean {
  * reminders, only tool results). The field is still named
  * `firstUserPrompt` in `SessionNode` for backwards compatibility.
  */
-function readFirstUserPrompt(filePath: string): string | null {
+function readFirstUserPrompt(filePath: string, mtimeMs: number): string | null {
+  const key = mtimeKey(filePath, mtimeMs);
+  const cached = promptCache.get(key);
+  if (cached !== undefined) return cached;
+  const value = computeFirstUserPrompt(filePath);
+  promptCache.set(key, value);
+  return value;
+}
+
+function computeFirstUserPrompt(filePath: string): string | null {
   if (!existsSync(filePath)) return null;
   let content: string;
   try {
@@ -306,7 +386,16 @@ function readFirstUserPrompt(filePath: string): string | null {
   return latestSubstantial ?? first;
 }
 
-function readEntrypoint(filePath: string): string | null {
+function readEntrypoint(filePath: string, mtimeMs: number): string | null {
+  const key = mtimeKey(filePath, mtimeMs);
+  const cached = entrypointCache.get(key);
+  if (cached !== undefined) return cached;
+  const value = computeEntrypoint(filePath);
+  entrypointCache.set(key, value);
+  return value;
+}
+
+function computeEntrypoint(filePath: string): string | null {
   if (!existsSync(filePath)) return null;
   try {
     const firstLine = readFileSync(filePath, "utf-8").split("\n")[0];
@@ -344,7 +433,10 @@ function buildSubAgents(
         const filePath = join(subagentsDir, file);
         try {
           const stat = statSync(filePath);
-          const { agentId, taskDescription } = readSubAgentInfo(filePath);
+          const { agentId, taskDescription } = readSubAgentInfo(
+            filePath,
+            stat.mtimeMs,
+          );
           const { modelName, liveState, contextUsage } = readSessionTail(
             filePath,
             stat.mtimeMs,
@@ -490,7 +582,8 @@ export function discoverSessions(
       try {
         const stat = statSync(filePath);
         const subAgents = buildSubAgents(id, projectDir, config, projectName);
-        const nonInteractive = readEntrypoint(filePath) === "sdk-cli";
+        const nonInteractive =
+          readEntrypoint(filePath, stat.mtimeMs) === "sdk-cli";
         const { modelName, liveState, contextUsage } = readSessionTail(
           filePath,
           stat.mtimeMs,
@@ -507,7 +600,7 @@ export function discoverSessions(
           modelName,
           subAgents,
           nonInteractive,
-          firstUserPrompt: readFirstUserPrompt(filePath),
+          firstUserPrompt: readFirstUserPrompt(filePath, stat.mtimeMs),
           liveState: nonInteractive ? null : liveState,
           provider: "claude",
           contextUsage: contextUsage ?? undefined,

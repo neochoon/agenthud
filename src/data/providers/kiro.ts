@@ -185,6 +185,7 @@ function toSessionNode(raw: RawSession, hidden: boolean): SessionNode {
     nonInteractive: false,
     firstUserPrompt: raw.title,
     liveState,
+    provider: "kiro",
   };
   if (hidden) node.hidden = true;
   return node;

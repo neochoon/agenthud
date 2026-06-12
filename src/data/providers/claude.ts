@@ -315,6 +315,7 @@ function buildSubAgents(
             nonInteractive: false,
             firstUserPrompt: null,
             liveState,
+            provider: "claude",
           };
         } catch {
           return null;
@@ -457,6 +458,7 @@ export function discoverSessions(
           nonInteractive,
           firstUserPrompt: readFirstUserPrompt(filePath),
           liveState: nonInteractive ? null : liveState,
+          provider: "claude",
         });
       } catch {}
     }

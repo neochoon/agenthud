@@ -194,7 +194,21 @@ function SessionRow({
   // Short ID is now the name itself for parent sessions; no separate suffix needed
   const shortIdDisplay = "";
 
+  // Provider tag (top-level sessions only — sub-agents inherit their
+  // parent's provider visually). Subtle dim-colored label sandwiched
+  // between elapsed and model so users can tell at a glance which
+  // CLI created the session. Claude rows get a gold tint (Anthropic
+  // brand), Kiro rows magenta.
+  const providerTag = isParent && session.provider ? session.provider : "";
+  const providerColor =
+    session.provider === "kiro"
+      ? "magenta"
+      : session.provider === "claude"
+        ? "yellow"
+        : undefined;
+
   const rightParts: string[] = [elapsed];
+  if (providerTag) rightParts.push(providerTag);
   if (model) rightParts.push(model);
   const rightSide = rightParts.join(" ");
 
@@ -266,6 +280,11 @@ function SessionRow({
         {middleText ? <Text dimColor>{middleSection}</Text> : null}
         <Text>{gap}</Text>
         <Text dimColor>{elapsed}</Text>
+        {providerTag ? (
+          <Text color={providerColor} dimColor>
+            {` ${providerTag}`}
+          </Text>
+        ) : null}
         {model ? <Text dimColor>{` ${model}`}</Text> : null}
       </Text>
       {" ".repeat(linePadding)}
@@ -412,11 +431,13 @@ function ProjectRow({
   isSelected,
   hasFocus,
   contentWidth,
+  census,
 }: {
   project: ProjectNode;
   isSelected: boolean;
   hasFocus: boolean;
   contentWidth: number;
+  census?: TreeCensus;
 }): React.ReactElement {
   const nameText = `> ${project.hidden ? "⊘ " : ""}${project.name}`;
   const pathText = project.projectPath
@@ -437,25 +458,31 @@ function ProjectRow({
   // the panel-title census style: long ("5 sessions (2) · 142
   // sub-agents (3)") when wide enough, short ("5s (2) · 142a (3)")
   // when narrow, dropped entirely when nothing fits. The active
-  // parens are omitted when the count is zero (same rule as
-  // `activeParen` in the census). Totals reflect the visible tree —
-  // hidden items are excluded when `showHidden` is off and included
-  // (with `⊘`) when it's on; the panel-title census is the source of
-  // truth for "actual size with hidden".
-  const sessionCount = project.sessions.length;
-  const subAgentCount = project.sessions.reduce(
-    (n, s) => n + s.subAgents.length,
-    0,
-  );
+  // parens are omitted when the count is zero.
+  //
+  // Counts come from the SAME walk that produced the panel-title
+  // census — `census.perProject` keyed by projectPath — so the row
+  // and the title bar can never disagree. When census isn't
+  // supplied (tests that render SessionTreePanel directly) we fall
+  // back to counting the displayed tree inline.
   const isActive = (status: SessionStatus) =>
     status === "hot" || status === "warm";
-  const activeSessionCount = project.sessions.filter((s) =>
-    isActive(s.status),
-  ).length;
-  const activeSubAgentCount = project.sessions.reduce(
-    (n, s) => n + s.subAgents.filter((sa) => isActive(sa.status)).length,
-    0,
-  );
+  const entry = census?.perProject.get(project.projectPath);
+  const sessionCount = entry
+    ? entry.sessions.total
+    : project.sessions.length;
+  const activeSessionCount = entry
+    ? entry.sessions.active
+    : project.sessions.filter((s) => isActive(s.status)).length;
+  const subAgentCount = entry
+    ? entry.subAgents.total
+    : project.sessions.reduce((n, s) => n + s.subAgents.length, 0);
+  const activeSubAgentCount = entry
+    ? entry.subAgents.active
+    : project.sessions.reduce(
+        (n, s) => n + s.subAgents.filter((sa) => isActive(sa.status)).length,
+        0,
+      );
 
   const buildCountsSegments = (short: boolean): TitleSegment[] => [
     {
@@ -964,6 +991,7 @@ export function SessionTreePanel({
             isSelected={selectedId === row.sentinelId}
             hasFocus={hasFocus}
             contentWidth={contentWidth}
+            census={census}
           />
         ) : row.kind === "session" ? (
           <SessionRow

@@ -649,6 +649,88 @@ describe("computeCensus", () => {
       sessions: { total: 0, active: 0 },
       subAgents: { total: 0, active: 0 },
       hidden: { total: 0, active: 0 },
+      perProject: new Map(),
+    });
+  });
+
+  it("populates perProject so tree totals equal the sum of per-row counts", () => {
+    const tree: SessionTree = {
+      projects: [
+        {
+          name: "alpha",
+          projectPath: "/p/alpha",
+          hotness: "hot",
+          sessions: [
+            {
+              ...sessionStub("a-hot"),
+              status: "hot",
+              subAgents: [{ ...sessionStub("sa-warm"), status: "warm" }],
+            },
+            {
+              ...sessionStub("a-cold"),
+              status: "cold",
+              subAgents: [],
+            },
+          ],
+        },
+        {
+          name: "beta",
+          projectPath: "/p/beta",
+          hotness: "cool",
+          sessions: [
+            {
+              ...sessionStub("b-cool"),
+              status: "cool",
+              subAgents: [{ ...sessionStub("sb-hot"), status: "hot" }],
+            },
+          ],
+        },
+      ],
+      coldProjects: [],
+      totalCount: 5,
+      timestamp: "",
+      hiddenStats: { total: 0, active: 0 },
+    };
+    const census = computeCensus(tree);
+
+    expect(census.sessions.active).toBe(1); // a-hot
+    expect(census.subAgents.active).toBe(2); // sa-warm + sb-hot
+
+    // Sum of per-project counts must match the top-level totals.
+    let sessActiveSum = 0;
+    let subAgentActiveSum = 0;
+    for (const e of census.perProject.values()) {
+      sessActiveSum += e.sessions.active;
+      subAgentActiveSum += e.subAgents.active;
+    }
+    expect(sessActiveSum).toBe(census.sessions.active);
+    expect(subAgentActiveSum).toBe(census.subAgents.active);
+
+    // Per-project entries reflect the visible counts a ProjectRow renders.
+    expect(census.perProject.get("/p/alpha")).toEqual({
+      sessions: { total: 2, active: 1 },
+      subAgents: { total: 1, active: 1 },
+    });
+    expect(census.perProject.get("/p/beta")).toEqual({
+      sessions: { total: 1, active: 0 },
+      subAgents: { total: 1, active: 1 },
     });
   });
 });
+
+function sessionStub(id: string) {
+  return {
+    id,
+    hideKey: id,
+    filePath: "",
+    projectPath: "",
+    projectName: "",
+    lastModifiedMs: 0,
+    status: "cool" as const,
+    modelName: null,
+    subAgents: [],
+    nonInteractive: false,
+    firstUserPrompt: null,
+    liveState: null,
+  };
+}

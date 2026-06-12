@@ -35,6 +35,7 @@ export interface SessionNode {
   firstUserPrompt: string | null; // Display description: latest substantial (≥10 chars, non-slash) user message, falling back to the first natural-language one. Name kept for backwards compat.
   liveState: LiveState | null; // working/waiting from JSONL tail; null = fall back to time-based status
   hidden?: boolean; // true when matched by hiddenSessions/hiddenSubAgents, or descendant of a hidden project
+  provider?: "claude" | "kiro"; // origin source of this node. Renderer uses it for a small per-row label so users can tell at a glance which CLI created the session.
 }
 
 // Project node grouping sessions
@@ -56,6 +57,15 @@ export interface HiddenStats {
   active: number;
 }
 
+// Per-project counts derived in the same walk that produces the
+// tree-wide census. ProjectRow looks up its row from this map
+// instead of re-counting independently, so the panel-title totals
+// and the per-row "(N active)" parens are guaranteed to add up.
+export interface ProjectCensus {
+  sessions: { total: number; active: number };
+  subAgents: { total: number; active: number };
+}
+
 // Tree-wide census rendered in the Projects panel title bar.
 // Per-level (projects / sessions / sub-agents) totals + visible
 // active subset, plus a separate hidden bucket. See
@@ -65,6 +75,10 @@ export interface TreeCensus {
   sessions: { total: number; active: number };
   subAgents: { total: number; active: number };
   hidden: { total: number; active: number };
+  /** Visible counts (matches what ProjectRow renders) keyed by
+   * `ProjectNode.projectPath`. Same walk as the totals above —
+   * sum of all entries equals `sessions/subAgents.active`. */
+  perProject: Map<string, ProjectCensus>;
 }
 
 export interface SessionTree {

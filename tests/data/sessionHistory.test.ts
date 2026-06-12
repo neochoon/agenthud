@@ -53,4 +53,47 @@ describe("parseSessionHistory", () => {
       );
     }
   });
+
+  it("routes Kiro paths to the Kiro parser (not the Claude one)", () => {
+    // A line in Kiro shape (`kind: "Prompt"`) — the Claude parser
+    // would silently produce zero activities for this; the Kiro
+    // parser maps it to a user activity.
+    const kiroLine = JSON.stringify({
+      version: "v1",
+      kind: "Prompt",
+      data: {
+        message_id: "p1",
+        content: [{ kind: "text", data: "Hello Kiro" }],
+        meta: { timestamp: 1781220419 },
+      },
+    });
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(kiroLine);
+    const result = parseSessionHistory(
+      "/Users/x/.kiro/sessions/cli/aaa.jsonl",
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0].type).toBe("user");
+    expect(result[0].detail).toBe("Hello Kiro");
+  });
+
+  it("routes non-Kiro paths to the Claude parser (default)", () => {
+    // Claude parser ignores Kiro-shaped records, so a Kiro line
+    // fed through a non-Kiro path yields zero activities.
+    const kiroLine = JSON.stringify({
+      version: "v1",
+      kind: "Prompt",
+      data: {
+        message_id: "p1",
+        content: [{ kind: "text", data: "Hello" }],
+        meta: { timestamp: 1781220419 },
+      },
+    });
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(kiroLine);
+    const result = parseSessionHistory(
+      "/Users/x/.claude/projects/-foo/bar.jsonl",
+    );
+    expect(result).toHaveLength(0);
+  });
 });

@@ -28,7 +28,7 @@ import type {
   SessionTree,
 } from "../../types/index.js";
 
-export type ProviderName = "claude" | "kiro" | "kiro-ide";
+export type ProviderName = "claude" | "kiro" | "kiro-ide" | "codex";
 
 export interface DiscoverOptions {
   // When set, drop every project whose decoded path is not exactly this
@@ -54,6 +54,13 @@ export interface ParseContext {
 
 export interface SessionProvider {
   readonly name: ProviderName;
+  /** True when every line of the session file is an independent
+   * record (real JSONL) — Claude / Kiro CLI / Codex. The history
+   * cache uses this to parse only the newly-appended tail when such
+   * a file grows, instead of re-parsing the whole (possibly huge)
+   * file. False for formats where the file is a single JSON
+   * document (Kiro IDE), which must always be parsed whole. */
+  readonly lineDelimited: boolean;
   /** True when the provider's storage location exists and looks
    * usable. Cheap check — no file reads beyond a directory probe. */
   isAvailable(): boolean;
@@ -70,4 +77,13 @@ export interface SessionProvider {
    * `context` carries out-of-band info (e.g. file mtime) for
    * formats that lack it inline; providers may ignore it. */
   parseActivities(lines: string[], context?: ParseContext): ParseResult;
+  /** Line-delimited providers only: true when `line` STARTS a new
+   * turn (a user prompt). The history cache splits its frozen
+   * prefix from the re-parsed tail ONLY at such lines, so a
+   * cross-line dependency that lives within one turn — Claude's
+   * tool_use→tool_result enrichment and consecutive-call merge —
+   * never straddles the seam. Optional; when absent the cache falls
+   * back to any line boundary (a rare tool may lose its detail at
+   * the seam). */
+  isTurnBoundary?(line: string): boolean;
 }

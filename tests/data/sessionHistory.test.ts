@@ -4,16 +4,31 @@ vi.mock("node:fs", () => ({
   existsSync: vi.fn(),
   readFileSync: vi.fn(),
   statSync: vi.fn(),
+  openSync: vi.fn(),
+  readSync: vi.fn(),
+  closeSync: vi.fn(),
 }));
 
-const { existsSync, readFileSync } = await import("node:fs");
-const { parseSessionHistory } = await import(
+const { existsSync, readFileSync, statSync } = await import("node:fs");
+const { parseSessionHistory, clearSessionHistoryCache } = await import(
   "../../src/data/sessionHistory.js"
 );
+
+// Each test sets readFileSync's return; mirror its byte size into
+// statSync so the (mtime, size)-gated incremental cache treats the
+// file as a single small full-parse (size < TAIL_TARGET → no
+// byte-offset/tail-read path, which the fs mock doesn't implement).
+function stubStat(content: string): void {
+  vi.mocked(statSync).mockReturnValue({
+    mtimeMs: 1,
+    size: Buffer.byteLength(content, "utf-8"),
+  } as ReturnType<typeof statSync>);
+}
 
 afterEach(() => {
   vi.resetAllMocks();
   delete process.env.KIRO_SESSIONS_DIR;
+  clearSessionHistoryCache();
 });
 
 const makeLines = (count: number) =>
@@ -43,6 +58,7 @@ describe("parseSessionHistory", () => {
   it("parses all entries without truncation (300 lines)", () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readFileSync).mockReturnValue(makeLines(300));
+    stubStat(makeLines(300));
     const result = parseSessionHistory("/session.jsonl");
     expect(result.length).toBe(300);
   });
@@ -50,6 +66,7 @@ describe("parseSessionHistory", () => {
   it("returns entries in chronological order (oldest first)", () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readFileSync).mockReturnValue(makeLines(5));
+    stubStat(makeLines(5));
     const result = parseSessionHistory("/session.jsonl");
     for (let i = 1; i < result.length; i++) {
       expect(result[i].timestamp.getTime()).toBeGreaterThanOrEqual(
@@ -73,6 +90,7 @@ describe("parseSessionHistory", () => {
     });
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readFileSync).mockReturnValue(kiroLine);
+    stubStat(kiroLine);
     const result = parseSessionHistory("/Users/x/.kiro/sessions/cli/aaa.jsonl");
     expect(result).toHaveLength(1);
     expect(result[0].type).toBe("user");
@@ -96,6 +114,7 @@ describe("parseSessionHistory", () => {
     });
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readFileSync).mockReturnValue(kiroLine);
+    stubStat(kiroLine);
     const result = parseSessionHistory("/tmp/kiro-alt/aaa.jsonl");
     expect(result).toHaveLength(1);
     expect(result[0].type).toBe("user");
@@ -116,6 +135,7 @@ describe("parseSessionHistory", () => {
     });
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readFileSync).mockReturnValue(kiroLine);
+    stubStat(kiroLine);
     const result = parseSessionHistory(
       "/Users/x/.claude/projects/-foo/bar.jsonl",
     );

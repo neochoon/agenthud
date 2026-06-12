@@ -14,6 +14,9 @@ const { existsSync, readdirSync, statSync, readFileSync } = await import(
 const { discoverSessions, findContainingProject } = await import(
   "../../src/data/sessions.js"
 );
+const { clearClaudeFileCaches } = await import(
+  "../../src/data/providers/claude.js"
+);
 
 const NOW = 1_700_000_000_000;
 
@@ -28,6 +31,10 @@ const mockConfig = {
 afterEach(() => {
   vi.resetAllMocks();
   delete process.env.CLAUDE_PROJECTS_DIR;
+  // The provider caches per-file derived data by (path, mtime).
+  // Fixtures reuse paths + the fixed NOW mtime across cases, so drop
+  // the cache between tests to avoid a stale hit from a prior fixture.
+  clearClaudeFileCaches();
 });
 
 describe("discoverSessions", () => {

@@ -131,10 +131,73 @@ describe("kiroIdeProvider.discoverSessions", () => {
     expect(tree.projects[0].projectPath).toBe("/Users/neo/myproject");
     const s = tree.projects[0].sessions[0];
     expect(s.id).toBe("ide-1111");
-    expect(s.firstUserPrompt).toBe("Refactor the auth flow");
+    // Row title is the latest user message from history[], NOT the
+    // `.title` field (an auto-generated session label like
+    // "Refactor the auth flow"/"Clean State" the user never typed).
+    expect(s.firstUserPrompt).toBe("hello.");
     expect(s.modelName).toBe("auto");
     expect(s.provider).toBe("kiro-ide");
     expect(s.hideKey).toBe("myproject/ide-1111");
+  });
+
+  it("uses the latest user message as the title, skipping slash commands", () => {
+    setRoot();
+    const wsDir = join(ROOT, WS_B64);
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === ROOT)
+        return [WS_B64] as unknown as ReturnType<typeof readdirSync>;
+      if (path === wsDir)
+        return ["sessions.json", "ide-1111.json"] as unknown as ReturnType<
+          typeof readdirSync
+        >;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(statSync).mockImplementation(
+      (p) =>
+        ({
+          isDirectory: () => !String(p).endsWith(".json"),
+          mtimeMs: NOW - 60_000,
+          size: 100,
+        }) as ReturnType<typeof statSync>,
+    );
+    vi.mocked(readFileSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path.endsWith("sessions.json")) return indexJson();
+      if (path.endsWith("ide-1111.json"))
+        return sessionJson({
+          title: "Auto Label",
+          history: [
+            {
+              message: {
+                role: "user",
+                content: [{ type: "text", text: "first task" }],
+              },
+            },
+            { message: { role: "assistant", content: "ok" } },
+            {
+              message: {
+                role: "user",
+                content: [{ type: "text", text: "now do the real thing" }],
+              },
+            },
+            {
+              message: {
+                role: "user",
+                content: [{ type: "text", text: "/compact" }],
+              },
+            },
+          ],
+        });
+      return "";
+    });
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const tree = kiroIdeProvider.discoverSessions(mockConfig);
+    expect(tree.projects[0].sessions[0].firstUserPrompt).toBe(
+      "now do the real thing",
+    );
   });
 
   it("extracts contextUsage percent (200K assumed window)", () => {

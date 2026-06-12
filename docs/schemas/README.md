@@ -16,8 +16,7 @@ sessions to catch anything we missed.
 Future docs (when those providers land): `opencode-session.md`.
 
 > Implemented as providers today: **Claude Code, Kiro CLI, Kiro
-> IDE.** The **Codex CLI** doc is recon only — schema captured, no
-> provider built yet.
+> IDE, Codex CLI.**
 
 ## How to keep these in sync
 

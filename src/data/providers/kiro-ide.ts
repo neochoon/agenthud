@@ -55,6 +55,7 @@ import type {
 } from "../../types/index.js";
 import { ICONS } from "../../types/index.js";
 import { ONE_HOUR_MS, THIRTY_MINUTES_MS } from "../../ui/constants.js";
+import { pickLatestUserTitle } from "./sessionTitle.js";
 import type { ParseContext, ParseResult, SessionProvider } from "./types.js";
 
 export function getKiroIdeSessionsDir(): string {
@@ -159,6 +160,16 @@ function toNode(
       : undefined;
 
   const model = file?.selectedModel;
+  // Row title = latest substantial user message from history[].
+  // The `.title` field is an auto-generated session label ("Clean
+  // State") the user never typed — useless as a description. Fall
+  // back to it only when there are no user messages yet.
+  const userMessages = (file?.history ?? [])
+    .filter((h) => h.message?.role === "user")
+    .map((h) => firstTextBlock(h.message?.content))
+    .filter((t) => t.length > 0);
+  const title =
+    pickLatestUserTitle(userMessages) ?? meta.title ?? file?.title ?? null;
   const node: SessionNode = {
     id,
     hideKey: `${projectName}/${id}`,
@@ -170,7 +181,7 @@ function toNode(
     modelName: typeof model === "string" && model.length > 0 ? model : null,
     subAgents: [],
     nonInteractive: false,
-    firstUserPrompt: meta.title ?? file?.title ?? null,
+    firstUserPrompt: title,
     liveState: null,
     provider: "kiro-ide",
     contextUsage,
@@ -659,6 +670,7 @@ export function parseKiroIdeActivities(
 
 export const kiroIdeProvider: SessionProvider = {
   name: "kiro-ide",
+  lineDelimited: false,
   isAvailable: () => existsSync(getKiroIdeSessionsDir()),
   discoverSessions: discoverKiroIdeSessions,
   parseActivities: parseKiroIdeActivities,

@@ -4,19 +4,28 @@
 [![CI](https://github.com/neochoon/agenthud/actions/workflows/ci.yml/badge.svg)](https://github.com/neochoon/agenthud/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/neochoon/agenthud/branch/main/graph/badge.svg)](https://codecov.io/gh/neochoon/agenthud)
 
-An observability layer for [Claude Code](https://github.com/anthropics/claude-code). **See** your live sessions, **export** structured activity logs, and **summarize** a day or a week into an LLM digest — all from one CLI.
+An observability layer for AI coding agents. **See** your live sessions, **export** structured activity logs, and **summarize** a day or a week into an LLM digest — all from one CLI, across every agent you use.
 
 ![demo](./demo/live.gif)
 
-AgentHUD reads Claude Code's session files from `~/.claude/projects/` and gives you three things:
+AgentHUD reads each agent's on-disk session files and merges them into one tree, so a project you've touched from several agents shows as a single row with combined sessions and sub-agents. Supported today:
+
+| Agent | Source |
+|---|---|
+| [Claude Code](https://github.com/anthropics/claude-code) | `~/.claude/projects/` |
+| [Codex CLI](https://github.com/openai/codex) | `~/.codex/sessions/` |
+| Kiro IDE | `…/Kiro/User/globalStorage/kiro.kiroagent/` |
+| Kiro CLI | `~/.kiro/sessions/cli/` |
+
+Each session row shows its provider, model, and context-window usage; sub-agents nest under their parent regardless of which agent spawned them. It gives you three things:
 
 - **Live monitor** (`agenthud`) — a split-view TUI showing every project, session, sub-agent, and activity as it happens
-- **Structured export** (`agenthud report`) — Markdown or JSON for piping to scripts, dashboards, or other LLMs
+- **Structured export** (`agenthud report`) — Markdown or JSON (with provider + model per session) for piping to scripts, dashboards, or other LLMs
 - **LLM digest** (`agenthud summary`) — a day or a date range synthesized into an engineering summary via the `claude` CLI
 
-→ **See [FEATURES.md](./FEATURES.md) for the full surface** — every flag, keybinding, config key, file path, and env var.
+→ **See [FEATURES.md](./FEATURES.md) for the full surface** — every flag, keybinding, config key, file path, and env var. Per-agent session-file schemas live in [docs/schemas/](./docs/schemas/).
 
-Requires Node.js 20+. Open agenthud in a separate terminal while using Claude Code; press `?` inside the TUI for in-app help.
+Requires Node.js 20+. Open agenthud in a separate terminal while you work; press `?` inside the TUI for in-app help.
 
 ## Try without installing
 
@@ -38,7 +47,7 @@ npm i -g agenthud
 
 ```bash
 # Live monitor
-agenthud                                  # all Claude projects
+agenthud                                  # all projects, every agent
 agenthud --cwd                            # scope to the project containing $PWD
 agenthud --once                           # snapshot mode, no alt-screen
 
@@ -58,25 +67,26 @@ agenthud summary -oI                      # open the summary + the summaries ind
 The TUI splits into a project tree (top) and an activity viewer (bottom):
 
 ```
-┌─ Projects ─────────────────────────────────────────────────┐
-│ > agenthud  ~/WestbrookAI/agenthud                     13m │
-│     #864f [hot] Fix the auth bug in login flow             │
-│         ├─ » code-reviewer                                 │
-│     (#398c [warm])                                         │
-│   myproject  ~/work/myproject                           2d │
-│     #def4 [hot] Add OAuth support                          │
-│ ... 12 cold projects                                       │
-└────────────────────────────────────────────────────────────┘
-┌─ Activity · agenthud ──────────────────────────────────────┐
-│ [10:23] ○ Read  src/ui/App.tsx                             │
-│ [10:23] ~ Edit  src/ui/App.tsx                             │
-│ [10:23] $ Bash  npm test                                   │
-│ [10:23] < Response  Tests passed successfully              │
-│ [10:25] ⠧ Edit  src/auth/oauth.ts  ← bold + spinner = live │
-└────────────────────────────────────────────────────────────┘
+┌─ Projects ──────────────────────────────────────────────────────────┐
+│ 4 projects (2) · 31 sessions (3) · 142 sub-agents (1) · ⊘ 2 hidden   │
+│ > agenthud  ~/WestbrookAI/agenthud  6 sessions (2) · 114 sub-agents  │
+│     #864f [hot] Fix the auth bug in login flow    9s 41% claude opus │
+│         ├─ » code-reviewer                                           │
+│     #019e [cool] review the data layer            3h 44% codex gpt-5 │
+│   myproject  ~/work/myproject                                    2d  │
+│     #def4 [hot] Add OAuth support                12m 5% kiro-ide auto│
+│ ... 12 cold projects                                                 │
+└──────────────────────────────────────────────────────────────────────┘
+┌─ Activity · agenthud ────────────────────────────────────────────────┐
+│ [10:23] ○ Read  src/ui/App.tsx                                       │
+│ [10:23] ~ Edit  src/ui/App.tsx                                       │
+│ [10:23] $ Bash  npm test                                             │
+│ [10:23] < Response  Tests passed successfully                        │
+│ [10:25] ⠧ Edit  src/auth/oauth.ts  ← bold + spinner = live          │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
-Sessions get colored badges — `[hot]` / `[warm]` / `[cool]` / `[cold]` — based on how recently their JSONL file was touched. Cold projects collapse under a `... N cold projects` sentinel. Press `↵` on any activity to open a scrollable detail view.
+Each session row carries a colored provider label (`claude` / `codex` / `kiro` / `kiro-ide`), its model, and a context-window gauge. Badges — `[hot]` / `[warm]` / `[cool]` / `[cold]` — reflect how recently the session was touched; only hot/warm count as active (and render bright). The panel title is a tree-wide census; cold projects collapse under a `... N cold projects` sentinel. Press `↵` on any activity for a scrollable detail view.
 
 Full keybinding and badge reference: [FEATURES.md](./FEATURES.md#keybindings).
 

@@ -11,8 +11,13 @@ sessions to catch anything we missed.
 | Claude Code  | [claude-session.md](./claude-session.md)        | `~/.claude/projects/{encoded-path}/{uuid}.jsonl`      |
 | Kiro CLI     | [kiro-session.md](./kiro-session.md)            | `~/.kiro/sessions/cli/{uuid}.{json,jsonl,history,lock}` |
 | Kiro IDE     | [kiro-ide-session.md](./kiro-ide-session.md)    | `<app-storage>/Kiro/User/globalStorage/kiro.kiroagent/workspace-sessions/` |
+| Codex CLI    | [codex-session.md](./codex-session.md)          | `~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<uuid>.jsonl` |
 
 Future docs (when those providers land): `opencode-session.md`.
+
+> Implemented as providers today: **Claude Code, Kiro CLI, Kiro
+> IDE.** The **Codex CLI** doc is recon only — schema captured, no
+> provider built yet.
 
 ## How to keep these in sync
 

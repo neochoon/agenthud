@@ -2,6 +2,88 @@
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-06-12
+
+### Added
+- **Kiro IDE sessions appear alongside Claude Code and Kiro CLI.**
+  Reads the IDE's VSCode-fork storage
+  (`<app-storage>/Kiro/User/globalStorage/kiro.kiroagent/`,
+  override: `KIRO_IDE_SESSIONS_DIR`). Sessions group by
+  `workspaceDirectory`, the `title` becomes the row description,
+  `selectedModel` the model, and `contextUsagePercentage` the
+  context gauge. Rows carry a magenta `kiro-ide` provider label.
+- **Kiro IDE sub-agents nest under their parent.** Unlike the CLI,
+  IDE sub-agents live as `invokeSubAgent` actions inside the
+  parent's execution log (tagged `subExecutionId`), not as
+  separate files. agenthud parses those execution documents,
+  surfaces each sub-agent as a tree row, and renders its tool
+  stream (`runCommand` → Bash, `readFiles` → Read, etc.) in the
+  activity viewer.
+- **`waiting` badge for IDE approval gates.** A sub-agent parked on
+  a `PendingAction` (the IDE's run-command approval prompt) shows
+  `[waiting]` — answering the "is it even running?" question
+  directly.
+- **`AGENTHUD_HOME` env override** for the app data directory
+  (`~/.agenthud`), mirroring `CLAUDE_PROJECTS_DIR` /
+  `KIRO_SESSIONS_DIR`. Used for test isolation and mounted/synced
+  setups.
+
+### Changed
+- **Live badges are recency-gated across all providers.** A `.lock`
+  file (Kiro CLI) or a `running` execution (Kiro IDE) only drives a
+  `[working]`/`[waiting]` badge when the session was touched in the
+  last 30 minutes — the same rule Claude already used. A terminal
+  left open for hours now falls back to the time-based
+  `[cool]`/`[cold]` badge instead of looking perpetually active.
+- **Session-row description shows the latest user message of any
+  length.** The previous 10-character minimum dropped short
+  follow-ups ("ok", "go", "yes") in favor of a stale older
+  message; now the literal latest non-slash-command message wins.
+
+### Fixed
+- **`agenthud report` truncated piped output.** `process.exit(0)`
+  fired before the async stdout pipe drained, silently cutting
+  ~40% of a long report (`| grep`/`| less` lost trailing session
+  blocks while a file redirect kept everything). All exits after a
+  stdout write now flush first.
+- **Kiro IDE sessions were missing from reports** — history
+  entries carried no timestamps, so the same-day filter dropped
+  them. Activities now inherit the session file's mtime.
+- **macOS/Windows watch mode never refreshed on non-Claude
+  activity.** Polling was Linux-only; `fs.watch` only covers the
+  Claude projects dir, so Kiro CLI/IDE changes never triggered an
+  update. Polling is now always primary on every platform.
+- **`KIRO_SESSIONS_DIR` overrides routed to the wrong parser.**
+  Activity from an overridden Kiro root was parsed as Claude JSONL
+  (and came back empty). Routing now prefix-matches each provider's
+  actual configured root.
+- **`summary --last Nd --force` rebuilt ranges from stale daily
+  caches.** `--force` now regenerates the per-day summaries too.
+- **`--with-git` duplicated commits** once per session of the same
+  project; commits are now fetched once per project.
+- **`--date 2026-02-31` was accepted** (JS silently normalized it
+  to Mar 3); impossible dates are now rejected.
+- **`--help` / `--version` / `-V` created `~/.agenthud/config.yaml`**
+  as a side effect; read-only commands now short-circuit before
+  loading config.
+- **Summary cache could be left partial on a crash.** Output now
+  streams to a temp file and renames into place on success.
+- **`task` activity type was inconsistent** between the default
+  include set, `--include all`, and the generated config template —
+  all three now agree, so first-run and later-run payloads match.
+- **Multi-provider project order depended on provider registration
+  order**; merged trees are now re-sorted by status/mtime.
+
+### Internal
+- Provider abstraction (`src/data/providers/`) with `SessionProvider`
+  interface; Claude / Kiro CLI / Kiro IDE are independent providers
+  merged into one tree.
+- Per-provider session-file schemas under `docs/schemas/`.
+- CI gained a lint gate; the publish workflow now refuses tags
+  whose commit is not an ancestor of `main`.
+- `@types/node` pinned to the lowest supported runtime (^20);
+  publish builds on Node 20.
+
 ## [0.15.0] - 2026-06-12
 
 ### Added

@@ -47,6 +47,18 @@ export function parseModelName(modelId: string): string {
   const haikuMatch = modelId.match(/claude-(\d+)-(\d+)-haiku/);
   if (haikuMatch) return `haiku-${haikuMatch[1]}.${haikuMatch[2]}`;
 
+  // Mythos-class tier (Claude 5 family): fable / mythos. Minor
+  // version is optional — `claude-fable-5` → `fable-5`,
+  // `claude-fable-5-1-20260601` → `fable-5.1`. The date guard
+  // (\d{8}) keeps a date segment from being misread as a minor.
+  const mythosMatch = modelId.match(
+    /claude-(fable|mythos)-(\d+)(?:-(\d{1,3}))?(?=-\d{8}|$)/,
+  );
+  if (mythosMatch) {
+    const minor = mythosMatch[3] ? `.${mythosMatch[3]}` : "";
+    return `${mythosMatch[1]}-${mythosMatch[2]}${minor}`;
+  }
+
   return modelId.replace(/-\d{8}$/, "");
 }
 

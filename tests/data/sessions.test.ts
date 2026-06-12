@@ -97,6 +97,166 @@ describe("discoverSessions", () => {
     expect(tree.projects[0].sessions[0].modelName).toBe("sonnet-4");
   });
 
+  it("derives contextUsage from the last assistant usage (200K window)", () => {
+    const projectsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".claude",
+      "projects",
+    );
+    const projectDir = join(projectsDir, "-Users-neo-myproject");
+
+    vi.mocked(existsSync).mockImplementation((p) => {
+      const path = String(p);
+      return path === projectsDir || path.includes("myproject");
+    });
+    vi.mocked(readdirSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === projectsDir)
+        return ["-Users-neo-myproject"] as unknown as ReturnType<
+          typeof readdirSync
+        >;
+      if (path === projectDir)
+        return ["ctx1.jsonl"] as unknown as ReturnType<typeof readdirSync>;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(statSync).mockImplementation((p) => {
+      const path = String(p);
+      const isDir = !path.endsWith(".jsonl");
+      return {
+        isDirectory: () => isDir,
+        mtimeMs: NOW - 10_000,
+        size: 100,
+      } as ReturnType<typeof statSync>;
+    });
+    // 100K used on a 200K window → 50%
+    vi.mocked(readFileSync).mockReturnValue(
+      `${JSON.stringify({
+        type: "assistant",
+        message: {
+          model: "claude-sonnet-4-20250514",
+          content: [],
+          usage: {
+            input_tokens: 1,
+            cache_creation_input_tokens: 999,
+            cache_read_input_tokens: 99_000,
+            output_tokens: 50,
+          },
+        },
+        timestamp: new Date(NOW - 10_000).toISOString(),
+      })}\n`,
+    );
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const tree = discoverSessions(mockConfig);
+    const ctx = tree.projects[0].sessions[0].contextUsage;
+    expect(ctx).toBeDefined();
+    expect(ctx?.used).toBe(100_000);
+    expect(ctx?.total).toBe(200_000);
+    expect(ctx?.percent).toBe(50);
+  });
+
+  it("infers a 1M window when usage exceeds 200K (long-context session)", () => {
+    const projectsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".claude",
+      "projects",
+    );
+    const projectDir = join(projectsDir, "-Users-neo-myproject");
+
+    vi.mocked(existsSync).mockImplementation((p) => {
+      const path = String(p);
+      return path === projectsDir || path.includes("myproject");
+    });
+    vi.mocked(readdirSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === projectsDir)
+        return ["-Users-neo-myproject"] as unknown as ReturnType<
+          typeof readdirSync
+        >;
+      if (path === projectDir)
+        return ["ctx2.jsonl"] as unknown as ReturnType<typeof readdirSync>;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(statSync).mockImplementation((p) => {
+      const path = String(p);
+      const isDir = !path.endsWith(".jsonl");
+      return {
+        isDirectory: () => isDir,
+        mtimeMs: NOW - 10_000,
+        size: 100,
+      } as ReturnType<typeof statSync>;
+    });
+    // 541.6K used — impossible on a 200K window, must be 1M → 54%
+    vi.mocked(readFileSync).mockReturnValue(
+      `${JSON.stringify({
+        type: "assistant",
+        message: {
+          model: "claude-opus-4-7",
+          content: [],
+          usage: {
+            input_tokens: 1,
+            cache_creation_input_tokens: 601,
+            cache_read_input_tokens: 540_998,
+            output_tokens: 200,
+          },
+        },
+        timestamp: new Date(NOW - 10_000).toISOString(),
+      })}\n`,
+    );
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const tree = discoverSessions(mockConfig);
+    const ctx = tree.projects[0].sessions[0].contextUsage;
+    expect(ctx).toBeDefined();
+    expect(ctx?.used).toBe(541_600);
+    expect(ctx?.total).toBe(1_000_000);
+    expect(ctx?.percent).toBe(54);
+  });
+
+  it("leaves contextUsage undefined when no assistant entry carries usage", () => {
+    const projectsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".claude",
+      "projects",
+    );
+    const projectDir = join(projectsDir, "-Users-neo-myproject");
+
+    vi.mocked(existsSync).mockImplementation((p) => {
+      const path = String(p);
+      return path === projectsDir || path.includes("myproject");
+    });
+    vi.mocked(readdirSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === projectsDir)
+        return ["-Users-neo-myproject"] as unknown as ReturnType<
+          typeof readdirSync
+        >;
+      if (path === projectDir)
+        return ["ctx3.jsonl"] as unknown as ReturnType<typeof readdirSync>;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(statSync).mockImplementation((p) => {
+      const path = String(p);
+      const isDir = !path.endsWith(".jsonl");
+      return {
+        isDirectory: () => isDir,
+        mtimeMs: NOW - 10_000,
+        size: 100,
+      } as ReturnType<typeof statSync>;
+    });
+    vi.mocked(readFileSync).mockReturnValue(
+      `${JSON.stringify({
+        type: "assistant",
+        message: { model: "claude-sonnet-4-20250514", content: [] },
+        timestamp: new Date(NOW - 10_000).toISOString(),
+      })}\n`,
+    );
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const tree = discoverSessions(mockConfig);
+    expect(tree.projects[0].sessions[0].contextUsage).toBeUndefined();
+  });
+
   it("marks session as hot when mtime is within 30m", () => {
     const projectsDir = join(
       process.env.HOME ?? "/home/user",

@@ -220,6 +220,17 @@ export function computeCensus(tree: SessionTree): TreeCensus {
   let subAgentsActive = 0;
   let hiddenTotal = 0;
   let hiddenActive = 0;
+  // Per-project visible counts. Built in the same walk so the
+  // panel-title census and ProjectRow's "(N active)" parens are
+  // guaranteed to add up to the same totals — ProjectRow looks
+  // each row up from here instead of re-counting independently.
+  const perProject = new Map<
+    string,
+    {
+      sessions: { total: number; active: number };
+      subAgents: { total: number; active: number };
+    }
+  >();
 
   const isActive = (n: SessionNode) =>
     n.status === "hot" || n.status === "warm";
@@ -227,12 +238,19 @@ export function computeCensus(tree: SessionTree): TreeCensus {
   for (const p of [...tree.projects, ...tree.coldProjects]) {
     projectsTotal++;
     let projectHasVisibleActive = false;
+    const projectEntry = {
+      sessions: { total: 0, active: 0 },
+      subAgents: { total: 0, active: 0 },
+    };
+    perProject.set(p.projectPath, projectEntry);
     for (const s of p.sessions) {
       sessionsTotal++;
       const sessionVisible = !s.hidden && !p.hidden;
       if (sessionVisible) {
+        projectEntry.sessions.total++;
         if (isActive(s)) {
           sessionsActive++;
+          projectEntry.sessions.active++;
           projectHasVisibleActive = true;
         }
       } else {
@@ -243,7 +261,11 @@ export function computeCensus(tree: SessionTree): TreeCensus {
         subAgentsTotal++;
         const saVisible = !sa.hidden && !s.hidden && !p.hidden;
         if (saVisible) {
-          if (isActive(sa)) subAgentsActive++;
+          projectEntry.subAgents.total++;
+          if (isActive(sa)) {
+            subAgentsActive++;
+            projectEntry.subAgents.active++;
+          }
         } else {
           hiddenTotal++;
           if (isActive(sa)) hiddenActive++;
@@ -258,6 +280,7 @@ export function computeCensus(tree: SessionTree): TreeCensus {
     sessions: { total: sessionsTotal, active: sessionsActive },
     subAgents: { total: subAgentsTotal, active: subAgentsActive },
     hidden: { total: hiddenTotal, active: hiddenActive },
+    perProject,
   };
 }
 

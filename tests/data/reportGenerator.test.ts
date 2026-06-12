@@ -70,6 +70,71 @@ describe("generateReport", () => {
     expect(result).toBe("No activity found for 2026-05-14.");
   });
 
+  it("appends provider and model to the markdown session header", () => {
+    vi.mocked(statSync).mockReturnValue({
+      mtimeMs: new Date("2026-05-14T10:00:00Z").getTime(),
+    } as ReturnType<typeof statSync>);
+    vi.mocked(parseSessionHistory).mockReturnValue([
+      makeActivity({ type: "response", icon: "<", label: "Response" }),
+    ]);
+
+    const result = generateReport(
+      [
+        makeSession({ provider: "claude", modelName: "opus-4.7" }),
+      ],
+      { date: DAY, include: ["response"] },
+    );
+    expect(result).toMatch(/## myproject \(.+ – .+\) · claude · opus-4\.7/);
+  });
+
+  it("omits model from header when modelName is null", () => {
+    vi.mocked(statSync).mockReturnValue({
+      mtimeMs: new Date("2026-05-14T10:00:00Z").getTime(),
+    } as ReturnType<typeof statSync>);
+    vi.mocked(parseSessionHistory).mockReturnValue([
+      makeActivity({ type: "response", icon: "<", label: "Response" }),
+    ]);
+
+    const result = generateReport(
+      [makeSession({ provider: "kiro", modelName: null })],
+      { date: DAY, include: ["response"] },
+    );
+    expect(result).toMatch(/## myproject \(.+ – .+\) · kiro$/m);
+  });
+
+  it("omits the · suffix entirely when neither provider nor model is set", () => {
+    vi.mocked(statSync).mockReturnValue({
+      mtimeMs: new Date("2026-05-14T10:00:00Z").getTime(),
+    } as ReturnType<typeof statSync>);
+    vi.mocked(parseSessionHistory).mockReturnValue([
+      makeActivity({ type: "response", icon: "<", label: "Response" }),
+    ]);
+
+    const result = generateReport([makeSession()], {
+      date: DAY,
+      include: ["response"],
+    });
+    expect(result).toMatch(/## myproject \(.+ – .+\)$/m);
+    expect(result).not.toMatch(/## myproject .*·/);
+  });
+
+  it("includes provider and model in the JSON report shape", () => {
+    vi.mocked(statSync).mockReturnValue({
+      mtimeMs: new Date("2026-05-14T10:00:00Z").getTime(),
+    } as ReturnType<typeof statSync>);
+    vi.mocked(parseSessionHistory).mockReturnValue([
+      makeActivity({ type: "response", icon: "<", label: "Response" }),
+    ]);
+
+    const result = generateReport(
+      [makeSession({ provider: "kiro", modelName: "auto" })],
+      { date: DAY, include: ["response"], format: "json" },
+    );
+    const parsed = JSON.parse(result);
+    expect(parsed.sessions[0].provider).toBe("kiro");
+    expect(parsed.sessions[0].model).toBe("auto");
+  });
+
   it("includes session with activity on target date", () => {
     vi.mocked(statSync).mockReturnValue({
       mtimeMs: new Date("2026-05-14T10:00:00Z").getTime(),

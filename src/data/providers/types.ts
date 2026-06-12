@@ -28,7 +28,7 @@ import type {
   SessionTree,
 } from "../../types/index.js";
 
-export type ProviderName = "claude";
+export type ProviderName = "claude" | "kiro";
 
 export interface DiscoverOptions {
   // When set, drop every project whose decoded path is not exactly this

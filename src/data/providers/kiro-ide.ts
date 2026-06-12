@@ -43,10 +43,11 @@
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import type {
   ActivityEntry,
   GlobalConfig,
+  LiveState,
   ProjectNode,
   SessionNode,
   SessionStatus,
@@ -178,6 +179,186 @@ function toNode(
   return node;
 }
 
+interface IdeExecutionAction {
+  actionType?: string;
+  actionState?: string;
+  subExecutionId?: string;
+  input?: { prompt?: string; command?: string };
+  output?: { response?: string; subExecutionId?: string };
+  emittedAt?: number;
+  endTime?: number;
+}
+
+interface IdeExecution {
+  executionId?: string;
+  status?: string;
+  startTime?: number;
+  endTime?: number;
+  chatSessionId?: string;
+  actions?: IdeExecutionAction[];
+}
+
+// Execution-file parse cache keyed by path → {mtime, value}. The
+// files are rewritten constantly while a turn runs but stay
+// untouched afterward; without the cache every 2s poll re-reads
+// and re-parses every historical execution (some are 200KB+).
+const execCache = new Map<
+  string,
+  { mtimeMs: number; value: IdeExecution | null }
+>();
+
+/** Test hook: the cache is module-level and keyed by (path, mtime),
+ * which collides across test cases that mock the same fake path
+ * with the same fake mtime. Production never needs this. */
+export function clearKiroIdeExecutionCache(): void {
+  execCache.clear();
+}
+
+function readExecutionFile(path: string, mtimeMs: number): IdeExecution | null {
+  const cached = execCache.get(path);
+  if (cached && cached.mtimeMs === mtimeMs) return cached.value;
+  let value: IdeExecution | null = null;
+  try {
+    const parsed = JSON.parse(readFileSync(path, "utf-8")) as IdeExecution;
+    // Identify execution files structurally — profile dirs also
+    // hold index files and other JSON we don't care about.
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      typeof parsed.chatSessionId === "string" &&
+      Array.isArray(parsed.actions)
+    ) {
+      value = parsed;
+    }
+  } catch {
+    value = null;
+  }
+  execCache.set(path, { mtimeMs, value });
+  return value;
+}
+
+/**
+ * Walk the agent root's profile directories for execution files and
+ * synthesize sub-agent SessionNodes, grouped by the parent session's
+ * uuid (`chatSessionId`).
+ *
+ * IDE sub-agents aren't separate session files (unlike the CLI) —
+ * they exist as actions inside the parent's execution log:
+ *   - `invokeSubAgent` carries the spawning prompt (input.prompt)
+ *     and the child's id (output.subExecutionId)
+ *   - subsequent actions tagged with that subExecutionId are the
+ *     child's own steps; their timestamps drive recency
+ *   - any action still in `PendingAction` ⇒ the child is parked on
+ *     the IDE's approval gate ⇒ liveState "waiting" (the user-facing
+ *     answer to "is it even running?")
+ */
+function buildSubAgentsBySession(
+  agentRoot: string,
+  config: GlobalConfig,
+): Map<string, SessionNode[]> {
+  const out = new Map<string, SessionNode[]>();
+  let profileDirs: string[];
+  try {
+    profileDirs = readdirSync(agentRoot) as unknown as string[];
+  } catch {
+    return out;
+  }
+
+  for (const profile of profileDirs) {
+    if (profile === "workspace-sessions" || profile === "dev_data") continue;
+    const profilePath = join(agentRoot, profile);
+    let entries: string[];
+    try {
+      if (!statSync(profilePath).isDirectory()) continue;
+      entries = readdirSync(profilePath) as unknown as string[];
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      const entryPath = join(profilePath, entry);
+      let isDir: boolean;
+      try {
+        isDir = statSync(entryPath).isDirectory();
+      } catch {
+        continue;
+      }
+      if (!isDir) continue; // top-level files are indexes, skip
+      let execFiles: string[];
+      try {
+        execFiles = readdirSync(entryPath) as unknown as string[];
+      } catch {
+        continue;
+      }
+      for (const f of execFiles) {
+        const execPath = join(entryPath, f);
+        let mtimeMs: number;
+        try {
+          mtimeMs = statSync(execPath).mtimeMs;
+        } catch {
+          continue;
+        }
+        const exec = readExecutionFile(execPath, mtimeMs);
+        if (!exec?.chatSessionId || !exec.actions) continue;
+
+        // Collect sub-agent groups within this execution.
+        for (const action of exec.actions) {
+          if (action.actionType !== "invokeSubAgent") continue;
+          const subId =
+            action.output?.subExecutionId ?? action.subExecutionId;
+          if (!subId) continue;
+
+          const groupActions = exec.actions.filter(
+            (a) => a.subExecutionId === subId,
+          );
+          const timestamps = groupActions
+            .flatMap((a) => [a.emittedAt, a.endTime])
+            .filter((t): t is number => typeof t === "number");
+          const lastMs =
+            timestamps.length > 0
+              ? Math.max(...timestamps)
+              : (exec.endTime ?? exec.startTime ?? mtimeMs);
+
+          const pending = groupActions.some(
+            (a) => a.actionState === "PendingAction",
+          );
+          const running =
+            exec.status === "running" &&
+            !groupActions.some(
+              (a) => a.actionType === "subagent_response",
+            );
+          const liveState: LiveState | null = pending
+            ? "waiting"
+            : running
+              ? "working"
+              : null;
+
+          const prompt = action.input?.prompt ?? "";
+          out.set(exec.chatSessionId, [
+            ...(out.get(exec.chatSessionId) ?? []),
+            {
+              id: subId,
+              hideKey: "", // parent fills in projectName below
+              filePath: execPath,
+              projectPath: "",
+              projectName: "",
+              lastModifiedMs: lastMs,
+              status: getSessionStatus(lastMs),
+              modelName: null,
+              subAgents: [],
+              taskDescription: prompt.split("\n")[0] || undefined,
+              nonInteractive: false,
+              firstUserPrompt: null,
+              liveState,
+              provider: "kiro-ide",
+            },
+          ]);
+        }
+      }
+    }
+  }
+  return out;
+}
+
 function discoverKiroIdeSessions(config: GlobalConfig): SessionTree {
   const root = getKiroIdeSessionsDir();
   const empty: SessionTree = {
@@ -199,6 +380,11 @@ function discoverKiroIdeSessions(config: GlobalConfig): SessionTree {
   const byProject = new Map<string, SessionNode[]>();
   let hiddenTotal = 0;
   let hiddenActive = 0;
+
+  // Sub-agents come from execution files, which live under sibling
+  // profile dirs of workspace-sessions — i.e. the agent root is the
+  // parent directory of the sessions root.
+  const subAgentsBySession = buildSubAgentsBySession(dirname(root), config);
 
   for (const ws of workspaceDirs) {
     const wsDir = join(root, ws);
@@ -239,6 +425,24 @@ function discoverKiroIdeSessions(config: GlobalConfig): SessionTree {
         hiddenTotal++;
         if (node.status === "hot" || node.status === "warm") hiddenActive++;
       }
+
+      // Attach sub-agents discovered in execution files. Fill in
+      // the project-scoped fields the builder couldn't know.
+      const subs = subAgentsBySession.get(node.id) ?? [];
+      for (const sub of subs) {
+        sub.projectPath = workspace;
+        sub.projectName = projectName;
+        sub.hideKey = `${projectName}/${sub.id}`;
+        const subHidden =
+          projectHidden || config.hiddenSubAgents.includes(sub.hideKey);
+        if (subHidden) {
+          sub.hidden = true;
+          hiddenTotal++;
+          if (sub.status === "hot" || sub.status === "warm") hiddenActive++;
+        }
+        node.subAgents.push(sub);
+      }
+
       const arr = byProject.get(workspace) ?? [];
       arr.push(node);
       byProject.set(workspace, arr);
@@ -279,7 +483,13 @@ function discoverKiroIdeSessions(config: GlobalConfig): SessionTree {
   });
 
   const count = (projects: ProjectNode[]) =>
-    projects.reduce((sum, p) => sum + p.sessions.length, 0);
+    projects.reduce(
+      (sum, p) =>
+        sum +
+        p.sessions.length +
+        p.sessions.reduce((s, sn) => s + sn.subAgents.length, 0),
+      0,
+    );
 
   return {
     projects: activeProjects,
@@ -313,6 +523,56 @@ function firstTextBlock(content: unknown): string {
  * relative ordering. Execution files have real timestamps and are
  * the follow-up source.
  */
+function actionToActivity(a: IdeExecutionAction): ActivityEntry | null {
+  const ts = new Date(a.emittedAt ?? a.endTime ?? 0);
+  switch (a.actionType) {
+    case "runCommand":
+      return {
+        timestamp: ts,
+        type: "tool",
+        icon: ICONS.Bash,
+        label: "Bash",
+        detail: a.input?.command ?? "",
+      };
+    case "readFiles":
+      return {
+        timestamp: ts,
+        type: "tool",
+        icon: ICONS.Read,
+        label: "Read",
+        detail: "",
+      };
+    case "invokeSubAgent": {
+      const prompt = a.input?.prompt ?? "";
+      return {
+        timestamp: ts,
+        type: "tool",
+        icon: ICONS.Task,
+        label: "Task",
+        detail: prompt.split("\n")[0] ?? "",
+        detailBody: a.output?.response || prompt,
+      };
+    }
+    case "say": {
+      const text =
+        typeof a.output === "string"
+          ? a.output
+          : ((a.output as { response?: string } | undefined)?.response ?? "");
+      if (!text) return null;
+      return {
+        timestamp: ts,
+        type: "response",
+        icon: ICONS.Response,
+        label: "Response",
+        detail: text.split("\n")[0] ?? "",
+        detailBody: text,
+      };
+    }
+    default:
+      return null; // model / bookkeeping actions add no user-facing info
+  }
+}
+
 export function parseKiroIdeActivities(lines: string[]): ParseResult {
   const empty: ParseResult = {
     activities: [],
@@ -320,13 +580,34 @@ export function parseKiroIdeActivities(lines: string[]): ParseResult {
     modelName: null,
     sessionStartTime: null,
   };
-  let doc: IdeSessionFile;
+  let doc: IdeSessionFile & IdeExecution;
   try {
-    doc = JSON.parse(lines.join("\n")) as IdeSessionFile;
+    doc = JSON.parse(lines.join("\n")) as IdeSessionFile & IdeExecution;
   } catch {
     return empty;
   }
-  if (!doc || !Array.isArray(doc.history)) return empty;
+  if (!doc || typeof doc !== "object") return empty;
+
+  // Execution document (sub-agent filePath points here): map the
+  // actions[] stream to activities. The whole execution is shown —
+  // parent steps and every sub-agent's steps interleaved in emit
+  // order — which is more context, not less, when inspecting a
+  // sub-agent row.
+  if (Array.isArray(doc.actions)) {
+    const activities = doc.actions
+      .map(actionToActivity)
+      .filter((a): a is ActivityEntry => a !== null)
+      .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    return {
+      activities,
+      tokenCount: 0,
+      modelName: null,
+      sessionStartTime:
+        typeof doc.startTime === "number" ? new Date(doc.startTime) : null,
+    };
+  }
+
+  if (!Array.isArray(doc.history)) return empty;
 
   const activities: ActivityEntry[] = [];
   const ts = new Date(0);

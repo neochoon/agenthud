@@ -11,9 +11,11 @@ vi.mock("node:fs", () => ({
 const { existsSync, readdirSync, statSync, readFileSync } = await import(
   "node:fs"
 );
-const { kiroIdeProvider, parseKiroIdeActivities } = await import(
-  "../../../src/data/providers/kiro-ide.js"
-);
+const {
+  kiroIdeProvider,
+  parseKiroIdeActivities,
+  clearKiroIdeExecutionCache,
+} = await import("../../../src/data/providers/kiro-ide.js");
 
 const NOW = 1_700_000_000_000;
 
@@ -37,6 +39,7 @@ function setRoot() {
 afterEach(() => {
   vi.resetAllMocks();
   delete process.env.KIRO_IDE_SESSIONS_DIR;
+  clearKiroIdeExecutionCache();
 });
 
 const WS_B64 = Buffer.from("/Users/neo/myproject").toString("base64");
@@ -223,6 +226,157 @@ describe("kiroIdeProvider.discoverSessions", () => {
   });
 });
 
+describe("kiroIdeProvider sub-agents from execution files", () => {
+  // Executions live OUTSIDE workspace-sessions, under sibling
+  // profile dirs: <agent-root>/<profile>/<dir>/<execution-file>.
+  // agent-root = dirname(workspace-sessions).
+  const AGENT_ROOT = join("/tmp", "kiro-ide-test");
+  const PROFILE = join(AGENT_ROOT, "profileA");
+  const EXEC_DIR = join(PROFILE, "dirB");
+  const EXEC_FILE = join(EXEC_DIR, "exechash01");
+
+  function executionJson() {
+    return JSON.stringify({
+      executionId: "exec-1",
+      workflowType: "chat-agent",
+      status: "succeed",
+      startTime: NOW - 300_000,
+      endTime: NOW - 60_000,
+      chatSessionId: "ide-1111",
+      actions: [
+        {
+          type: "AgentExecutionAction",
+          executionId: "exec-1",
+          actionId: "a1",
+          actionType: "invokeSubAgent",
+          actionState: "Success",
+          input: {
+            prompt: "Run the test suite for the launcher project.\nSteps: ...",
+          },
+          output: { response: "## Results\n905 passed", subExecutionId: "sub-9999" },
+        },
+        {
+          type: "AgentExecutionAction",
+          executionId: "exec-1",
+          actionId: "a2",
+          actionType: "runCommand",
+          actionState: "Success",
+          subExecutionId: "sub-9999",
+          input: { command: "which uv" },
+          emittedAt: NOW - 200_000,
+          endTime: NOW - 150_000,
+        },
+        {
+          type: "AgentExecutionAction",
+          executionId: "exec-1",
+          actionId: "a3",
+          actionType: "subagent_response",
+          actionState: "Success",
+          subExecutionId: "sub-9999",
+          emittedAt: NOW - 70_000,
+        },
+      ],
+    });
+  }
+
+  function mockFullLayout(execContent: string) {
+    const wsDir = join(ROOT, WS_B64);
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === ROOT)
+        return [WS_B64] as unknown as ReturnType<typeof readdirSync>;
+      if (path === wsDir)
+        return ["sessions.json", "ide-1111.json"] as unknown as ReturnType<
+          typeof readdirSync
+        >;
+      if (path === AGENT_ROOT)
+        return [
+          "workspace-sessions",
+          "profileA",
+          "dev_data",
+          "config.json",
+        ] as unknown as ReturnType<typeof readdirSync>;
+      if (path === PROFILE)
+        return ["indexhash", "dirB"] as unknown as ReturnType<
+          typeof readdirSync
+        >;
+      if (path === EXEC_DIR)
+        return ["exechash01"] as unknown as ReturnType<typeof readdirSync>;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(statSync).mockImplementation((p) => {
+      const path = String(p);
+      const isFile =
+        path.endsWith(".json") ||
+        path.endsWith("indexhash") ||
+        path.endsWith("exechash01");
+      return {
+        isDirectory: () => !isFile,
+        mtimeMs: NOW - 60_000,
+        size: 100,
+      } as ReturnType<typeof statSync>;
+    });
+    vi.mocked(readFileSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path.endsWith("sessions.json")) return indexJson();
+      if (path.endsWith("ide-1111.json")) return sessionJson();
+      if (path.endsWith("exechash01")) return execContent;
+      if (path.endsWith("indexhash"))
+        return JSON.stringify({ executions: [] });
+      return "";
+    });
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+  }
+
+  it("attaches sub-agents from execution files via chatSessionId", () => {
+    setRoot();
+    mockFullLayout(executionJson());
+
+    const tree = kiroIdeProvider.discoverSessions(mockConfig);
+    const session = tree.projects[0].sessions[0];
+    expect(session.id).toBe("ide-1111");
+    expect(session.subAgents).toHaveLength(1);
+    const sub = session.subAgents[0];
+    expect(sub.id).toBe("sub-9999");
+    expect(sub.taskDescription).toBe(
+      "Run the test suite for the launcher project.",
+    );
+    expect(sub.provider).toBe("kiro-ide");
+    expect(sub.hideKey).toBe("myproject/sub-9999");
+    // mtime from the latest action timestamp (NOW-70s → hot)
+    expect(sub.lastModifiedMs).toBe(NOW - 70_000);
+    expect(sub.status).toBe("hot");
+  });
+
+  it("marks a sub-agent waiting when any of its actions is PendingAction", () => {
+    setRoot();
+    const exec = JSON.parse(executionJson());
+    exec.status = "running";
+    exec.actions[1].actionState = "PendingAction";
+    exec.actions = exec.actions.slice(0, 2); // drop the response action
+    mockFullLayout(JSON.stringify(exec));
+
+    const tree = kiroIdeProvider.discoverSessions(mockConfig);
+    const sub = tree.projects[0].sessions[0].subAgents[0];
+    expect(sub.liveState).toBe("waiting");
+  });
+
+  it("counts sub-agents in totalCount", () => {
+    setRoot();
+    mockFullLayout(executionJson());
+    const tree = kiroIdeProvider.discoverSessions(mockConfig);
+    expect(tree.totalCount).toBe(2); // 1 session + 1 sub-agent
+  });
+
+  it("tolerates execution files that are not JSON", () => {
+    setRoot();
+    mockFullLayout("garbage not json");
+    const tree = kiroIdeProvider.discoverSessions(mockConfig);
+    expect(tree.projects[0].sessions[0].subAgents).toHaveLength(0);
+  });
+});
+
 describe("parseKiroIdeActivities", () => {
   it("maps history user/assistant entries to activities", () => {
     const lines = sessionJson().split("\n");
@@ -265,5 +419,42 @@ describe("parseKiroIdeActivities", () => {
   it("returns empty result on malformed JSON", () => {
     const { activities } = parseKiroIdeActivities(["not json at all"]);
     expect(activities).toHaveLength(0);
+  });
+
+  it("parses execution documents (actions[]) into tool/response activities", () => {
+    const exec = JSON.stringify({
+      executionId: "exec-1",
+      status: "succeed",
+      startTime: 1_700_000_000_000,
+      chatSessionId: "ide-1111",
+      actions: [
+        {
+          actionType: "runCommand",
+          actionState: "Success",
+          input: { command: "npm test" },
+          emittedAt: 1_700_000_100_000,
+        },
+        {
+          actionType: "invokeSubAgent",
+          actionState: "Success",
+          input: { prompt: "Run the suite.\nDetails..." },
+          output: { response: "## 905 passed", subExecutionId: "sub-1" },
+          emittedAt: 1_700_000_050_000,
+        },
+        {
+          actionType: "model",
+          actionState: "Success",
+          emittedAt: 1_700_000_060_000,
+        },
+      ],
+    });
+    const { activities } = parseKiroIdeActivities([exec]);
+    // model action dropped; remaining two sorted by emit time
+    expect(activities).toHaveLength(2);
+    expect(activities[0].label).toBe("Task");
+    expect(activities[0].detail).toBe("Run the suite.");
+    expect(activities[0].detailBody).toBe("## 905 passed");
+    expect(activities[1].label).toBe("Bash");
+    expect(activities[1].detail).toBe("npm test");
   });
 });

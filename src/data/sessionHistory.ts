@@ -26,7 +26,10 @@ import type { SessionProvider } from "./providers/types.js";
 function providerForPath(filePath: string): SessionProvider {
   const p = filePath.replace(/\\/g, "/");
   if (p.includes("/.kiro/sessions/")) return kiroProvider;
-  if (p.includes("kiro.kiroagent/workspace-sessions/")) return kiroIdeProvider;
+  // Covers both workspace-sessions (session docs) and the profile
+  // dirs (execution docs — sub-agent rows point their filePath at
+  // these). The IDE parser sniffs which document shape it received.
+  if (p.includes("kiro.kiroagent/")) return kiroIdeProvider;
   return claudeProvider;
 }
 

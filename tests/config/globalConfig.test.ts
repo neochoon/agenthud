@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("node:fs", () => ({
   existsSync: vi.fn(),
@@ -27,6 +27,14 @@ const CONFIG_PATH = join(homedir(), ".agenthud", "config.yaml");
 
 afterEach(() => {
   vi.resetAllMocks();
+});
+
+// These tests assert against the DEFAULT home-dir layout
+// (join(homedir(), ".agenthud")). The global setup points
+// AGENTHUD_HOME at a temp dir for isolation; unset it here — safe
+// because this file mocks node:fs, so no real I/O can occur.
+beforeAll(() => {
+  delete process.env.AGENTHUD_HOME;
 });
 
 describe("loadGlobalConfig", () => {

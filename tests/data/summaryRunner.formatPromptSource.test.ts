@@ -1,6 +1,14 @@
 import { homedir } from "node:os";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { formatPromptSource } from "../../src/data/summaryRunner.js";
+
+// These tests assert against the DEFAULT home-dir layout
+// (join(homedir(), ".agenthud")). The global setup points
+// AGENTHUD_HOME at a temp dir for isolation; unset it here — safe
+// because this file mocks node:fs, so no real I/O can occur.
+beforeAll(() => {
+  delete process.env.AGENTHUD_HOME;
+});
 
 describe("formatPromptSource", () => {
   it("returns the daily prompt path with ~ abbreviation when no override", () => {

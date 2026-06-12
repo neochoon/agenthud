@@ -18,6 +18,18 @@ describe("parseModelName", () => {
     expect(parseModelName("claude-3-5-haiku-20241022")).toBe("haiku-3.5");
   });
 
+  it("parses fable model ID", () => {
+    expect(parseModelName("claude-fable-5")).toBe("fable-5");
+  });
+
+  it("parses fable model ID with minor version and date", () => {
+    expect(parseModelName("claude-fable-5-1-20260601")).toBe("fable-5.1");
+  });
+
+  it("parses mythos model ID (same family pattern as fable)", () => {
+    expect(parseModelName("claude-mythos-5")).toBe("mythos-5");
+  });
+
   it("strips date suffix as fallback", () => {
     expect(parseModelName("claude-unknown-20250101")).toBe("claude-unknown");
   });

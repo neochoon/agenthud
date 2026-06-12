@@ -69,9 +69,7 @@ describe("parseSessionHistory", () => {
     });
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readFileSync).mockReturnValue(kiroLine);
-    const result = parseSessionHistory(
-      "/Users/x/.kiro/sessions/cli/aaa.jsonl",
-    );
+    const result = parseSessionHistory("/Users/x/.kiro/sessions/cli/aaa.jsonl");
     expect(result).toHaveLength(1);
     expect(result[0].type).toBe("user");
     expect(result[0].detail).toBe("Hello Kiro");

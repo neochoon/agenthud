@@ -17,17 +17,20 @@ import { existsSync, readFileSync } from "node:fs";
 import type { ActivityEntry } from "../types/index.js";
 import { claudeProvider } from "./providers/claude.js";
 import { kiroProvider } from "./providers/kiro.js";
+import { kiroIdeProvider } from "./providers/kiro-ide.js";
+import type { SessionProvider } from "./providers/types.js";
 
-function isKiroPath(filePath: string): boolean {
-  // Match both the default `~/.kiro/sessions/` location and
-  // the test/override path via `KIRO_SESSIONS_DIR`. Looking for
-  // the literal segment is robust against home-directory
-  // variations; normalize separators first so Windows paths
-  // (`C:\Users\x\.kiro\sessions\...`) match too.
-  return filePath.replace(/\\/g, "/").includes("/.kiro/sessions/");
+// Provider routing by path segment. Each check normalizes
+// backslashes first so Windows paths match too. Order matters only
+// in that Claude is the default fallback.
+function providerForPath(filePath: string): SessionProvider {
+  const p = filePath.replace(/\\/g, "/");
+  if (p.includes("/.kiro/sessions/")) return kiroProvider;
+  if (p.includes("kiro.kiroagent/workspace-sessions/")) return kiroIdeProvider;
+  return claudeProvider;
 }
 
-// Parse the full, untruncated activity history from a JSONL file.
+// Parse the full, untruncated activity history from a session file.
 // Returns entries in chronological order (oldest first).
 export function parseSessionHistory(filePath: string): ActivityEntry[] {
   if (!existsSync(filePath)) return [];
@@ -40,8 +43,7 @@ export function parseSessionHistory(filePath: string): ActivityEntry[] {
   }
 
   const lines = content.trim().split("\n").filter(Boolean);
-  const provider = isKiroPath(filePath) ? kiroProvider : claudeProvider;
-  const { activities } = provider.parseActivities(lines);
+  const { activities } = providerForPath(filePath).parseActivities(lines);
 
   return activities;
 }

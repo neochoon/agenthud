@@ -248,8 +248,7 @@ export function generateReport(
     const provenance: string[] = [];
     if (session.provider) provenance.push(session.provider);
     if (session.modelName) provenance.push(session.modelName);
-    const suffix =
-      provenance.length > 0 ? ` · ${provenance.join(" · ")}` : "";
+    const suffix = provenance.length > 0 ? ` · ${provenance.join(" · ")}` : "";
     lines.push(`## ${session.projectName} (${first} – ${last})${suffix}`);
     lines.push("");
     for (const activity of activities) {

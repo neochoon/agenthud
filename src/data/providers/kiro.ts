@@ -52,8 +52,7 @@ import type { DiscoverOptions, SessionProvider } from "./types.js";
 
 export function getKiroSessionsDir(): string {
   return (
-    process.env.KIRO_SESSIONS_DIR ??
-    join(homedir(), ".kiro", "sessions", "cli")
+    process.env.KIRO_SESSIONS_DIR ?? join(homedir(), ".kiro", "sessions", "cli")
   );
 }
 

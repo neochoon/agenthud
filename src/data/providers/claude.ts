@@ -44,11 +44,8 @@ import type {
   SessionTree,
 } from "../../types/index.js";
 import { ONE_HOUR_MS, THIRTY_MINUTES_MS } from "../../ui/constants.js";
-import {
-  parseActivitiesFromLines,
-  parseModelName,
-} from "./claude-activity.js";
 import { detectLiveState } from "../sessionLiveness.js";
+import { parseActivitiesFromLines, parseModelName } from "./claude-activity.js";
 import type { DiscoverOptions, SessionProvider } from "./types.js";
 
 export function getProjectsDir(): string {

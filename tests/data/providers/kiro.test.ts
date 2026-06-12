@@ -11,9 +11,7 @@ vi.mock("node:fs", () => ({
 const { existsSync, readdirSync, statSync, readFileSync } = await import(
   "node:fs"
 );
-const { kiroProvider } = await import(
-  "../../../src/data/providers/kiro.js"
-);
+const { kiroProvider } = await import("../../../src/data/providers/kiro.js");
 
 const NOW = 1_700_000_000_000;
 
@@ -98,9 +96,7 @@ describe("kiroProvider.discoverSessions", () => {
     expect(tree.projects[0].projectPath).toBe("/Users/neo/myproject");
     expect(tree.projects[0].sessions).toHaveLength(1);
     expect(tree.projects[0].sessions[0].id).toBe(sessionId);
-    expect(tree.projects[0].sessions[0].hideKey).toBe(
-      `myproject/${sessionId}`,
-    );
+    expect(tree.projects[0].sessions[0].hideKey).toBe(`myproject/${sessionId}`);
     expect(tree.projects[0].sessions[0].firstUserPrompt).toBe(
       "Hello world prompt",
     );

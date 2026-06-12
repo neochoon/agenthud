@@ -79,9 +79,7 @@ describe("generateReport", () => {
     ]);
 
     const result = generateReport(
-      [
-        makeSession({ provider: "claude", modelName: "opus-4.7" }),
-      ],
+      [makeSession({ provider: "claude", modelName: "opus-4.7" })],
       { date: DAY, include: ["response"] },
     );
     expect(result).toMatch(/## myproject \(.+ – .+\) · claude · opus-4\.7/);

@@ -33,6 +33,7 @@ import type {
 } from "../types/index.js";
 import { claudeProvider } from "./providers/claude.js";
 import { kiroProvider } from "./providers/kiro.js";
+import { kiroIdeProvider } from "./providers/kiro-ide.js";
 import type { DiscoverOptions, SessionProvider } from "./providers/types.js";
 
 export {
@@ -42,7 +43,11 @@ export {
 } from "./providers/claude.js";
 export type { DiscoverOptions } from "./providers/types.js";
 
-const PROVIDERS: SessionProvider[] = [claudeProvider, kiroProvider];
+const PROVIDERS: SessionProvider[] = [
+  claudeProvider,
+  kiroProvider,
+  kiroIdeProvider,
+];
 
 /**
  * Walk every enabled provider, build per-provider `SessionTree`s,
@@ -92,10 +97,7 @@ function mergeTrees(trees: SessionTree[]): SessionTree {
   const hotter = (a: SessionStatus, b: SessionStatus) =>
     statusRank[a] <= statusRank[b] ? a : b;
 
-  const merge = (
-    target: Map<string, ProjectNode>,
-    p: ProjectNode,
-  ) => {
+  const merge = (target: Map<string, ProjectNode>, p: ProjectNode) => {
     const existing = target.get(p.projectPath);
     if (!existing) {
       target.set(p.projectPath, { ...p, sessions: [...p.sessions] });

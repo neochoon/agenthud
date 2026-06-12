@@ -6,13 +6,13 @@ observed via `jq` against real corpora) and includes verification
 commands at the bottom so you can re-run them against your own
 sessions to catch anything we missed.
 
-| Provider     | Doc                                       | Source                                                |
-|--------------|-------------------------------------------|-------------------------------------------------------|
-| Claude Code  | [claude-session.md](./claude-session.md)  | `~/.claude/projects/{encoded-path}/{uuid}.jsonl`      |
-| Kiro CLI     | [kiro-session.md](./kiro-session.md)      | `~/.kiro/sessions/cli/{uuid}.{json,jsonl,history,lock}` |
+| Provider     | Doc                                             | Source                                                |
+|--------------|-------------------------------------------------|-------------------------------------------------------|
+| Claude Code  | [claude-session.md](./claude-session.md)        | `~/.claude/projects/{encoded-path}/{uuid}.jsonl`      |
+| Kiro CLI     | [kiro-session.md](./kiro-session.md)            | `~/.kiro/sessions/cli/{uuid}.{json,jsonl,history,lock}` |
+| Kiro IDE     | [kiro-ide-session.md](./kiro-ide-session.md)    | `<app-storage>/Kiro/User/globalStorage/kiro.kiroagent/workspace-sessions/` |
 
-Future docs (when those providers land): `kiro-ide-session.md`,
-`opencode-session.md`.
+Future docs (when those providers land): `opencode-session.md`.
 
 ## How to keep these in sync
 

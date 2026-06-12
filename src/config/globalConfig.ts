@@ -31,13 +31,16 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import type { GlobalConfig } from "../types/index.js";
+import { agenthudHome } from "../utils/agenthudHome.js";
 
-const CONFIG_PATH = join(homedir(), ".agenthud", "config.yaml");
-const STATE_PATH = join(homedir(), ".agenthud", "state.yaml");
+// Computed lazily (not module-level constants) so the AGENTHUD_HOME
+// override works even when the env var is set after import — e.g.
+// per-test in a suite that imported this module once.
+const CONFIG_PATH = () => join(agenthudHome(), "config.yaml");
+const STATE_PATH = () => join(agenthudHome(), "state.yaml");
 
 // The canonical built-in include set. report and summary both lean on
 // this when neither the CLI flag nor the user config narrows it down.
@@ -94,7 +97,7 @@ function parseInterval(value: string): number | null {
 }
 
 function ensureAgenthudDir(): void {
-  const dir = join(homedir(), ".agenthud");
+  const dir = agenthudHome();
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 }
 
@@ -135,7 +138,7 @@ summary:
   # model: sonnet
 `;
   try {
-    writeFileSync(CONFIG_PATH, defaultYaml, "utf-8");
+    writeFileSync(CONFIG_PATH(), defaultYaml, "utf-8");
   } catch {
     // best effort — silent
   }
@@ -149,7 +152,7 @@ function writeState(
 ): void {
   ensureAgenthudDir();
   try {
-    writeFileSync(STATE_PATH, stringifyYaml(state), "utf-8");
+    writeFileSync(STATE_PATH(), stringifyYaml(state), "utf-8");
   } catch {
     // best effort
   }
@@ -167,7 +170,7 @@ function rewriteConfigWithoutHideFields(raw: Record<string, unknown>): void {
     cleaned[k] = v;
   }
   try {
-    writeFileSync(CONFIG_PATH, stringifyYaml(cleaned), "utf-8");
+    writeFileSync(CONFIG_PATH(), stringifyYaml(cleaned), "utf-8");
   } catch {
     // best effort
   }
@@ -193,9 +196,9 @@ export function loadGlobalConfig(): GlobalConfig {
   let configRaw: Record<string, unknown> = {};
   let configHadHideFields = false;
 
-  if (existsSync(CONFIG_PATH)) {
+  if (existsSync(CONFIG_PATH())) {
     try {
-      const text = readFileSync(CONFIG_PATH, "utf-8");
+      const text = readFileSync(CONFIG_PATH(), "utf-8");
       configRaw = (parseYaml(text) as Record<string, unknown>) ?? {};
     } catch {
       configRaw = {};
@@ -288,9 +291,9 @@ export function loadGlobalConfig(): GlobalConfig {
 
   // Read state.yaml (hide fields)
   let stateRaw: Record<string, unknown> = {};
-  if (existsSync(STATE_PATH)) {
+  if (existsSync(STATE_PATH())) {
     try {
-      const text = readFileSync(STATE_PATH, "utf-8");
+      const text = readFileSync(STATE_PATH(), "utf-8");
       stateRaw = (parseYaml(text) as Record<string, unknown>) ?? {};
     } catch {
       stateRaw = {};
@@ -354,9 +357,9 @@ function updateState(
     hiddenSubAgents: [],
     hiddenProjects: [],
   };
-  if (existsSync(STATE_PATH)) {
+  if (existsSync(STATE_PATH())) {
     try {
-      const text = readFileSync(STATE_PATH, "utf-8");
+      const text = readFileSync(STATE_PATH(), "utf-8");
       const raw = (parseYaml(text) as Record<string, unknown>) ?? {};
       for (const key of [
         "hiddenSessions",
@@ -434,6 +437,6 @@ export function hasProjectLevelConfig(): boolean {
   const candidate = join(process.cwd(), ".agenthud", "config.yaml");
   // When cwd is the user's home directory, candidate resolves to the global
   // config — that's not a "project-level" file at all.
-  if (candidate === join(homedir(), ".agenthud", "config.yaml")) return false;
+  if (candidate === CONFIG_PATH()) return false;
   return existsSync(candidate);
 }

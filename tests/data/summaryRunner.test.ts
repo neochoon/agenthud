@@ -1,6 +1,14 @@
 import { EventEmitter } from "node:events";
 import { PassThrough, Readable } from "node:stream";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 vi.mock("node:fs", () => ({
   existsSync: vi.fn(),
@@ -63,6 +71,14 @@ function mockClaudeProcess(stdout = "OK", exitCode = 0, stderr = "") {
   setImmediate(() => proc.emit("close", exitCode));
   return proc;
 }
+
+// These tests assert against the DEFAULT home-dir layout
+// (join(homedir(), ".agenthud")). The global setup points
+// AGENTHUD_HOME at a temp dir for isolation; unset it here — safe
+// because this file mocks node:fs, so no real I/O can occur.
+beforeAll(() => {
+  delete process.env.AGENTHUD_HOME;
+});
 
 describe("runSummary cache behavior", () => {
   it("returns cached content for past date when cache exists and !force", async () => {

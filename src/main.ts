@@ -67,7 +67,7 @@ if (
 }
 if (
   rawArgs.includes("--version") ||
-  rawArgs.includes("-v") ||
+  rawArgs.includes("-V") ||
   rawArgs[0] === "version"
 ) {
   console.log(getVersion());

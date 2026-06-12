@@ -59,6 +59,7 @@ import { dirname, join } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { loadGlobalConfig } from "../config/globalConfig.js";
+import { agenthudHome } from "../utils/agenthudHome.js";
 import { openInDefaultApp } from "../utils/openInDefaultApp.js";
 import { startStderrTicker } from "../utils/stderrTicker.js";
 import { generateReport } from "./reportGenerator.js";
@@ -106,7 +107,7 @@ export interface RangeSummaryOptions {
 type PromptKind = "daily" | "range";
 
 function agenthudHomeDir(): string {
-  const dir = join(homedir(), ".agenthud");
+  const dir = agenthudHome();
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -122,7 +123,7 @@ function promptFilename(kind: PromptKind): string {
 }
 
 function userPromptPath(kind: PromptKind): string {
-  return join(homedir(), ".agenthud", promptFilename(kind));
+  return join(agenthudHome(), promptFilename(kind));
 }
 
 /**

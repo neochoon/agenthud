@@ -53,10 +53,31 @@ import { App } from "./ui/App.js";
 import { enterAltScreen, installAltScreenCleanup } from "./utils/altScreen.js";
 import { isLegacyProjectConfig } from "./utils/legacyConfig.js";
 
+// Short-circuit help/version BEFORE touching the config: these are
+// read-only queries and shouldn't create ~/.agenthud/config.yaml as
+// a side effect (loadGlobalConfig materializes the default file).
+const rawArgs = process.argv.slice(2);
+if (
+  rawArgs.includes("--help") ||
+  rawArgs.includes("-h") ||
+  rawArgs[0] === "help"
+) {
+  console.log(getHelp());
+  process.exit(0);
+}
+if (
+  rawArgs.includes("--version") ||
+  rawArgs.includes("-v") ||
+  rawArgs[0] === "version"
+) {
+  console.log(getVersion());
+  process.exit(0);
+}
+
 // Load config up front so parseArgs can layer flags over user defaults
 // (report.* / summary.* keys in ~/.agenthud/config.yaml).
 const globalConfig = loadGlobalConfig();
-const options = parseArgs(process.argv.slice(2), globalConfig);
+const options = parseArgs(rawArgs, globalConfig);
 
 // exit(0) immediately after a large stdout write TRUNCATES piped
 // output — pipe writes are async and the unflushed remainder is

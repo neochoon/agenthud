@@ -160,11 +160,20 @@ export function generateReport(
   };
   const blocks: SessionBlock[] = [];
 
+  // Git commits are per-PROJECT, not per-session — fetch them once
+  // per projectPath and attach to the first qualifying session, or
+  // every session of the same project would repeat the same commits.
+  const commitsFetched = new Set<string>();
+
   for (const session of sessions) {
     const allActivities = parseSessionHistory(session.filePath);
     if (!sessionIsOnDate(session, date, allActivities)) continue;
 
-    const commits = withGit ? parseGitCommits(session.projectPath, date) : [];
+    let commits: ActivityEntry[] = [];
+    if (withGit && !commitsFetched.has(session.projectPath)) {
+      commitsFetched.add(session.projectPath);
+      commits = parseGitCommits(session.projectPath, date);
+    }
     const dayActivities = [
       ...allActivities
         .filter((a) => isSameLocalDay(a.timestamp, date))

@@ -11,11 +11,8 @@ vi.mock("node:fs", () => ({
 const { existsSync, readdirSync, statSync, readFileSync } = await import(
   "node:fs"
 );
-const {
-  kiroIdeProvider,
-  parseKiroIdeActivities,
-  clearKiroIdeExecutionCache,
-} = await import("../../../src/data/providers/kiro-ide.js");
+const { kiroIdeProvider, parseKiroIdeActivities, clearKiroIdeExecutionCache } =
+  await import("../../../src/data/providers/kiro-ide.js");
 
 const NOW = 1_700_000_000_000;
 
@@ -233,7 +230,6 @@ describe("kiroIdeProvider sub-agents from execution files", () => {
   const AGENT_ROOT = join("/tmp", "kiro-ide-test");
   const PROFILE = join(AGENT_ROOT, "profileA");
   const EXEC_DIR = join(PROFILE, "dirB");
-  const EXEC_FILE = join(EXEC_DIR, "exechash01");
 
   function executionJson() {
     return JSON.stringify({
@@ -253,7 +249,10 @@ describe("kiroIdeProvider sub-agents from execution files", () => {
           input: {
             prompt: "Run the test suite for the launcher project.\nSteps: ...",
           },
-          output: { response: "## Results\n905 passed", subExecutionId: "sub-9999" },
+          output: {
+            response: "## Results\n905 passed",
+            subExecutionId: "sub-9999",
+          },
         },
         {
           type: "AgentExecutionAction",
@@ -322,8 +321,7 @@ describe("kiroIdeProvider sub-agents from execution files", () => {
       if (path.endsWith("sessions.json")) return indexJson();
       if (path.endsWith("ide-1111.json")) return sessionJson();
       if (path.endsWith("exechash01")) return execContent;
-      if (path.endsWith("indexhash"))
-        return JSON.stringify({ executions: [] });
+      if (path.endsWith("indexhash")) return JSON.stringify({ executions: [] });
       return "";
     });
     vi.spyOn(Date, "now").mockReturnValue(NOW);

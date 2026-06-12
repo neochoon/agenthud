@@ -201,7 +201,6 @@ const ActivityRow = memo(function ActivityRow({
   const countSuffix = count && count > 1 ? ` (×${count})` : "";
   const countSuffixWidth = countSuffix.length;
 
-  const prefixWidth = 2 + timestampWidth + iconWidth + 1;
   const labelPart = detail ? `${label}: ` : label;
   const labelWidth = labelPart.length;
   const detailMaxWidth =

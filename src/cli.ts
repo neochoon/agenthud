@@ -39,6 +39,7 @@ const ALL_TYPES = [
   "read",
   "glob",
   "user",
+  "task",
 ];
 
 export interface CliOptions {
@@ -216,6 +217,16 @@ function parseLocalMidnight(dateStr: string): Date | null {
   const [, y, m, d] = match.map(Number);
   const date = new Date(y, m - 1, d);
   if (Number.isNaN(date.getTime())) return null;
+  // Reject impossible dates that JS silently normalizes
+  // (2026-02-31 → Mar 3). Round-trip the components instead of
+  // trusting the constructor.
+  if (
+    date.getFullYear() !== y ||
+    date.getMonth() !== m - 1 ||
+    date.getDate() !== d
+  ) {
+    return null;
+  }
   return date;
 }
 

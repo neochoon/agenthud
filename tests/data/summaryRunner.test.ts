@@ -9,6 +9,8 @@ vi.mock("node:fs", () => ({
   writeFileSync: vi.fn(),
   createWriteStream: vi.fn(),
   copyFileSync: vi.fn(),
+  renameSync: vi.fn(),
+  unlinkSync: vi.fn(),
 }));
 vi.mock("node:child_process", () => ({
   spawn: vi.fn(),
@@ -93,7 +95,9 @@ describe("runSummary cache behavior", () => {
     vi.mocked(readFileSync).mockReturnValue("ignored");
     const mockStream = {
       write: vi.fn(),
-      end: vi.fn(),
+      end: vi.fn((cb?: () => void) => {
+        if (cb) cb();
+      }),
       on: vi.fn().mockReturnThis(),
     };
     vi.mocked(createWriteStream).mockReturnValue(
@@ -117,7 +121,9 @@ describe("runSummary cache behavior", () => {
     vi.mocked(readFileSync).mockReturnValue("ignored");
     const mockStream = {
       write: vi.fn(),
-      end: vi.fn(),
+      end: vi.fn((cb?: () => void) => {
+        if (cb) cb();
+      }),
       on: vi.fn().mockReturnThis(),
     };
     vi.mocked(createWriteStream).mockReturnValue(
@@ -142,7 +148,9 @@ describe("runSummary prompt resolution", () => {
     vi.mocked(existsSync).mockReturnValue(false);
     const mockStream = {
       write: vi.fn(),
-      end: vi.fn(),
+      end: vi.fn((cb?: () => void) => {
+        if (cb) cb();
+      }),
       on: vi.fn().mockReturnThis(),
     };
     vi.mocked(createWriteStream).mockReturnValue(
@@ -171,7 +179,9 @@ describe("runSummary prompt resolution", () => {
     vi.mocked(readFileSync).mockReturnValue("user file prompt");
     const mockStream = {
       write: vi.fn(),
-      end: vi.fn(),
+      end: vi.fn((cb?: () => void) => {
+        if (cb) cb();
+      }),
       on: vi.fn().mockReturnThis(),
     };
     vi.mocked(createWriteStream).mockReturnValue(
@@ -195,7 +205,9 @@ describe("runSummary prompt resolution", () => {
     vi.mocked(existsSync).mockReturnValue(false);
     const mockStream = {
       write: vi.fn(),
-      end: vi.fn(),
+      end: vi.fn((cb?: () => void) => {
+        if (cb) cb();
+      }),
       on: vi.fn().mockReturnThis(),
     };
     vi.mocked(createWriteStream).mockReturnValue(
@@ -223,7 +235,9 @@ describe("runSummary spawn options", () => {
     vi.mocked(existsSync).mockReturnValue(false);
     const mockStream = {
       write: vi.fn(),
-      end: vi.fn(),
+      end: vi.fn((cb?: () => void) => {
+        if (cb) cb();
+      }),
       on: vi.fn().mockReturnThis(),
     };
     vi.mocked(createWriteStream).mockReturnValue(
@@ -251,7 +265,9 @@ describe("runSummary cache write error", () => {
     vi.mocked(existsSync).mockReturnValue(false);
 
     const writeFn = vi.fn();
-    const endFn = vi.fn();
+    const endFn = vi.fn((cb?: () => void) => {
+      if (cb) cb();
+    });
     let errorHandler: ((err: Error) => void) | undefined;
     const fakeStream = {
       write: writeFn,

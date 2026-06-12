@@ -37,7 +37,11 @@ for (let i = 1; i <= iterations; i++) {
   parseSessionHistory(session.filePath);
   if (session.projectPath) {
     const today = new Date();
-    const day = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const day = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+    );
     parseGitCommits(session.projectPath, day);
   }
 

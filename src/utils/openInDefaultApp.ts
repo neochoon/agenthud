@@ -141,7 +141,7 @@ export async function openInDefaultApp(path: string): Promise<void> {
       resolve();
     };
 
-    let child;
+    let child: ReturnType<typeof spawn>;
     try {
       child = spawn(cmd.command, cmd.args, {
         detached: true,

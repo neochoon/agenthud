@@ -14,22 +14,41 @@
  */
 
 import { existsSync, readFileSync, statSync } from "node:fs";
+import { dirname } from "node:path";
 import type { ActivityEntry } from "../types/index.js";
 import { claudeProvider } from "./providers/claude.js";
-import { kiroProvider } from "./providers/kiro.js";
-import { kiroIdeProvider } from "./providers/kiro-ide.js";
+import { getKiroSessionsDir, kiroProvider } from "./providers/kiro.js";
+import {
+  getKiroIdeSessionsDir,
+  kiroIdeProvider,
+} from "./providers/kiro-ide.js";
 import type { SessionProvider } from "./providers/types.js";
 
-// Provider routing by path segment. Each check normalizes
-// backslashes first so Windows paths match too. Order matters only
-// in that Claude is the default fallback.
+const norm = (p: string) => p.replace(/\\/g, "/");
+
+// Provider routing by path. Primary check is a prefix match against
+// each provider's ACTUAL configured root (so KIRO_SESSIONS_DIR /
+// KIRO_IDE_SESSIONS_DIR overrides route correctly — a hardcoded
+// segment check alone would silently send overridden Kiro paths to
+// the Claude parser). The well-known segments stay as fallbacks for
+// nodes constructed before an env change. Claude is the default.
 function providerForPath(filePath: string): SessionProvider {
-  const p = filePath.replace(/\\/g, "/");
-  if (p.includes("/.kiro/sessions/")) return kiroProvider;
-  // Covers both workspace-sessions (session docs) and the profile
-  // dirs (execution docs — sub-agent rows point their filePath at
-  // these). The IDE parser sniffs which document shape it received.
-  if (p.includes("kiro.kiroagent/")) return kiroIdeProvider;
+  const p = norm(filePath);
+  if (
+    p.startsWith(`${norm(getKiroSessionsDir())}/`) ||
+    p.includes("/.kiro/sessions/")
+  ) {
+    return kiroProvider;
+  }
+  // The IDE root env points at workspace-sessions; execution docs
+  // (sub-agent filePaths) live under its PARENT, so prefix on the
+  // parent covers both.
+  if (
+    p.startsWith(`${norm(dirname(getKiroIdeSessionsDir()))}/`) ||
+    p.includes("kiro.kiroagent/")
+  ) {
+    return kiroIdeProvider;
+  }
   return claudeProvider;
 }
 

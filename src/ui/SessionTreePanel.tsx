@@ -165,12 +165,6 @@ function formatProjectPath(projectPath: string): string {
   return raw;
 }
 
-function truncatePath(path: string, maxWidth: number): string {
-  if (getDisplayWidth(path) <= maxWidth) return path;
-  if (maxWidth < 4) return "";
-  return `...${path.slice(-(maxWidth - 3))}`;
-}
-
 function SessionRow({
   session,
   isSelected,

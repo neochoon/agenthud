@@ -704,7 +704,10 @@ export function App({
     }
   }, [selectedId, sessionTree]);
 
-  // Reset scroll when filter changes
+  // Reset scroll when filter changes. `filterIndex` isn't read in
+  // the body — it's the trigger. biome's exhaustive-deps flags it,
+  // so spell the intent out for both the linter and the reader.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: filterIndex is the change trigger, not a body dependency
   useEffect(() => {
     setScrollOffset(0);
     setIsLive(true);
@@ -811,38 +814,38 @@ export function App({
     refreshRef.current = refresh;
   }, [refresh]);
 
-  // Auto-refresh in watch mode: fs.watch on macOS/Windows, polling fallback on Linux
+  // Auto-refresh in watch mode. POLLING IS PRIMARY and always on:
+  // it guarantees the tree converges within one interval on every
+  // platform, and it's the only signal that covers non-Claude
+  // providers — fs.watch below only watches the Claude projects
+  // dir, so without the poll, Kiro CLI/IDE changes would never
+  // trigger a refresh on macOS/Windows. fs.watch is a supplemental
+  // accelerator (sub-second updates) where recursive watch works.
   useEffect(() => {
     if (!isWatchMode) return;
 
-    const projectsDir = getProjectsDir();
-    const usePolling = process.platform === "linux" || !existsSync(projectsDir);
-
-    if (usePolling) {
-      const timer = setInterval(
-        () => refreshRef.current(),
-        config.refreshIntervalMs,
-      );
-      return () => clearInterval(timer);
-    }
+    const timer = setInterval(
+      () => refreshRef.current(),
+      config.refreshIntervalMs,
+    );
 
     let debounce: ReturnType<typeof setTimeout> | null = null;
     let watcher: FSWatcher | null = null;
-    try {
-      watcher = watch(projectsDir, { recursive: true }, () => {
-        if (debounce) clearTimeout(debounce);
-        debounce = setTimeout(() => refreshRef.current(), 150);
-      });
-    } catch {
-      // If watch() fails for any reason, fall back to polling
-      const timer = setInterval(
-        () => refreshRef.current(),
-        config.refreshIntervalMs,
-      );
-      return () => clearInterval(timer);
+    const projectsDir = getProjectsDir();
+    if (process.platform !== "linux" && existsSync(projectsDir)) {
+      try {
+        watcher = watch(projectsDir, { recursive: true }, () => {
+          if (debounce) clearTimeout(debounce);
+          debounce = setTimeout(() => refreshRef.current(), 150);
+        });
+      } catch {
+        // Recursive watch unsupported or failed — the poll above
+        // already covers us.
+      }
     }
 
     return () => {
+      clearInterval(timer);
       watcher?.close();
       if (debounce) clearTimeout(debounce);
     };

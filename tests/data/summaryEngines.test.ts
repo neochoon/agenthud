@@ -74,12 +74,24 @@ describe("engine arg building", () => {
     ).toContain("-m");
   });
 
-  it("kiro: non-interactive chat, no tools, prompt as input arg", () => {
+  it("kiro: non-interactive chat, no tools, NO positional (prompt goes via stdin)", () => {
     const args = kiroEngine.buildArgs({ prompt: "P" });
     expect(args[0]).toBe("chat");
     expect(args).toContain("--no-interactive");
     expect(args).toContain("--trust-tools=");
-    expect(args[args.length - 1]).toBe("P");
+    // Kiro reads stdin only when no positional question is given; if we
+    // pass the prompt as a positional it ignores the piped report. So
+    // the prompt must NOT appear in argv — it's prepended to stdin.
+    expect(args).not.toContain("P");
+  });
+});
+
+describe("engine inputMode", () => {
+  it("kiro takes its prompt via stdin; claude and codex via argv", () => {
+    expect(kiroEngine.inputMode).toBe("stdin");
+    // arg-mode engines either omit the field or set it to "arg".
+    expect(claudeEngine.inputMode ?? "arg").toBe("arg");
+    expect(codexEngine.inputMode ?? "arg").toBe("arg");
   });
 });
 

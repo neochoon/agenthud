@@ -31,7 +31,13 @@ vi.mock("node:child_process", () => ({
 vi.mock("../../src/data/summaryEngines.js", async (importActual) => {
   const actual =
     await importActual<typeof import("../../src/data/summaryEngines.js")>();
-  return { ...actual, resolveSummaryEngine: () => actual.claudeEngine };
+  // A vi.fn (not a plain arrow) so individual tests can override the
+  // resolved engine via mockReturnValueOnce — e.g. to exercise the
+  // stdin-input Kiro path. clearAllMocks keeps the default impl.
+  return {
+    ...actual,
+    resolveSummaryEngine: vi.fn(() => actual.claudeEngine),
+  };
 });
 
 vi.mock("../../src/data/sessions.js", () => ({
@@ -65,6 +71,9 @@ const {
   copyFileSync,
 } = await import("node:fs");
 const { spawn } = await import("node:child_process");
+const { kiroEngine, resolveSummaryEngine } = await import(
+  "../../src/data/summaryEngines.js"
+);
 const { runSummary } = await import("../../src/data/summaryRunner.js");
 
 beforeEach(() => {
@@ -96,6 +105,42 @@ function mockClaudeProcess(text = "OK", exitCode = 0, stderr = "") {
   proc.stdout = Readable.from([streamJson]);
   proc.stderr = Readable.from([stderr]);
   setImmediate(() => proc.emit("close", exitCode));
+  return proc;
+}
+
+// A Kiro-style process: plain text on stdout (the kiro parser strips
+// ANSI and passes it through), and a capturable stdin. `onStdin`
+// receives each chunk written to the child's stdin. `failStdin` makes
+// the stdin pipe emit an EPIPE on end() — simulating Kiro closing its
+// input early — to prove the runner doesn't crash on it.
+function mockKiroProcess(
+  opts: {
+    onStdin?: (chunk: string) => void;
+    failStdin?: boolean;
+    exitCode?: number;
+  } = {},
+) {
+  const proc = new EventEmitter() as EventEmitter & {
+    stdin: PassThrough;
+    stdout: Readable;
+    stderr: Readable;
+  };
+  proc.stdin = new PassThrough();
+  if (opts.onStdin) {
+    proc.stdin.on("data", (c: Buffer) => opts.onStdin?.(c.toString()));
+  }
+  if (opts.failStdin) {
+    proc.stdin.end = (() => {
+      proc.stdin.emit(
+        "error",
+        Object.assign(new Error("write EPIPE"), { code: "EPIPE" }),
+      );
+      return proc.stdin;
+    }) as typeof proc.stdin.end;
+  }
+  proc.stdout = Readable.from(["kiro summary text"]);
+  proc.stderr = Readable.from([""]);
+  setImmediate(() => proc.emit("close", opts.exitCode ?? 0));
   return proc;
 }
 
@@ -300,6 +345,80 @@ describe("runSummary spawn options", () => {
     const opts = callArgs[2] as { cwd: string };
     expect(opts).toBeDefined();
     expect(opts.cwd).toContain(".agenthud");
+  });
+});
+
+describe("runSummary stdin-input engine (Kiro)", () => {
+  it("sends the prompt AND the report on stdin for a stdin-mode engine", async () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(resolveSummaryEngine).mockReturnValueOnce(kiroEngine);
+
+    let stdin = "";
+    const mockStream = {
+      write: vi.fn(),
+      end: vi.fn((cb?: () => void) => {
+        if (cb) cb();
+      }),
+      on: vi.fn().mockReturnThis(),
+    };
+    vi.mocked(createWriteStream).mockReturnValue(
+      mockStream as unknown as ReturnType<typeof createWriteStream>,
+    );
+    vi.mocked(spawn).mockReturnValue(
+      mockKiroProcess({
+        onStdin: (c) => {
+          stdin += c;
+        },
+      }) as unknown as ReturnType<typeof spawn>,
+    );
+
+    await runSummary({
+      date: new Date(2026, 4, 15),
+      force: false,
+      today: new Date(2026, 4, 15),
+      prompt: "SUMMARIZE THIS",
+    });
+
+    // Kiro ignores a positional question when stdin is piped, so the
+    // instruction prompt has to ride along on stdin with the report.
+    const callArgs = vi.mocked(spawn).mock.calls[0];
+    expect(callArgs[0]).toBe("kiro-cli");
+    expect(callArgs[1]).not.toContain("SUMMARIZE THIS");
+    expect(stdin).toContain("SUMMARIZE THIS");
+    // ...followed by the generated report payload (the mocked report).
+    expect(stdin).toContain("## test");
+  });
+
+  it("does not crash when the engine closes stdin early (EPIPE)", async () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(resolveSummaryEngine).mockReturnValueOnce(kiroEngine);
+
+    const mockStream = {
+      write: vi.fn(),
+      end: vi.fn((cb?: () => void) => {
+        if (cb) cb();
+      }),
+      on: vi.fn().mockReturnThis(),
+    };
+    vi.mocked(createWriteStream).mockReturnValue(
+      mockStream as unknown as ReturnType<typeof createWriteStream>,
+    );
+    vi.mocked(spawn).mockReturnValue(
+      mockKiroProcess({ failStdin: true }) as unknown as ReturnType<
+        typeof spawn
+      >,
+    );
+
+    const code = await runSummary({
+      date: new Date(2026, 4, 15),
+      force: false,
+      today: new Date(2026, 4, 15),
+      prompt: "p",
+    });
+
+    // An unhandled 'error' on the stdin socket would throw and abort the
+    // process; reaching here with a clean exit proves it's swallowed.
+    expect(code).toBe(0);
   });
 });
 

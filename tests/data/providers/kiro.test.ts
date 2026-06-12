@@ -389,6 +389,49 @@ describe("kiroProvider.discoverSessions", () => {
     expect(tree.projects[0].sessions[0].modelName).toBeNull();
   });
 
+  it("does NOT mark stale sessions waiting even with a .lock present", () => {
+    // A Kiro terminal left open for hours keeps its .lock alive,
+    // but the conversation is idle — same recency rule as Claude's
+    // detectLiveState: no live badge past 30 minutes of mtime.
+    const sessionsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".kiro",
+      "sessions",
+      "cli",
+    );
+    const id = "stale444-dddd-dddd-dddd-dddddddddddd";
+
+    vi.mocked(existsSync).mockReturnValue(true); // .lock exists
+    vi.mocked(readdirSync).mockReturnValue([
+      `${id}.json`,
+      `${id}.jsonl`,
+      `${id}.lock`,
+    ] as unknown as ReturnType<typeof readdirSync>);
+    vi.mocked(statSync).mockImplementation(
+      () =>
+        ({
+          isDirectory: () => false,
+          mtimeMs: NOW - 2 * 60 * 60 * 1000, // 2h idle
+          size: 100,
+        }) as ReturnType<typeof statSync>,
+    );
+    vi.mocked(readFileSync).mockImplementation((p) => {
+      if (String(p).endsWith(".json")) {
+        return JSON.stringify({
+          session_id: id,
+          cwd: "/Users/neo/p",
+          title: "idle",
+          parent_session_id: null,
+        });
+      }
+      return "";
+    });
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const tree = kiroProvider.discoverSessions(mockConfig);
+    expect(tree.projects[0].sessions[0].liveState).toBeNull();
+  });
+
   it("sets liveState=waiting when a .lock file is present", () => {
     const sessionsDir = join(
       process.env.HOME ?? "/home/user",

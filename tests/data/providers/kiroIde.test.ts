@@ -362,6 +362,25 @@ describe("kiroIdeProvider sub-agents from execution files", () => {
     expect(sub.liveState).toBe("waiting");
   });
 
+  it("does NOT mark a stale PendingAction sub-agent waiting (IDE closed)", () => {
+    // If the IDE was quit while an approval was parked, the
+    // execution file stays "running"/"PendingAction" forever. The
+    // recency gate (30m on the group's last action) keeps dead
+    // approvals from showing a live badge indefinitely.
+    setRoot();
+    const exec = JSON.parse(executionJson());
+    exec.status = "running";
+    exec.actions[1].actionState = "PendingAction";
+    exec.actions[1].emittedAt = NOW - 2 * 60 * 60 * 1000; // 2h ago
+    exec.actions[1].endTime = undefined;
+    exec.actions = exec.actions.slice(0, 2);
+    mockFullLayout(JSON.stringify(exec));
+
+    const tree = kiroIdeProvider.discoverSessions(mockConfig);
+    const sub = tree.projects[0].sessions[0].subAgents[0];
+    expect(sub.liveState).toBeNull();
+  });
+
   it("counts sub-agents in totalCount", () => {
     setRoot();
     mockFullLayout(executionJson());

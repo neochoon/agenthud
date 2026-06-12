@@ -326,11 +326,18 @@ function buildSubAgentsBySession(
             !groupActions.some(
               (a) => a.actionType === "subagent_response",
             );
-          const liveState: LiveState | null = pending
-            ? "waiting"
-            : running
-              ? "working"
-              : null;
+          // Recency gate (same 30m rule as the other providers): a
+          // quit IDE leaves executions parked in "running" /
+          // "PendingAction" forever — without the gate those dead
+          // approvals would wear a live badge indefinitely.
+          const recentlyActive = Date.now() - lastMs < THIRTY_MINUTES_MS;
+          const liveState: LiveState | null = !recentlyActive
+            ? null
+            : pending
+              ? "waiting"
+              : running
+                ? "working"
+                : null;
 
           const prompt = action.input?.prompt ?? "";
           out.set(exec.chatSessionId, [

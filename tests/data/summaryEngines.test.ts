@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("node:fs", () => ({
@@ -25,21 +26,25 @@ afterEach(() => {
 
 // Make `isAvailable()` deterministic. Takes engine NAMES and maps to
 // the actual CLI binaries (kiro → kiro-cli), stubbing existsSync to
-// report only those present under a single fake PATH dir.
+// report only those present under a single fake PATH dir. The expected
+// lookup paths are built with the SAME `path.join` + extension logic as
+// commandExists, so the comparison holds on Windows (backslash
+// separators, `.exe`/`.cmd`/`.bat`) as well as POSIX.
 const NAME_TO_CMD: Record<string, string> = {
   claude: "claude",
   codex: "codex",
   kiro: "kiro-cli",
 };
+const FAKE_BIN = "/fakebin";
+const EXTS = process.platform === "win32" ? ["", ".exe", ".cmd", ".bat"] : [""];
 function onlyAvailable(...names: string[]): void {
-  process.env.PATH = "/fakebin";
-  const cmds = names.map((n) => NAME_TO_CMD[n] ?? n);
-  vi.mocked(existsSync).mockImplementation((p) => {
-    const path = String(p);
-    return cmds.some(
-      (c) => path === `/fakebin/${c}` || path === `/fakebin/${c}.exe`,
-    );
-  });
+  process.env.PATH = FAKE_BIN;
+  const present = new Set<string>();
+  for (const n of names) {
+    const cmd = NAME_TO_CMD[n] ?? n;
+    for (const ext of EXTS) present.add(join(FAKE_BIN, cmd + ext));
+  }
+  vi.mocked(existsSync).mockImplementation((p) => present.has(String(p)));
 }
 
 describe("engine arg building", () => {

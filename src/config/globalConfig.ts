@@ -130,11 +130,15 @@ report:
   format: markdown
 
 # Defaults for \`agenthud summary\`. Any field omitted here is inherited
-# from \`report\` above. \`model\` is summary-specific and passed to
-# \`claude --model\` (e.g. sonnet, haiku, or a full model id).
+# from \`report\` above. \`model\` is summary-specific, forwarded to the
+# engine's model flag (e.g. sonnet, gpt-5, or a full model id).
+# \`engine\` selects which agent CLI synthesizes the summary:
+#   auto (default) → first installed of claude, codex, kiro
+#   claude | codex | kiro → force that one
 summary:
   withGit: true
   detailLimit: 0
+  # engine: auto
   # model: sonnet
 `;
   try {
@@ -269,6 +273,9 @@ export function loadGlobalConfig(): GlobalConfig {
       config.summary.format = s.format;
     if (typeof s.model === "string" && s.model.trim().length > 0) {
       config.summary.model = s.model.trim();
+    }
+    if (typeof s.engine === "string" && s.engine.trim().length > 0) {
+      config.summary.engine = s.engine.trim().toLowerCase();
     }
   }
 

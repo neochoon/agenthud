@@ -237,15 +237,15 @@ function isSystemNoise(text: string): boolean {
  * Walk the session JSONL and pick the best user message to surface
  * as the session's row description. Preference order:
  *
- *   1. The LATEST "substantial" user message — long enough to carry
- *      intent (≥ 10 chars after trim) and not a slash command
+ *   1. The LATEST user message that isn't a slash command
  *      (`/compact`, `/clear`, …). For long sessions, this reflects
- *      what the user is doing NOW, not just what they asked at
- *      session start (which is often stale by hour 3).
- *   2. The FIRST natural-language user message — fallback when no
- *      later message qualifies as substantial. Preserves the
- *      original "first user prompt" behavior so short / quick
- *      sessions still show something meaningful.
+ *      what the user is doing NOW, not what they asked at session
+ *      start. Short follow-ups ("ok", "go") count — a length
+ *      threshold was tried (≥ 10 chars) and dropped by user
+ *      request: seeing the literal latest reply beats a stale
+ *      longer one.
+ *   2. The FIRST natural-language user message — fallback when
+ *      every later message is a slash command.
  *
  * Returns null when neither exists (empty session, all system
  * reminders, only tool results). The field is still named
@@ -260,13 +260,8 @@ function readFirstUserPrompt(filePath: string): string | null {
     return null;
   }
 
-  const MIN_SUBSTANTIAL_LEN = 10;
-  const isSubstantial = (text: string): boolean => {
-    const trimmed = text.trim();
-    if (trimmed.length < MIN_SUBSTANTIAL_LEN) return false;
-    if (trimmed.startsWith("/")) return false;
-    return true;
-  };
+  const isSubstantial = (text: string): boolean =>
+    !text.trim().startsWith("/");
 
   let first: string | null = null;
   let latestSubstantial: string | null = null;

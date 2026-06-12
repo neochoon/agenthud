@@ -965,7 +965,7 @@ describe("discoverSessions", () => {
     );
   });
 
-  it("prefers the latest substantial user message over the first", () => {
+  it("shows the latest user message regardless of length (slash commands skipped)", () => {
     const projectsDir = join(
       process.env.HOME ?? "/home/user",
       ".claude",
@@ -1004,7 +1004,7 @@ describe("discoverSessions", () => {
       }),
       JSON.stringify({
         type: "user",
-        message: { content: "ok" }, // trivial follow-up, must NOT win
+        message: { content: "Implement the OAuth2 callback handler" },
       }),
       JSON.stringify({
         type: "user",
@@ -1012,23 +1012,17 @@ describe("discoverSessions", () => {
       }),
       JSON.stringify({
         type: "user",
-        message: { content: "Implement the OAuth2 callback handler" },
-      }),
-      JSON.stringify({
-        type: "user",
-        message: { content: "yes" }, // trivial, must NOT win
+        message: { content: "yes" }, // short but real — WINS (no length filter)
       }),
     ].join("\n");
     vi.mocked(readFileSync).mockReturnValue(lines);
     vi.spyOn(Date, "now").mockReturnValue(NOW);
 
     const tree = discoverSessions(mockConfig);
-    expect(tree.projects[0].sessions[0].firstUserPrompt).toBe(
-      "Implement the OAuth2 callback handler",
-    );
+    expect(tree.projects[0].sessions[0].firstUserPrompt).toBe("yes");
   });
 
-  it("falls back to first prompt when all later messages are trivial or slash commands", () => {
+  it("falls back to first prompt when all later messages are slash commands", () => {
     const projectsDir = join(
       process.env.HOME ?? "/home/user",
       ".claude",
@@ -1067,15 +1061,11 @@ describe("discoverSessions", () => {
       }),
       JSON.stringify({
         type: "user",
-        message: { content: "ok" },
-      }),
-      JSON.stringify({
-        type: "user",
         message: { content: "/clear" },
       }),
       JSON.stringify({
         type: "user",
-        message: { content: "go" },
+        message: { content: "/compact" },
       }),
     ].join("\n");
     vi.mocked(readFileSync).mockReturnValue(lines);

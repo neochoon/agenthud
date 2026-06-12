@@ -210,6 +210,8 @@ export function generateReport(
 
       return {
         project: session.projectName,
+        provider: session.provider ?? null,
+        model: session.modelName ?? null,
         start: formatTime(acts[0].timestamp),
         end: formatTime(acts[acts.length - 1].timestamp),
         activities: acts.map((a) => ({
@@ -239,7 +241,16 @@ export function generateReport(
   for (const { session, activities } of blocks) {
     const first = formatTime(activities[0].timestamp);
     const last = formatTime(activities[activities.length - 1].timestamp);
-    lines.push(`## ${session.projectName} (${first} – ${last})`);
+    // Append provider + model as bullet-separated provenance so the
+    // reader (and the downstream summary LLM) knows which CLI / model
+    // produced this block. Same labels as the TUI: claude/kiro plus
+    // the shortened model id when known.
+    const provenance: string[] = [];
+    if (session.provider) provenance.push(session.provider);
+    if (session.modelName) provenance.push(session.modelName);
+    const suffix =
+      provenance.length > 0 ? ` · ${provenance.join(" · ")}` : "";
+    lines.push(`## ${session.projectName} (${first} – ${last})${suffix}`);
     lines.push("");
     for (const activity of activities) {
       lines.push(formatActivity(activity, detailLimit));

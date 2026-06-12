@@ -496,6 +496,14 @@ export function parseCodexActivities(lines: string[]): ParseResult {
 
 export const codexProvider: SessionProvider = {
   name: "codex",
+  lineDelimited: true,
+  isTurnBoundary: (line) => {
+    try {
+      return JSON.parse(line).type === "turn_context";
+    } catch {
+      return false;
+    }
+  },
   isAvailable: () => existsSync(getCodexSessionsDir()),
   discoverSessions: discoverCodexSessions,
   parseActivities: parseCodexActivities,

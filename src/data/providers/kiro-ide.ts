@@ -659,6 +659,7 @@ export function parseKiroIdeActivities(
 
 export const kiroIdeProvider: SessionProvider = {
   name: "kiro-ide",
+  lineDelimited: false,
   isAvailable: () => existsSync(getKiroIdeSessionsDir()),
   discoverSessions: discoverKiroIdeSessions,
   parseActivities: parseKiroIdeActivities,

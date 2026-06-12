@@ -718,6 +718,15 @@ export function discoverSessions(
  */
 export const claudeProvider: SessionProvider = {
   name: "claude",
+  lineDelimited: true,
+  isTurnBoundary: (line) => {
+    try {
+      const e = JSON.parse(line);
+      return e.type === "user" && e.toolUseResult === undefined;
+    } catch {
+      return false;
+    }
+  },
   isAvailable: () => existsSync(getProjectsDir()),
   discoverSessions,
   parseActivities: parseActivitiesFromLines,

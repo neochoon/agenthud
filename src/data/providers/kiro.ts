@@ -384,6 +384,14 @@ function discoverKiroSessions(
 
 export const kiroProvider: SessionProvider = {
   name: "kiro",
+  lineDelimited: true,
+  isTurnBoundary: (line) => {
+    try {
+      return JSON.parse(line).kind === "Prompt";
+    } catch {
+      return false;
+    }
+  },
   isAvailable: () => existsSync(getKiroSessionsDir()),
   discoverSessions: discoverKiroSessions,
   parseActivities: parseKiroActivitiesFromLines,

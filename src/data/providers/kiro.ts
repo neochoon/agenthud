@@ -48,6 +48,7 @@ import type {
 } from "../../types/index.js";
 import { ONE_HOUR_MS, THIRTY_MINUTES_MS } from "../../ui/constants.js";
 import { parseKiroActivitiesFromLines } from "./kiro-activity.js";
+import { pickLatestUserTitle } from "./sessionTitle.js";
 import type { DiscoverOptions, SessionProvider } from "./types.js";
 
 export function getKiroSessionsDir(): string {
@@ -97,6 +98,19 @@ interface KiroSessionMeta {
       context_usage_percentage?: number | null;
     } | null;
   } | null;
+}
+
+// The `.history` sidecar is newline-separated user prompts in
+// order. Return the latest substantial one (or null when the file
+// is missing/empty).
+function readHistoryTitle(historyPath: string): string | null {
+  if (!existsSync(historyPath)) return null;
+  try {
+    const lines = readFileSync(historyPath, "utf-8").split("\n");
+    return pickLatestUserTitle(lines);
+  } catch {
+    return null;
+  }
 }
 
 function readMeta(jsonPath: string): KiroSessionMeta | null {
@@ -205,6 +219,16 @@ function readRawSessions(
         percent: Math.min(100, Math.round(pct)),
       };
     }
+    // Row title = latest substantial user prompt, consistent with
+    // every other provider. The `.history` sidecar is a plain-text,
+    // newline-separated log of every user prompt in order (tiny) —
+    // the last non-slash line is the latest intent. Fall back to
+    // `.json.title` (the FIRST prompt) only when there's no history.
+    const historyTitle = readHistoryTitle(join(sessionsDir, `${id}.history`));
+    const metaTitle =
+      typeof meta.title === "string" && meta.title.trim().length > 0
+        ? meta.title
+        : null;
     out.push({
       id,
       hideKey: `${projectName}/${id}`,
@@ -212,10 +236,7 @@ function readRawSessions(
       projectPath: meta.cwd,
       projectName,
       lastModifiedMs: mtimeMs,
-      title:
-        typeof meta.title === "string" && meta.title.trim().length > 0
-          ? meta.title
-          : null,
+      title: historyTitle ?? metaTitle,
       parentSessionId: meta.parent_session_id ?? null,
       hasLock: existsSync(lockPath),
       modelId,

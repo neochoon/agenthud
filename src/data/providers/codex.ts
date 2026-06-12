@@ -50,6 +50,7 @@ import type {
 } from "../../types/index.js";
 import { ICONS } from "../../types/index.js";
 import { ONE_HOUR_MS, THIRTY_MINUTES_MS } from "../../ui/constants.js";
+import { pickLatestUserTitle } from "./sessionTitle.js";
 import type { ParseResult, SessionProvider } from "./types.js";
 
 export function getCodexSessionsDir(): string {
@@ -143,7 +144,7 @@ function parseMeta(path: string, mtimeMs: number): CodexMeta | null {
     let isSubagent = false;
     let parentThreadId: string | null = null;
     let model: string | null = null;
-    let title: string | null = null;
+    const userMessages: string[] = [];
     let contextUsage: CodexMeta["contextUsage"] = null;
 
     for (const line of lines) {
@@ -173,9 +174,7 @@ function parseMeta(path: string, mtimeMs: number): CodexMeta | null {
         }
       } else if (rec.type === "event_msg") {
         if (p.type === "user_message" && typeof p.message === "string") {
-          if (!title && p.message.trim() && !isEnvContext(p.message)) {
-            title = p.message.split("\n")[0] ?? null;
-          }
+          userMessages.push(p.message);
         } else if (p.type === "token_count" && p.info) {
           const total = p.info.model_context_window;
           const used = p.info.last_token_usage?.total_tokens;
@@ -201,7 +200,7 @@ function parseMeta(path: string, mtimeMs: number): CodexMeta | null {
         isSubagent,
         parentThreadId,
         model,
-        title,
+        title: pickLatestUserTitle(userMessages, isEnvContext),
         contextUsage,
       };
     }

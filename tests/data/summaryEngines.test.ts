@@ -95,6 +95,25 @@ describe("engine inputMode", () => {
   });
 });
 
+describe("engine stderrFilter", () => {
+  it("kiro drops its benign empty-`--trust-tools` warning, nothing else", () => {
+    const f = kiroEngine.stderrFilter;
+    expect(f).toBeInstanceOf(RegExp);
+    const esc = "\u001b";
+    // The real warning is ANSI-wrapped; the stable token is the phrase.
+    const warning = `${esc}[38;5;11mWARNING: ${esc}[0m--trust-tools arg for custom tool ${esc}[0m needs to be prepended with @{MCPSERVERNAME}/\n`;
+    expect(warning.replace(f as RegExp, "")).toBe("");
+    // A real diagnostic (e.g. an auth error) must pass through untouched.
+    const real = "Error: not logged in. Please run /login\n";
+    expect(real.replace(f as RegExp, "")).toBe(real);
+  });
+
+  it("claude and codex do not filter stderr", () => {
+    expect(claudeEngine.stderrFilter).toBeUndefined();
+    expect(codexEngine.stderrFilter).toBeUndefined();
+  });
+});
+
 describe("resolveSummaryEngine", () => {
   it("explicit config name wins and must be available", () => {
     onlyAvailable("codex");

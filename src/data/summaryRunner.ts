@@ -387,8 +387,15 @@ function spawnEngine(opts: SpawnEngineOpts): Promise<SpawnEngineResult> {
     });
 
     proc.stderr.on("data", (chunk: Buffer) => {
-      stderrBuf += chunk.toString();
-      process.stderr.write(chunk);
+      const text = chunk.toString();
+      // Keep the raw text for auth-hint detection on close, but strip a
+      // known-benign line (e.g. Kiro's empty-`--trust-tools` warning)
+      // from what the user sees. Real errors aren't matched.
+      stderrBuf += text;
+      const shown = engine.stderrFilter
+        ? text.replace(engine.stderrFilter, "")
+        : text;
+      if (shown) process.stderr.write(shown);
     });
 
     proc.on("close", (code) => {

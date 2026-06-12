@@ -118,6 +118,7 @@ function mockKiroProcess(
     onStdin?: (chunk: string) => void;
     failStdin?: boolean;
     exitCode?: number;
+    stderrText?: string;
   } = {},
 ) {
   const proc = new EventEmitter() as EventEmitter & {
@@ -139,7 +140,7 @@ function mockKiroProcess(
     }) as typeof proc.stdin.end;
   }
   proc.stdout = Readable.from(["kiro summary text"]);
-  proc.stderr = Readable.from([""]);
+  proc.stderr = Readable.from([opts.stderrText ?? ""]);
   setImmediate(() => proc.emit("close", opts.exitCode ?? 0));
   return proc;
 }
@@ -387,6 +388,47 @@ describe("runSummary stdin-input engine (Kiro)", () => {
     expect(stdin).toContain("SUMMARIZE THIS");
     // ...followed by the generated report payload (the mocked report).
     expect(stdin).toContain("## test");
+  });
+
+  it("suppresses Kiro's benign --trust-tools warning but keeps real stderr", async () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(resolveSummaryEngine).mockReturnValueOnce(kiroEngine);
+
+    const mockStream = {
+      write: vi.fn(),
+      end: vi.fn((cb?: () => void) => {
+        if (cb) cb();
+      }),
+      on: vi.fn().mockReturnThis(),
+    };
+    vi.mocked(createWriteStream).mockReturnValue(
+      mockStream as unknown as ReturnType<typeof createWriteStream>,
+    );
+    vi.mocked(spawn).mockReturnValue(
+      mockKiroProcess({
+        stderrText:
+          "WARNING: --trust-tools arg for custom tool  needs to be prepended with @{MCPSERVERNAME}/\nreal diagnostic line\n",
+      }) as unknown as ReturnType<typeof spawn>,
+    );
+
+    const stderrChunks: string[] = [];
+    const origErr = process.stderr.write.bind(process.stderr);
+    process.stderr.write = ((c: string | Uint8Array) => {
+      stderrChunks.push(String(c));
+      return true;
+    }) as typeof process.stderr.write;
+
+    await runSummary({
+      date: new Date(2026, 4, 15),
+      force: false,
+      today: new Date(2026, 4, 15),
+      prompt: "p",
+    });
+
+    process.stderr.write = origErr;
+    const allErr = stderrChunks.join("");
+    expect(allErr).not.toContain("--trust-tools arg for custom tool");
+    expect(allErr).toContain("real diagnostic line");
   });
 
   it("does not crash when the engine closes stdin early (EPIPE)", async () => {

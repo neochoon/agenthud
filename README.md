@@ -4,7 +4,7 @@
 [![CI](https://github.com/neochoon/agenthud/actions/workflows/ci.yml/badge.svg)](https://github.com/neochoon/agenthud/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/neochoon/agenthud/branch/main/graph/badge.svg)](https://codecov.io/gh/neochoon/agenthud)
 
-A heads-up display for your AI coding agents. AgentHUD reads each agent's on-disk session files and merges them into one tree, so a project you've touched from several agents shows as a single row with combined sessions and sub-agents.
+A heads-up display for your AI coding agents — Claude Code, OpenAI Codex, and AWS Kiro. AgentHUD reads each agent's on-disk session files and merges them into one tree, so a project you've touched from several agents shows as a single row with combined sessions and sub-agents.
 
 ![demo](./demo/live.gif)
 

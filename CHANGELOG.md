@@ -2,6 +2,54 @@
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-06-12
+
+### Added
+- **OpenAI Codex CLI as a fourth session provider.** Reads
+  `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` (override
+  `CODEX_SESSIONS_DIR`). Sessions group by `cwd`, show the model
+  (`turn_context.model`), a context-window gauge (taken directly
+  from the `token_count` event — no inference), and a cyan `codex`
+  provider label. Sub-agents are separate rollout files linked by
+  `parent_thread_id` and nest under their parent; older
+  (`source: { subagent: "<role>" }`, no parent link) sub-agents
+  surface at top level instead of being dropped.
+- **Per-agent session-file schemas** for all four providers under
+  `docs/schemas/` (Claude, Kiro CLI, Kiro IDE, Codex), each with
+  the `jq` commands used to derive it.
+
+### Changed
+- **Repositioned as a multi-agent monitor.** README, npm
+  description/keywords, and FEATURES now cover Claude Code + Codex
+  CLI + Kiro IDE + Kiro CLI rather than Claude-only. The same
+  project worked from multiple agents merges into one tree row.
+- **Consistent session-row titles across providers.** Every
+  provider now shows the latest substantial user message (skipping
+  slash commands), matching Claude. Previously Codex/Kiro CLI
+  showed the first prompt and Kiro IDE showed an auto-generated
+  label (`"Clean State"`) the user never typed.
+- **Cool sessions render dim.** The active count is hot + warm, but
+  cool sessions used to render bright like active ones — visually
+  contradicting the count. Cool now dims (still expanded/visible,
+  unlike collapsed cold); only hot/warm render bright.
+
+### Performance
+- **Discovery is cached per file by (path, mtime).** The Claude
+  provider re-read every session + sub-agent file's tail on each
+  ~2 s poll; with hundreds of mostly-cold files this was ~1.4 s and
+  blocked navigation. Cold files now read once — warm discovery
+  ~1450 ms → ~6 ms.
+- **The activity viewer no longer re-parses unchanged files.**
+  Parsed history is cached by (path, mtime), so reading or
+  navigating a stable session costs nothing.
+- **Growing JSONL parses only the appended tail.** When a session
+  file grows, agenthud re-parses just the new bytes (bounded-tail,
+  with the seam aligned to a turn boundary so nothing cross-line
+  straddles it) instead of the whole file. On a 25 MB session a new
+  response went from ~150 ms to ~12 ms, and stays bounded as the
+  session keeps growing. Kiro IDE (single JSON document) still
+  parses whole, gated by mtime.
+
 ## [0.16.0] - 2026-06-12
 
 ### Added

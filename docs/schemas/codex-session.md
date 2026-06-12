@@ -209,18 +209,21 @@ Robust classification rule:
   sub-agent without it is an orphan (surface it at top level rather
   than dropping it).
 
-## What an agenthud `codex` provider would consume
+## What the agenthud `codex` provider consumes
+
+Implemented in `src/data/providers/codex.ts`.
 
 | Signal | Source |
 |---|---|
-| Discovery | walk `~/.codex/sessions/**/*.jsonl` |
-| Top-level vs sub-agent | `session_meta.source` / `parent_thread_id` |
+| Discovery | walk `~/.codex/sessions/YYYY/MM/DD/*.jsonl` (override `CODEX_SESSIONS_DIR`) |
+| Top-level vs sub-agent | `session_meta.source` (object-with-`subagent` = child) / `parent_thread_id` |
 | Project grouping | `session_meta.cwd` |
 | Model | latest `turn_context.model` |
 | Context gauge | `token_count.info.last_token_usage.total_tokens / model_context_window` |
 | Row description | first non-`<environment_context>` `user_message.message` |
-| Recency | file mtime (or last record `timestamp`) |
+| Recency | file mtime |
 | Activities | `event_msg.user_message`/`agent_message`, `response_item.function_call` (exec_command → Bash, spawn_agent → Task) |
+| Per-file parse cache | keyed by (path, mtime) — cold rollouts never re-read |
 
 ## Verify the schema yourself
 

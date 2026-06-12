@@ -17,6 +17,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname } from "node:path";
 import type { ActivityEntry } from "../types/index.js";
 import { claudeProvider } from "./providers/claude.js";
+import { codexProvider, getCodexSessionsDir } from "./providers/codex.js";
 import { getKiroSessionsDir, kiroProvider } from "./providers/kiro.js";
 import {
   getKiroIdeSessionsDir,
@@ -48,6 +49,12 @@ function providerForPath(filePath: string): SessionProvider {
     p.includes("kiro.kiroagent/")
   ) {
     return kiroIdeProvider;
+  }
+  if (
+    p.startsWith(`${norm(getCodexSessionsDir())}/`) ||
+    p.includes("/.codex/sessions/")
+  ) {
+    return codexProvider;
   }
   return claudeProvider;
 }

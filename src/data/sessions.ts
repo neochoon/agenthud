@@ -33,6 +33,7 @@ import type {
   SessionTree,
 } from "../types/index.js";
 import { claudeProvider } from "./providers/claude.js";
+import { codexProvider } from "./providers/codex.js";
 import { kiroProvider } from "./providers/kiro.js";
 import { kiroIdeProvider } from "./providers/kiro-ide.js";
 import type { DiscoverOptions, SessionProvider } from "./providers/types.js";
@@ -48,6 +49,7 @@ const PROVIDERS: SessionProvider[] = [
   claudeProvider,
   kiroProvider,
   kiroIdeProvider,
+  codexProvider,
 ];
 
 /**

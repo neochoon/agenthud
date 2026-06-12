@@ -259,6 +259,100 @@ describe("kiroProvider.discoverSessions", () => {
     expect(tree.projects[0].sessions[0].modelName).toBe("claude-sonnet-4");
   });
 
+  it("extracts contextUsage from rts_model_state.context_usage_percentage", () => {
+    const sessionsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".kiro",
+      "sessions",
+      "cli",
+    );
+    const id = "iii99999-iiii-iiii-iiii-iiiiiiiiiiii";
+
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue([
+      `${id}.json`,
+      `${id}.jsonl`,
+    ] as unknown as ReturnType<typeof readdirSync>);
+    vi.mocked(statSync).mockImplementation(
+      () =>
+        ({
+          isDirectory: () => false,
+          mtimeMs: NOW - 60_000,
+          size: 100,
+        }) as ReturnType<typeof statSync>,
+    );
+    vi.mocked(readFileSync).mockImplementation((p) => {
+      if (String(p).endsWith(".json")) {
+        return JSON.stringify({
+          session_id: id,
+          cwd: "/Users/neo/p",
+          title: "t",
+          parent_session_id: null,
+          session_state: {
+            rts_model_state: {
+              model_info: { model_id: "auto", context_window_tokens: 200000 },
+              context_usage_percentage: 42.5,
+            },
+          },
+        });
+      }
+      return "";
+    });
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const tree = kiroProvider.discoverSessions(mockConfig);
+    const ctx = tree.projects[0].sessions[0].contextUsage;
+    expect(ctx).toBeDefined();
+    expect(ctx?.total).toBe(200000);
+    expect(ctx?.percent).toBe(43); // rounded from 42.5
+    expect(ctx?.used).toBe(85000);
+  });
+
+  it("leaves contextUsage undefined when percent is null", () => {
+    const sessionsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".kiro",
+      "sessions",
+      "cli",
+    );
+    const id = "jjjaaaaa-jjjj-jjjj-jjjj-jjjjjjjjjjjj";
+
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue([
+      `${id}.json`,
+      `${id}.jsonl`,
+    ] as unknown as ReturnType<typeof readdirSync>);
+    vi.mocked(statSync).mockImplementation(
+      () =>
+        ({
+          isDirectory: () => false,
+          mtimeMs: NOW - 60_000,
+          size: 100,
+        }) as ReturnType<typeof statSync>,
+    );
+    vi.mocked(readFileSync).mockImplementation((p) => {
+      if (String(p).endsWith(".json")) {
+        return JSON.stringify({
+          session_id: id,
+          cwd: "/Users/neo/p",
+          title: "t",
+          parent_session_id: null,
+          session_state: {
+            rts_model_state: {
+              model_info: null,
+              context_usage_percentage: null,
+            },
+          },
+        });
+      }
+      return "";
+    });
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const tree = kiroProvider.discoverSessions(mockConfig);
+    expect(tree.projects[0].sessions[0].contextUsage).toBeUndefined();
+  });
+
   it("falls back to null modelName when model_info is missing", () => {
     const sessionsDir = join(
       process.env.HOME ?? "/home/user",

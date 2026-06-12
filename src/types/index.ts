@@ -36,6 +36,18 @@ export interface SessionNode {
   liveState: LiveState | null; // working/waiting from JSONL tail; null = fall back to time-based status
   hidden?: boolean; // true when matched by hiddenSessions/hiddenSubAgents, or descendant of a hidden project
   provider?: "claude" | "kiro"; // origin source of this node. Renderer uses it for a small per-row label so users can tell at a glance which CLI created the session.
+  /**
+   * Most-recent context-window usage observed for this session.
+   * `percent` is the fraction-of-window (0..100) the renderer shows
+   * as a small colored gauge so users can spot sessions approaching
+   * the compact boundary at a glance. Source differs per provider:
+   * Claude derives it from the last `assistant.message.usage`
+   * (input + cache fields summed, divided by the model's window);
+   * Kiro reads `rts_model_state.context_usage_percentage` directly.
+   * Undefined when the value can't be derived (e.g. brand-new
+   * session with no assistant turns yet).
+   */
+  contextUsage?: { used: number; total: number; percent: number };
 }
 
 // Project node grouping sessions

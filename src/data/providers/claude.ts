@@ -134,7 +134,22 @@ function readSessionTail(
   filePath: string,
   mtimeMs: number,
   now: number,
-): { modelName: string | null; liveState: LiveState | null } {
+): {
+  modelName: string | null;
+  liveState: LiveState | null;
+} {
+  // Note on contextUsage: we INTENTIONALLY don't surface a context
+  // gauge for Claude sessions from JSONL. The naive computation
+  // (input_tokens + cache_creation_input_tokens + cache_read_input_tokens
+  // ÷ window) is wrong because `cache_read_input_tokens` sums
+  // CUMULATIVELY across cache breakpoints — a single turn on a
+  // 200K-window model routinely reports 500K+ in cache_read,
+  // which would mislabel every session as 100% full. A correct
+  // gauge would require either walking conversational lines since
+  // the most recent `compact_boundary` and tokenizing them, or
+  // hooking into Claude Code's `/context` output. Both are out of
+  // scope here; Kiro stores the percentage directly in its sidecar
+  // so the gauge works there.
   if (!existsSync(filePath)) return { modelName: null, liveState: null };
   try {
     const content = readFileSync(filePath, "utf-8");

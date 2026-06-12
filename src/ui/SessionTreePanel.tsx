@@ -207,7 +207,23 @@ function SessionRow({
         ? "yellow"
         : undefined;
 
+  // Context-window usage gauge. Shown on BOTH top-level sessions and
+  // sub-agents (they have independent contexts). Color encodes
+  // headroom: < 60% green (plenty), 60-85% yellow (watch), > 85%
+  // red (compact imminent). Plain dim when undefined.
+  const ctxPercent = session.contextUsage?.percent;
+  const ctxTag = ctxPercent !== undefined ? `${ctxPercent}%` : "";
+  const ctxColor: "green" | "yellow" | "red" | undefined =
+    ctxPercent === undefined
+      ? undefined
+      : ctxPercent >= 85
+        ? "red"
+        : ctxPercent >= 60
+          ? "yellow"
+          : "green";
+
   const rightParts: string[] = [elapsed];
+  if (ctxTag) rightParts.push(ctxTag);
   if (providerTag) rightParts.push(providerTag);
   if (model) rightParts.push(model);
   const rightSide = rightParts.join(" ");
@@ -280,6 +296,9 @@ function SessionRow({
         {middleText ? <Text dimColor>{middleSection}</Text> : null}
         <Text>{gap}</Text>
         <Text dimColor>{elapsed}</Text>
+        {ctxTag ? (
+          <Text color={ctxColor}>{` ${ctxTag}`}</Text>
+        ) : null}
         {providerTag ? (
           <Text color={providerColor} dimColor>
             {` ${providerTag}`}

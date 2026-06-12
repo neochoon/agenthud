@@ -89,7 +89,13 @@ interface KiroSessionMeta {
   // typically have `model_info: null` in their own sidecar.
   session_state?: {
     rts_model_state?: {
-      model_info?: { model_id?: string | null } | null;
+      model_info?: {
+        model_id?: string | null;
+        context_window_tokens?: number | null;
+      } | null;
+      // Float 0..1 in observed corpora (verify with the
+      // verification jq in docs/schemas/kiro-session.md).
+      context_usage_percentage?: number | null;
     } | null;
   } | null;
 }
@@ -118,6 +124,7 @@ interface RawSession {
   parentSessionId: string | null;
   hasLock: boolean;
   modelId: string | null;
+  contextUsage: { used: number; total: number; percent: number } | null;
 }
 
 function shortenModelId(raw: string): string {
@@ -176,11 +183,29 @@ function readRawSessions(
     }
 
     const projectName = basename(meta.cwd);
-    const rawModelId = meta.session_state?.rts_model_state?.model_info?.model_id;
+    const rts = meta.session_state?.rts_model_state;
+    const rawModelId = rts?.model_info?.model_id;
     const modelId =
       typeof rawModelId === "string" && rawModelId.length > 0
         ? shortenModelId(rawModelId)
         : null;
+    // Kiro stores percent (float 0..100) and the absolute window
+    // separately. Both nullable on brand-new sessions; we only
+    // surface the gauge when we have a real percentage value.
+    const pct = rts?.context_usage_percentage;
+    const total = rts?.model_info?.context_window_tokens;
+    let contextUsage: {
+      used: number;
+      total: number;
+      percent: number;
+    } | null = null;
+    if (typeof pct === "number" && pct >= 0 && typeof total === "number") {
+      contextUsage = {
+        used: Math.round((pct / 100) * total),
+        total,
+        percent: Math.min(100, Math.round(pct)),
+      };
+    }
     out.push({
       id,
       hideKey: `${projectName}/${id}`,
@@ -195,6 +220,7 @@ function readRawSessions(
       parentSessionId: meta.parent_session_id ?? null,
       hasLock: existsSync(lockPath),
       modelId,
+      contextUsage,
     });
   }
   return out;
@@ -216,6 +242,7 @@ function toSessionNode(raw: RawSession, hidden: boolean): SessionNode {
     firstUserPrompt: raw.title,
     liveState,
     provider: "kiro",
+    contextUsage: raw.contextUsage ?? undefined,
   };
   if (hidden) node.hidden = true;
   return node;

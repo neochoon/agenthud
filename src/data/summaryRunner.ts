@@ -68,7 +68,11 @@ import { generateReport } from "./reportGenerator.js";
 import { discoverSessions } from "./sessions.js";
 import { regenerateIndex } from "./summariesIndex.js";
 import type { SummaryEngine } from "./summaryEngines.js";
-import { resolveSummaryEngine } from "./summaryEngines.js";
+import {
+  cacheMatchesEngine,
+  engineMarker,
+  resolveSummaryEngine,
+} from "./summaryEngines.js";
 
 export interface SummaryOptions {
   date: Date;
@@ -434,8 +438,13 @@ function spawnEngine(opts: SpawnEngineOpts): Promise<SpawnEngineResult> {
       const failed = code !== 0 || noText;
       if (opts.cachePath && !failed) {
         const tmp = `${opts.cachePath}.tmp`;
+        // Stamp the cache with which (engine, model) produced it, so a
+        // later run with a different engine/model regenerates rather
+        // than serving stale text. The marker is an HTML comment, inert
+        // in rendered markdown and ignored by the index/backlink layer.
+        const cacheBody = `${engineMarker(engine.name, opts.model)}\n\n${assembledText}`;
         try {
-          writeFileSync(tmp, assembledText, "utf-8");
+          writeFileSync(tmp, cacheBody, "utf-8");
           renameSync(tmp, opts.cachePath);
         } catch (err) {
           process.stderr.write(
@@ -503,20 +512,30 @@ async function generateDailySummary(
   if (!isToday && !opts.force && existsSync(cached)) {
     try {
       const content = readFileSync(cached, "utf-8");
+      // Only reuse the cache if it was produced by the same engine and
+      // model now being requested; otherwise fall through to regenerate
+      // so a switched engine/model doesn't serve another's stale text.
+      if (cacheMatchesEngine(content, opts.engine.name, opts.model)) {
+        if (opts.announce) {
+          process.stderr.write(`cached summary from ${cached}\n`);
+        }
+        if (opts.streamToStdout) {
+          process.stdout.write(content);
+          if (!content.endsWith("\n")) process.stdout.write("\n");
+        }
+        return {
+          code: 0,
+          markdown: content,
+          fromCache: true,
+          skipped: false,
+          usage: null,
+        };
+      }
       if (opts.announce) {
-        process.stderr.write(`cached summary from ${cached}\n`);
+        process.stderr.write(
+          `cache from a different engine/model — regenerating ${dateLabel}...\n`,
+        );
       }
-      if (opts.streamToStdout) {
-        process.stdout.write(content);
-        if (!content.endsWith("\n")) process.stdout.write("\n");
-      }
-      return {
-        code: 0,
-        markdown: content,
-        fromCache: true,
-        skipped: false,
-        usage: null,
-      };
     } catch {
       // fall through to regenerate
     }
@@ -748,21 +767,28 @@ export async function runRangeSummary(
   ) {
     try {
       const content = readFileSync(rangeCache, "utf-8");
-      process.stderr.write(`cached range summary from ${rangeCache}\n`);
-      if (!options.open) {
-        process.stdout.write(content);
-        if (!content.endsWith("\n")) process.stdout.write("\n");
+      // Reuse only when the same engine/model produced it; a switched
+      // engine/model falls through to regenerate.
+      if (cacheMatchesEngine(content, engine.name, options.model)) {
+        process.stderr.write(`cached range summary from ${rangeCache}\n`);
+        if (!options.open) {
+          process.stdout.write(content);
+          if (!content.endsWith("\n")) process.stdout.write("\n");
+        }
+        try {
+          regenerateIndex(summariesDir());
+        } catch {
+          /* best-effort */
+        }
+        if (options.open) await openInDefaultApp(rangeCache);
+        if (options.openIndex) {
+          await openInDefaultApp(join(summariesDir(), "index.md"));
+        }
+        return 0;
       }
-      try {
-        regenerateIndex(summariesDir());
-      } catch {
-        /* best-effort */
-      }
-      if (options.open) await openInDefaultApp(rangeCache);
-      if (options.openIndex) {
-        await openInDefaultApp(join(summariesDir(), "index.md"));
-      }
-      return 0;
+      process.stderr.write(
+        `range cache from a different engine/model — regenerating\n`,
+      );
     } catch {
       // fall through to regenerate
     }

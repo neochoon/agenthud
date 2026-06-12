@@ -233,6 +233,51 @@ function engineByName(name: string): SummaryEngine | undefined {
   return ENGINES.find((e) => e.name === name);
 }
 
+// ── Cache provenance ──────────────────────────────────────────────
+//
+// A cached summary is the output of ONE (engine, model). Switching
+// either must regenerate, not silently serve the old engine's text.
+// We stamp a provenance marker into the summary body (separate from
+// the index's backlink block, so regenerateIndex leaves it alone)
+// and compare it on a cache hit.
+
+const ENGINE_MARKER_RE =
+  /<!--\s*agenthud-engine:\s*([a-z-]+)\s+model:\s*(.+?)\s*-->/i;
+
+/** Build the provenance marker prepended to a freshly generated
+ * summary. `model` defaults to the literal "default" when unset. */
+export function engineMarker(engine: string, model?: string): string {
+  return `<!-- agenthud-engine: ${engine} model: ${model ?? "default"} -->`;
+}
+
+/** Read the provenance marker back out of a cached summary, or null
+ * when the file predates markers. */
+export function parseEngineMarker(
+  content: string,
+): { engine: string; model: string } | null {
+  const m = content.match(ENGINE_MARKER_RE);
+  if (!m) return null;
+  return { engine: m[1].toLowerCase(), model: m[2] };
+}
+
+/**
+ * True when a cached summary may be reused for a request of
+ * (engine, model). A present marker must match both. A LEGACY cache
+ * (no marker — written before this feature) is treated as a claude
+ * summary, model-agnostic: reusable for claude requests, regenerated
+ * for codex/kiro. This avoids needlessly regenerating everyone's
+ * existing Claude summaries on upgrade while still honoring switches.
+ */
+export function cacheMatchesEngine(
+  content: string,
+  engine: string,
+  model?: string,
+): boolean {
+  const prov = parseEngineMarker(content);
+  if (!prov) return engine === "claude";
+  return prov.engine === engine && prov.model === (model ?? "default");
+}
+
 /**
  * Resolve which engine to run. `flag` (from `--engine`) wins, then
  * `engine` (from `summary.engine` config). `auto` (or unset) picks

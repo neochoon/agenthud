@@ -5,8 +5,16 @@ vi.mock("node:fs", () => ({
 }));
 
 const { existsSync } = await import("node:fs");
-const { claudeEngine, codexEngine, kiroEngine, resolveSummaryEngine, ENGINES } =
-  await import("../../src/data/summaryEngines.js");
+const {
+  claudeEngine,
+  codexEngine,
+  kiroEngine,
+  resolveSummaryEngine,
+  ENGINES,
+  engineMarker,
+  parseEngineMarker,
+  cacheMatchesEngine,
+} = await import("../../src/data/summaryEngines.js");
 
 const origPath = process.env.PATH;
 
@@ -149,5 +157,53 @@ describe("engine output parsing", () => {
     parser.feed(`${esc}[32mgreen${esc}[0m text`, (t) => out.push(t));
     expect(out.join("")).toBe("green text");
     expect(parser.usage()).toBeNull();
+  });
+});
+
+describe("engine provenance marker", () => {
+  it("round-trips engine + model through the marker", () => {
+    const marker = engineMarker("codex", "gpt-5");
+    expect(marker).toContain("codex");
+    expect(marker).toContain("gpt-5");
+    const parsed = parseEngineMarker(`${marker}\n\n## Summary body`);
+    expect(parsed).toEqual({ engine: "codex", model: "gpt-5" });
+  });
+
+  it("records 'default' when no model is given", () => {
+    const parsed = parseEngineMarker(engineMarker("claude"));
+    expect(parsed).toEqual({ engine: "claude", model: "default" });
+  });
+
+  it("returns null when the content has no marker", () => {
+    expect(parseEngineMarker("## just a body, no marker")).toBeNull();
+  });
+
+  describe("cacheMatchesEngine", () => {
+    it("matches when marker engine + model equal the request", () => {
+      const c = `${engineMarker("codex", "gpt-5")}\nbody`;
+      expect(cacheMatchesEngine(c, "codex", "gpt-5")).toBe(true);
+    });
+
+    it("misses on a different engine", () => {
+      const c = `${engineMarker("claude", "opus")}\nbody`;
+      expect(cacheMatchesEngine(c, "codex", undefined)).toBe(false);
+    });
+
+    it("misses on a different model", () => {
+      const c = `${engineMarker("claude", "opus")}\nbody`;
+      expect(cacheMatchesEngine(c, "claude", "sonnet")).toBe(false);
+    });
+
+    it("treats `undefined` request model as 'default'", () => {
+      const c = `${engineMarker("claude")}\nbody`;
+      expect(cacheMatchesEngine(c, "claude", undefined)).toBe(true);
+    });
+
+    it("legacy cache (no marker) counts as a claude summary, model-agnostic", () => {
+      const c = "## old summary written before provenance markers";
+      expect(cacheMatchesEngine(c, "claude", "anything")).toBe(true);
+      expect(cacheMatchesEngine(c, "codex", undefined)).toBe(false);
+      expect(cacheMatchesEngine(c, "kiro", undefined)).toBe(false);
+    });
   });
 });

@@ -66,6 +66,10 @@ export interface SummaryEngine {
   readonly inputMode?: "arg" | "stdin";
   /** Human label for the "CLI not found" hint. */
   readonly installHint: string;
+  /** Optional: a benign, known stderr line this engine always prints
+   *  that should be stripped from the passed-through diagnostics. Real
+   *  errors (auth, crashes) are NOT matched and still surface. */
+  readonly stderrFilter?: RegExp;
   buildArgs(ctx: BuildArgsCtx): string[];
   makeParser(): EngineParser;
   isAvailable(): boolean;
@@ -219,6 +223,12 @@ export const kiroEngine: SummaryEngine = {
   // the prompt rides on stdin (see buildArgs — it adds no positional).
   inputMode: "stdin",
   installHint: "see https://kiro.dev for the Kiro CLI",
+  // Kiro itself documents `--trust-tools=` as "trust no tools", yet
+  // still prints a warning that parses the empty value as a custom MCP
+  // tool name. It's harmless noise; strip just that line (ANSI and all)
+  // so real diagnostics stay visible. Matches the whole line by its
+  // stable phrase.
+  stderrFilter: /^.*--trust-tools arg for custom tool.*\r?\n?/m,
   buildArgs: ({ model }) => {
     const args = ["chat", "--no-interactive", "--trust-tools="];
     if (model) args.push("--model", model);

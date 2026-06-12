@@ -2,6 +2,58 @@
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-06-12
+
+### Added
+- **Kiro CLI sessions appear alongside Claude Code.** agenthud now
+  reads `~/.kiro/sessions/cli/` (override: `KIRO_SESSIONS_DIR`) as
+  a second session source. Both providers merge into one tree —
+  the same project worked from both CLIs renders as a single row
+  with combined counts. Discovery uses Kiro's `.json` sidecar
+  (`cwd` for grouping, `title` as the row description,
+  `parent_session_id` for sub-agent nesting) and the `.lock` file
+  as the liveness signal. The Kiro JSONL record format
+  (`Prompt` / `AssistantMessage` / `ToolResults`) is parsed into
+  the same activity stream the viewer, report, and summary
+  consume.
+- **Provider label on session rows.** Top-level sessions show
+  which CLI created them — `claude` (yellow) or `kiro`
+  (magenta) — between elapsed time and model name.
+- **Context-window usage gauge on session rows.** A colored `NN%`
+  (green < 60%, yellow 60–85%, red ≥ 85%) shows how full each
+  session's context is. Kiro reports the percentage directly in
+  its sidecar; Claude derives it from the last assistant turn's
+  usage fields with an adaptive window inference (usage > 200K ⇒
+  the session must be on the 1M long-context window). Verified
+  against `/context` output.
+- **Report headers carry provenance.** Markdown session blocks
+  now read `## project (start – end) · provider · model`; the
+  JSON format gains `provider` and `model` keys per session. The
+  summary LLM sees the provenance for free.
+- **Canonical tool labels across providers.** Kiro's raw tool
+  names (`shell`, `subagent`, `introspect`, `web_fetch`) map to
+  the Claude-style canonical taxonomy (`Bash`, `Task`, `Read`,
+  `WebFetch`) at the parser boundary, so report include-filters
+  and the activity viewer treat both providers uniformly.
+  Unknown names pass through visibly instead of being mislabeled.
+- **Per-provider session-file schema docs** at `docs/schemas/`
+  (claude-session.md, kiro-session.md), each ending with the jq
+  commands used to derive the field inventory — re-run them to
+  falsify the doc against your own sessions.
+
+### Changed
+- **Census is now the single source of truth for per-project
+  counts.** `computeCensus` builds a per-project map in the same
+  walk as the tree-wide totals and ProjectRow reads from it, so
+  the panel title and row counts can no longer disagree.
+- **Fable/Mythos model ids shorten like other families**
+  (`claude-fable-5` → `fable-5`).
+
+### Fixed
+- **Windows: Kiro session history routed to the wrong parser.**
+  The path check hardcoded `/` separators; backslash paths now
+  normalize first.
+
 ## [0.14.1] - 2026-06-12
 
 ### Changed

@@ -130,6 +130,29 @@ function readSubAgentInfo(filePath: string): {
   }
 }
 
+interface UsageFields {
+  input_tokens?: number;
+  cache_creation_input_tokens?: number;
+  cache_read_input_tokens?: number;
+}
+
+// Claude context windows come in two sizes: the standard 200K and
+// the long-context 1M (Opus 4.7+, Sonnet 1M beta). The JSONL doesn't
+// record which one a session runs on, so we infer: if the observed
+// prompt size exceeds 200K the session MUST be on the 1M window
+// (otherwise it would already have failed). The inverse direction
+// is lossy — a 1M session that hasn't crossed 200K yet reads as a
+// 200K session and its percentage shows inflated (conservative for
+// a "headroom before compact" gauge, so acceptable).
+const CLAUDE_WINDOW_STANDARD = 200_000;
+const CLAUDE_WINDOW_LONG = 1_000_000;
+
+function inferClaudeWindow(usedTokens: number): number {
+  return usedTokens > CLAUDE_WINDOW_STANDARD
+    ? CLAUDE_WINDOW_LONG
+    : CLAUDE_WINDOW_STANDARD;
+}
+
 function readSessionTail(
   filePath: string,
   mtimeMs: number,
@@ -137,40 +160,61 @@ function readSessionTail(
 ): {
   modelName: string | null;
   liveState: LiveState | null;
+  contextUsage: { used: number; total: number; percent: number } | null;
 } {
-  // Note on contextUsage: we INTENTIONALLY don't surface a context
-  // gauge for Claude sessions from JSONL. The naive computation
-  // (input_tokens + cache_creation_input_tokens + cache_read_input_tokens
-  // ÷ window) is wrong because `cache_read_input_tokens` sums
-  // CUMULATIVELY across cache breakpoints — a single turn on a
-  // 200K-window model routinely reports 500K+ in cache_read,
-  // which would mislabel every session as 100% full. A correct
-  // gauge would require either walking conversational lines since
-  // the most recent `compact_boundary` and tokenizing them, or
-  // hooking into Claude Code's `/context` output. Both are out of
-  // scope here; Kiro stores the percentage directly in its sidecar
-  // so the gauge works there.
-  if (!existsSync(filePath)) return { modelName: null, liveState: null };
+  if (!existsSync(filePath))
+    return { modelName: null, liveState: null, contextUsage: null };
   try {
     const content = readFileSync(filePath, "utf-8");
     const tail = content.trim().split("\n").filter(Boolean).slice(-50);
 
     let modelName: string | null = null;
+    let contextUsage: {
+      used: number;
+      total: number;
+      percent: number;
+    } | null = null;
+
+    // Walk backward for the most recent assistant entry. Its
+    // `message.model` is the display model; its `message.usage`
+    // input-side sum (input + cache_creation + cache_read) closely
+    // tracks the live prompt size — verified against `/context`
+    // output (sum 529K vs /context 541.6K on the same session).
     for (const line of [...tail].reverse()) {
       try {
         const entry = JSON.parse(line);
-        if (entry.type === "assistant" && entry.message?.model) {
+        if (entry.type !== "assistant") continue;
+        if (!modelName && entry.message?.model) {
           modelName = parseModelName(entry.message.model as string);
-          break;
         }
+        const usage = entry.message?.usage as UsageFields | undefined;
+        if (!contextUsage && usage) {
+          const used =
+            (usage.input_tokens ?? 0) +
+            (usage.cache_creation_input_tokens ?? 0) +
+            (usage.cache_read_input_tokens ?? 0);
+          if (used > 0) {
+            const total = inferClaudeWindow(used);
+            contextUsage = {
+              used,
+              total,
+              percent: Math.min(100, Math.round((used / total) * 100)),
+            };
+          }
+        }
+        if (modelName && contextUsage) break;
       } catch {
         // skip
       }
     }
 
-    return { modelName, liveState: detectLiveState(tail, mtimeMs, now) };
+    return {
+      modelName,
+      liveState: detectLiveState(tail, mtimeMs, now),
+      contextUsage,
+    };
   } catch {
-    return { modelName: null, liveState: null };
+    return { modelName: null, liveState: null, contextUsage: null };
   }
 }
 
@@ -310,7 +354,7 @@ function buildSubAgents(
         try {
           const stat = statSync(filePath);
           const { agentId, taskDescription } = readSubAgentInfo(filePath);
-          const { modelName, liveState } = readSessionTail(
+          const { modelName, liveState, contextUsage } = readSessionTail(
             filePath,
             stat.mtimeMs,
             Date.now(),
@@ -331,6 +375,7 @@ function buildSubAgents(
             firstUserPrompt: null,
             liveState,
             provider: "claude",
+            contextUsage: contextUsage ?? undefined,
           };
         } catch {
           return null;
@@ -455,7 +500,7 @@ export function discoverSessions(
         const stat = statSync(filePath);
         const subAgents = buildSubAgents(id, projectDir, config, projectName);
         const nonInteractive = readEntrypoint(filePath) === "sdk-cli";
-        const { modelName, liveState } = readSessionTail(
+        const { modelName, liveState, contextUsage } = readSessionTail(
           filePath,
           stat.mtimeMs,
           Date.now(),
@@ -474,6 +519,7 @@ export function discoverSessions(
           firstUserPrompt: readFirstUserPrompt(filePath),
           liveState: nonInteractive ? null : liveState,
           provider: "claude",
+          contextUsage: contextUsage ?? undefined,
         });
       } catch {}
     }

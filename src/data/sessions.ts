@@ -25,8 +25,14 @@
  *   should not assume per-project freshness from this field.
  */
 
-import type { GlobalConfig, SessionTree } from "../types/index.js";
+import type {
+  GlobalConfig,
+  ProjectNode,
+  SessionStatus,
+  SessionTree,
+} from "../types/index.js";
 import { claudeProvider } from "./providers/claude.js";
+import { kiroProvider } from "./providers/kiro.js";
 import type { DiscoverOptions, SessionProvider } from "./providers/types.js";
 
 export {
@@ -36,7 +42,7 @@ export {
 } from "./providers/claude.js";
 export type { DiscoverOptions } from "./providers/types.js";
 
-const PROVIDERS: SessionProvider[] = [claudeProvider];
+const PROVIDERS: SessionProvider[] = [claudeProvider, kiroProvider];
 
 /**
  * Walk every enabled provider, build per-provider `SessionTree`s,
@@ -68,9 +74,57 @@ function mergeTrees(trees: SessionTree[]): SessionTree {
   }
   if (trees.length === 1) return trees[0];
 
+  // Coalesce ProjectNodes by `projectPath` across providers — same
+  // directory worked from Claude AND Kiro should render as ONE
+  // project row with combined sessions, not two. Without this we
+  // produce duplicate keys in the React renderer (same `name` used
+  // as key prop) and the user sees the same project twice with the
+  // sessions split unpredictably between rows.
+  const byPath = new Map<string, ProjectNode>();
+  const coldByPath = new Map<string, ProjectNode>();
+
+  const statusRank: Record<string, number> = {
+    hot: 0,
+    warm: 1,
+    cool: 2,
+    cold: 3,
+  };
+  const hotter = (a: SessionStatus, b: SessionStatus) =>
+    statusRank[a] <= statusRank[b] ? a : b;
+
+  const merge = (
+    target: Map<string, ProjectNode>,
+    p: ProjectNode,
+  ) => {
+    const existing = target.get(p.projectPath);
+    if (!existing) {
+      target.set(p.projectPath, { ...p, sessions: [...p.sessions] });
+      return;
+    }
+    existing.sessions = existing.sessions.concat(p.sessions);
+    existing.hotness = hotter(existing.hotness, p.hotness);
+    if (p.hidden) existing.hidden = true;
+  };
+
+  for (const t of trees) {
+    for (const p of t.projects) merge(byPath, p);
+    for (const p of t.coldProjects) merge(coldByPath, p);
+  }
+
+  // A project that was cold from one provider but active from
+  // another should appear in the active list, not cold. Promote.
+  for (const [path, p] of coldByPath) {
+    if (byPath.has(path)) {
+      const target = byPath.get(path);
+      if (!target) continue;
+      target.sessions = target.sessions.concat(p.sessions);
+      coldByPath.delete(path);
+    }
+  }
+
   return {
-    projects: trees.flatMap((t) => t.projects),
-    coldProjects: trees.flatMap((t) => t.coldProjects),
+    projects: [...byPath.values()],
+    coldProjects: [...coldByPath.values()],
     totalCount: trees.reduce((n, t) => n + t.totalCount, 0),
     timestamp: trees[trees.length - 1].timestamp,
     hiddenStats: {

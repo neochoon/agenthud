@@ -440,6 +440,18 @@ describe("parseKiroIdeActivities", () => {
     expect(activities).toHaveLength(0);
   });
 
+  it("stamps history activities with the file mtime from context", () => {
+    // history[] has no timestamps; without the mtime stand-in every
+    // activity lands on epoch and the report's same-day filter
+    // silently drops the whole session.
+    const { activities } = parseKiroIdeActivities([sessionJson()], {
+      mtimeMs: NOW - 5_000,
+    });
+    expect(activities).toHaveLength(2);
+    expect(activities[0].timestamp.getTime()).toBe(NOW - 5_000);
+    expect(activities[1].timestamp.getTime()).toBe(NOW - 5_000);
+  });
+
   it("parses execution documents (actions[]) into tool/response activities", () => {
     const exec = JSON.stringify({
       executionId: "exec-1",

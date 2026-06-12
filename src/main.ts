@@ -58,6 +58,18 @@ import { isLegacyProjectConfig } from "./utils/legacyConfig.js";
 const globalConfig = loadGlobalConfig();
 const options = parseArgs(process.argv.slice(2), globalConfig);
 
+// exit(0) immediately after a large stdout write TRUNCATES piped
+// output — pipe writes are async and the unflushed remainder is
+// discarded on exit. Reproduced live: `agenthud report | grep` got
+// 574 of 966 lines and silently lost the trailing session blocks
+// (a file redirect got all 966 — file fds flush synchronously).
+// Await this before any exit that follows stdout output.
+function flushStdout(): Promise<void> {
+  return new Promise((resolve) => {
+    process.stdout.write("", () => resolve());
+  });
+}
+
 if (options.error) {
   process.stderr.write(`agenthud: ${options.error}\n`);
   process.exit(1);
@@ -125,6 +137,7 @@ if (options.mode === "report") {
     withGit: options.reportWithGit,
   });
   process.stdout.write(`${markdown}\n`);
+  await flushStdout();
   process.exit(0);
 }
 
@@ -163,6 +176,7 @@ if (options.mode === "summary") {
       open: options.summaryOpen,
       openIndex: options.summaryOpenIndex,
     });
+    await flushStdout();
     process.exit(exitCode);
   }
   const exitCode = await runSummary({
@@ -177,6 +191,7 @@ if (options.mode === "summary") {
     open: options.summaryOpen,
     openIndex: options.summaryOpenIndex,
   });
+  await flushStdout();
   process.exit(exitCode);
 }
 

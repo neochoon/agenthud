@@ -13,7 +13,7 @@
  *   reportGenerator, etc.) work unchanged for Claude paths.
  */
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import type { ActivityEntry } from "../types/index.js";
 import { claudeProvider } from "./providers/claude.js";
 import { kiroProvider } from "./providers/kiro.js";
@@ -46,7 +46,17 @@ export function parseSessionHistory(filePath: string): ActivityEntry[] {
   }
 
   const lines = content.trim().split("\n").filter(Boolean);
-  const { activities } = providerForPath(filePath).parseActivities(lines);
+  // mtime rides along for formats whose records carry no timestamps
+  // (Kiro IDE history[]). Providers that don't need it ignore it.
+  let mtimeMs: number | undefined;
+  try {
+    mtimeMs = statSync(filePath).mtimeMs;
+  } catch {
+    mtimeMs = undefined;
+  }
+  const { activities } = providerForPath(filePath).parseActivities(lines, {
+    mtimeMs,
+  });
 
   return activities;
 }

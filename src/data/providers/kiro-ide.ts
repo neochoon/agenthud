@@ -55,7 +55,11 @@ import type {
 } from "../../types/index.js";
 import { ICONS } from "../../types/index.js";
 import { ONE_HOUR_MS, THIRTY_MINUTES_MS } from "../../ui/constants.js";
-import type { ParseResult, SessionProvider } from "./types.js";
+import type {
+  ParseContext,
+  ParseResult,
+  SessionProvider,
+} from "./types.js";
 
 export function getKiroIdeSessionsDir(): string {
   if (process.env.KIRO_IDE_SESSIONS_DIR) {
@@ -580,7 +584,10 @@ function actionToActivity(a: IdeExecutionAction): ActivityEntry | null {
   }
 }
 
-export function parseKiroIdeActivities(lines: string[]): ParseResult {
+export function parseKiroIdeActivities(
+  lines: string[],
+  context?: ParseContext,
+): ParseResult {
   const empty: ParseResult = {
     activities: [],
     tokenCount: 0,
@@ -617,7 +624,12 @@ export function parseKiroIdeActivities(lines: string[]): ParseResult {
   if (!Array.isArray(doc.history)) return empty;
 
   const activities: ActivityEntry[] = [];
-  const ts = new Date(0);
+  // History entries carry no timestamps. The session file's mtime
+  // (passed via context) is the best stand-in — it makes the
+  // activities land on the day the session was last touched so the
+  // report's same-day filter doesn't silently drop the session.
+  // Epoch fallback keeps direct callers (tests) working.
+  const ts = new Date(context?.mtimeMs ?? 0);
   for (const entry of doc.history) {
     const role = entry?.message?.role;
     const text = firstTextBlock(entry?.message?.content);

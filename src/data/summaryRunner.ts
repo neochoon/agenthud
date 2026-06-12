@@ -459,7 +459,19 @@ function spawnEngine(opts: SpawnEngineOpts): Promise<SpawnEngineResult> {
       });
     });
 
-    proc.stdin.end(opts.stdin);
+    // "stdin"-mode engines (Kiro) ignore stdin once a positional
+    // question is present, so their prompt is kept out of argv and
+    // prepended to the piped payload here instead.
+    const stdinPayload =
+      engine.inputMode === "stdin"
+        ? `${opts.prompt}\n\n${opts.stdin}`
+        : opts.stdin;
+    // An engine that reads only part of stdin (or none) closes the pipe
+    // early; the in-flight write then surfaces as EPIPE. Swallow it —
+    // the summary still streams from stdout — rather than letting the
+    // unhandled 'error' event abort the whole process.
+    proc.stdin.on("error", () => {});
+    proc.stdin.end(stdinPayload);
   });
 }
 

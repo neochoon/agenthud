@@ -57,6 +57,13 @@ export interface SummaryEngine {
    *  "file": stdout is progress noise; the text is read from the
    *  `outFile` the caller passed in buildArgs. */
   readonly outputMode: "stream" | "file";
+  /** How the engine receives the prompt.
+   *  "arg" (default): prompt is a positional in buildArgs; the report
+   *  is piped to stdin and the CLI merges the two.
+   *  "stdin": the CLI reads stdin only when given NO positional
+   *  question (Kiro), so the prompt is prepended to the stdin payload
+   *  and kept out of argv. */
+  readonly inputMode?: "arg" | "stdin";
   /** Human label for the "CLI not found" hint. */
   readonly installHint: string;
   buildArgs(ctx: BuildArgsCtx): string[];
@@ -208,11 +215,13 @@ export const kiroEngine: SummaryEngine = {
   name: "kiro",
   command: "kiro-cli",
   outputMode: "stream",
+  // Kiro reads stdin only when no positional question is supplied, so
+  // the prompt rides on stdin (see buildArgs — it adds no positional).
+  inputMode: "stdin",
   installHint: "see https://kiro.dev for the Kiro CLI",
-  buildArgs: ({ prompt, model }) => {
+  buildArgs: ({ model }) => {
     const args = ["chat", "--no-interactive", "--trust-tools="];
     if (model) args.push("--model", model);
-    args.push(prompt);
     return args;
   },
   // Plain text on stdout; strip ANSI so the cached summary is clean.

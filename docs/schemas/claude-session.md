@@ -177,15 +177,39 @@ interface TokenUsage {
 }
 ```
 
-### Canonical tool names
+### Tool names
 
-The `name` field on `tool_use` blocks uses CamelCase canonical names:
+The `name` field on `tool_use` blocks uses CamelCase. Names observed
+in the user's actual session pile (run the jq command below to
+regenerate this list against your own corpus):
 
 ```
-Read, Edit, Write, Bash, Glob, Grep, WebFetch, WebSearch, Task,
-TodoWrite, AskUserQuestion, NotebookEdit, Skill, ExitPlanMode,
-SlashCommand
+Agent, AskUserQuestion, Bash, Edit, EnterWorktree, ExitPlanMode,
+ExitWorktree, Monitor, Read, ScheduleWakeup, Skill, TaskCreate,
+TaskList, TaskOutput, TaskStop, TaskUpdate, ToolSearch, WebSearch,
+Write
 ```
+
+Additional tools that exist in Claude Code but didn't show up in
+this user's recent sessions (kept in `providers/toolLabels.ts` and
+the `ICONS` table because they appear on other machines): `Glob`,
+`Grep`, `WebFetch`, `TodoWrite`, `NotebookEdit`, `SlashCommand`,
+`Task` (legacy name, may have been superseded by `Agent` —
+verify if you care).
+
+#### MCP-namespaced tools
+
+Tools provided by MCP servers carry a namespaced name:
+
+```
+mcp__<server>__<tool>
+e.g. mcp__plugin_Notion_notion__notion-fetch
+```
+
+agenthud's parser treats these as opaque labels (passes through to
+`ICONS.Default` since the inner tool semantics vary by server).
+There's no fixed list — every MCP server the user installs adds
+more.
 
 agenthud's `providers/toolLabels.ts` treats Claude's names as the
 canonical taxonomy that other providers (Kiro, ...) map into.

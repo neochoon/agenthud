@@ -66,13 +66,16 @@ jobs:
           echo "Timed out waiting for CI."
           exit 1
 
-      # Build on the LOWEST supported runtime (engines: >=20) so an
-      # accidental use of a newer-Node API fails here, not on a
-      # user's machine.
-      - name: Use Node.js 20
+      # npm OIDC trusted publishing (id-token + --provenance, no
+      # NPM_TOKEN) requires npm >= 11.5.1, which ships with Node 24+.
+      # Node 20's bundled npm 10.x can't authenticate via OIDC and
+      # the publish 404s. The "does it run on Node 20" guarantee is
+      # the typecheck's job (CI runs tsc against @types/node@^20),
+      # not the publish build's — so publish stays on Node 24.
+      - name: Use Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies

@@ -7,13 +7,14 @@ vi.mock("node:fs", () => ({
 }));
 
 const { existsSync, readFileSync } = await import("node:fs");
-const { parseSessionHistory } = await import(
+const { parseSessionHistory, clearSessionHistoryCache } = await import(
   "../../src/data/sessionHistory.js"
 );
 
 afterEach(() => {
   vi.resetAllMocks();
   delete process.env.KIRO_SESSIONS_DIR;
+  clearSessionHistoryCache();
 });
 
 const makeLines = (count: number) =>

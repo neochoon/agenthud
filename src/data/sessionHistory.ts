@@ -59,10 +59,40 @@ function providerForPath(filePath: string): SessionProvider {
   return claudeProvider;
 }
 
+// Parsed-history cache keyed by path → { mtime, activities }. The
+// activity viewer in LIVE mode re-asks for the selected session's
+// history on every ~2s poll. For a long-running session the file is
+// huge (this conversation's JSONL is 25 MB) and a full re-parse runs
+// ~150 ms — every poll, even while the user is just reading or
+// navigating and the file hasn't changed. Caching by mtime makes the
+// no-change polls free; a re-parse only happens when new content was
+// actually appended (mtime advances).
+const historyCache = new Map<
+  string,
+  { mtimeMs: number; activities: ActivityEntry[] }
+>();
+
+/** Test/maintenance hook: drop the parsed-history cache. */
+export function clearSessionHistoryCache(): void {
+  historyCache.clear();
+}
+
 // Parse the full, untruncated activity history from a session file.
 // Returns entries in chronological order (oldest first).
 export function parseSessionHistory(filePath: string): ActivityEntry[] {
   if (!existsSync(filePath)) return [];
+
+  let mtimeMs: number | undefined;
+  try {
+    mtimeMs = statSync(filePath).mtimeMs;
+  } catch {
+    mtimeMs = undefined;
+  }
+
+  if (mtimeMs !== undefined) {
+    const cached = historyCache.get(filePath);
+    if (cached && cached.mtimeMs === mtimeMs) return cached.activities;
+  }
 
   let content: string;
   try {
@@ -74,15 +104,12 @@ export function parseSessionHistory(filePath: string): ActivityEntry[] {
   const lines = content.trim().split("\n").filter(Boolean);
   // mtime rides along for formats whose records carry no timestamps
   // (Kiro IDE history[]). Providers that don't need it ignore it.
-  let mtimeMs: number | undefined;
-  try {
-    mtimeMs = statSync(filePath).mtimeMs;
-  } catch {
-    mtimeMs = undefined;
-  }
   const { activities } = providerForPath(filePath).parseActivities(lines, {
     mtimeMs,
   });
 
+  if (mtimeMs !== undefined) {
+    historyCache.set(filePath, { mtimeMs, activities });
+  }
   return activities;
 }

@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-06-12
+
+### Added
+- **Pluggable summary engine.** `agenthud summary` is no longer hard-wired
+  to `claude` — it can now run through Claude Code, OpenAI Codex CLI, or
+  Kiro CLI. Pick one per run with `--engine <claude|codex|kiro|auto>`, or
+  set a default with `summary.engine` in `~/.agenthud/config.yaml`. The
+  default is `auto`, which detects the first installed CLI in
+  claude → codex → kiro order. This lets Codex- or Kiro-only users
+  generate summaries without installing Claude.
+
+### Changed
+- **Summary cache is now keyed by engine and model, not just date.** Each
+  cached daily/range summary records which (engine, model) produced it via
+  an inert HTML-comment marker; switching the engine or model regenerates
+  the summary instead of serving the previous engine's stale text. Caches
+  written before this release are treated as Claude output and reused for
+  Claude requests, so existing summaries are not needlessly regenerated on
+  upgrade.
+
 ## [0.17.0] - 2026-06-12
 
 ### Added

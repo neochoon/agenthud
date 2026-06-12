@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("node:fs", () => ({
@@ -39,14 +40,23 @@ describe("discoverSessions orchestrator", () => {
     // Set up: Claude has one session in /shared/proj, Kiro has one
     // session in the SAME /shared/proj. Merge must produce ONE
     // ProjectNode with both sessions, not two.
-    const claudeProjects = "/home/u/.claude/projects";
-    const claudeProj = `${claudeProjects}/-shared-proj`;
-    const claudeSess = `${claudeProj}/claude-id.jsonl`;
-    const kiroDir = "/home/u/.kiro/sessions/cli";
+    //
+    // Platform note: both provider roots are injected via their env
+    // overrides (CLAUDE_PROJECTS_DIR / KIRO_SESSIONS_DIR) and every
+    // expected path is built with join() — comparisons must match
+    // what the providers construct, which uses the OS separator.
+    // Setting process.env.HOME doesn't work on Windows (homedir()
+    // reads USERPROFILE), which is why the env overrides exist.
+    const claudeProjects = join("/home", "u", ".claude", "projects");
+    const claudeProj = join(claudeProjects, "-shared-proj");
+    const claudeSess = join(claudeProj, "claude-id.jsonl");
+    const kiroDir = join("/home", "u", ".kiro", "sessions", "cli");
     const kiroId = "kiro-id";
+    const kiroJson = join(kiroDir, `${kiroId}.json`);
+    const kiroJsonl = join(kiroDir, `${kiroId}.jsonl`);
 
-    process.env.HOME = "/home/u";
     process.env.CLAUDE_PROJECTS_DIR = claudeProjects;
+    process.env.KIRO_SESSIONS_DIR = kiroDir;
 
     vi.mocked(existsSync).mockImplementation((p) => {
       const path = String(p);
@@ -56,8 +66,8 @@ describe("discoverSessions orchestrator", () => {
         path === claudeProj ||
         path === claudeSess ||
         path === kiroDir ||
-        path === `${kiroDir}/${kiroId}.json` ||
-        path === `${kiroDir}/${kiroId}.jsonl`
+        path === kiroJson ||
+        path === kiroJsonl
       );
     });
     vi.mocked(readdirSync).mockImplementation((p) => {
@@ -88,6 +98,8 @@ describe("discoverSessions orchestrator", () => {
       if (String(p).endsWith(`${kiroId}.json`)) {
         return JSON.stringify({
           session_id: kiroId,
+          // cwd must decode to the same projectPath the Claude
+          // provider derives from the encoded directory name.
           cwd: "/shared/proj",
           title: "kiro work",
           parent_session_id: null,
@@ -106,5 +118,6 @@ describe("discoverSessions orchestrator", () => {
     expect(tree.projects[0].sessions).toHaveLength(2);
 
     delete process.env.CLAUDE_PROJECTS_DIR;
+    delete process.env.KIRO_SESSIONS_DIR;
   });
 });

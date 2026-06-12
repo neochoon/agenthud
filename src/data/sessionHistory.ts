@@ -21,8 +21,10 @@ import { kiroProvider } from "./providers/kiro.js";
 function isKiroPath(filePath: string): boolean {
   // Match both the default `~/.kiro/sessions/` location and
   // the test/override path via `KIRO_SESSIONS_DIR`. Looking for
-  // the literal segment is robust against home-directory variations.
-  return filePath.includes("/.kiro/sessions/");
+  // the literal segment is robust against home-directory
+  // variations; normalize separators first so Windows paths
+  // (`C:\Users\x\.kiro\sessions\...`) match too.
+  return filePath.replace(/\\/g, "/").includes("/.kiro/sessions/");
 }
 
 // Parse the full, untruncated activity history from a JSONL file.

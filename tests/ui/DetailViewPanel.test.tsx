@@ -213,7 +213,7 @@ describe("wrapText", () => {
   });
 
   it("word-wraps long lines independently", () => {
-    const text = "short\n" + "word ".repeat(20).trim();
+    const text = `short\n${"word ".repeat(20).trim()}`;
     const result = wrapText(text, 30);
     expect(result[0]).toBe("short");
     expect(result.length).toBeGreaterThan(2);

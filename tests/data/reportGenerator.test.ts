@@ -598,6 +598,39 @@ describe("generateReport", () => {
     );
   });
 
+  it("fetches commits once per project even with multiple sessions", () => {
+    vi.mocked(statSync).mockReturnValue({
+      mtimeMs: new Date("2026-05-14T10:00:00Z").getTime(),
+    } as ReturnType<typeof statSync>);
+    vi.mocked(parseSessionHistory).mockReturnValue([
+      makeActivity({
+        type: "response",
+        icon: "<",
+        label: "Response",
+        detail: "Done.",
+      }),
+    ]);
+    vi.mocked(parseGitCommits).mockReturnValue([
+      {
+        timestamp: new Date(2026, 4, 14, 11, 0),
+        type: "commit",
+        icon: "◆",
+        label: "abc1234",
+        detail: "feat: add report command",
+      },
+    ]);
+
+    // Two sessions in the SAME project — the commit must appear in
+    // the report exactly once, not once per session.
+    const result = generateReport(
+      [makeSession({ id: "s1" }), makeSession({ id: "s2" })],
+      { date: DAY, include: ["response"], withGit: true },
+    );
+    expect(vi.mocked(parseGitCommits)).toHaveBeenCalledTimes(1);
+    const occurrences = result.split("◆ abc1234").length - 1;
+    expect(occurrences).toBe(1);
+  });
+
   it("does not call parseGitCommits when withGit is false", () => {
     vi.mocked(statSync).mockReturnValue({
       mtimeMs: new Date("2026-05-14T10:00:00Z").getTime(),

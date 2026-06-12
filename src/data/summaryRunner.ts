@@ -51,6 +51,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  renameSync,
   unlinkSync,
 } from "node:fs";
 import { homedir } from "node:os";
@@ -337,9 +338,15 @@ function spawnClaude(opts: SpawnClaudeOpts): Promise<SpawnClaudeResult> {
       cwd: agenthudHomeDir(),
     });
 
+    // Stream to a temp file and rename into place on success. A
+    // direct stream to the final path leaves a PARTIAL summary
+    // behind if the process dies mid-generation (SIGKILL, crash,
+    // power loss) — and a partial file at the cache path is
+    // indistinguishable from a complete summary on the next run.
     let cacheStream: ReturnType<typeof createWriteStream> | null = null;
-    if (opts.cachePath) {
-      cacheStream = createWriteStream(opts.cachePath, { encoding: "utf-8" });
+    const cacheTmpPath = opts.cachePath ? `${opts.cachePath}.tmp` : null;
+    if (cacheTmpPath) {
+      cacheStream = createWriteStream(cacheTmpPath, { encoding: "utf-8" });
       cacheStream.on("error", (err: Error) => {
         process.stderr.write(
           `agenthud: warning: cannot write cache (${err.message})\n`,
@@ -442,16 +449,8 @@ function spawnClaude(opts: SpawnClaudeOpts): Promise<SpawnClaudeResult> {
         lineBuf = "";
       }
       if (opts.streamToStdout) process.stdout.write("\n");
-      cacheStream?.end();
 
       if (code !== 0) {
-        if (opts.cachePath) {
-          try {
-            unlinkSync(opts.cachePath);
-          } catch {
-            // ignore
-          }
-        }
         const combined = (stderrBuf + stdoutErrBuf).toLowerCase();
         if (
           combined.includes("not logged in") ||
@@ -464,7 +463,33 @@ function spawnClaude(opts: SpawnClaudeOpts): Promise<SpawnClaudeResult> {
           );
         }
       }
-      resolve({ code: code ?? 1, text: assembledText, usage });
+
+      // Promote the temp cache into place (success) or discard it
+      // (failure) BEFORE resolving — callers read the cache path
+      // right after this promise settles.
+      const finishCache = () => {
+        if (cacheTmpPath && opts.cachePath) {
+          if (code === 0) {
+            try {
+              renameSync(cacheTmpPath, opts.cachePath);
+            } catch {
+              // best-effort — worst case the cache is just absent
+            }
+          } else {
+            try {
+              unlinkSync(cacheTmpPath);
+            } catch {
+              // ignore
+            }
+          }
+        }
+        resolve({ code: code ?? 1, text: assembledText, usage });
+      };
+      if (cacheStream) {
+        cacheStream.end(() => finishCache());
+      } else {
+        finishCache();
+      }
     });
 
     proc.stdin.end(opts.stdin);
@@ -511,8 +536,6 @@ interface DailyGenResult {
 async function generateDailySummary(
   opts: DailyGenOpts,
 ): Promise<DailyGenResult> {
-  ensureUserPromptFile("daily");
-
   const isToday = isSameLocalDay(opts.date, opts.today);
   const cached = dailyCachePath(opts.date);
   const dateLabel = dateKey(opts.date);
@@ -542,6 +565,11 @@ async function generateDailySummary(
   if (opts.announce) {
     process.stderr.write(`scanning sessions for ${dateLabel}...\n`);
   }
+
+  // Materialize the user-editable prompt template only on the
+  // generate path — a cache hit (early-returned above) is read-only
+  // and shouldn't write files into the user's home directory.
+  ensureUserPromptFile("daily");
 
   const config = loadGlobalConfig();
   const tree = discoverSessions(config);
@@ -723,9 +751,6 @@ export async function runSummary(options: SummaryOptions): Promise<number> {
 export async function runRangeSummary(
   options: RangeSummaryOptions,
 ): Promise<number> {
-  ensureUserPromptFile("daily");
-  ensureUserPromptFile("range");
-
   const dates = enumerateDates(options.from, options.to);
   const fromLabel = dateKey(options.from);
   const toLabel = dateKey(options.to);
@@ -761,12 +786,20 @@ export async function runRangeSummary(
     }
   }
 
-  // Classify cached vs missing for the pre-run report (today is never cached).
+  // Generate path from here on — safe to materialize the
+  // user-editable prompt templates now (the range-cache hit above
+  // returns without writing anything to the home directory).
+  ensureUserPromptFile("daily");
+  ensureUserPromptFile("range");
+
+  // Classify cached vs missing for the pre-run report (today is never
+  // cached; --force treats everything as missing).
   let cachedCount = 0;
   let missingCount = 0;
   for (const d of dates) {
     const isToday = isSameLocalDay(d, options.today);
-    if (!isToday && existsSync(dailyCachePath(d))) cachedCount++;
+    if (!options.force && !isToday && existsSync(dailyCachePath(d)))
+      cachedCount++;
     else missingCount++;
   }
 
@@ -778,14 +811,14 @@ export async function runRangeSummary(
   // Generate dailies sequentially. Confirm just-in-time after scan (when --yes is off).
   // Each prompt comes with concrete context (session/activity/commit counts).
   const dailyMarkdowns: { date: Date; markdown: string }[] = [];
-  let skippedCount = 0;
   for (const d of dates) {
     const label = dateKey(d);
     const isToday = isSameLocalDay(d, options.today);
     process.stderr.write(`\n--- ${label} ---\n`);
 
     const willPrompt =
-      !options.assumeYes && (isToday || !existsSync(dailyCachePath(d)));
+      !options.assumeYes &&
+      (isToday || options.force || !existsSync(dailyCachePath(d)));
     const confirmer = willPrompt
       ? async () => {
           const hint = isToday ? " (today — regenerated every time)" : "";
@@ -796,7 +829,10 @@ export async function runRangeSummary(
     const res = await generateDailySummary({
       date: d,
       today: options.today,
-      force: false,
+      // --force regenerates the dailies too, not just the range
+      // synthesis — otherwise `summary --last 7d --force` would
+      // rebuild the range from stale daily markdown.
+      force: options.force,
       streamToStdout: false,
       announce: true,
       confirmBeforeSpawn: confirmer,
@@ -813,7 +849,6 @@ export async function runRangeSummary(
       // identical at the result-shape level; one neutral message
       // works for both.
       process.stderr.write(`agenthud: ${label} — skipped.\n`);
-      skippedCount++;
       continue;
     }
     if (res.code !== 0) {

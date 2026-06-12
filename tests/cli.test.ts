@@ -126,6 +126,15 @@ describe("parseArgs", () => {
       expect(opts.reportDate!.getDate()).toBe(today.getDate());
     });
 
+    it("rejects impossible dates instead of letting JS normalize them", () => {
+      // new Date(2026, 1, 31) silently becomes Mar 3 — the parser
+      // must surface an error, not run the report for a different
+      // day than the user typed. (reportDate still carries the
+      // default; main.ts exits on reportError before using it.)
+      const opts = parseArgs(["report", "--date", "2026-02-31"]);
+      expect(opts.reportError).toBeDefined();
+    });
+
     it("uses default include types when --include not given", () => {
       const opts = parseArgs(["report"]);
       expect(opts.reportInclude).toEqual([
@@ -148,6 +157,7 @@ describe("parseArgs", () => {
         "read",
         "glob",
         "user",
+        "task",
       ]);
     });
 
@@ -536,6 +546,7 @@ describe("parseArgs", () => {
           "read",
           "glob",
           "user",
+          "task",
         ]);
       });
 

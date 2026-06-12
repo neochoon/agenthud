@@ -232,8 +232,7 @@ function toSessionNode(raw: RawSession, hidden: boolean): SessionNode {
   // rule Claude's detectLiveState uses, so idle-but-open sessions
   // fall back to the time-based [cool]/[cold] badge instead of
   // showing [waiting] forever.
-  const recentlyActive =
-    Date.now() - raw.lastModifiedMs < THIRTY_MINUTES_MS;
+  const recentlyActive = Date.now() - raw.lastModifiedMs < THIRTY_MINUTES_MS;
   const liveState: LiveState | null =
     raw.hasLock && recentlyActive ? "waiting" : null;
   const node: SessionNode = {

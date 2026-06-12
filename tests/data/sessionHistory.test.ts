@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("node:fs", () => ({
   existsSync: vi.fn(),
   readFileSync: vi.fn(),
+  statSync: vi.fn(),
 }));
 
 const { existsSync, readFileSync } = await import("node:fs");
@@ -10,7 +11,10 @@ const { parseSessionHistory } = await import(
   "../../src/data/sessionHistory.js"
 );
 
-afterEach(() => vi.resetAllMocks());
+afterEach(() => {
+  vi.resetAllMocks();
+  delete process.env.KIRO_SESSIONS_DIR;
+});
 
 const makeLines = (count: number) =>
   Array.from({ length: count }, (_, i) =>
@@ -73,6 +77,29 @@ describe("parseSessionHistory", () => {
     expect(result).toHaveLength(1);
     expect(result[0].type).toBe("user");
     expect(result[0].detail).toBe("Hello Kiro");
+  });
+
+  it("routes paths under a KIRO_SESSIONS_DIR override to the Kiro parser", () => {
+    // The override moves the Kiro root to a path that contains
+    // neither `/.kiro/sessions/` nor `kiro.kiroagent/` — a
+    // segment-only check would silently route these to the Claude
+    // parser and the activities would come back empty.
+    process.env.KIRO_SESSIONS_DIR = "/tmp/kiro-alt";
+    const kiroLine = JSON.stringify({
+      version: "v1",
+      kind: "Prompt",
+      data: {
+        message_id: "p1",
+        content: [{ kind: "text", data: "Hello from override" }],
+        meta: { timestamp: 1781220419 },
+      },
+    });
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(kiroLine);
+    const result = parseSessionHistory("/tmp/kiro-alt/aaa.jsonl");
+    expect(result).toHaveLength(1);
+    expect(result[0].type).toBe("user");
+    expect(result[0].detail).toBe("Hello from override");
   });
 
   it("routes non-Kiro paths to the Claude parser (default)", () => {

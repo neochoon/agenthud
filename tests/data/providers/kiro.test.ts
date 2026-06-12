@@ -106,12 +106,6 @@ describe("kiroProvider.discoverSessions", () => {
   });
 
   it("links sub-agents to their parent via parent_session_id", () => {
-    const sessionsDir = join(
-      process.env.HOME ?? "/home/user",
-      ".kiro",
-      "sessions",
-      "cli",
-    );
     const parentId = "bbb22222-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
     const childId = "ccc33333-cccc-cccc-cccc-cccccccccccc";
 
@@ -166,12 +160,6 @@ describe("kiroProvider.discoverSessions", () => {
   });
 
   it("extracts model_id from session_state.rts_model_state.model_info", () => {
-    const sessionsDir = join(
-      process.env.HOME ?? "/home/user",
-      ".kiro",
-      "sessions",
-      "cli",
-    );
     const id = "fff66666-ffff-ffff-ffff-ffffffffffff";
 
     vi.mocked(existsSync).mockReturnValue(true);
@@ -210,12 +198,6 @@ describe("kiroProvider.discoverSessions", () => {
   });
 
   it("shortens concrete model ids (drops vendor prefix, date, version)", () => {
-    const sessionsDir = join(
-      process.env.HOME ?? "/home/user",
-      ".kiro",
-      "sessions",
-      "cli",
-    );
     const id = "ggg77777-gggg-gggg-gggg-gggggggggggg";
 
     vi.mocked(existsSync).mockReturnValue(true);
@@ -256,12 +238,6 @@ describe("kiroProvider.discoverSessions", () => {
   });
 
   it("extracts contextUsage from rts_model_state.context_usage_percentage", () => {
-    const sessionsDir = join(
-      process.env.HOME ?? "/home/user",
-      ".kiro",
-      "sessions",
-      "cli",
-    );
     const id = "iii99999-iiii-iiii-iiii-iiiiiiiiiiii";
 
     vi.mocked(existsSync).mockReturnValue(true);
@@ -305,12 +281,6 @@ describe("kiroProvider.discoverSessions", () => {
   });
 
   it("leaves contextUsage undefined when percent is null", () => {
-    const sessionsDir = join(
-      process.env.HOME ?? "/home/user",
-      ".kiro",
-      "sessions",
-      "cli",
-    );
     const id = "jjjaaaaa-jjjj-jjjj-jjjj-jjjjjjjjjjjj";
 
     vi.mocked(existsSync).mockReturnValue(true);
@@ -350,12 +320,6 @@ describe("kiroProvider.discoverSessions", () => {
   });
 
   it("falls back to null modelName when model_info is missing", () => {
-    const sessionsDir = join(
-      process.env.HOME ?? "/home/user",
-      ".kiro",
-      "sessions",
-      "cli",
-    );
     const id = "hhh88888-hhhh-hhhh-hhhh-hhhhhhhhhhhh";
 
     vi.mocked(existsSync).mockReturnValue(true);
@@ -393,12 +357,6 @@ describe("kiroProvider.discoverSessions", () => {
     // A Kiro terminal left open for hours keeps its .lock alive,
     // but the conversation is idle — same recency rule as Claude's
     // detectLiveState: no live badge past 30 minutes of mtime.
-    const sessionsDir = join(
-      process.env.HOME ?? "/home/user",
-      ".kiro",
-      "sessions",
-      "cli",
-    );
     const id = "stale444-dddd-dddd-dddd-dddddddddddd";
 
     vi.mocked(existsSync).mockReturnValue(true); // .lock exists
@@ -478,12 +436,6 @@ describe("kiroProvider.discoverSessions", () => {
   });
 
   it("respects hiddenSessions config (marks but keeps in tree)", () => {
-    const sessionsDir = join(
-      process.env.HOME ?? "/home/user",
-      ".kiro",
-      "sessions",
-      "cli",
-    );
     const id = "eee55555-eeee-eeee-eeee-eeeeeeeeeeee";
 
     vi.mocked(existsSync).mockReturnValue(true);

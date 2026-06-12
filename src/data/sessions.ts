@@ -28,6 +28,7 @@
 import type {
   GlobalConfig,
   ProjectNode,
+  SessionNode,
   SessionStatus,
   SessionTree,
 } from "../types/index.js";
@@ -124,8 +125,33 @@ function mergeTrees(trees: SessionTree[]): SessionTree {
     }
   }
 
+  // Re-sort after coalescing. Each provider sorted its own tree,
+  // but concat order inside merged projects (and the project list
+  // itself) would otherwise depend on provider registration order —
+  // a Kiro hot session could render below a Claude cool one. Same
+  // comparators the providers use.
+  const sessionCmp = (a: SessionNode, b: SessionNode) => {
+    if (a.nonInteractive !== b.nonInteractive) {
+      return a.nonInteractive ? 1 : -1;
+    }
+    const d = statusRank[a.status] - statusRank[b.status];
+    if (d !== 0) return d;
+    return b.lastModifiedMs - a.lastModifiedMs;
+  };
+  for (const p of byPath.values()) p.sessions.sort(sessionCmp);
+  for (const p of coldByPath.values()) p.sessions.sort(sessionCmp);
+
+  const projects = [...byPath.values()].sort((a, b) => {
+    const d = statusRank[a.hotness] - statusRank[b.hotness];
+    if (d !== 0) return d;
+    return (
+      (b.sessions[0]?.lastModifiedMs ?? 0) -
+      (a.sessions[0]?.lastModifiedMs ?? 0)
+    );
+  });
+
   return {
-    projects: [...byPath.values()],
+    projects,
     coldProjects: [...coldByPath.values()],
     totalCount: trees.reduce((n, t) => n + t.totalCount, 0),
     timestamp: trees[trees.length - 1].timestamp,

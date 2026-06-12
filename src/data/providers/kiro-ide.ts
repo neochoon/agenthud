@@ -55,11 +55,7 @@ import type {
 } from "../../types/index.js";
 import { ICONS } from "../../types/index.js";
 import { ONE_HOUR_MS, THIRTY_MINUTES_MS } from "../../ui/constants.js";
-import type {
-  ParseContext,
-  ParseResult,
-  SessionProvider,
-} from "./types.js";
+import type { ParseContext, ParseResult, SessionProvider } from "./types.js";
 
 export function getKiroIdeSessionsDir(): string {
   if (process.env.KIRO_IDE_SESSIONS_DIR) {
@@ -307,8 +303,7 @@ function buildSubAgentsBySession(
         // Collect sub-agent groups within this execution.
         for (const action of exec.actions) {
           if (action.actionType !== "invokeSubAgent") continue;
-          const subId =
-            action.output?.subExecutionId ?? action.subExecutionId;
+          const subId = action.output?.subExecutionId ?? action.subExecutionId;
           if (!subId) continue;
 
           const groupActions = exec.actions.filter(
@@ -327,9 +322,7 @@ function buildSubAgentsBySession(
           );
           const running =
             exec.status === "running" &&
-            !groupActions.some(
-              (a) => a.actionType === "subagent_response",
-            );
+            !groupActions.some((a) => a.actionType === "subagent_response");
           // Recency gate (same 30m rule as the other providers): a
           // quit IDE leaves executions parked in "running" /
           // "PendingAction" forever — without the gate those dead

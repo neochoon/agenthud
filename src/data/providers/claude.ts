@@ -260,8 +260,7 @@ function readFirstUserPrompt(filePath: string): string | null {
     return null;
   }
 
-  const isSubstantial = (text: string): boolean =>
-    !text.trim().startsWith("/");
+  const isSubstantial = (text: string): boolean => !text.trim().startsWith("/");
 
   let first: string | null = null;
   let latestSubstantial: string | null = null;

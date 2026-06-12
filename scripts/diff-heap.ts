@@ -18,10 +18,14 @@ interface Snapshot {
   strings: string[];
 }
 
-function countByType(path: string): Map<string, { count: number; size: number }> {
+function countByType(
+  path: string,
+): Map<string, { count: number; size: number }> {
   const raw = JSON.parse(readFileSync(path, "utf-8")) as Snapshot;
   const fields = raw.snapshot.meta.node_fields;
-  const typeEnum = raw.snapshot.meta.node_types[fields.indexOf("type")] as string[];
+  const typeEnum = raw.snapshot.meta.node_types[
+    fields.indexOf("type")
+  ] as string[];
   const fieldCount = fields.length;
   const nameIdx = fields.indexOf("name");
   const typeIdx = fields.indexOf("type");

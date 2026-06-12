@@ -116,12 +116,12 @@ filterPresets:
 
 # Defaults for \`agenthud report\` (CLI flags still win per-invocation).
 # include: activity types to keep. Types: user, response, bash, edit,
-#          thinking, read, glob.
+#          thinking, read, glob, task.
 # detailLimit: max chars per activity detail (0 = unlimited).
 # withGit: merge git commits from each session's project.
 # format: markdown | json.
 report:
-  include: [user, response, bash, edit, thinking]
+  include: [user, response, bash, edit, thinking, task]
   detailLimit: 120
   withGit: false
   format: markdown

@@ -88,9 +88,14 @@ describe("discoverSessions orchestrator", () => {
     vi.mocked(statSync).mockImplementation((p) => {
       const path = String(p);
       const isDir = !path.endsWith(".jsonl") && !path.endsWith(".json");
+      // Claude session is OLDER (2h → cool), Kiro session is fresh
+      // (60s → hot). Exercises the post-merge re-sort: the hot Kiro
+      // session must come first inside the merged project even
+      // though the Claude provider ran first.
+      const isClaudeSession = path.endsWith("claude-id.jsonl");
       return {
         isDirectory: () => isDir,
-        mtimeMs: NOW - 60_000,
+        mtimeMs: isClaudeSession ? NOW - 2 * 60 * 60 * 1000 : NOW - 60_000,
         size: 100,
       } as ReturnType<typeof statSync>;
     });
@@ -116,6 +121,10 @@ describe("discoverSessions orchestrator", () => {
     expect(tree.projects).toHaveLength(1);
     expect(tree.projects[0].projectPath).toBe("/shared/proj");
     expect(tree.projects[0].sessions).toHaveLength(2);
+    // Post-merge re-sort: hot (kiro, 60s) before cool (claude, 2h)
+    // regardless of provider registration order.
+    expect(tree.projects[0].sessions[0].id).toBe(kiroId);
+    expect(tree.projects[0].sessions[1].id).toBe("claude-id");
 
     delete process.env.CLAUDE_PROJECTS_DIR;
     delete process.env.KIRO_SESSIONS_DIR;

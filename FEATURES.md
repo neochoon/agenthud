@@ -436,13 +436,23 @@ the `?` overlay renders in-app.
 | `~/.agenthud/summary-range-prompt.md` | Range summary prompt template |
 | `~/.agenthud/summaries/` | Cached daily and range summaries |
 | `~/.agenthud/summaries/index.md` | Auto-generated navigable index |
-| `~/.claude/projects/` | Claude Code session JSONL files (read-only to agenthud) |
+| `~/.claude/projects/` | Claude Code session JSONL files (read-only) |
+| `~/.codex/sessions/` | Codex CLI rollout JSONL files (read-only) |
+| `…/Kiro/User/globalStorage/kiro.kiroagent/` | Kiro IDE session + execution files (read-only) |
+| `~/.kiro/sessions/cli/` | Kiro CLI session files (read-only) |
+
+Per-provider on-disk schemas (with `jq` verification commands) are
+documented under [`docs/schemas/`](./docs/schemas/).
 
 ## Environment variables
 
 | Variable | Effect |
 |---|---|
 | `CLAUDE_PROJECTS_DIR` | Override the Claude projects directory (default: `~/.claude/projects`). Useful for backups or mounted volumes. (v0.8.2) |
+| `CODEX_SESSIONS_DIR` | Override the Codex sessions directory (default: `~/.codex/sessions`). |
+| `KIRO_SESSIONS_DIR` | Override the Kiro CLI sessions directory (default: `~/.kiro/sessions/cli`). |
+| `KIRO_IDE_SESSIONS_DIR` | Override the Kiro IDE `workspace-sessions` directory. |
+| `AGENTHUD_HOME` | Override the app data directory (default: `~/.agenthud`). |
 | `WSL_DISTRO_NAME`, `/proc/version` markers | WSL detection (cached for the process; v0.12.4). Affects `--open` opener preference (`wslview` over `xdg-open`) and the cwd-home protection in legacy-config migration. |
 | `NODE_ENV` | Set to `production` by default in the bundled binary to disable React dev-mode profiler accumulation (~12× memory-leak reduction; v0.9.0). |
 | `FORCE_COLOR` / `NO_COLOR` | Honored by Ink for color output. |

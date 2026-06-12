@@ -81,6 +81,17 @@ interface KiroSessionMeta {
   parent_session_id?: string | null;
   updated_at?: string;
   created_at?: string;
+  // Kiro stores the chosen model under
+  // `session_state.rts_model_state.model_info.model_id`. Common
+  // value is `"auto"` (Kiro picks dynamically); concrete IDs like
+  // `"anthropic.claude-sonnet-4-20250514-v1:0"` also show up when
+  // the user pins a model. Sub-agents inherit from the parent and
+  // typically have `model_info: null` in their own sidecar.
+  session_state?: {
+    rts_model_state?: {
+      model_info?: { model_id?: string | null } | null;
+    } | null;
+  } | null;
 }
 
 function readMeta(jsonPath: string): KiroSessionMeta | null {
@@ -106,6 +117,19 @@ interface RawSession {
   title: string | null;
   parentSessionId: string | null;
   hasLock: boolean;
+  modelId: string | null;
+}
+
+function shortenModelId(raw: string): string {
+  // Concrete Kiro model IDs look like
+  // `anthropic.claude-sonnet-4-20250514-v1:0` — strip the
+  // `<vendor>.` prefix, drop the date suffix, drop the version
+  // tail so the model column stays readable. `auto` stays as-is.
+  if (raw === "auto") return raw;
+  const noVendor = raw.replace(/^[a-z0-9-]+\./, "");
+  const noVersion = noVendor.replace(/-v\d+:\d+$/, "");
+  const noDate = noVersion.replace(/-\d{8}$/, "");
+  return noDate;
 }
 
 function readRawSessions(
@@ -152,6 +176,11 @@ function readRawSessions(
     }
 
     const projectName = basename(meta.cwd);
+    const rawModelId = meta.session_state?.rts_model_state?.model_info?.model_id;
+    const modelId =
+      typeof rawModelId === "string" && rawModelId.length > 0
+        ? shortenModelId(rawModelId)
+        : null;
     out.push({
       id,
       hideKey: `${projectName}/${id}`,
@@ -165,6 +194,7 @@ function readRawSessions(
           : null,
       parentSessionId: meta.parent_session_id ?? null,
       hasLock: existsSync(lockPath),
+      modelId,
     });
   }
   return out;
@@ -180,7 +210,7 @@ function toSessionNode(raw: RawSession, hidden: boolean): SessionNode {
     projectName: raw.projectName,
     lastModifiedMs: raw.lastModifiedMs,
     status: getSessionStatus(raw.lastModifiedMs),
-    modelName: null,
+    modelName: raw.modelId,
     subAgents: [],
     nonInteractive: false,
     firstUserPrompt: raw.title,

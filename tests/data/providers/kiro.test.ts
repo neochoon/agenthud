@@ -169,6 +169,136 @@ describe("kiroProvider.discoverSessions", () => {
     expect(tree.totalCount).toBe(2);
   });
 
+  it("extracts model_id from session_state.rts_model_state.model_info", () => {
+    const sessionsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".kiro",
+      "sessions",
+      "cli",
+    );
+    const id = "fff66666-ffff-ffff-ffff-ffffffffffff";
+
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue([
+      `${id}.json`,
+      `${id}.jsonl`,
+    ] as unknown as ReturnType<typeof readdirSync>);
+    vi.mocked(statSync).mockImplementation(
+      () =>
+        ({
+          isDirectory: () => false,
+          mtimeMs: NOW - 60_000,
+          size: 100,
+        }) as ReturnType<typeof statSync>,
+    );
+    vi.mocked(readFileSync).mockImplementation((p) => {
+      if (String(p).endsWith(".json")) {
+        return JSON.stringify({
+          session_id: id,
+          cwd: "/Users/neo/p",
+          title: "t",
+          parent_session_id: null,
+          session_state: {
+            rts_model_state: {
+              model_info: { model_id: "auto" },
+            },
+          },
+        });
+      }
+      return "";
+    });
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const tree = kiroProvider.discoverSessions(mockConfig);
+    expect(tree.projects[0].sessions[0].modelName).toBe("auto");
+  });
+
+  it("shortens concrete model ids (drops vendor prefix, date, version)", () => {
+    const sessionsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".kiro",
+      "sessions",
+      "cli",
+    );
+    const id = "ggg77777-gggg-gggg-gggg-gggggggggggg";
+
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue([
+      `${id}.json`,
+      `${id}.jsonl`,
+    ] as unknown as ReturnType<typeof readdirSync>);
+    vi.mocked(statSync).mockImplementation(
+      () =>
+        ({
+          isDirectory: () => false,
+          mtimeMs: NOW - 60_000,
+          size: 100,
+        }) as ReturnType<typeof statSync>,
+    );
+    vi.mocked(readFileSync).mockImplementation((p) => {
+      if (String(p).endsWith(".json")) {
+        return JSON.stringify({
+          session_id: id,
+          cwd: "/Users/neo/p",
+          title: "t",
+          parent_session_id: null,
+          session_state: {
+            rts_model_state: {
+              model_info: {
+                model_id: "anthropic.claude-sonnet-4-20250514-v1:0",
+              },
+            },
+          },
+        });
+      }
+      return "";
+    });
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const tree = kiroProvider.discoverSessions(mockConfig);
+    expect(tree.projects[0].sessions[0].modelName).toBe("claude-sonnet-4");
+  });
+
+  it("falls back to null modelName when model_info is missing", () => {
+    const sessionsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".kiro",
+      "sessions",
+      "cli",
+    );
+    const id = "hhh88888-hhhh-hhhh-hhhh-hhhhhhhhhhhh";
+
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue([
+      `${id}.json`,
+      `${id}.jsonl`,
+    ] as unknown as ReturnType<typeof readdirSync>);
+    vi.mocked(statSync).mockImplementation(
+      () =>
+        ({
+          isDirectory: () => false,
+          mtimeMs: NOW - 60_000,
+          size: 100,
+        }) as ReturnType<typeof statSync>,
+    );
+    vi.mocked(readFileSync).mockImplementation((p) => {
+      if (String(p).endsWith(".json")) {
+        return JSON.stringify({
+          session_id: id,
+          cwd: "/Users/neo/p",
+          title: "t",
+          parent_session_id: null,
+          // No session_state at all — sub-agent case.
+        });
+      }
+      return "";
+    });
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const tree = kiroProvider.discoverSessions(mockConfig);
+    expect(tree.projects[0].sessions[0].modelName).toBeNull();
+  });
+
   it("sets liveState=waiting when a .lock file is present", () => {
     const sessionsDir = join(
       process.env.HOME ?? "/home/user",

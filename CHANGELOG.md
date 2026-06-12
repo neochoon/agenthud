@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [0.18.1] - 2026-06-12
+
+### Fixed
+- **Kiro summary engine now actually summarizes.** `summary --engine
+  kiro` previously fed the activity report to `kiro-cli` on stdin while
+  passing the prompt as a positional argument — but Kiro reads stdin
+  only when no positional question is given, so it ignored the report
+  and replied that the log was empty. The prompt and report are now
+  combined onto stdin (no positional), so the model sees both. Claude
+  and Codex are unaffected.
+- **No more EPIPE crash when an engine closes stdin early.** Writing the
+  large report to a child that had already closed its input surfaced as
+  an unhandled `EPIPE` error and aborted the process; the stdin pipe now
+  has an error handler, so the run degrades gracefully.
+
 ## [0.18.0] - 2026-06-12
 
 ### Added

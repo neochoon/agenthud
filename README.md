@@ -57,23 +57,23 @@ agenthud report --with-git                # merge git commits into the timeline
 The hero. A split-view TUI: a project tree (top) and an activity viewer (bottom), refreshing as your agents work.
 
 ```
-┌─ Projects ───────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ 4 projects (2) · 31 sessions (3) · 142 sub-agents (1) · ⊘ 2 hidden                                                   │
-│ > agenthud  ~/WestbrookAI/agenthud  6 sessions (2) · 114 sub-agents                                                  │
-│     #864f [working] Fix the auth bug in login flow                                                9s 41% claude opus │
-│         ├─ » code-reviewer                                                                                           │
-│     #019e [waiting] review the data layer                                                         2m 44% codex gpt-5 │
-│   myproject  ~/work/myproject                                                                                     2d │
-│     #def4 [cool] Add OAuth support                                                              12m 5% kiro-ide auto │
-│ ... 12 cold projects                                                                                                 │
-└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-┌─ Activity · agenthud ────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ [10:23] ○ Read  src/ui/App.tsx                                                                                       │
-│ [10:23] ~ Edit  src/ui/App.tsx                                                                                       │
-│ [10:23] $ Bash  npm test                                                                                             │
-│ [10:23] < Response  Tests passed successfully                                                                        │
-│ [10:25] ⠧ Edit  src/auth/oauth.ts  ← bold + spinner = live                                                           │
-└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌─ Projects ────────────────────────────────────────────────────────────────────────────────────┐
+│ 4 projects (2) · 31 sessions (3) · 142 sub-agents (1) · ⊘ 2 hidden                            │
+│ > agenthud  ~/WestbrookAI/agenthud  6 sessions (2) · 114 sub-agents                           │
+│     #864f [working] Fix the auth bug in login flow                         9s 41% claude opus │
+│         ├─ » code-reviewer                                                                    │
+│     #019e [waiting] review the data layer                                  2m 44% codex gpt-5 │
+│   myproject  ~/work/myproject                                                              2d │
+│     #def4 [cool] Add OAuth support                                        2m 5% kiro-ide auto │
+│ ... 12 cold projects                                                                          │
+└───────────────────────────────────────────────────────────────────────────────────────────────┘
+┌─ Activity · agenthud ─────────────────────────────────────────────────────────────────────────┐
+│ [10:23] ○ Read  src/ui/App.tsx                                                                │
+│ [10:23] ~ Edit  src/ui/App.tsx                                                                │
+│ [10:23] $ Bash  npm test                                                                      │
+│ [10:23] < Response  Tests passed successfully                                                 │
+│ [10:25] ⠧ Edit  src/auth/oauth.ts  ← bold + spinner = live                                    │
+└───────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 The badge tells you, per session, **what the agent is doing right now**:
@@ -90,7 +90,7 @@ Full keybinding and badge reference: [FEATURES.md](./FEATURES.md#keybindings).
 The asynchronous human layer: a day or a date range, synthesized into an engineering summary you can read like a standup note.
 
 ```bash
-agenthud summary --date today             # one day
+agenthud summary --date yesterday         # one day
 agenthud summary --last 7d                # a rolling window
 agenthud summary --from 2026-06-01 --to 2026-06-07
 ```
@@ -105,11 +105,11 @@ Summaries are cached one-file-per-day under `~/.agenthud/summaries/`, cross-link
 
 ```bash
 # This is, essentially, what `summary` does under the hood:
-agenthud report --date today | claude -p "$(cat ~/.agenthud/summary-prompt.md)"
+agenthud report --date yesterday | claude -p "$(cat ~/.agenthud/summary-prompt.md)"
 
 # …so the same report can flow anywhere else:
 agenthud report --format json | jq '.sessions[].model'   # into a dashboard
-agenthud report --with-git    | your-own-llm             # into any pipeline
+agenthud report --with-git    | your-own-llm-call        # into any pipeline
 ```
 
 `summary` is just `report` piped into an agent CLI. The digest isn't a black box — it's `report` + a prompt + whichever LLM you like, and you can swap any part. Markdown is the default; `--format json` (with provider + model per session) is the script-friendly form.

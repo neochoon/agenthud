@@ -179,6 +179,76 @@ describe("runSummary cache behavior", () => {
     expect(vi.mocked(spawn)).not.toHaveBeenCalled();
   });
 
+  it("on a cache hit, reports the file path with cache wording (not 'saved to')", async () => {
+    vi.mocked(existsSync).mockImplementation((p) =>
+      String(p).endsWith("2026-05-14.md"),
+    );
+    vi.mocked(readFileSync).mockReturnValue("cached summary text");
+
+    const origOut = process.stdout.write.bind(process.stdout);
+    process.stdout.write = (() => true) as typeof process.stdout.write;
+    const stderrChunks: string[] = [];
+    const origErr = process.stderr.write.bind(process.stderr);
+    process.stderr.write = ((c: string | Uint8Array) => {
+      stderrChunks.push(String(c));
+      return true;
+    }) as typeof process.stderr.write;
+
+    await runSummary({
+      date: new Date(2026, 4, 14),
+      force: false,
+      today: new Date(2026, 4, 15),
+    });
+
+    process.stdout.write = origOut;
+    process.stderr.write = origErr;
+    const allErr = stderrChunks.join("");
+    // The path must be reported so the user can open the file, and the
+    // wording must reflect a cache read — nothing was "saved".
+    expect(allErr).toContain("2026-05-14.md");
+    expect(allErr).toMatch(/from cache/i);
+    expect(allErr).not.toContain("saved to");
+  });
+
+  it("on a fresh generation, reports the file path with write wording", async () => {
+    vi.mocked(existsSync).mockReturnValue(false); // no cache → generate
+    const mockStream = {
+      write: vi.fn(),
+      end: vi.fn((cb?: () => void) => {
+        if (cb) cb();
+      }),
+      on: vi.fn().mockReturnThis(),
+    };
+    vi.mocked(createWriteStream).mockReturnValue(
+      mockStream as unknown as ReturnType<typeof createWriteStream>,
+    );
+    vi.mocked(spawn).mockReturnValue(
+      mockClaudeProcess() as unknown as ReturnType<typeof spawn>,
+    );
+
+    const origOut = process.stdout.write.bind(process.stdout);
+    process.stdout.write = (() => true) as typeof process.stdout.write;
+    const stderrChunks: string[] = [];
+    const origErr = process.stderr.write.bind(process.stderr);
+    process.stderr.write = ((c: string | Uint8Array) => {
+      stderrChunks.push(String(c));
+      return true;
+    }) as typeof process.stderr.write;
+
+    await runSummary({
+      date: new Date(2026, 4, 14),
+      force: false,
+      today: new Date(2026, 4, 15),
+    });
+
+    process.stdout.write = origOut;
+    process.stderr.write = origErr;
+    const allErr = stderrChunks.join("");
+    expect(allErr).toContain("2026-05-14.md");
+    expect(allErr).toMatch(/written to/i);
+    expect(allErr).not.toContain("saved to");
+  });
+
   it("bypasses cache when force is true", async () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readFileSync).mockReturnValue("ignored");

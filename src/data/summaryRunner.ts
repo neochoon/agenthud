@@ -535,12 +535,15 @@ async function generateDailySummary(
       // model now being requested; otherwise fall through to regenerate
       // so a switched engine/model doesn't serve another's stale text.
       if (cacheMatchesEngine(content, opts.engine.name, opts.model)) {
-        if (opts.announce) {
-          process.stderr.write(`cached summary from ${cached}\n`);
-        }
         if (opts.streamToStdout) {
           process.stdout.write(content);
           if (!content.endsWith("\n")) process.stdout.write("\n");
+        }
+        // Report the path AFTER the content so it's the last thing the
+        // user sees — otherwise a long summary scrolls it off the top
+        // and they can't tell which file to open.
+        if (opts.announce) {
+          process.stderr.write(`\nsummary read from cache: ${cached}\n`);
         }
         return {
           code: 0,
@@ -689,7 +692,7 @@ async function generateDailySummary(
 
   if (opts.announce && result.code === 0) {
     process.stderr.write("\n");
-    process.stderr.write(`saved to ${cached}\n`);
+    process.stderr.write(`summary written to ${cached}\n`);
     if (result.usage) {
       process.stderr.write(`${formatUsage(result.usage)}\n`);
     }
@@ -789,11 +792,14 @@ export async function runRangeSummary(
       // Reuse only when the same engine/model produced it; a switched
       // engine/model falls through to regenerate.
       if (cacheMatchesEngine(content, engine.name, options.model)) {
-        process.stderr.write(`cached range summary from ${rangeCache}\n`);
         if (!options.open) {
           process.stdout.write(content);
           if (!content.endsWith("\n")) process.stdout.write("\n");
         }
+        // Path last, so it survives a long summary scrolling by.
+        process.stderr.write(
+          `\nrange summary read from cache: ${rangeCache}\n`,
+        );
         try {
           regenerateIndex(summariesDir());
         } catch {
@@ -940,7 +946,7 @@ export async function runRangeSummary(
   }
 
   process.stderr.write("\n");
-  process.stderr.write(`saved to ${rangeCache}\n`);
+  process.stderr.write(`range summary written to ${rangeCache}\n`);
   if (metaResult.usage) {
     process.stderr.write(`${formatUsage(metaResult.usage)}\n`);
   }

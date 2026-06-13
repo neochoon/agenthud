@@ -4,26 +4,17 @@
 [![CI](https://github.com/neochoon/agenthud/actions/workflows/ci.yml/badge.svg)](https://github.com/neochoon/agenthud/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/neochoon/agenthud/branch/main/graph/badge.svg)](https://codecov.io/gh/neochoon/agenthud)
 
-A heads-up display for your AI coding agents — Claude Code, OpenAI Codex, and AWS Kiro. AgentHUD reads each agent's on-disk session files and merges them into one tree, so a project you've touched from several agents shows as a single row with combined sessions and sub-agents.
+A **heads-up display** for your AI coding agents — **Claude Code**, **OpenAI Codex**, and **AWS Kiro**. AgentHUD reads each agent's on-disk session files and merges them into one tree, so a project you've touched from several agents shows as a single row with combined sessions and sub-agents.
 
 ![demo](./demo/live.gif)
 
 It's organized as **three layers, by who's reading** — a human at a glance, a human at the end of the day, and a machine:
 
 - **`agenthud`** — **the live HUD.** A real-time TUI showing which session is `[working]` versus `[waiting]` on you, right now, across every agent. Glance at it in a side terminal and know what all your agents are doing. *This is the hero — the name is HUD for a reason.*
-- **`agenthud summary`** — **the daily digest.** Fold a day (or a week) into an LLM engineering summary — a standup-in-one-command habit, via whichever agent CLI you have installed (Claude, Codex, or Kiro, auto-detected).
+- **`agenthud summary`** — **the daily digest.** Fold a day (or a week) into an LLM engineering summary — a standup-in-one-command habit, via whichever agent CLI you have installed (claude, codex, or kiro-cli, auto-detected).
 - **`agenthud report`** — **the machine layer.** Structured Markdown / JSON. `summary` is literally `report` piped into an agent CLI, so the daily digest isn't a black box — and you can pipe `report` into anything else, too.
 
-Supported agents today:
-
-| Agent | Source |
-|---|---|
-| [Claude Code](https://github.com/anthropics/claude-code) | `~/.claude/projects/` |
-| [Codex CLI](https://github.com/openai/codex) | `~/.codex/sessions/` |
-| Kiro IDE | `…/Kiro/User/globalStorage/kiro.kiroagent/` |
-| Kiro CLI | `~/.kiro/sessions/cli/` |
-
-→ **See [FEATURES.md](./FEATURES.md) for the full surface** — every flag, keybinding, config key, file path, and env var. Per-agent session-file schemas live in [docs/schemas/](./docs/schemas/).
+→ **See [FEATURES.md](./FEATURES.md) for the full surface** — every flag, keybinding, config key, file path, and env var. Per-agent session-file schemas: [Claude Code](./docs/schemas/claude-session.md) · [Codex CLI](./docs/schemas/codex-session.md) · [Kiro IDE](./docs/schemas/kiro-ide-session.md) · [Kiro CLI](./docs/schemas/kiro-session.md) (or browse [docs/schemas/](./docs/schemas/)).
 
 Requires Node.js 20+. Open agenthud in a separate terminal while you work; press `?` inside the TUI for in-app help.
 
@@ -49,16 +40,14 @@ npm i -g agenthud
 # 1 · The live HUD
 agenthud                                  # all projects, every agent
 agenthud --cwd                            # scope to the project containing $PWD
-agenthud --once                           # snapshot mode, no alt-screen
 
 # 2 · The daily digest
-agenthud summary --date today             # synthesize today via your agent CLI
+agenthud summary                          # synthesize today via your agent CLI
 agenthud summary --last 7d                # cross-day synthesis of the last 7 days
-agenthud summary --engine codex           # force a specific engine
 agenthud summary -oI                      # open the summary + the summaries index
 
 # 3 · The machine layer
-agenthud report --date today              # today's activity as markdown
+agenthud report                           # today's activity as markdown
 agenthud report --format json             # script-readable
 agenthud report --with-git                # merge git commits into the timeline
 ```
@@ -68,23 +57,23 @@ agenthud report --with-git                # merge git commits into the timeline
 The hero. A split-view TUI: a project tree (top) and an activity viewer (bottom), refreshing as your agents work.
 
 ```
-┌─ Projects ───────────────────────────────────────────────────────────┐
-│ 4 projects (2) · 31 sessions (3) · 142 sub-agents (1) · ⊘ 2 hidden    │
-│ > agenthud  ~/WestbrookAI/agenthud  6 sessions (2) · 114 sub-agents   │
-│     #864f [working] Fix the auth bug in login flow 9s 41% claude opus│
-│         ├─ » code-reviewer                                           │
-│     #019e [waiting] review the data layer          2m 44% codex gpt-5│
-│   myproject  ~/work/myproject                                    2d  │
-│     #def4 [cool] Add OAuth support               12m 5% kiro-ide auto│
-│ ... 12 cold projects                                                 │
-└──────────────────────────────────────────────────────────────────────┘
-┌─ Activity · agenthud ────────────────────────────────────────────────┐
-│ [10:23] ○ Read  src/ui/App.tsx                                       │
-│ [10:23] ~ Edit  src/ui/App.tsx                                       │
-│ [10:23] $ Bash  npm test                                             │
-│ [10:23] < Response  Tests passed successfully                        │
-│ [10:25] ⠧ Edit  src/auth/oauth.ts  ← bold + spinner = live           │
-└──────────────────────────────────────────────────────────────────────┘
+┌─ Projects ───────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ 4 projects (2) · 31 sessions (3) · 142 sub-agents (1) · ⊘ 2 hidden                                                   │
+│ > agenthud  ~/WestbrookAI/agenthud  6 sessions (2) · 114 sub-agents                                                  │
+│     #864f [working] Fix the auth bug in login flow                                                9s 41% claude opus │
+│         ├─ » code-reviewer                                                                                           │
+│     #019e [waiting] review the data layer                                                         2m 44% codex gpt-5 │
+│   myproject  ~/work/myproject                                                                                     2d │
+│     #def4 [cool] Add OAuth support                                                              12m 5% kiro-ide auto │
+│ ... 12 cold projects                                                                                                 │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌─ Activity · agenthud ────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ [10:23] ○ Read  src/ui/App.tsx                                                                                       │
+│ [10:23] ~ Edit  src/ui/App.tsx                                                                                       │
+│ [10:23] $ Bash  npm test                                                                                             │
+│ [10:23] < Response  Tests passed successfully                                                                        │
+│ [10:25] ⠧ Edit  src/auth/oauth.ts  ← bold + spinner = live                                                           │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 The badge tells you, per session, **what the agent is doing right now**:

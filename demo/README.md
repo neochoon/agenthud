@@ -5,7 +5,7 @@ written as [VHS](https://github.com/charmbracelet/vhs) tape files.
 
 | Tape | Output | What it shows |
 |------|--------|---------------|
-| `live.tape` | `live.gif` | Launching the TUI, navigating the project tree, opening the help overlay, scrolling the viewer, jumping to live, quitting (alt-screen exit). |
+| `live.tape` | `live.gif` | The three layers in one take: the live HUD (browse the tree, Tab into the viewer, scroll with the arrow key, open an activity's detail), then `agenthud summary` (a cached daily digest), then `agenthud report` (the structured timeline it's built from). |
 | `summary-daily.tape` | `summary-daily.gif` | `agenthud summary --date <past date>` returning instantly from cache. |
 | `summary-range.tape` | `summary-range.gif` | `agenthud summary --from X --to Y` returning a cross-day digest instantly from the range cache. |
 
@@ -39,6 +39,9 @@ the README renders without contributors needing VHS installed.
   on the machine generating the GIF (`ls ~/.agenthud/summaries/`).
 - **Styling** (font size, theme, dimensions, typing speed) is set at
   the top of each tape. Edit there to retune.
-- The `live.tape` recording captures the alt-screen exit too — the
-  pre-launch shell prompt reappears at the end, which is part of the
-  demo.
+- The `live.tape` recording captures the alt-screen exit too — after
+  `q`, the pre-launch shell prompt reappears, and the recording then
+  runs `summary` and `report` in that restored shell.
+- `live.tape`'s summary step uses `--engine kiro` so it hits an existing
+  cached digest instantly; adjust the engine/date to whatever is cached
+  and logged in on the recording machine.

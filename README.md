@@ -4,26 +4,17 @@
 [![CI](https://github.com/neochoon/agenthud/actions/workflows/ci.yml/badge.svg)](https://github.com/neochoon/agenthud/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/neochoon/agenthud/branch/main/graph/badge.svg)](https://codecov.io/gh/neochoon/agenthud)
 
-An observability layer for AI coding agents. **See** your live sessions, **export** structured activity logs, and **summarize** a day or a week into an LLM digest — all from one CLI, across every agent you use.
+A **heads-up display** for your AI coding agents — **Claude Code**, **OpenAI Codex**, and **AWS Kiro**. AgentHUD reads each agent's on-disk session files and merges them into one tree, so a project you've touched from several agents shows as a single row with combined sessions and sub-agents.
 
 ![demo](./demo/live.gif)
 
-AgentHUD reads each agent's on-disk session files and merges them into one tree, so a project you've touched from several agents shows as a single row with combined sessions and sub-agents. Supported today:
+It's organized as **three layers, by who's reading** — a human at a glance, a human at the end of the day, and a machine:
 
-| Agent | Source |
-|---|---|
-| [Claude Code](https://github.com/anthropics/claude-code) | `~/.claude/projects/` |
-| [Codex CLI](https://github.com/openai/codex) | `~/.codex/sessions/` |
-| Kiro IDE | `…/Kiro/User/globalStorage/kiro.kiroagent/` |
-| Kiro CLI | `~/.kiro/sessions/cli/` |
+- **`agenthud`** — **the live HUD.** A real-time TUI showing which session is `[working]` versus `[waiting]` on you, right now, across every agent. Glance at it in a side terminal and know what all your agents are doing. *This is the hero — the name is HUD for a reason.*
+- **`agenthud summary`** — **the daily digest.** Fold a day (or a week) into an LLM engineering summary — a standup-in-one-command habit, via whichever agent CLI you have installed (claude, codex, or kiro-cli, auto-detected).
+- **`agenthud report`** — **the machine layer.** Structured Markdown / JSON. `summary` is literally `report` piped into an agent CLI, so the daily digest isn't a black box — and you can pipe `report` into anything else, too.
 
-Each session row shows its provider, model, and context-window usage; sub-agents nest under their parent regardless of which agent spawned them. It gives you three things:
-
-- **Live monitor** (`agenthud`) — a split-view TUI showing every project, session, sub-agent, and activity as it happens
-- **Structured export** (`agenthud report`) — Markdown or JSON (with provider + model per session) for piping to scripts, dashboards, or other LLMs
-- **LLM digest** (`agenthud summary`) — a day or a date range synthesized into an engineering summary via the `claude` CLI
-
-→ **See [FEATURES.md](./FEATURES.md) for the full surface** — every flag, keybinding, config key, file path, and env var. Per-agent session-file schemas live in [docs/schemas/](./docs/schemas/).
+→ **See [FEATURES.md](./FEATURES.md) for the full surface** — every flag, keybinding, config key, file path, and env var. Per-agent session-file schemas: [Claude Code](./docs/schemas/claude-session.md) · [Codex CLI](./docs/schemas/codex-session.md) · [Kiro IDE](./docs/schemas/kiro-ide-session.md) · [Kiro CLI](./docs/schemas/kiro-session.md) (or browse [docs/schemas/](./docs/schemas/)).
 
 Requires Node.js 20+. Open agenthud in a separate terminal while you work; press `?` inside the TUI for in-app help.
 
@@ -46,49 +37,82 @@ npm i -g agenthud
 ## Quickstart
 
 ```bash
-# Live monitor
+# 1 · The live HUD
 agenthud                                  # all projects, every agent
 agenthud --cwd                            # scope to the project containing $PWD
-agenthud --once                           # snapshot mode, no alt-screen
 
-# Activity report
-agenthud report --date today              # today's activity as markdown
+# 2 · The daily digest
+agenthud summary                          # synthesize today via your agent CLI
+agenthud summary --last 7d                # cross-day synthesis of the last 7 days
+agenthud summary -oI                      # open the summary + the summaries index
+
+# 3 · The machine layer
+agenthud report                           # today's activity as markdown
 agenthud report --format json             # script-readable
 agenthud report --with-git                # merge git commits into the timeline
-
-# LLM summary
-agenthud summary --date today             # daily summary via `claude -p`
-agenthud summary --last 7d                # cross-day synthesis of last 7 days
-agenthud summary -oI                      # open the summary + the summaries index
 ```
 
-## What you see
+## The live HUD — `agenthud`
 
-The TUI splits into a project tree (top) and an activity viewer (bottom):
+The hero. A split-view TUI: a project tree (top) and an activity viewer (bottom), refreshing as your agents work.
 
 ```
-┌─ Projects ──────────────────────────────────────────────────────────┐
-│ 4 projects (2) · 31 sessions (3) · 142 sub-agents (1) · ⊘ 2 hidden   │
-│ > agenthud  ~/WestbrookAI/agenthud  6 sessions (2) · 114 sub-agents  │
-│     #864f [hot] Fix the auth bug in login flow    9s 41% claude opus │
-│         ├─ » code-reviewer                                           │
-│     #019e [cool] review the data layer            3h 44% codex gpt-5 │
-│   myproject  ~/work/myproject                                    2d  │
-│     #def4 [hot] Add OAuth support                12m 5% kiro-ide auto│
-│ ... 12 cold projects                                                 │
-└──────────────────────────────────────────────────────────────────────┘
-┌─ Activity · agenthud ────────────────────────────────────────────────┐
-│ [10:23] ○ Read  src/ui/App.tsx                                       │
-│ [10:23] ~ Edit  src/ui/App.tsx                                       │
-│ [10:23] $ Bash  npm test                                             │
-│ [10:23] < Response  Tests passed successfully                        │
-│ [10:25] ⠧ Edit  src/auth/oauth.ts  ← bold + spinner = live          │
-└──────────────────────────────────────────────────────────────────────┘
+┌─ Projects ────────────────────────────────────────────────────────────────────────────────────┐
+│ 4 projects (2) · 31 sessions (3) · 142 sub-agents (1) · ⊘ 2 hidden                            │
+│ > agenthud  ~/WestbrookAI/agenthud  6 sessions (2) · 114 sub-agents                           │
+│     #864f [working] Fix the auth bug in login flow                         9s 41% claude opus │
+│         ├─ » code-reviewer                                                                    │
+│     #019e [waiting] review the data layer                                  2m 44% codex gpt-5 │
+│   myproject  ~/work/myproject                                                              2d │
+│     #def4 [cool] Add OAuth support                                        2m 5% kiro-ide auto │
+│ ... 12 cold projects                                                                          │
+└───────────────────────────────────────────────────────────────────────────────────────────────┘
+┌─ Activity · agenthud ─────────────────────────────────────────────────────────────────────────┐
+│ [10:23] ○ Read  src/ui/App.tsx                                                                │
+│ [10:23] ~ Edit  src/ui/App.tsx                                                                │
+│ [10:23] $ Bash  npm test                                                                      │
+│ [10:23] < Response  Tests passed successfully                                                 │
+│ [10:25] ⠧ Edit  src/auth/oauth.ts  ← bold + spinner = live                                    │
+└───────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Each session row carries a colored provider label (`claude` / `codex` / `kiro` / `kiro-ide`), its model, and a context-window gauge. Badges — `[hot]` / `[warm]` / `[cool]` / `[cold]` — reflect how recently the session was touched; only hot/warm count as active (and render bright). The panel title is a tree-wide census; cold projects collapse under a `... N cold projects` sentinel. Press `↵` on any activity for a scrollable detail view.
+The badge tells you, per session, **what the agent is doing right now**:
+
+- `[working]` — there's a pending tool call at the tail; the agent is mid-step.
+- `[waiting]` — the turn yielded back to you (a question, or a finished reply).
+
+These live states are read from the structure of each session's JSONL tail and **override** the time-based recency badges (`[hot]` / `[warm]` / `[cool]` / `[cold]`) whenever a session is live. Each row also carries a colored provider label (`claude` / `codex` / `kiro` / `kiro-ide`), its model, and a context-window gauge; only hot/warm (and live) sessions count as active and render bright. Sub-agents nest under their parent regardless of which agent spawned them, the panel title is a tree-wide census, and cold projects collapse under a `... N cold projects` sentinel. Press `↵` on any activity for a scrollable detail view.
 
 Full keybinding and badge reference: [FEATURES.md](./FEATURES.md#keybindings).
+
+## The daily digest — `agenthud summary`
+
+The asynchronous human layer: a day or a date range, synthesized into an engineering summary you can read like a standup note.
+
+```bash
+agenthud summary --date yesterday         # one day
+agenthud summary --last 7d                # a rolling window
+agenthud summary --from 2026-06-01 --to 2026-06-07
+```
+
+The summary runs through an **agent CLI of your choice**. By default it auto-detects the first one installed in `claude → codex → kiro` order; set a default with `summary.engine` in `~/.agenthud/config.yaml`, or override per-run with `--engine <claude|codex|kiro>`. So Claude-, Codex-, and Kiro-only users all get summaries with no extra setup.
+
+Summaries are cached one-file-per-day under `~/.agenthud/summaries/`, cross-linked into a browsable index (`-I` to open it), and stamped with the engine + model that produced them — so switching engines regenerates rather than serving stale text.
+
+## Scripting & integration — `agenthud report`
+
+`agenthud report` is the machine-readable layer the other two are built on. It isn't a feature you rarely touch — it's the substrate of the one you use every day:
+
+```bash
+# This is, essentially, what `summary` does under the hood:
+agenthud report --date yesterday | claude -p "$(cat ~/.agenthud/summary-prompt.md)"
+
+# …so the same report can flow anywhere else:
+agenthud report --format json | jq '.sessions[].model'   # into a dashboard
+agenthud report --with-git    | your-own-llm-call        # into any pipeline
+```
+
+`summary` is just `report` piped into an agent CLI. The digest isn't a black box — it's `report` + a prompt + whichever LLM you like, and you can swap any part. Markdown is the default; `--format json` (with provider + model per session) is the script-friendly form.
 
 ## Configuration
 

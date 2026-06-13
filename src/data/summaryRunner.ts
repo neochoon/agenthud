@@ -797,7 +797,9 @@ export async function runRangeSummary(
           if (!content.endsWith("\n")) process.stdout.write("\n");
         }
         // Path last, so it survives a long summary scrolling by.
-        process.stderr.write(`\nrange summary read from cache: ${rangeCache}\n`);
+        process.stderr.write(
+          `\nrange summary read from cache: ${rangeCache}\n`,
+        );
         try {
           regenerateIndex(summariesDir());
         } catch {

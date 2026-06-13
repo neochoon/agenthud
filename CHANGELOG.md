@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [0.18.3] - 2026-06-13
+
+### Fixed
+- **`summary` now reports the file path at the end of its output.** On a
+  cache hit the path was printed before the content, so a long summary
+  scrolled it off the top. It now prints last, with wording that says
+  whether the file was freshly written (`summary written to <path>`) or
+  served from cache (`summary read from cache: <path>`) — no more
+  ambiguous "saved to" on a read.
+
+### Changed
+- **Docs:** README repositioned around the three layers (live HUD /
+  daily digest / machine report), supported agents named up front, and
+  the demo GIF re-recorded as a three-layer walkthrough.
+
 ## [0.18.2] - 2026-06-13
 
 ### Fixed

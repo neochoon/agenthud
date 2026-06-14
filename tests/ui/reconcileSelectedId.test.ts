@@ -73,7 +73,10 @@ describe("reconcileSelectedId", () => {
 
   it("falls back to the first visible row when the whole branch is gone", () => {
     // project "p" went fully cold and collapsed under "__cold__".
-    const t = tree([project("active", [node("x")])], [project("p", [node("s1")])]);
+    const t = tree(
+      [project("active", [node("x")])],
+      [project("p", [node("s1")])],
+    );
     const flat = flatOf("__proj-active__", "x", "__cold__");
     expect(reconcileSelectedId("s1", flat, t)).toBe("__proj-active__");
   });

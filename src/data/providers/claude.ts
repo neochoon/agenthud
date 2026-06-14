@@ -208,15 +208,19 @@ function readSessionTail(
   filePath: string,
   mtimeMs: number,
   now: number,
+  isSubAgent = false,
 ): {
   modelName: string | null;
   liveState: LiveState | null;
   contextUsage: { used: number; total: number; percent: number } | null;
 } {
+  // `isSubAgent` is a fixed property of the file's location (the
+  // subagents/ dir), so it never varies for a given path — caching by
+  // (path, mtime) alone stays correct.
   const key = mtimeKey(filePath, mtimeMs);
   const cached = tailCache.get(key);
   if (cached) return cached;
-  const value = computeSessionTail(filePath, mtimeMs, now);
+  const value = computeSessionTail(filePath, mtimeMs, now, isSubAgent);
   tailCache.set(key, value);
   return value;
 }
@@ -225,6 +229,7 @@ function computeSessionTail(
   filePath: string,
   mtimeMs: number,
   now: number,
+  isSubAgent = false,
 ): {
   modelName: string | null;
   liveState: LiveState | null;
@@ -278,7 +283,7 @@ function computeSessionTail(
 
     return {
       modelName,
-      liveState: detectLiveState(tail, mtimeMs, now),
+      liveState: detectLiveState(tail, mtimeMs, now, isSubAgent),
       contextUsage,
     };
   } catch {
@@ -441,6 +446,7 @@ function buildSubAgents(
             filePath,
             stat.mtimeMs,
             Date.now(),
+            true, // sub-agent: a yielded turn means done, not waiting
           );
           return {
             id,

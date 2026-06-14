@@ -541,6 +541,53 @@ export function findParentTarget(
   return flat[idx - 1]?.id ?? currentId;
 }
 
+/**
+ * Keep the tree selection on a row that is actually visible. The
+ * `selectedId` is a stable id, but the flattened view it points into
+ * changes underneath it — a refresh that cools the selected session into
+ * a `... N cold` fold, an expand/collapse, a show-hidden toggle. When the
+ * id falls out of `flat` the cursor vanishes and j/k go silent
+ * (selectedIndex = -1).
+ *
+ * Returns a still-visible id by walking UP from the missing selection
+ * (sub-agent → its session → that session's project header) until it
+ * lands on a row that's in `flat`; failing that, the first visible row
+ * (or null when nothing is visible).
+ */
+export function reconcileSelectedId(
+  selectedId: string | null,
+  flat: SessionNode[],
+  tree: SessionTree,
+): string | null {
+  const inFlat = (id: string | null | undefined): boolean =>
+    id != null && flat.some((row) => row.id === id);
+
+  if (inFlat(selectedId)) return selectedId;
+
+  if (selectedId != null) {
+    const allProjects = [...tree.projects, ...tree.coldProjects];
+    const allSessions = allProjects.flatMap((p) => p.sessions);
+
+    // sub-agent → its containing session
+    const owningSession = allSessions.find((s) =>
+      s.subAgents.some((sa) => sa.id === selectedId),
+    );
+    if (inFlat(owningSession?.id)) return owningSession?.id ?? null;
+
+    // the selected session (or the sub-agent's session) → project header
+    const sessionId = owningSession?.id ?? selectedId;
+    const owningProject = allProjects.find((p) =>
+      p.sessions.some((s) => s.id === sessionId),
+    );
+    const projectSentinel = owningProject
+      ? `__proj-${owningProject.name}__`
+      : null;
+    if (inFlat(projectSentinel)) return projectSentinel;
+  }
+
+  return flat[0]?.id ?? null;
+}
+
 export function initialSelectedId(tree: SessionTree): string | null {
   const firstProject = tree.projects[0];
   if (firstProject) return `__proj-${firstProject.name}__`;
@@ -642,6 +689,17 @@ export function App({
   useEffect(() => {
     allFlatRef.current = allFlat;
   }, [allFlat]);
+
+  // Selection must always point to a visible row. Whenever the flattened
+  // view changes (refresh cooling a session into "... N cold", an
+  // expand/collapse, a show-hidden toggle) and the selected id drops out
+  // of it, snap to the nearest visible ancestor so the cursor never
+  // vanishes and j/k don't go silent (selectedIndex = -1). Converges in
+  // one extra render: the reconciled id is always in `allFlat`.
+  useEffect(() => {
+    const next = reconcileSelectedId(selectedId, allFlat, displayTree);
+    if (next !== selectedId) setSelectedId(next);
+  }, [allFlat, selectedId, displayTree]);
 
   const activitiesRef = useRef<ActivityEntry[]>(activities);
   useEffect(() => {

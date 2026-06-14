@@ -14,6 +14,11 @@
  * - `AskUserQuestion` is treated as `waiting`. Even though it's
  *   technically a pending tool_use, the ball is in the user's
  *   court — they need to answer before Claude can continue.
+ * - `isSubAgent` suppresses every `waiting` verdict. A sub-agent is
+ *   one-shot: it produces a result and terminates, never pausing for
+ *   user input. A yielded turn (text-only assistant) therefore means
+ *   DONE, not waiting — so it returns `null` (→ time-based badge)
+ *   instead. A pending tool_use still reads as `working` (mid-task).
  * - Returns `null` outside the 30-minute recency window;
  *   upstream falls back to the time-based `[hot/warm/cool/cold]`
  *   ladder.
@@ -46,8 +51,13 @@ export function detectLiveState(
   tailLines: string[],
   mtimeMs: number,
   now: number,
+  isSubAgent = false,
 ): LiveState | null {
   if (now - mtimeMs > THIRTY_MINUTES_MS) return null;
+
+  // A sub-agent never waits on a user, so a yielded turn means it's done,
+  // not waiting → fall back to the time-based badge (null) instead.
+  const yielded: LiveState | null = isSubAgent ? null : "waiting";
 
   for (let i = tailLines.length - 1; i >= 0; i--) {
     const line = tailLines[i];
@@ -64,8 +74,8 @@ export function detectLiveState(
       const content = entry.message?.content;
       const blocks: ContentBlock[] = Array.isArray(content) ? content : [];
       const toolUses = blocks.filter((b) => b && b.type === "tool_use");
-      if (toolUses.length === 0) return "waiting"; // turn yielded (text only)
-      if (toolUses.some((b) => b.name === "AskUserQuestion")) return "waiting";
+      if (toolUses.length === 0) return yielded; // turn yielded (text only)
+      if (toolUses.some((b) => b.name === "AskUserQuestion")) return yielded;
       return "working"; // pending tool_use
     }
 

@@ -137,4 +137,40 @@ describe("detectLiveState", () => {
     ];
     expect(detectLiveState(lines, STALE, NOW)).toBeNull();
   });
+
+  // Sub-agents are one-shot: they produce a result and terminate, never
+  // pausing for user input. So a yielded turn (text-only assistant, or an
+  // AskUserQuestion it can't actually get answered) means DONE, not
+  // "waiting". `isSubAgent` suppresses the waiting verdict; a pending
+  // tool_use still reads as working (the sub-agent is mid-task).
+  describe("isSubAgent", () => {
+    it("a finished sub-agent (text-only end_turn) is null, not 'waiting'", () => {
+      const lines = [
+        j({ type: "user", message: { role: "user", content: "Explore X" } }),
+        j({
+          type: "assistant",
+          message: {
+            content: [{ type: "text", text: "Here is the result." }],
+            stop_reason: "end_turn",
+          },
+        }),
+      ];
+      expect(detectLiveState(lines, RECENT, NOW)).toBe("waiting");
+      expect(detectLiveState(lines, RECENT, NOW, true)).toBeNull();
+    });
+
+    it("a sub-agent with a pending tool_use still reads as 'working'", () => {
+      const lines = [
+        j({
+          type: "assistant",
+          message: {
+            content: [
+              { type: "tool_use", name: "Grep", input: { pattern: "foo" } },
+            ],
+          },
+        }),
+      ];
+      expect(detectLiveState(lines, RECENT, NOW, true)).toBe("working");
+    });
+  });
 });

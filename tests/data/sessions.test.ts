@@ -14,7 +14,7 @@ const { existsSync, readdirSync, statSync, readFileSync } = await import(
 const { discoverSessions, findContainingProject } = await import(
   "../../src/data/sessions.js"
 );
-const { clearClaudeFileCaches } = await import(
+const { clearClaudeFileCaches, claudeFileCacheEntryCount } = await import(
   "../../src/data/providers/claude.js"
 );
 
@@ -44,6 +44,54 @@ describe("discoverSessions", () => {
     expect(tree.projects).toHaveLength(0);
     expect(tree.coldProjects).toHaveLength(0);
     expect(tree.totalCount).toBe(0);
+  });
+
+  it("per-file caches stay bounded as a session's mtime changes each refresh", () => {
+    const projectsDir = join(
+      process.env.HOME ?? "/home/user",
+      ".claude",
+      "projects",
+    );
+    const projectDir = join(projectsDir, "-Users-neo-myproject");
+    vi.mocked(existsSync).mockImplementation(
+      (p) => String(p) === projectsDir || String(p).includes("myproject"),
+    );
+    vi.mocked(readdirSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === projectsDir)
+        return ["-Users-neo-myproject"] as unknown as ReturnType<
+          typeof readdirSync
+        >;
+      if (path === projectDir)
+        return ["s.jsonl"] as unknown as ReturnType<typeof readdirSync>;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(readFileSync).mockReturnValue(
+      `${JSON.stringify({
+        type: "user",
+        message: { role: "user", content: "hi" },
+        timestamp: new Date(NOW).toISOString(),
+      })}\n`,
+    );
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    // Each refresh the file's mtime advances (an active, appending
+    // session). The pre-fix caches keyed by (path, mtime) grew one entry
+    // per refresh forever; now it's one entry per file.
+    for (let i = 0; i < 20; i++) {
+      vi.mocked(statSync).mockImplementation((p) => {
+        const isDir = !String(p).endsWith(".jsonl");
+        return {
+          isDirectory: () => isDir,
+          mtimeMs: NOW - i,
+          size: 80,
+        } as ReturnType<typeof statSync>;
+      });
+      discoverSessions(mockConfig);
+    }
+
+    // 1 file × 4 caches = 4 entries, regardless of how many refreshes ran.
+    expect(claudeFileCacheEntryCount()).toBeLessThanOrEqual(4);
   });
 
   it("discovers a top-level session with no sub-agents", () => {

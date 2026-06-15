@@ -128,23 +128,35 @@ function extractTaskDescription(content: string): string {
 // up to one poll for a file that goes idle without any further
 // write (same mtime → cache hit). Acceptable: a ~2s delay on a
 // hot→cool transition, invisible in practice.
-const tailCache = new Map<
-  string,
-  {
-    modelName: string | null;
-    liveState: LiveState | null;
-    contextUsage: { used: number; total: number; percent: number } | null;
-  }
->();
-const promptCache = new Map<string, string | null>();
-const entrypointCache = new Map<string, string | null>();
-const subAgentInfoCache = new Map<
-  string,
-  { agentId: string | null; taskDescription: string | null }
->();
+// Per-file derived caches. Keyed by path (NOT by path+mtime) with the
+// mtime stored alongside the value, so a session that changes every poll
+// overwrites its one entry instead of accumulating a new key forever —
+// the long-run leak. One entry per file ⇒ bounded by the file count.
+type Memo<V> = Map<string, { mtimeMs: number; value: V }>;
 
-function mtimeKey(filePath: string, mtimeMs: number): string {
-  return `${filePath}:${mtimeMs}`;
+const tailCache: Memo<{
+  modelName: string | null;
+  liveState: LiveState | null;
+  contextUsage: { used: number; total: number; percent: number } | null;
+}> = new Map();
+const promptCache: Memo<string | null> = new Map();
+const entrypointCache: Memo<string | null> = new Map();
+const subAgentInfoCache: Memo<{
+  agentId: string | null;
+  taskDescription: string | null;
+}> = new Map();
+
+function memoByMtime<V>(
+  cache: Memo<V>,
+  filePath: string,
+  mtimeMs: number,
+  compute: () => V,
+): V {
+  const cached = cache.get(filePath);
+  if (cached && cached.mtimeMs === mtimeMs) return cached.value;
+  const value = compute();
+  cache.set(filePath, { mtimeMs, value });
+  return value;
 }
 
 /** Test/maintenance hook: drop all per-file derived caches. */
@@ -155,6 +167,16 @@ export function clearClaudeFileCaches(): void {
   subAgentInfoCache.clear();
 }
 
+/** Test hook: total entries across the per-file caches (bound check). */
+export function claudeFileCacheEntryCount(): number {
+  return (
+    tailCache.size +
+    promptCache.size +
+    entrypointCache.size +
+    subAgentInfoCache.size
+  );
+}
+
 function readSubAgentInfo(
   filePath: string,
   mtimeMs: number,
@@ -162,12 +184,9 @@ function readSubAgentInfo(
   agentId: string | null;
   taskDescription: string | null;
 } {
-  const key = mtimeKey(filePath, mtimeMs);
-  const cached = subAgentInfoCache.get(key);
-  if (cached) return cached;
-  const value = computeSubAgentInfo(filePath);
-  subAgentInfoCache.set(key, value);
-  return value;
+  return memoByMtime(subAgentInfoCache, filePath, mtimeMs, () =>
+    computeSubAgentInfo(filePath),
+  );
 }
 
 // Discovery touches every session on every refresh. Reading whole files
@@ -287,14 +306,10 @@ function readSessionTail(
   contextUsage: { used: number; total: number; percent: number } | null;
 } {
   // `isSubAgent` is a fixed property of the file's location (the
-  // subagents/ dir), so it never varies for a given path — caching by
-  // (path, mtime) alone stays correct.
-  const key = mtimeKey(filePath, mtimeMs);
-  const cached = tailCache.get(key);
-  if (cached) return cached;
-  const value = computeSessionTail(filePath, mtimeMs, now, isSubAgent);
-  tailCache.set(key, value);
-  return value;
+  // subagents/ dir), so it never varies for a given path.
+  return memoByMtime(tailCache, filePath, mtimeMs, () =>
+    computeSessionTail(filePath, mtimeMs, now, isSubAgent),
+  );
 }
 
 function computeSessionTail(
@@ -400,12 +415,9 @@ function isSystemNoise(text: string): boolean {
  * `firstUserPrompt` in `SessionNode` for backwards compatibility.
  */
 function readFirstUserPrompt(filePath: string, mtimeMs: number): string | null {
-  const key = mtimeKey(filePath, mtimeMs);
-  const cached = promptCache.get(key);
-  if (cached !== undefined) return cached;
-  const value = computeFirstUserPrompt(filePath);
-  promptCache.set(key, value);
-  return value;
+  return memoByMtime(promptCache, filePath, mtimeMs, () =>
+    computeFirstUserPrompt(filePath),
+  );
 }
 
 function computeFirstUserPrompt(filePath: string): string | null {
@@ -466,12 +478,9 @@ function computeFirstUserPrompt(filePath: string): string | null {
 }
 
 function readEntrypoint(filePath: string, mtimeMs: number): string | null {
-  const key = mtimeKey(filePath, mtimeMs);
-  const cached = entrypointCache.get(key);
-  if (cached !== undefined) return cached;
-  const value = computeEntrypoint(filePath);
-  entrypointCache.set(key, value);
-  return value;
+  return memoByMtime(entrypointCache, filePath, mtimeMs, () =>
+    computeEntrypoint(filePath),
+  );
 }
 
 function computeEntrypoint(filePath: string): string | null {

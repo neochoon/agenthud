@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.18.6] - 2026-06-15
+
+### Fixed
+- **Giant-session freeze.** The live viewer fully read and parsed the
+  selected session; with today's large sessions (100MB+) that spiked
+  ~700MB RSS on selection and froze the TUI (unresponsive to Ctrl+C/q).
+  It now loads only a recent window (the last 8MB, snapped to a turn
+  boundary) of a session file — bounded memory regardless of file size
+  (104MB session: ~700MB → 40MB transient, ~200MB → 17MB retained). Full
+  history is unchanged in `report` / `summary`; the viewer's scrollback
+  is bounded to the recent window. Completes the v0.18.5 cache fix, which
+  only addressed multi-session accumulation.
+
 ## [0.18.5] - 2026-06-15
 
 ### Fixed

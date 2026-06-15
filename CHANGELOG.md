@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.18.5] - 2026-06-15
+
+### Fixed
+- **Long-run freeze / memory bloat in the live viewer.** Leaving the TUI
+  open for hours with a busy session selected grew it to hundreds of MB
+  of RSS and eventually froze it — unresponsive to Ctrl+C / q. The
+  per-session history cache was unbounded (it kept the full parsed
+  activity array of every session ever selected) and returned a fresh
+  array on every cache hit, so the viewer re-rendered on every 2s
+  refresh even when nothing changed. The cache is now LRU-bounded and
+  returns a stable reference on a hit, so memory stays flat and an
+  unchanged refresh does no work.
+
 ## [0.18.4] - 2026-06-15
 
 ### Fixed

@@ -32,7 +32,15 @@
  *   `sessionLiveness.ts`.
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+  readSync,
+  statSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import type {
@@ -162,13 +170,77 @@ function readSubAgentInfo(
   return value;
 }
 
+// Discovery touches every session on every refresh. Reading whole files
+// just to peek at the first or last lines slurps 100MB+ sessions
+// repeatedly (the freeze). These read a bounded slice instead.
+const HEAD_READ_BYTES = 16 * 1024; // first line: entrypoint / sub-agent header
+const TAIL_READ_BYTES = 256 * 1024; // recent lines: model / liveState / context
+const PROMPT_TAIL_BYTES = 1024 * 1024; // latest substantial user prompt (title)
+
+// Files at or under the cap are read whole (cheap, and the common case);
+// only an oversized session pays the bounded positioned read. This also
+// keeps the unit tests — which use small in-memory fixtures — on the
+// plain readFileSync path.
+function readHeadText(filePath: string, maxBytes: number): string {
+  let size: number;
+  try {
+    size = statSync(filePath).size;
+  } catch {
+    return "";
+  }
+  if (size <= maxBytes) {
+    try {
+      return readFileSync(filePath, "utf-8");
+    } catch {
+      return "";
+    }
+  }
+  const fd = openSync(filePath, "r");
+  try {
+    const buf = Buffer.alloc(maxBytes);
+    const n = readSync(fd, buf, 0, maxBytes, 0);
+    return buf.toString("utf-8", 0, n);
+  } finally {
+    closeSync(fd);
+  }
+}
+
+// Read at most `maxBytes` from the END of the file, dropping a leading
+// partial line when the file is larger than the slice.
+function readTailText(filePath: string, maxBytes: number): string {
+  let size: number;
+  try {
+    size = statSync(filePath).size;
+  } catch {
+    return "";
+  }
+  if (size <= maxBytes) {
+    try {
+      return readFileSync(filePath, "utf-8");
+    } catch {
+      return "";
+    }
+  }
+  const fd = openSync(filePath, "r");
+  try {
+    const buf = Buffer.alloc(maxBytes);
+    const n = readSync(fd, buf, 0, maxBytes, size - maxBytes);
+    let text = buf.toString("utf-8", 0, n);
+    const nl = text.indexOf("\n");
+    if (nl >= 0) text = text.slice(nl + 1); // drop partial first line
+    return text;
+  } finally {
+    closeSync(fd);
+  }
+}
+
 function computeSubAgentInfo(filePath: string): {
   agentId: string | null;
   taskDescription: string | null;
 } {
   if (!existsSync(filePath)) return { agentId: null, taskDescription: null };
   try {
-    const firstLine = readFileSync(filePath, "utf-8").split("\n")[0];
+    const firstLine = readHeadText(filePath, HEAD_READ_BYTES).split("\n")[0];
     if (!firstLine) return { agentId: null, taskDescription: null };
     const entry = JSON.parse(firstLine);
     const agentId = typeof entry.agentId === "string" ? entry.agentId : null;
@@ -238,7 +310,7 @@ function computeSessionTail(
   if (!existsSync(filePath))
     return { modelName: null, liveState: null, contextUsage: null };
   try {
-    const content = readFileSync(filePath, "utf-8");
+    const content = readTailText(filePath, TAIL_READ_BYTES);
     const tail = content.trim().split("\n").filter(Boolean).slice(-50);
 
     let modelName: string | null = null;
@@ -338,9 +410,11 @@ function readFirstUserPrompt(filePath: string, mtimeMs: number): string | null {
 
 function computeFirstUserPrompt(filePath: string): string | null {
   if (!existsSync(filePath)) return null;
+  // The row title is the LATEST substantial user message — always recent,
+  // so a bounded tail read finds it without slurping a huge session.
   let content: string;
   try {
-    content = readFileSync(filePath, "utf-8");
+    content = readTailText(filePath, PROMPT_TAIL_BYTES);
   } catch {
     return null;
   }
@@ -403,7 +477,7 @@ function readEntrypoint(filePath: string, mtimeMs: number): string | null {
 function computeEntrypoint(filePath: string): string | null {
   if (!existsSync(filePath)) return null;
   try {
-    const firstLine = readFileSync(filePath, "utf-8").split("\n")[0];
+    const firstLine = readHeadText(filePath, HEAD_READ_BYTES).split("\n")[0];
     if (!firstLine) return null;
     const entry = JSON.parse(firstLine);
     return typeof entry.entrypoint === "string" ? entry.entrypoint : null;

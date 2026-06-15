@@ -79,8 +79,10 @@ function turn(i: number): string[] {
 describe("parseSessionHistory incremental (real fs, >2 MB)", () => {
   it("incremental growth matches a cold full parse exactly", () => {
     const lines: string[] = [];
-    // ~2.5 MB: 3 lines/turn, ~500 bytes/turn → need ~5000 turns.
-    for (let i = 0; i < 6000; i++) lines.push(...turn(i));
+    // ~3.4 MB: big enough to cross TAIL_MAX (2 MB) so a prefix-advance
+    // fold happens, but under MAX_VIEWER_BYTES (4 MB) so the viewer reads
+    // the whole file and incremental must equal a cold full parse.
+    for (let i = 0; i < 3500; i++) lines.push(...turn(i));
 
     // Grow the file in 6 chunks, parsing after each (drives tail
     // re-parse + at least one prefix-advance fold past TAIL_MAX).

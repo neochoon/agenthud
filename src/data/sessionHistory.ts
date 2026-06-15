@@ -108,12 +108,41 @@ interface HistoryCacheEntry {
   prefixByteLen: number; // [0, prefixByteLen) is the frozen prefix
   prefixActivities: ActivityEntry[];
   tailActivities: ActivityEntry[];
+  // Memoized prefix ++ tail. Returned (by reference) on every cache hit
+  // so a re-parse of an unchanged file yields the SAME array — letting
+  // `setActivities` bail out of re-rendering the viewer.
+  activities: ActivityEntry[];
 }
+
+// Bound the cache so a long-lived watch process doesn't hoard the full
+// parsed activity array of every session ever selected. Without this the
+// map grew unboundedly (600MB+ RSS over hours → GC thrash → the whole
+// TUI freezes, unresponsive to Ctrl+C/q). LRU: keep the N most-recently
+// read sessions; the viewer only shows one at a time.
+export const HISTORY_CACHE_MAX = 8;
+
 const historyCache = new Map<string, HistoryCacheEntry>();
 
 /** Test/maintenance hook: drop the parsed-history cache. */
 export function clearSessionHistoryCache(): void {
   historyCache.clear();
+}
+
+// Insert/refresh an entry at the most-recently-used end, memoizing the
+// concatenated activities once, and evict the oldest beyond the cap.
+function storeEntry(
+  filePath: string,
+  fields: Omit<HistoryCacheEntry, "activities">,
+): ActivityEntry[] {
+  const activities = fields.prefixActivities.concat(fields.tailActivities);
+  historyCache.delete(filePath); // re-insert at the end (LRU recency)
+  historyCache.set(filePath, { ...fields, activities });
+  while (historyCache.size > HISTORY_CACHE_MAX) {
+    const oldest = historyCache.keys().next().value;
+    if (oldest === undefined) break;
+    historyCache.delete(oldest);
+  }
+  return activities;
 }
 
 // Byte offset of the first byte AFTER the first '\n' at index >=
@@ -190,7 +219,9 @@ export function parseSessionHistory(filePath: string): ActivityEntry[] {
 
   const cached = historyCache.get(filePath);
   if (cached && cached.mtimeMs === mtimeMs) {
-    return cached.prefixActivities.concat(cached.tailActivities);
+    historyCache.delete(filePath); // bump LRU recency
+    historyCache.set(filePath, cached);
+    return cached.activities; // stable reference — no re-render churn
   }
 
   const provider = providerForPath(filePath);
@@ -205,14 +236,13 @@ export function parseSessionHistory(filePath: string): ActivityEntry[] {
     }
     const lines = content.trim().split("\n").filter(Boolean);
     const activities = provider.parseActivities(lines, { mtimeMs }).activities;
-    historyCache.set(filePath, {
+    return storeEntry(filePath, {
       mtimeMs,
       size,
       prefixByteLen: size,
       prefixActivities: activities,
       tailActivities: [],
     });
-    return activities;
   }
 
   // Incremental append: file grew and the frozen prefix is intact.
@@ -221,7 +251,7 @@ export function parseSessionHistory(filePath: string): ActivityEntry[] {
   // appended tail bytes, never the whole file.
   if (cached && size > cached.size) {
     const tailBytes = readRange(filePath, cached.prefixByteLen, size);
-    let entry: HistoryCacheEntry;
+    let entry: Omit<HistoryCacheEntry, "activities">;
     if (tailBytes.length <= TAIL_MAX) {
       entry = {
         mtimeMs,
@@ -260,8 +290,7 @@ export function parseSessionHistory(filePath: string): ActivityEntry[] {
         ),
       };
     }
-    historyCache.set(filePath, entry);
-    return entry.prefixActivities.concat(entry.tailActivities);
+    return storeEntry(filePath, entry);
   }
 
   // Full (re)parse: first sight of this file, or it was rewritten.
@@ -288,12 +317,11 @@ export function parseSessionHistory(filePath: string): ActivityEntry[] {
     tailText = buf.subarray(prefixByteLen).toString("utf-8");
   }
   const tailActivities = parseChunk(provider, tailText, mtimeMs);
-  historyCache.set(filePath, {
+  return storeEntry(filePath, {
     mtimeMs,
     size,
     prefixByteLen,
     prefixActivities,
     tailActivities,
   });
-  return prefixActivities.concat(tailActivities);
 }

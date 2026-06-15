@@ -10,9 +10,8 @@ vi.mock("node:fs", () => ({
 }));
 
 const { existsSync, readFileSync, statSync } = await import("node:fs");
-const { parseSessionHistory, clearSessionHistoryCache } = await import(
-  "../../src/data/sessionHistory.js"
-);
+const { parseSessionHistory, clearSessionHistoryCache, HISTORY_CACHE_MAX } =
+  await import("../../src/data/sessionHistory.js");
 
 // Each test sets readFileSync's return; mirror its byte size into
 // statSync so the (mtime, size)-gated incremental cache treats the
@@ -140,5 +139,42 @@ describe("parseSessionHistory", () => {
       "/Users/x/.claude/projects/-foo/bar.jsonl",
     );
     expect(result).toHaveLength(0);
+  });
+});
+
+// The watch process is long-lived and re-parses the selected session on
+// every 2s refresh. Two memory/CPU hazards this guards against (the
+// "agenthud froze after hours, 680MB, no Ctrl+C" report):
+//   1. the cache must return a STABLE reference on a hit, so setActivities
+//      bails out of re-rendering when nothing changed.
+//   2. the cache must be BOUNDED, so it doesn't accumulate every session's
+//      full activity array forever.
+describe("parseSessionHistory cache (memory/CPU safety)", () => {
+  it("returns the same array reference on a cache hit (no churn)", () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(makeLines(20));
+    stubStat(makeLines(20));
+    const a = parseSessionHistory("/s.jsonl");
+    const b = parseSessionHistory("/s.jsonl");
+    expect(b).toBe(a);
+  });
+
+  it("bounds the cache with LRU eviction (oldest dropped past the cap)", () => {
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(makeLines(5));
+    stubStat(makeLines(5));
+
+    const first = parseSessionHistory("/f0.jsonl");
+    // Fill past the cap with distinct paths → f0 becomes least-recent.
+    for (let i = 1; i <= HISTORY_CACHE_MAX; i++) {
+      parseSessionHistory(`/f${i}.jsonl`);
+    }
+    // f0 was evicted → re-parsing yields a NEW reference.
+    expect(parseSessionHistory("/f0.jsonl")).not.toBe(first);
+  });
+
+  it("keeps a small fixed cap regardless of how many sessions are read", () => {
+    expect(HISTORY_CACHE_MAX).toBeGreaterThan(0);
+    expect(HISTORY_CACHE_MAX).toBeLessThanOrEqual(16);
   });
 });

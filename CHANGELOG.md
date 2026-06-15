@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [0.18.7] - 2026-06-15
+
+### Fixed
+- **Giant-session freeze, part 2: discovery.** v0.18.6 bounded the
+  viewer (the selected session), but the tree-discovery walk still read
+  whole files on every refresh — peeking at the first line, the last ~50
+  lines, and the latest user prompt by slurping the entire session. With
+  100MB+ sessions on disk this re-read hundreds of MB every 2s and froze
+  the TUI *even when the giant session wasn't selected*. Discovery now
+  reads bounded head/tail slices (first 16KB / last 256KB–1MB) of
+  oversized files. Measured: `discoverSessions` over a real ~/.claude
+  with a 104MB session dropped from hundreds of MB to ~25MB. Steady-state
+  memory is now flat regardless of session size.
+
 ## [0.18.6] - 2026-06-15
 
 ### Fixed

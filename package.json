@@ -1,6 +1,6 @@
 {
   "name": "agenthud",
-  "version": "0.18.6",
+  "version": "0.18.7",
   "description": "TUI dashboard for AI coding agents (Claude Code, Codex, Kiro): live monitor for parallel sessions and sub-agents across agents, with structured activity export and LLM-generated daily/weekly digests",
   "type": "module",
   "main": "dist/index.js",

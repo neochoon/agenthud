@@ -101,6 +101,11 @@ function providerForPath(filePath: string): SessionProvider {
  */
 const TAIL_TARGET = 2 * 1024 * 1024; // aim to keep the tail this size
 const TAIL_MAX = 4 * 1024 * 1024; // advance the prefix past this
+// The viewer is a recent-activity window, not a full-history reader.
+// Never load more than this from a session file: a 100MB+ session read
+// in full spikes ~700MB and freezes the TUI. Older history lives in
+// `report` / `summary`, which truncate and stream.
+const MAX_VIEWER_BYTES = 8 * 1024 * 1024;
 
 interface HistoryCacheEntry {
   mtimeMs: number;
@@ -294,33 +299,45 @@ export function parseSessionHistory(filePath: string): ActivityEntry[] {
   }
 
   // Full (re)parse: first sight of this file, or it was rewritten.
-  // Read as a string; only large files pay a Buffer copy to locate
-  // the prefix/tail split on a byte boundary.
-  let content: string;
-  try {
-    content = readFileSync(filePath, "utf-8");
-  } catch {
-    return [];
+  // For a huge file, read only the last MAX_VIEWER_BYTES (snapped to a
+  // turn boundary) instead of the whole thing — loading a 100MB session
+  // in full is what spiked memory and froze the TUI.
+  let windowStart = 0;
+  let buf: Buffer;
+  if (size > MAX_VIEWER_BYTES) {
+    const rough = readRange(filePath, size - MAX_VIEWER_BYTES, size);
+    const snap = nextTurnBoundary(rough, 0, provider); // drop partial first record
+    buf = rough.subarray(snap);
+    windowStart = size - rough.length + snap;
+  } else {
+    try {
+      buf = Buffer.from(readFileSync(filePath, "utf-8"), "utf-8");
+    } catch {
+      return [];
+    }
   }
 
-  let prefixByteLen = 0;
+  // Within the loaded window, freeze everything but the last TAIL_TARGET
+  // as the prefix so later appends only re-parse the tail.
+  let prefixWithinBuf = 0;
   let prefixActivities: ActivityEntry[] = [];
-  let tailText = content;
-  if (Buffer.byteLength(content, "utf-8") > TAIL_TARGET) {
-    const buf = Buffer.from(content, "utf-8");
-    prefixByteLen = nextTurnBoundary(buf, buf.length - TAIL_TARGET, provider);
+  if (buf.length > TAIL_TARGET) {
+    prefixWithinBuf = nextTurnBoundary(buf, buf.length - TAIL_TARGET, provider);
     prefixActivities = parseChunk(
       provider,
-      buf.subarray(0, prefixByteLen).toString("utf-8"),
+      buf.subarray(0, prefixWithinBuf).toString("utf-8"),
       mtimeMs,
     );
-    tailText = buf.subarray(prefixByteLen).toString("utf-8");
   }
-  const tailActivities = parseChunk(provider, tailText, mtimeMs);
+  const tailActivities = parseChunk(
+    provider,
+    buf.subarray(prefixWithinBuf).toString("utf-8"),
+    mtimeMs,
+  );
   return storeEntry(filePath, {
     mtimeMs,
     size,
-    prefixByteLen,
+    prefixByteLen: windowStart + prefixWithinBuf,
     prefixActivities,
     tailActivities,
   });

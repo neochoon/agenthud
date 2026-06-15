@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [0.18.8] - 2026-06-15
+
+### Fixed
+- **Per-file caches no longer leak over long runs.** The discovery caches
+  (model/liveState, row title, entrypoint, sub-agent info) were keyed by
+  `path:mtime` with no eviction, so an actively-appending session added a
+  new entry every ~2s poll and never dropped the old one — a slow leak
+  that bloated memory over a multi-hour watch. They're now keyed by path
+  (mtime stored in the value), so a changed file overwrites its single
+  entry: one entry per file, bounded regardless of runtime. Rounds out
+  the v0.18.5–0.18.7 freeze fixes.
+
 ## [0.18.7] - 2026-06-15
 
 ### Fixed

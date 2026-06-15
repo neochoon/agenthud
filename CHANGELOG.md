@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [0.18.4] - 2026-06-15
+
+### Fixed
+- **Finished sub-agents no longer show `[waiting]`.** A sub-agent that
+  produced its result and terminated ended its tail with a text-only
+  turn, which the liveness classifier read as "waiting" — a verdict that
+  only makes sense for an interactive top-level session. Sub-agents are
+  one-shot, so a yielded turn now reads as done (the time-based badge),
+  while a pending tool call still reads as `[working]`.
+- **The tree selection no longer vanishes.** When the selected session
+  cooled and folded under the `... N cold` row it dropped out of the
+  nav list, leaving "No session selected" and silent `j`/`k`. The cursor
+  now snaps to the nearest visible ancestor (sub-agent → session →
+  project) whenever its row disappears, so navigation never freezes.
+
 ## [0.18.3] - 2026-06-13
 
 ### Fixed

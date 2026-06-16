@@ -29,7 +29,7 @@ export interface SessionNode {
   status: SessionStatus;
   modelName: string | null; // e.g. "sonnet-4.6", null if not yet known
   subAgents: SessionNode[]; // direct sub-agents of this session
-  agentId?: string; // short agent ID from JSONL (sub-agents only)
+  agentId?: string; // agent ID from JSONL (sub-agents only); a long hex string, truncated for display
   taskDescription?: string; // extracted task summary from first message (sub-agents only)
   nonInteractive: boolean; // true when entrypoint === "sdk-cli"
   firstUserPrompt: string | null; // Display description: latest substantial (≥10 chars, non-slash) user message, falling back to the first natural-language one. Name kept for backwards compat.

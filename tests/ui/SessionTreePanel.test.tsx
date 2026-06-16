@@ -171,7 +171,7 @@ describe("SessionTreePanel", () => {
     expect(frame).toContain("2 cool");
   });
 
-  it("shows short session ID for parent sessions with a project name", () => {
+  it("shows a 6-char short session ID for parent sessions with a project name", () => {
     const session = makeSession({ id: "abc12345", projectName: "myproject" });
     const project = makeProject("myproject", [session]);
     const { lastFrame } = render(
@@ -183,7 +183,9 @@ describe("SessionTreePanel", () => {
         width={80}
       />,
     );
-    expect(lastFrame()).toContain("#abc1");
+    const frame = lastFrame() ?? "";
+    expect(frame).toContain("#abc123"); // 6 chars
+    expect(frame).not.toContain("#abc1234"); // not 7
   });
 
   it("shows project path on the project header row (not the session row)", () => {
@@ -230,15 +232,15 @@ describe("SessionTreePanel", () => {
     expect(lastFrame()).not.toContain("#chil");
   });
 
-  it("shows agentId as name for sub-agents", () => {
+  it("shows a 6-char truncated agentId as name for sub-agents", () => {
     const session = makeSession({
       subAgents: [
         makeSession({
-          id: "agent-a26daaf",
+          id: "agent-abce044562ca241ed",
           projectName: "",
           status: "hot",
           subAgents: [],
-          agentId: "a26daaf",
+          agentId: "abce044562ca241ed", // 17-char hex, as Claude writes it
           taskDescription: "Task 3: Create .env.example",
         }),
       ],
@@ -254,7 +256,8 @@ describe("SessionTreePanel", () => {
       />,
     );
     const frame = lastFrame() ?? "";
-    expect(frame).toContain("a26daaf");
+    expect(frame).toContain("abce04"); // first 6 chars
+    expect(frame).not.toContain("abce044562ca241ed"); // not the full id
     expect(frame).toContain("Task 3: Create .env.example");
   });
 

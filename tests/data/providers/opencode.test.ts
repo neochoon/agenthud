@@ -214,6 +214,26 @@ describe.skipIf(!sqliteAvailable)("opencodeProvider", () => {
     expect(acts[1].detail).toBe("file.ts");
     expect(acts[3].detail).toBe("Here is the answer");
   });
+
+  it("skips a single malformed part instead of blanking the timeline", () => {
+    const db = new DatabaseSync(dbPath);
+    db.prepare("INSERT INTO part VALUES (?,?,?,?,?)").run(
+      "p_bad",
+      "m_asst",
+      "ses_top",
+      NOW - 2200,
+      "{not valid json",
+    );
+    db.close();
+    const acts = parseOpenCodeSessionActivities("ses_top");
+    // The 4 good parts still come through; the malformed one is dropped.
+    expect(acts.map((a) => a.type)).toEqual([
+      "user",
+      "tool",
+      "thinking",
+      "response",
+    ]);
+  });
 });
 
 // parseActivities is pure (line-based) and testable without SQLite.

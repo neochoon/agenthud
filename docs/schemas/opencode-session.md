@@ -68,8 +68,11 @@ scope for the SQLite-first implementation — document, don't build.
   concern as a reader, but a reason never to open read-write).
 - **Schema is migration-versioned** (`migration` / `data_migration`
   tables). Column set WILL drift across opencode releases (note how many
-  `session` columns below are `ALTER TABLE` add-ons). Treat columns as
-  optional and feature-detect; pin behavior to the verification queries.
+  `session` columns below are `ALTER TABLE` add-ons). The current provider
+  pins the column set it selects and **fails soft to an empty tree** if a
+  query can't bind (older/newer schema) — it never crashes the refresh. A
+  `PRAGMA table_info`-based feature-detect is a future hardening; until
+  then, the verification queries below are the contract.
 
 ## Tables that matter
 
@@ -280,8 +283,10 @@ If any output surprises you, this doc is wrong — open an issue.
 - `session.model` and `message.data` / `part.data` are JSON encoded as
   TEXT — `json_extract` in SQL or parse in JS.
 - The schema is migration-versioned and several `session` columns are
-  late `ALTER TABLE` additions — feature-detect columns; expect drift
-  between opencode releases.
+  late `ALTER TABLE` additions — expect drift between opencode releases.
+  The provider pins its selected columns and degrades to an empty tree on
+  a binding mismatch (never crashes); column feature-detection is a
+  future hardening.
 - Context-window size is NOT in the DB; it comes from the models catalog
   (`~/.cache/opencode/models.json`) keyed by `modelID`.
 - Sample install was small (2 sessions, 43 parts); a larger corpus may

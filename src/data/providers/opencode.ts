@@ -88,7 +88,12 @@ function loadSqlite() {
     // instead of failing the ESM module graph at import time.
     const req = createRequire(import.meta.url);
     sqliteMod = req("node:sqlite") as typeof sqliteMod;
+    // Keep the filter installed on success: the warning fires on first DB
+    // use (later), not necessarily here.
   } catch {
+    // Unavailable (Node < 22): restore the original handler — nothing in
+    // this process will emit the SQLite warning, so leave no global trace.
+    process.emitWarning = originalEmit;
     sqliteMod = null;
   }
   return sqliteMod;
@@ -458,9 +463,19 @@ export function parseOpenCodeSessionActivities(
          ORDER BY p.time_created ASC`,
       )
       .all(sessionId) as Array<{ pdata: string; t: number; role: string }>;
-    const lines = rows.map((r) =>
-      JSON.stringify({ role: r.role, t: r.t, part: JSON.parse(r.pdata) }),
-    );
+    // Per-row guard: one malformed part.data must not blank the whole
+    // timeline (parseActivities guards each line too, but the pre-parse
+    // here would otherwise throw for the entire session).
+    const lines: string[] = [];
+    for (const r of rows) {
+      try {
+        lines.push(
+          JSON.stringify({ role: r.role, t: r.t, part: JSON.parse(r.pdata) }),
+        );
+      } catch {
+        // skip this malformed part
+      }
+    }
     return parseActivities(lines).activities;
   } catch {
     return [];

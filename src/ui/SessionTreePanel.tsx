@@ -178,13 +178,13 @@ function SessionRow({
   const model = session.modelName ?? "";
   const isNonInteractive = session.nonInteractive;
 
-  // Name: parent uses a short 6-char ID (project name is shown on the
-  // project header); sub-agent uses its agentId, also truncated to 6 chars
-  // so both read consistently (Claude writes agentId as a long hex string).
+  // Name: parent uses a short 4-char ID (project name is shown on the
+  // project header); sub-agent uses its agentId truncated to 6 chars so it
+  // no longer prints the long hex string Claude writes verbatim.
   const rawName = isParent
     ? isNonInteractive
-      ? `(#${session.id.slice(0, 6)})`
-      : `#${session.id.slice(0, 6)}`
+      ? `(#${session.id.slice(0, 4)})`
+      : `#${session.id.slice(0, 4)}`
     : (session.agentId ?? session.id).slice(0, 6);
 
   // Short ID is now the name itself for parent sessions; no separate suffix needed

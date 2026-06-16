@@ -171,7 +171,7 @@ describe("SessionTreePanel", () => {
     expect(frame).toContain("2 cool");
   });
 
-  it("shows a 6-char short session ID for parent sessions with a project name", () => {
+  it("shows a 4-char short session ID for parent sessions with a project name", () => {
     const session = makeSession({ id: "abc12345", projectName: "myproject" });
     const project = makeProject("myproject", [session]);
     const { lastFrame } = render(
@@ -184,8 +184,8 @@ describe("SessionTreePanel", () => {
       />,
     );
     const frame = lastFrame() ?? "";
-    expect(frame).toContain("#abc123"); // 6 chars
-    expect(frame).not.toContain("#abc1234"); // not 7
+    expect(frame).toContain("#abc1"); // 4 chars
+    expect(frame).not.toContain("#abc12"); // not 5
   });
 
   it("shows project path on the project header row (not the session row)", () => {

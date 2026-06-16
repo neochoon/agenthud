@@ -99,13 +99,13 @@ function providerForPath(filePath: string): SessionProvider {
  * document) can't be tail-parsed; they always parse whole, gated
  * only by mtime.
  */
-const TAIL_TARGET = 2 * 1024 * 1024; // aim to keep the tail this size
-const TAIL_MAX = 4 * 1024 * 1024; // advance the prefix past this
+const TAIL_TARGET = 1 * 1024 * 1024; // aim to keep the tail this size
+const TAIL_MAX = 2 * 1024 * 1024; // advance the prefix past this
 // The viewer is a recent-activity window, not a full-history reader.
 // Never load more than this from a session file: a 100MB+ session read
 // in full spikes ~700MB and freezes the TUI. Older history lives in
 // `report` / `summary`, which truncate and stream.
-const MAX_VIEWER_BYTES = 8 * 1024 * 1024;
+const MAX_VIEWER_BYTES = 4 * 1024 * 1024;
 
 interface HistoryCacheEntry {
   mtimeMs: number;
@@ -124,7 +124,7 @@ interface HistoryCacheEntry {
 // map grew unboundedly (600MB+ RSS over hours → GC thrash → the whole
 // TUI freezes, unresponsive to Ctrl+C/q). LRU: keep the N most-recently
 // read sessions; the viewer only shows one at a time.
-export const HISTORY_CACHE_MAX = 8;
+export const HISTORY_CACHE_MAX = 4;
 
 const historyCache = new Map<string, HistoryCacheEntry>();
 

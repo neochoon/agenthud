@@ -194,7 +194,7 @@ function readSubAgentInfo(
 // repeatedly (the freeze). These read a bounded slice instead.
 const HEAD_READ_BYTES = 16 * 1024; // first line: entrypoint / sub-agent header
 const TAIL_READ_BYTES = 256 * 1024; // recent lines: model / liveState / context
-const PROMPT_TAIL_BYTES = 1024 * 1024; // latest substantial user prompt (title)
+const PROMPT_TAIL_BYTES = 256 * 1024; // latest substantial user prompt (title)
 
 // Files at or under the cap are read whole (cheap, and the common case);
 // only an oversized session pays the bounded positioned read. This also

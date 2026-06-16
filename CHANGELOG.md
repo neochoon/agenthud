@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.18.9] - 2026-06-16
+
+### Changed
+- **Lower memory footprint.** With the freeze fixed (memory now
+  oscillates in a bounded band), the caps were tightened to roughly halve
+  the per-instance footprint and the per-parse transients, leaving more
+  headroom: the viewer window is 4MB (was 8MB), the history cache keeps 4
+  sessions (was 8), the tail re-parse window is 1MB/2MB (was 2MB/4MB), and
+  discovery reads a 256KB prompt tail (was 1MB). Measured on a 104MB
+  session, the viewer parse transient dropped from ~40MB to ~18MB and its
+  retained set from ~17MB to ~7MB. The viewer's scrollback is now the
+  recent ~4MB of a session; full history remains in `report` / `summary`.
+
 ## [0.18.8] - 2026-06-15
 
 ### Fixed

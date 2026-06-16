@@ -9,9 +9,13 @@
  * - `getDisplayWidth` is memoized across calls. Without
  *   memoization, repeated `stringWidth` invocations on the same
  *   string across renders cost ~17% CPU on a 60-row tree
- *   (measured in v0.9.0). The cache survives renders and is
- *   stable across the process lifetime — no invalidation needed
- *   since string display width is a pure function.
+ *   (measured in v0.9.0). The cache is bounded (`WIDTH_CACHE_MAX`,
+ *   FIFO eviction) because some callers pass per-render dynamic
+ *   strings (elapsed time, context %, timestamps) that never recur,
+ *   so an unbounded map grew without limit over long watch sessions.
+ *   No staleness invalidation is needed since display width is a
+ *   pure function; eviction only caps memory, and an evicted hot
+ *   string recomputes on its next miss.
  *
  * Gotcha:
  * - `THIRTY_MINUTES_MS` and `ONE_HOUR_MS` are imported by

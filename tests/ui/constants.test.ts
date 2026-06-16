@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   DEFAULT_FALLBACK_WIDTH,
+  getDisplayWidth,
   getTerminalWidth,
   MAX_TERMINAL_WIDTH,
   MIN_TERMINAL_WIDTH,
+  WIDTH_CACHE_MAX,
+  widthCacheSize,
 } from "../../src/ui/constants.js";
 
 describe("getTerminalWidth", () => {
@@ -114,5 +117,30 @@ describe("getTerminalWidth", () => {
 
       expect(width).toBe(80);
     });
+  });
+});
+
+describe("getDisplayWidth width cache", () => {
+  it("returns accurate display widths (ASCII, empty, emoji, CJK)", () => {
+    expect(getDisplayWidth("abc")).toBe(3);
+    expect(getDisplayWidth("")).toBe(0);
+    expect(getDisplayWidth("👍")).toBe(2);
+    expect(getDisplayWidth("한글")).toBe(4); // wide CJK = 2 cells each
+  });
+
+  it("bounds the cache so a long-running session can't grow it without limit", () => {
+    // Simulate per-render dynamic strings (elapsed/context%) that never recur.
+    for (let i = 0; i < WIDTH_CACHE_MAX * 3; i++) {
+      getDisplayWidth(
+        `row-${i} feat/branch 4m${i}s ctx ${i % 100}% claude-opus`,
+      );
+    }
+    expect(widthCacheSize()).toBeLessThanOrEqual(WIDTH_CACHE_MAX);
+  });
+
+  it("still computes correctly for strings evicted by a flood", () => {
+    for (let i = 0; i < WIDTH_CACHE_MAX * 2; i++) getDisplayWidth(`flood-${i}`);
+    expect(getDisplayWidth("hello")).toBe(5);
+    expect(getDisplayWidth("한글")).toBe(4);
   });
 });

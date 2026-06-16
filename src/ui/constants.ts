@@ -171,11 +171,29 @@ export function truncateByWidth(text: string, maxWidth: number): string {
 // second during re-renders. CPU profiling showed it at ~17% of total runtime.
 import stringWidth from "string-width";
 
+// Bounded so a long-running watch session can't accumulate one entry per
+// dynamic string forever — several callers pass per-render strings (elapsed
+// time, context %, timestamps) that never produce a cache hit, so an
+// unbounded map grows without limit. Cap evicts the oldest insertion; hot
+// recurring strings (icons, single chars, stable line parts) re-insert on
+// the rare miss, so the CPU win is preserved at a ~0.5 MB ceiling.
+export const WIDTH_CACHE_MAX = 2000;
 const widthCache = new Map<string, number>();
 export function getDisplayWidth(s: string): number {
   const cached = widthCache.get(s);
   if (cached !== undefined) return cached;
   const w = stringWidth(s);
+  if (widthCache.size >= WIDTH_CACHE_MAX) {
+    // Evict the oldest insertion (Map preserves insertion order). Hot
+    // recurring strings simply re-insert on their next miss.
+    const oldest = widthCache.keys().next().value;
+    if (oldest !== undefined) widthCache.delete(oldest);
+  }
   widthCache.set(s, w);
   return w;
+}
+
+/** Test hook: current number of cached entries. */
+export function widthCacheSize(): number {
+  return widthCache.size;
 }

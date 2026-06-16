@@ -181,22 +181,25 @@ function SessionRow({
   // Name: parent uses a short 4-char ID (project name is shown on the
   // project header); sub-agent uses its agentId truncated to 6 chars so it
   // no longer prints the long hex string Claude writes verbatim.
-  // opencode prefixes every id with a constant `ses_` that carries no
-  // identity — strip it for display so the distinguishing hex shows
-  // (the underlying id/filePath/DB key keep the prefix).
-  const shortIdSource =
-    session.provider === "opencode"
-      ? (session.agentId ?? session.id).replace(/^ses_/, "")
-      : (session.agentId ?? session.id);
-  const parentIdSource =
-    session.provider === "opencode"
-      ? session.id.replace(/^ses_/, "")
-      : session.id;
+  //
+  // Most providers' ids start with their distinguishing bits AND map to a
+  // session FILE, so the leading chars help locate the file. opencode is
+  // different: it has no file, and its ids are time-ordered
+  // (`ses_<descending-timestamp><random>`), so close-in-time sessions share
+  // a long prefix. The distinguishing entropy is the random TAIL — show
+  // that instead (the title alongside is the primary identity).
+  const isOpencode = session.provider === "opencode";
+  const parentShort = isOpencode
+    ? session.id.slice(-4)
+    : session.id.slice(0, 4);
+  const subShort = isOpencode
+    ? (session.agentId ?? session.id).slice(-6)
+    : (session.agentId ?? session.id).slice(0, 6);
   const rawName = isParent
     ? isNonInteractive
-      ? `(#${parentIdSource.slice(0, 4)})`
-      : `#${parentIdSource.slice(0, 4)}`
-    : shortIdSource.slice(0, 6);
+      ? `(#${parentShort})`
+      : `#${parentShort}`
+    : subShort;
 
   // Short ID is now the name itself for parent sessions; no separate suffix needed
   const shortIdDisplay = "";

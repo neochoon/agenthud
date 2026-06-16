@@ -30,6 +30,12 @@ import {
   getKiroIdeSessionsDir,
   kiroIdeProvider,
 } from "./providers/kiro-ide.js";
+import {
+  OPENCODE_PATH_PREFIX,
+  opencodeProvider,
+  parseOpenCodeSessionActivities,
+  sessionIdFromPath,
+} from "./providers/opencode.js";
 import type { SessionProvider } from "./providers/types.js";
 
 const norm = (p: string) => p.replace(/\\/g, "/");
@@ -41,6 +47,7 @@ const norm = (p: string) => p.replace(/\\/g, "/");
 // the Claude parser). The well-known segments stay as fallbacks for
 // nodes constructed before an env change. Claude is the default.
 function providerForPath(filePath: string): SessionProvider {
+  if (filePath.startsWith(OPENCODE_PATH_PREFIX)) return opencodeProvider;
   const p = norm(filePath);
   if (
     p.startsWith(`${norm(getKiroSessionsDir())}/`) ||
@@ -210,6 +217,11 @@ function readRange(filePath: string, start: number, end: number): Buffer {
 // Parse the full, untruncated activity history from a session file.
 // Returns entries in chronological order (oldest first).
 export function parseSessionHistory(filePath: string): ActivityEntry[] {
+  // opencode sessions have no file — their synthetic `opencode:<id>` path
+  // resolves to a read-only DB query, bypassing the file-tail machinery.
+  const opencodeId = sessionIdFromPath(filePath);
+  if (opencodeId !== null) return parseOpenCodeSessionActivities(opencodeId);
+
   if (!existsSync(filePath)) return [];
 
   let mtimeMs: number;

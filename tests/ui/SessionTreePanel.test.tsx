@@ -188,6 +188,27 @@ describe("SessionTreePanel", () => {
     expect(frame).not.toContain("#abc12"); // not 5
   });
 
+  it("strips the constant `ses_` prefix from opencode session IDs", () => {
+    const session = makeSession({
+      id: "ses_abcdef12",
+      projectName: "myproject",
+      provider: "opencode",
+    });
+    const project = makeProject("myproject", [session]);
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[project]}
+        coldProjects={[]}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+      />,
+    );
+    const frame = lastFrame() ?? "";
+    expect(frame).toContain("#abcd"); // meaningful hex after ses_
+    expect(frame).not.toContain("#ses_"); // the constant prefix is gone
+  });
+
   it("shows project path on the project header row (not the session row)", () => {
     const session = makeSession({ projectPath: "/test/path/myproject" });
     const project = makeProject("myproject", [session], {

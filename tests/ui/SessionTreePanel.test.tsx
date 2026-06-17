@@ -1159,4 +1159,92 @@ describe("SessionTreePanel — pinned live rows", () => {
     expect(frame).toContain("#par0"); // live parent pinned
     expect(frame).toContain("subwor"); // working sub-agent pinned
   });
+
+  it("does not render a pinned live row twice (band + tree)", () => {
+    const live = makeSession({
+      id: "live0001",
+      status: "hot",
+      liveState: "working",
+      subAgents: Array.from({ length: 6 }, (_, i) =>
+        makeSession({
+          id: `hs${i}`,
+          status: "hot",
+          liveState: null,
+          projectName: "",
+        }),
+      ),
+    });
+    const active = makeProject("liveproj", [live]);
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[active]}
+        coldProjects={coldFiller(8)}
+        selectedId="live0001" // selecting the live row would scroll the tree to it
+        hasFocus={true}
+        width={110}
+        maxRows={6}
+      />,
+    );
+    const frame = lastFrame() ?? "";
+    const occurrences = (frame.match(/#live/g) ?? []).length;
+    expect(occurrences).toBe(1); // pinned only, removed from the tree
+  });
+
+  it("caps the band and summarizes the overflow as '+N more working'", () => {
+    const live = Array.from({ length: 8 }, (_, i) =>
+      makeProject(`lp${i}`, [
+        makeSession({ id: `lv${i}aaaa`, status: "hot", liveState: "working" }),
+      ]),
+    );
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={live}
+        coldProjects={coldFiller(4)}
+        selectedId="__cold__"
+        hasFocus={true}
+        width={110}
+        maxRows={8}
+      />,
+    );
+    expect(lastFrame() ?? "").toContain("more working"); // overflow summarized
+  });
+
+  it("shows at least one live row even in a tiny panel (bandCap === 1)", () => {
+    const live = Array.from({ length: 5 }, (_, i) =>
+      makeProject(`lp${i}`, [
+        makeSession({ id: `lv${i}aaaa`, status: "hot", liveState: "working" }),
+      ]),
+    );
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={live}
+        coldProjects={coldFiller(4)}
+        selectedId="__cold__"
+        hasFocus={true}
+        width={110}
+        maxRows={3}
+      />,
+    );
+    expect(lastFrame() ?? "").toContain("[working]"); // a real live row, not just a count
+  });
+
+  it("does not pin anything when no session is live (no regression)", () => {
+    const hotButIdle = makeSession({
+      id: "idle0001",
+      status: "hot",
+      liveState: null,
+    });
+    const active = makeProject("liveproj", [hotButIdle]);
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[active]}
+        coldProjects={coldFiller(8)}
+        selectedId="__cold__"
+        hasFocus={true}
+        width={110}
+        maxRows={4}
+      />,
+    );
+    expect(lastFrame() ?? "").not.toContain("more working");
+  });
 });

@@ -445,9 +445,10 @@ function flattenSessions(
 
 /** A flattened row for a session RUNNING right now: a top-level session
  * that is working or waiting, or a sub-agent that is working (sub-agents
- * never surface "waiting" — see App's liveness rule). Pins key on
- * liveState, NOT the 30-min hot window, so finished-but-recent sub-agents
- * don't flood the pinned band. */
+ * never surface "waiting" — `detectLiveState` in sessionLiveness.ts forces
+ * a sub-agent's state to working|null). Pins key on liveState, NOT the
+ * 30-min hot window, so finished-but-recent sub-agents don't flood the
+ * band. `isParent` mirrors SessionRow's own `prefix === "    "` test. */
 function isLiveSessionRow(
   row: FlatRow,
 ): row is Extract<FlatRow, { kind: "session" }> {
@@ -976,20 +977,7 @@ export function SessionTreePanel({
   const flatRows = flattenSessions(projects, coldProjects, expandedIds);
   const totalRows = flatRows.length;
 
-  // Find the index of the currently selected row
-  const selectedFlatIndex = flatRows.findIndex((row) => {
-    if (row.kind === "project") return selectedId === row.sentinelId;
-    if (row.kind === "session") return row.session.id === selectedId;
-    if (row.kind === "subagent-summary")
-      return selectedId === `__sub-${row.parentId}__`;
-    if (row.kind === "cold-projects-summary") return selectedId === "__cold__";
-    if (row.kind === "cold-sessions-summary")
-      return selectedId === `__cold-sessions-${row.projectName}__`;
-    return false;
-  });
-
-  // Compute scrollTop so the selected row stays visible. Census
-  // takes one row inside the panel content area when present, so
+  // Census takes one row inside the panel content area when present, so
   // the effective row budget shrinks by 1 in that case.
   const censusRowCost = censusSegments ? 1 : 0;
   const effectiveMaxRows =
@@ -1002,26 +990,60 @@ export function SessionTreePanel({
   // RIGHT NOW (working/waiting) must never scroll out of view — that's the
   // point of a live monitor. Pin them above the scrollable tree, capped to
   // half the budget so a burst of concurrent sub-agents can't eat the
-  // panel; the overflow collapses to a "+N working" line.
+  // panel; the overflow collapses to a "+N more working" line. Pinned rows
+  // are removed from the tree below so a live row never renders twice.
   const liveRows = needsOverflow ? flatRows.filter(isLiveSessionRow) : [];
   const bandCap = Math.max(1, Math.floor(visibleCount / 2));
-  let pinnedRows = liveRows.slice(0, bandCap);
-  let pinnedOverflow = liveRows.length - pinnedRows.length;
-  if (pinnedOverflow > 0) {
-    pinnedRows = liveRows.slice(0, Math.max(0, bandCap - 1));
+  let pinnedRows: Extract<FlatRow, { kind: "session" }>[];
+  let pinnedOverflow: number;
+  if (liveRows.length <= bandCap) {
+    pinnedRows = liveRows;
+    pinnedOverflow = 0;
+  } else if (bandCap === 1) {
+    // No room for both a row and a summary — always show at least one live
+    // row (the band's whole purpose), and drop the count.
+    pinnedRows = liveRows.slice(0, 1);
+    pinnedOverflow = 0;
+  } else {
+    // Reserve one slot for the "+N more working" summary line.
+    pinnedRows = liveRows.slice(0, bandCap - 1);
     pinnedOverflow = liveRows.length - pinnedRows.length;
   }
   const bandHeight = pinnedRows.length + (pinnedOverflow > 0 ? 1 : 0);
-  const treeVisibleCount = Math.max(1, visibleCount - bandHeight);
 
+  // The scrollable tree excludes pinned rows (no double render).
+  const pinnedIds = new Set(pinnedRows.map((r) => r.session.id));
+  const treeRows =
+    bandHeight > 0
+      ? flatRows.filter(
+          (r) => !(r.kind === "session" && pinnedIds.has(r.session.id)),
+        )
+      : flatRows;
+  const treeTotal = treeRows.length;
+
+  // Index of the selected row within the (de-pinned) tree. A selected row
+  // that is itself pinned won't be found here — it's shown in the band.
+  const selectedFlatIndex = treeRows.findIndex((row) => {
+    if (row.kind === "project") return selectedId === row.sentinelId;
+    if (row.kind === "session") return row.session.id === selectedId;
+    if (row.kind === "subagent-summary")
+      return selectedId === `__sub-${row.parentId}__`;
+    if (row.kind === "cold-projects-summary") return selectedId === "__cold__";
+    if (row.kind === "cold-sessions-summary")
+      return selectedId === `__cold-sessions-${row.projectName}__`;
+    return false;
+  });
+
+  // Compute scrollTop so the selected tree row stays visible.
+  const treeVisibleCount = Math.max(1, visibleCount - bandHeight);
   let scrollTop = 0;
-  if (needsOverflow && selectedFlatIndex >= 0) {
+  if (treeTotal > treeVisibleCount && selectedFlatIndex >= 0) {
     scrollTop = Math.max(0, selectedFlatIndex - treeVisibleCount + 1);
-    scrollTop = Math.min(scrollTop, Math.max(0, totalRows - treeVisibleCount));
+    scrollTop = Math.min(scrollTop, Math.max(0, treeTotal - treeVisibleCount));
   }
 
-  const displayRows = flatRows.slice(scrollTop, scrollTop + treeVisibleCount);
-  const hiddenBelow = totalRows - (scrollTop + displayRows.length);
+  const displayRows = treeRows.slice(scrollTop, scrollTop + treeVisibleCount);
+  const hiddenBelow = treeTotal - (scrollTop + displayRows.length);
 
   const overflowLabel = `▸ +${pinnedOverflow} more working`;
 

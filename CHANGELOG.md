@@ -2,6 +2,35 @@
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-06-17
+
+### Added
+- **opencode provider** (read-only SQLite). opencode keeps all sessions in
+  a single SQLite database rather than per-session files, so the provider
+  opens it read-only via Node's built-in `node:sqlite` and surfaces
+  sessions, sub-agents (via `parent_id`), model, context gauge, liveness,
+  and the activity timeline. Loaded through a guarded require so agenthud
+  still runs on Node < 22 (the provider is simply unavailable there — no
+  new dependency, no engine bump). Schema: `docs/schemas/opencode-session.md`.
+- **Pinned live sessions.** In a short Projects panel, sessions running
+  right now (working/waiting) are pinned above the scrollable tree so they
+  never scroll out of view, capped to half the panel with a `+N more
+  working` overflow line. Keyed on liveState, not the 30-min hot window,
+  so finished-but-recent sub-agents don't flood it.
+
+### Fixed
+- **Bound `widthCache`** to stop unbounded memory growth. `getDisplayWidth`
+  memoized `string-width` results in a never-evicted map; per-render
+  dynamic strings (elapsed time, context %, timestamps) accumulated
+  forever. Capped with FIFO eviction (~0.5 MB ceiling), preserving the
+  CPU win for the genuinely-recurring strings.
+
+### Changed
+- **Session ID display.** Sub-agents truncate their (no-longer-short)
+  `agentId` to 6 chars instead of printing it verbatim; parent sessions
+  keep their 4-char short ID. opencode's time-ordered `ses_…` ids show
+  their distinguishing random tail rather than the shared timestamp prefix.
+
 ## [0.18.9] - 2026-06-16
 
 ### Changed

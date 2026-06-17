@@ -22,6 +22,10 @@
   first; the prefix is capped so it can't swallow the whole panel.
 
 ### Fixed
+- **Row border alignment.** The `... N more` (Projects) and `No activity
+  yet` (viewer) lines were one cell narrower than every other row — their
+  right border sat one column to the left. Dropped a stray `-1` in the
+  padding.
 - **Bound `widthCache`** to stop unbounded memory growth. `getDisplayWidth`
   memoized `string-width` results in a never-evicted map; per-render
   dynamic strings (elapsed time, context %, timestamps) accumulated

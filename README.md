@@ -4,7 +4,7 @@
 [![CI](https://github.com/neochoon/agenthud/actions/workflows/ci.yml/badge.svg)](https://github.com/neochoon/agenthud/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/neochoon/agenthud/branch/main/graph/badge.svg)](https://codecov.io/gh/neochoon/agenthud)
 
-A **heads-up display** for your AI coding agents — **Claude Code**, **OpenAI Codex**, and **AWS Kiro**. AgentHUD reads each agent's on-disk session files and merges them into one tree, so a project you've touched from several agents shows as a single row with combined sessions and sub-agents.
+A **heads-up display** for your AI coding agents — **Claude Code**, **OpenAI Codex**, **AWS Kiro**, and **opencode**. AgentHUD reads each agent's on-disk sessions (JSONL files, or opencode's SQLite store) and merges them into one tree, so a project you've touched from several agents shows as a single row with combined sessions and sub-agents.
 
 ![demo](./demo/live.gif)
 
@@ -14,7 +14,7 @@ It's organized as **three layers, by who's reading** — a human at a glance, a 
 - **`agenthud summary`** — **the daily digest.** Fold a day (or a week) into an LLM engineering summary — a standup-in-one-command habit, via whichever agent CLI you have installed (claude, codex, or kiro-cli, auto-detected).
 - **`agenthud report`** — **the machine layer.** Structured Markdown / JSON. `summary` is literally `report` piped into an agent CLI, so the daily digest isn't a black box — and you can pipe `report` into anything else, too.
 
-→ **See [FEATURES.md](./FEATURES.md) for the full surface** — every flag, keybinding, config key, file path, and env var. Per-agent session-file schemas: [Claude Code](./docs/schemas/claude-session.md) · [Codex CLI](./docs/schemas/codex-session.md) · [Kiro IDE](./docs/schemas/kiro-ide-session.md) · [Kiro CLI](./docs/schemas/kiro-session.md) (or browse [docs/schemas/](./docs/schemas/)).
+→ **See [FEATURES.md](./FEATURES.md) for the full surface** — every flag, keybinding, config key, file path, and env var. Per-agent session schemas: [Claude Code](./docs/schemas/claude-session.md) · [Codex CLI](./docs/schemas/codex-session.md) · [Kiro IDE](./docs/schemas/kiro-ide-session.md) · [Kiro CLI](./docs/schemas/kiro-session.md) · [opencode](./docs/schemas/opencode-session.md) (or browse [docs/schemas/](./docs/schemas/)).
 
 Requires Node.js 20+. Open agenthud in a separate terminal while you work; press `?` inside the TUI for in-app help.
 
@@ -81,7 +81,7 @@ The badge tells you, per session, **what the agent is doing right now**:
 - `[working]` — there's a pending tool call at the tail; the agent is mid-step.
 - `[waiting]` — the turn yielded back to you (a question, or a finished reply).
 
-These live states are read from the structure of each session's JSONL tail and **override** the time-based recency badges (`[hot]` / `[warm]` / `[cool]` / `[cold]`) whenever a session is live. Each row also carries a colored provider label (`claude` / `codex` / `kiro` / `kiro-ide`), its model, and a context-window gauge; only hot/warm (and live) sessions count as active and render bright. Sub-agents nest under their parent regardless of which agent spawned them, the panel title is a tree-wide census, and cold projects collapse under a `... N cold projects` sentinel. Press `↵` on any activity for a scrollable detail view.
+These live states are read from the structure of each session's JSONL tail and **override** the time-based recency badges (`[hot]` / `[warm]` / `[cool]` / `[cold]`) whenever a session is live. Each row also carries a colored provider label (`claude` / `codex` / `kiro` / `kiro-ide` / `opencode`), its model, and a context-window gauge; only hot/warm (and live) sessions count as active and render bright. Sub-agents nest under their parent regardless of which agent spawned them, the panel title is a tree-wide census, and cold projects collapse under a `... N cold projects` sentinel. Press `↵` on any activity for a scrollable detail view.
 
 Full keybinding and badge reference: [FEATURES.md](./FEATURES.md#keybindings).
 

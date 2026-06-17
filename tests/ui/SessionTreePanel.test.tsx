@@ -188,6 +188,30 @@ describe("SessionTreePanel", () => {
     expect(frame).not.toContain("#abc12"); // not 5
   });
 
+  it("uses the random tail of an opencode session ID (ids are time-prefixed)", () => {
+    // opencode ids are `ses_<descending-timestamp><random>`; the leading
+    // chars are a shared timestamp, so the distinguishing part is the tail.
+    const session = makeSession({
+      id: "ses_12fad7a2vNo2G",
+      projectName: "myproject",
+      provider: "opencode",
+    });
+    const project = makeProject("myproject", [session]);
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[project]}
+        coldProjects={[]}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+      />,
+    );
+    const frame = lastFrame() ?? "";
+    expect(frame).toContain("#No2G"); // distinguishing random tail
+    expect(frame).not.toContain("#ses_"); // not the constant prefix
+    expect(frame).not.toContain("#12fa"); // not the shared time prefix
+  });
+
   it("shows project path on the project header row (not the session row)", () => {
     const session = makeSession({ projectPath: "/test/path/myproject" });
     const project = makeProject("myproject", [session], {

@@ -27,19 +27,52 @@ ${XDG_DATA_HOME:-~/.local/share}/opencode/opencode.db   (+ -wal, -shm)
 - Per-model context-window sizes live in `~/.cache/opencode/models.json`
   (a mirror of models.dev) — needed to turn token counts into a gauge.
 
+## Legacy storage (pre-SQLite) — file-per-entity JSON
+
+Before the SQLite store, opencode persisted to **many small JSON files**
+(one JSON object per file, NOT line-delimited JSONL), under
+`${XDG_DATA_HOME:-~/.local/share}/opencode/storage/`:
+
+```
+storage/
+  project/{projectID}.json              # one object per project
+  session/{projectID}/{sessionID}.json  # one object per session
+  message/{sessionID}/{messageID}.json  # one file PER message
+  part/{messageID}/{partID}.json        # one file PER part (tool call, text…)
+  session_diff/{sessionID}.json
+  share/{sessionID}.json
+  migration                             # migration version marker
+```
+
+A file per message and per part is why a short session could leave
+thousands of files on disk — the churn that motivated the move to
+SQLite. A migration engine bulk-inserts these into the DB (tracked by
+the `migration` / `data_migration` tables), so on a current install the
+DB is authoritative and `storage/` is usually absent or stale. A
+provider targeting **un-migrated older installs** could fall back to
+walking `storage/{session,message,part}/**.json`, but that is out of
+scope for the SQLite-first implementation — document, don't build.
+
 ## Access model (read this first)
 
 - Open **read-only**, e.g. `sqlite3 "file:<path>?mode=ro"`, or in Node
   `new DatabaseSync(path, { readOnly: true })` (`node:sqlite`, Node 22+)
   / `new Database(path, { readonly: true, fileMustExist: true })`
   (`better-sqlite3`). Never open read-write — opencode owns the file.
-- WAL mode: a read-only connection sees the last committed state; an
-  in-flight (uncommitted) opencode write is simply invisible until it
-  commits. That's fine — agenthud polls.
+- WAL mode (`journal_mode=WAL`, `synchronous=NORMAL`, `busy_timeout=5000`,
+  single writer / many readers): a read-only connection sees the last
+  committed state; an in-flight (uncommitted) opencode write is simply
+  invisible until it commits. That's fine — agenthud polls. Multiple
+  opencode instances share this one DB, so read-only is the only safe
+  posture (concurrent writers have caused corruption reports — not our
+  concern as a reader, but a reason never to open read-write).
 - **Schema is migration-versioned** (`migration` / `data_migration`
   tables). Column set WILL drift across opencode releases (note how many
-  `session` columns below are `ALTER TABLE` add-ons). Treat columns as
-  optional and feature-detect; pin behavior to the verification queries.
+  `session` columns below are `ALTER TABLE` add-ons). The current provider
+  pins the column set it selects and **fails soft to an empty tree** if a
+  query can't bind (older/newer schema) — it never crashes the refresh. A
+  `PRAGMA table_info`-based feature-detect is a future hardening; until
+  then, the verification queries below are the contract.
 
 ## Tables that matter
 
@@ -250,9 +283,16 @@ If any output surprises you, this doc is wrong — open an issue.
 - `session.model` and `message.data` / `part.data` are JSON encoded as
   TEXT — `json_extract` in SQL or parse in JS.
 - The schema is migration-versioned and several `session` columns are
-  late `ALTER TABLE` additions — feature-detect columns; expect drift
-  between opencode releases.
+  late `ALTER TABLE` additions — expect drift between opencode releases.
+  The provider pins its selected columns and degrades to an empty tree on
+  a binding mismatch (never crashes); column feature-detection is a
+  future hardening.
 - Context-window size is NOT in the DB; it comes from the models catalog
   (`~/.cache/opencode/models.json`) keyed by `modelID`.
 - Sample install was small (2 sessions, 43 parts); a larger corpus may
   surface more `part.type` / `tool` values and a populated `parent_id`.
+- **No auto-pruning:** opencode never prunes, size-caps, or cleans up old
+  sessions, so the DB (and the session count) grows unbounded over time.
+  A discovery pass should expect an ever-growing `session` table and lean
+  on recency (`time_updated`) ordering / hot-cold status rather than
+  assuming a small set.

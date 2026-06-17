@@ -36,6 +36,7 @@ import { claudeProvider } from "./providers/claude.js";
 import { codexProvider } from "./providers/codex.js";
 import { kiroProvider } from "./providers/kiro.js";
 import { kiroIdeProvider } from "./providers/kiro-ide.js";
+import { opencodeProvider } from "./providers/opencode.js";
 import type { DiscoverOptions, SessionProvider } from "./providers/types.js";
 
 export {
@@ -50,6 +51,7 @@ const PROVIDERS: SessionProvider[] = [
   kiroProvider,
   kiroIdeProvider,
   codexProvider,
+  opencodeProvider,
 ];
 
 /**

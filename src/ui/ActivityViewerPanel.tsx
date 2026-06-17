@@ -319,7 +319,7 @@ export function ActivityViewerPanel({
 
   if (visibleActivities.length === 0) {
     const emptyText = "No activity yet";
-    const emptyPadding = Math.max(0, contentWidth - emptyText.length - 1);
+    const emptyPadding = Math.max(0, contentWidth - emptyText.length);
     lines.push(
       <Text key="empty">
         {BOX.v} <Text dimColor>{emptyText}</Text>

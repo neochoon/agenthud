@@ -1295,3 +1295,37 @@ describe("SessionTreePanel — sticky live projects", () => {
     expect(lastFrame() ?? "").not.toContain("#idle");
   });
 });
+
+describe("SessionTreePanel — row width alignment", () => {
+  it("pads the '... N more' line to the full panel width (right border aligned)", () => {
+    const live = makeSession({ id: "live0001", liveState: "working" });
+    const liveProj = makeProject("livep", [live]);
+    const qsess = makeSession({
+      id: "qsess001",
+      status: "hot",
+      subAgents: Array.from({ length: 8 }, (_, i) =>
+        makeSession({ id: `qs${i}`, status: "hot", projectName: "" }),
+      ),
+    });
+    const qProj = makeProject("qqq", [qsess]);
+    const cold = Array.from({ length: 4 }, (_, i) =>
+      makeProject(`c${i}`, [makeSession({ id: `cold${i}`, status: "cold" })], {
+        hotness: "cold",
+      }),
+    );
+    const W = 80;
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[liveProj, qProj]}
+        coldProjects={cold}
+        selectedId="live0001"
+        hasFocus={true}
+        width={W}
+        maxRows={7}
+      />,
+    );
+    const lines = (lastFrame() ?? "").split("\n").filter(Boolean);
+    expect(lines.some((l) => l.includes("more"))).toBe(true); // the indicator is present
+    for (const l of lines) expect([...l].length).toBe(W); // every line is full width
+  });
+});

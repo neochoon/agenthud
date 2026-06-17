@@ -1206,4 +1206,92 @@ describe("SessionTreePanel — sticky live projects", () => {
     expect(frame).toContain("> liveproj"); // project pinned because a sub-agent is working
     expect(frame).toContain("subwor"); // the working sub-agent stays visible
   });
+
+  it("keeps the header when a single live block is taller than the panel", () => {
+    // One live project with many hot (non-live) sub-agents shown
+    // individually — the block alone exceeds the row budget.
+    const live = makeSession({
+      id: "liveAAAA",
+      status: "hot",
+      liveState: "working",
+      subAgents: Array.from({ length: 12 }, (_, i) =>
+        makeSession({
+          id: `hs${i}`,
+          status: "hot",
+          liveState: null,
+          projectName: "",
+        }),
+      ),
+    });
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[makeProject("liveproj", [live])]}
+        coldProjects={coldFiller(6)}
+        selectedId="__cold__"
+        hasFocus={true}
+        width={120}
+        maxRows={5}
+      />,
+    );
+    const frame = lastFrame() ?? "";
+    expect(frame).toContain("> liveproj"); // header always retained (block starts with it)
+    expect(frame).toContain("6 cold"); // the cold tail (selected) scrolled into view
+  });
+
+  it("scrolls a selected cold row into view while the live project stays pinned", () => {
+    const live = makeSession({
+      id: "liveAAAA",
+      status: "hot",
+      liveState: "working",
+    });
+    const liveProj = makeProject("liveproj", [live]);
+    const cold = coldFiller(10);
+    // expand the cold-projects group and select a deep cold session
+    const expanded = new Set<string>([
+      "__cold__",
+      "__expanded-__proj-coldp9__",
+    ]);
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[liveProj]}
+        coldProjects={cold}
+        selectedId="coldsess9"
+        hasFocus={true}
+        width={120}
+        maxRows={6}
+        expandedIds={expanded}
+      />,
+    );
+    const frame = lastFrame() ?? "";
+    expect(frame).toContain("> liveproj"); // live project still pinned at top
+    expect(frame).toContain("#cold"); // the selected deep cold session scrolled into view
+  });
+
+  it("does not pin a hot-but-idle project — it scrolls under a bottom selection", () => {
+    const idle = makeSession({
+      id: "idleAAAA",
+      status: "hot",
+      liveState: null,
+      subAgents: Array.from({ length: 6 }, (_, i) =>
+        makeSession({
+          id: `hs${i}`,
+          status: "hot",
+          liveState: null,
+          projectName: "",
+        }),
+      ),
+    });
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[makeProject("idleproj", [idle])]}
+        coldProjects={coldFiller(8)}
+        selectedId="__cold__"
+        hasFocus={true}
+        width={120}
+        maxRows={4}
+      />,
+    );
+    // nothing live → no sticky prefix → the idle session scrolls off
+    expect(lastFrame() ?? "").not.toContain("#idle");
+  });
 });

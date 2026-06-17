@@ -1074,3 +1074,89 @@ describe("buildTitleSegments", () => {
     expect(concat(segs)).not.toContain("⊘");
   });
 });
+
+describe("SessionTreePanel — pinned live rows", () => {
+  const coldFiller = (n: number) =>
+    Array.from({ length: n }, (_, i) =>
+      makeProject(
+        `coldp${i}`,
+        [makeSession({ id: `coldsess${i}`, status: "cold" })],
+        {
+          hotness: "cold",
+        },
+      ),
+    );
+
+  it("keeps a live session visible when the selection scrolls to the bottom (short panel)", () => {
+    // Several hot (but NOT live) sub-agents shown individually add rows, so
+    // that with the selection on the bottom cold sentinel the live session
+    // would otherwise scroll off the top.
+    const live = makeSession({
+      id: "live0001",
+      status: "hot",
+      liveState: "working",
+      firstUserPrompt: "active work",
+      subAgents: Array.from({ length: 6 }, (_, i) =>
+        makeSession({
+          id: `hs${i}`,
+          status: "hot",
+          liveState: null,
+          projectName: "",
+        }),
+      ),
+    });
+    const active = makeProject("liveproj", [live]);
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[active]}
+        coldProjects={coldFiller(8)}
+        selectedId="__cold__"
+        hasFocus={true}
+        width={110}
+        maxRows={4}
+      />,
+    );
+    const frame = lastFrame() ?? "";
+    expect(frame).toContain("#live"); // pinned, not scrolled off
+  });
+
+  it("pins by liveState, not the 30-min hot window: finished sub-agents don't flood", () => {
+    // A live parent with one WORKING sub-agent and many recently-finished
+    // (status hot, liveState null) ones. Only the working one should pin.
+    const parent = makeSession({
+      id: "par00001",
+      status: "hot",
+      liveState: "working",
+      subAgents: [
+        makeSession({
+          id: "subwork1",
+          status: "hot",
+          liveState: "working",
+          projectName: "",
+        }),
+        ...Array.from({ length: 6 }, (_, i) =>
+          makeSession({
+            id: `subdone${i}`,
+            status: "hot",
+            liveState: null,
+            projectName: "",
+          }),
+        ),
+      ],
+    });
+    const active = makeProject("liveproj", [parent]);
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[active]}
+        coldProjects={coldFiller(8)}
+        selectedId="__cold__"
+        hasFocus={true}
+        width={110}
+        maxRows={6}
+      />,
+    );
+    const frame = lastFrame() ?? "";
+    expect(frame).toContain("#par0"); // live parent pinned
+    expect(frame).toContain("subwor"); // working sub-agent pinned
+  });
+});

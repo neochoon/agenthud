@@ -443,6 +443,20 @@ function flattenSessions(
   return result;
 }
 
+/** A flattened row for a session RUNNING right now: a top-level session
+ * that is working or waiting, or a sub-agent that is working (sub-agents
+ * never surface "waiting" — see App's liveness rule). Pins key on
+ * liveState, NOT the 30-min hot window, so finished-but-recent sub-agents
+ * don't flood the pinned band. */
+function isLiveSessionRow(
+  row: FlatRow,
+): row is Extract<FlatRow, { kind: "session" }> {
+  if (row.kind !== "session") return false;
+  const isParent = row.prefix === "    ";
+  const ls = row.session.liveState;
+  return isParent ? ls === "working" || ls === "waiting" : ls === "working";
+}
+
 function ProjectRow({
   project,
   isSelected,
@@ -983,19 +997,55 @@ export function SessionTreePanel({
   const needsOverflow =
     effectiveMaxRows !== undefined && totalRows > effectiveMaxRows;
   const visibleCount = needsOverflow ? effectiveMaxRows - 1 : totalRows;
+
+  // Pinned "live" band: when the tree overflows, sessions that are running
+  // RIGHT NOW (working/waiting) must never scroll out of view — that's the
+  // point of a live monitor. Pin them above the scrollable tree, capped to
+  // half the budget so a burst of concurrent sub-agents can't eat the
+  // panel; the overflow collapses to a "+N working" line.
+  const liveRows = needsOverflow ? flatRows.filter(isLiveSessionRow) : [];
+  const bandCap = Math.max(1, Math.floor(visibleCount / 2));
+  let pinnedRows = liveRows.slice(0, bandCap);
+  let pinnedOverflow = liveRows.length - pinnedRows.length;
+  if (pinnedOverflow > 0) {
+    pinnedRows = liveRows.slice(0, Math.max(0, bandCap - 1));
+    pinnedOverflow = liveRows.length - pinnedRows.length;
+  }
+  const bandHeight = pinnedRows.length + (pinnedOverflow > 0 ? 1 : 0);
+  const treeVisibleCount = Math.max(1, visibleCount - bandHeight);
+
   let scrollTop = 0;
   if (needsOverflow && selectedFlatIndex >= 0) {
-    scrollTop = Math.max(0, selectedFlatIndex - visibleCount + 1);
-    scrollTop = Math.min(scrollTop, Math.max(0, totalRows - visibleCount));
+    scrollTop = Math.max(0, selectedFlatIndex - treeVisibleCount + 1);
+    scrollTop = Math.min(scrollTop, Math.max(0, totalRows - treeVisibleCount));
   }
 
-  const displayRows = flatRows.slice(scrollTop, scrollTop + visibleCount);
+  const displayRows = flatRows.slice(scrollTop, scrollTop + treeVisibleCount);
   const hiddenBelow = totalRows - (scrollTop + displayRows.length);
+
+  const overflowLabel = `▸ +${pinnedOverflow} more working`;
 
   return (
     <Box flexDirection="column" width={width}>
       <Text>{titleLine}</Text>
       {renderCensusRow()}
+      {pinnedRows.map((row, idx) => (
+        <SessionRow
+          key={`pin-${row.session.id}-${idx}`}
+          session={row.session}
+          isSelected={row.session.id === selectedId}
+          hasFocus={hasFocus}
+          prefix={row.prefix}
+          contentWidth={contentWidth}
+        />
+      ))}
+      {pinnedOverflow > 0 && (
+        <Text>
+          {BOX.v} <Text color="green">{overflowLabel}</Text>
+          {" ".repeat(Math.max(0, contentWidth - overflowLabel.length - 1))}
+          {BOX.v}
+        </Text>
+      )}
       {displayRows.map((row, idx) =>
         row.kind === "project" ? (
           <ProjectRow

@@ -12,11 +12,14 @@
   and the activity timeline. Loaded through a guarded require so agenthud
   still runs on Node < 22 (the provider is simply unavailable there — no
   new dependency, no engine bump). Schema: `docs/schemas/opencode-session.md`.
-- **Pinned live sessions.** In a short Projects panel, sessions running
-  right now (working/waiting) are pinned above the scrollable tree so they
-  never scroll out of view, capped to half the panel with a `+N more
-  working` overflow line. Keyed on liveState, not the 30-min hot window,
-  so finished-but-recent sub-agents don't flood it.
+- **Sticky live projects.** In a short Projects panel, projects that are
+  running right now stay anchored as a sticky block at the top — header
+  plus their sessions/sub-agents, hierarchy intact — so the live monitor
+  never scrolls active work out of view; only the cold tail scrolls. A
+  project is "live" when it has a working/waiting session or a working
+  sub-agent (keyed on liveState, not the 30-min hot window, so a project
+  whose sub-agents just finished doesn't stay pinned). Live projects sort
+  first; the prefix is capped so it can't swallow the whole panel.
 
 ### Fixed
 - **Bound `widthCache`** to stop unbounded memory growth. `getDisplayWidth`

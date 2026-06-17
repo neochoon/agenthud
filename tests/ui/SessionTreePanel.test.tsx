@@ -1099,58 +1099,89 @@ describe("buildTitleSegments", () => {
   });
 });
 
-describe("SessionTreePanel — pinned live rows", () => {
+describe("SessionTreePanel — sticky live projects", () => {
   const coldFiller = (n: number) =>
     Array.from({ length: n }, (_, i) =>
       makeProject(
         `coldp${i}`,
         [makeSession({ id: `coldsess${i}`, status: "cold" })],
-        {
-          hotness: "cold",
-        },
+        { hotness: "cold" },
       ),
     );
+  const lineOf = (frame: string, needle: string) =>
+    frame.split("\n").findIndex((l) => l.includes(needle));
 
-  it("keeps a live session visible when the selection scrolls to the bottom (short panel)", () => {
-    // Several hot (but NOT live) sub-agents shown individually add rows, so
-    // that with the selection on the bottom cold sentinel the live session
-    // would otherwise scroll off the top.
-    const live = makeSession({
-      id: "live0001",
+  it("pins a live project as a sticky block — session stays UNDER its own header, not above it", () => {
+    // Input order puts the non-live (hot, but not working) project first;
+    // the live project must sort first AND stay pinned with the selection on
+    // the bottom cold sentinel — with the header above its session.
+    const liveSession = makeSession({
+      id: "liveAAAA",
       status: "hot",
       liveState: "working",
       firstUserPrompt: "active work",
-      subAgents: Array.from({ length: 6 }, (_, i) =>
-        makeSession({
-          id: `hs${i}`,
-          status: "hot",
-          liveState: null,
-          projectName: "",
-        }),
-      ),
     });
-    const active = makeProject("liveproj", [live]);
+    const liveProj = makeProject("liveproj", [liveSession]);
+    const idleProj = makeProject("idleproj", [
+      makeSession({ id: "idleBBBB", status: "hot", liveState: null }),
+    ]);
     const { lastFrame } = render(
       <SessionTreePanel
-        projects={[active]}
-        coldProjects={coldFiller(8)}
+        projects={[idleProj, liveProj]}
+        coldProjects={coldFiller(10)}
         selectedId="__cold__"
         hasFocus={true}
-        width={110}
+        width={120}
         maxRows={4}
       />,
     );
     const frame = lastFrame() ?? "";
-    expect(frame).toContain("#live"); // pinned, not scrolled off
+    const header = lineOf(frame, "> liveproj");
+    const session = lineOf(frame, "#live");
+    expect(header).toBeGreaterThanOrEqual(0); // live project header pinned
+    expect(session).toBeGreaterThan(header); // its session sits UNDER the header
+    // the non-live project is not pinned — it scrolled away
+    expect(frame).not.toContain("> idleproj");
   });
 
-  it("pins by liveState, not the 30-min hot window: finished sub-agents don't flood", () => {
-    // A live parent with one WORKING sub-agent and many recently-finished
-    // (status hot, liveState null) ones. Only the working one should pin.
+  it("treats liveState (not the 30-min hot window) as 'live'", () => {
+    // A project whose only session is hot but NOT working/waiting is not
+    // live, so it is NOT pinned and scrolls off under a bottom selection.
+    const idleProj = makeProject("idleproj", [
+      makeSession({
+        id: "idleAAAA",
+        status: "hot",
+        liveState: null,
+        subAgents: Array.from({ length: 6 }, (_, i) =>
+          makeSession({
+            id: `done${i}`,
+            status: "hot",
+            liveState: null,
+            projectName: "",
+          }),
+        ),
+      }),
+    ]);
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[idleProj]}
+        coldProjects={coldFiller(10)}
+        selectedId="__cold__"
+        hasFocus={true}
+        width={120}
+        maxRows={4}
+      />,
+    );
+    // selection is on the cold sentinel; nothing is live, so nothing is
+    // pinned and the cold tail is what shows.
+    expect(lastFrame() ?? "").toContain("cold");
+  });
+
+  it("a working sub-agent makes its project live (whole block pinned)", () => {
     const parent = makeSession({
-      id: "par00001",
+      id: "parAAAAA",
       status: "hot",
-      liveState: "working",
+      liveState: null, // parent idle, but a sub-agent is working
       subAgents: [
         makeSession({
           id: "subwork1",
@@ -1158,117 +1189,21 @@ describe("SessionTreePanel — pinned live rows", () => {
           liveState: "working",
           projectName: "",
         }),
-        ...Array.from({ length: 6 }, (_, i) =>
-          makeSession({
-            id: `subdone${i}`,
-            status: "hot",
-            liveState: null,
-            projectName: "",
-          }),
-        ),
       ],
     });
-    const active = makeProject("liveproj", [parent]);
+    const liveProj = makeProject("liveproj", [parent]);
     const { lastFrame } = render(
       <SessionTreePanel
-        projects={[active]}
-        coldProjects={coldFiller(8)}
+        projects={[liveProj]}
+        coldProjects={coldFiller(10)}
         selectedId="__cold__"
         hasFocus={true}
-        width={110}
-        maxRows={6}
-      />,
-    );
-    const frame = lastFrame() ?? "";
-    expect(frame).toContain("#par0"); // live parent pinned
-    expect(frame).toContain("subwor"); // working sub-agent pinned
-  });
-
-  it("does not render a pinned live row twice (band + tree)", () => {
-    const live = makeSession({
-      id: "live0001",
-      status: "hot",
-      liveState: "working",
-      subAgents: Array.from({ length: 6 }, (_, i) =>
-        makeSession({
-          id: `hs${i}`,
-          status: "hot",
-          liveState: null,
-          projectName: "",
-        }),
-      ),
-    });
-    const active = makeProject("liveproj", [live]);
-    const { lastFrame } = render(
-      <SessionTreePanel
-        projects={[active]}
-        coldProjects={coldFiller(8)}
-        selectedId="live0001" // selecting the live row would scroll the tree to it
-        hasFocus={true}
-        width={110}
-        maxRows={6}
-      />,
-    );
-    const frame = lastFrame() ?? "";
-    const occurrences = (frame.match(/#live/g) ?? []).length;
-    expect(occurrences).toBe(1); // pinned only, removed from the tree
-  });
-
-  it("caps the band and summarizes the overflow as '+N more working'", () => {
-    const live = Array.from({ length: 8 }, (_, i) =>
-      makeProject(`lp${i}`, [
-        makeSession({ id: `lv${i}aaaa`, status: "hot", liveState: "working" }),
-      ]),
-    );
-    const { lastFrame } = render(
-      <SessionTreePanel
-        projects={live}
-        coldProjects={coldFiller(4)}
-        selectedId="__cold__"
-        hasFocus={true}
-        width={110}
-        maxRows={8}
-      />,
-    );
-    expect(lastFrame() ?? "").toContain("more working"); // overflow summarized
-  });
-
-  it("shows at least one live row even in a tiny panel (bandCap === 1)", () => {
-    const live = Array.from({ length: 5 }, (_, i) =>
-      makeProject(`lp${i}`, [
-        makeSession({ id: `lv${i}aaaa`, status: "hot", liveState: "working" }),
-      ]),
-    );
-    const { lastFrame } = render(
-      <SessionTreePanel
-        projects={live}
-        coldProjects={coldFiller(4)}
-        selectedId="__cold__"
-        hasFocus={true}
-        width={110}
-        maxRows={3}
-      />,
-    );
-    expect(lastFrame() ?? "").toContain("[working]"); // a real live row, not just a count
-  });
-
-  it("does not pin anything when no session is live (no regression)", () => {
-    const hotButIdle = makeSession({
-      id: "idle0001",
-      status: "hot",
-      liveState: null,
-    });
-    const active = makeProject("liveproj", [hotButIdle]);
-    const { lastFrame } = render(
-      <SessionTreePanel
-        projects={[active]}
-        coldProjects={coldFiller(8)}
-        selectedId="__cold__"
-        hasFocus={true}
-        width={110}
+        width={120}
         maxRows={4}
       />,
     );
-    expect(lastFrame() ?? "").not.toContain("more working");
+    const frame = lastFrame() ?? "";
+    expect(frame).toContain("> liveproj"); // project pinned because a sub-agent is working
+    expect(frame).toContain("subwor"); // the working sub-agent stays visible
   });
 });

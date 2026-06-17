@@ -457,19 +457,21 @@ function flattenSessions(
   return result;
 }
 
-/** A flattened row for a session RUNNING right now: a top-level session
- * that is working or waiting, or a sub-agent that is working (sub-agents
- * never surface "waiting" — `detectLiveState` in sessionLiveness.ts forces
- * a sub-agent's state to working|null). Pins key on liveState, NOT the
- * 30-min hot window, so finished-but-recent sub-agents don't flood the
- * band. `isParent` mirrors SessionRow's own `prefix === "    "` test. */
-function isLiveSessionRow(
-  row: FlatRow,
-): row is Extract<FlatRow, { kind: "session" }> {
-  if (row.kind !== "session") return false;
-  const isParent = row.prefix === "    ";
-  const ls = row.session.liveState;
-  return isParent ? ls === "working" || ls === "waiting" : ls === "working";
+/** A project is "live" when something is RUNNING in it right now: a
+ * top-level session that is working or waiting, or a sub-agent that is
+ * working (sub-agents never surface "waiting" — `detectLiveState` in
+ * sessionLiveness.ts forces a sub-agent's state to working|null). Keyed on
+ * liveState, NOT the 30-min hot window, so a project whose sub-agents just
+ * finished doesn't stay pinned. Live projects are anchored as a sticky top
+ * block so the monitor never scrolls active work out of view. */
+function isProjectLive(project: ProjectNode): boolean {
+  for (const s of project.sessions) {
+    if (s.liveState === "working" || s.liveState === "waiting") return true;
+    for (const sa of s.subAgents) {
+      if (sa.liveState === "working") return true;
+    }
+  }
+  return false;
 }
 
 function ProjectRow({
@@ -988,7 +990,21 @@ export function SessionTreePanel({
     );
   }
 
-  const flatRows = flattenSessions(projects, coldProjects, expandedIds);
+  // Live projects sort first so the sticky top block (below) is a clean
+  // leading prefix of the flattened rows.
+  const liveProjectPaths = new Set<string>();
+  for (const p of projects) {
+    if (isProjectLive(p)) liveProjectPaths.add(p.projectPath);
+  }
+  const orderedActive =
+    liveProjectPaths.size > 0 && liveProjectPaths.size < projects.length
+      ? [...projects].sort(
+          (a, b) =>
+            (liveProjectPaths.has(a.projectPath) ? 0 : 1) -
+            (liveProjectPaths.has(b.projectPath) ? 0 : 1),
+        )
+      : projects;
+  const flatRows = flattenSessions(orderedActive, coldProjects, expandedIds);
   const totalRows = flatRows.length;
 
   // Census takes one row inside the panel content area when present, so
@@ -1000,44 +1016,33 @@ export function SessionTreePanel({
     effectiveMaxRows !== undefined && totalRows > effectiveMaxRows;
   const visibleCount = needsOverflow ? effectiveMaxRows - 1 : totalRows;
 
-  // Pinned "live" band: when the tree overflows, sessions that are running
-  // RIGHT NOW (working/waiting) must never scroll out of view — that's the
-  // point of a live monitor. Pin them above the scrollable tree, capped to
-  // half the budget so a burst of concurrent sub-agents can't eat the
-  // panel; the overflow collapses to a "+N more working" line. Pinned rows
-  // are removed from the tree below so a live row never renders twice.
-  const liveRows = needsOverflow ? flatRows.filter(isLiveSessionRow) : [];
-  const bandCap = Math.max(1, Math.floor(visibleCount / 2));
-  let pinnedRows: Extract<FlatRow, { kind: "session" }>[];
-  let pinnedOverflow: number;
-  if (liveRows.length <= bandCap) {
-    pinnedRows = liveRows;
-    pinnedOverflow = 0;
-  } else if (bandCap === 1) {
-    // No room for both a row and a summary — always show at least one live
-    // row (the band's whole purpose), and drop the count.
-    pinnedRows = liveRows.slice(0, 1);
-    pinnedOverflow = 0;
-  } else {
-    // Reserve one slot for the "+N more working" summary line.
-    pinnedRows = liveRows.slice(0, bandCap - 1);
-    pinnedOverflow = liveRows.length - pinnedRows.length;
+  // Sticky live-project prefix: keep whole live-project blocks (header +
+  // their sessions/sub-agents, hierarchy intact) anchored at the top; only
+  // the cold tail below scrolls. A session always stays under its own
+  // header (unlike a detached session band). The leading rows are the live
+  // projects (sorted first above); stop at the first non-live project
+  // header or the cold-projects summary.
+  let livePrefixCount = 0;
+  for (const row of flatRows) {
+    if (row.kind === "project") {
+      if (!liveProjectPaths.has(row.project.projectPath)) break;
+    } else if (row.kind === "cold-projects-summary") {
+      break;
+    }
+    livePrefixCount++;
   }
-  const bandHeight = pinnedRows.length + (pinnedOverflow > 0 ? 1 : 0);
+  // Cap the sticky prefix so it can't swallow the whole panel — always
+  // leave at least one row for the scrollable tail.
+  const pinnedCount = needsOverflow
+    ? Math.min(livePrefixCount, Math.max(0, visibleCount - 1))
+    : 0;
+  const pinnedRows = flatRows.slice(0, pinnedCount);
+  const restRows = flatRows.slice(pinnedCount);
+  const restTotal = restRows.length;
 
-  // The scrollable tree excludes pinned rows (no double render).
-  const pinnedIds = new Set(pinnedRows.map((r) => r.session.id));
-  const treeRows =
-    bandHeight > 0
-      ? flatRows.filter(
-          (r) => !(r.kind === "session" && pinnedIds.has(r.session.id)),
-        )
-      : flatRows;
-  const treeTotal = treeRows.length;
-
-  // Index of the selected row within the (de-pinned) tree. A selected row
-  // that is itself pinned won't be found here — it's shown in the band.
-  const selectedFlatIndex = treeRows.findIndex((row) => {
+  // Index of the selected row within the scrollable tail (pinned rows are
+  // always visible, so a selection there needs no scroll).
+  const selectedRestIndex = restRows.findIndex((row) => {
     if (row.kind === "project") return selectedId === row.sentinelId;
     if (row.kind === "session") return row.session.id === selectedId;
     if (row.kind === "subagent-summary")
@@ -1048,87 +1053,71 @@ export function SessionTreePanel({
     return false;
   });
 
-  // Compute scrollTop so the selected tree row stays visible.
-  const treeVisibleCount = Math.max(1, visibleCount - bandHeight);
+  // Compute scrollTop so the selected tail row stays visible.
+  const treeVisibleCount = Math.max(1, visibleCount - pinnedRows.length);
   let scrollTop = 0;
-  if (treeTotal > treeVisibleCount && selectedFlatIndex >= 0) {
-    scrollTop = Math.max(0, selectedFlatIndex - treeVisibleCount + 1);
-    scrollTop = Math.min(scrollTop, Math.max(0, treeTotal - treeVisibleCount));
+  if (restTotal > treeVisibleCount && selectedRestIndex >= 0) {
+    scrollTop = Math.max(0, selectedRestIndex - treeVisibleCount + 1);
+    scrollTop = Math.min(scrollTop, Math.max(0, restTotal - treeVisibleCount));
   }
 
-  const displayRows = treeRows.slice(scrollTop, scrollTop + treeVisibleCount);
-  const hiddenBelow = treeTotal - (scrollTop + displayRows.length);
+  const displayRows = restRows.slice(scrollTop, scrollTop + treeVisibleCount);
+  const hiddenBelow = restTotal - (scrollTop + displayRows.length);
 
-  const overflowLabel = `▸ +${pinnedOverflow} more working`;
+  // One row renderer for both the sticky prefix and the scrollable tail.
+  const renderRow = (row: FlatRow, key: string) =>
+    row.kind === "project" ? (
+      <ProjectRow
+        key={key}
+        project={row.project}
+        isSelected={selectedId === row.sentinelId}
+        hasFocus={hasFocus}
+        contentWidth={contentWidth}
+        census={census}
+      />
+    ) : row.kind === "session" ? (
+      <SessionRow
+        key={key}
+        session={row.session}
+        isSelected={row.session.id === selectedId}
+        hasFocus={hasFocus}
+        prefix={row.prefix}
+        contentWidth={contentWidth}
+      />
+    ) : row.kind === "subagent-summary" ? (
+      <SubagentSummaryRow
+        key={key}
+        coolCount={row.coolCount}
+        coldCount={row.coldCount}
+        contentWidth={contentWidth}
+        isSelected={selectedId === `__sub-${row.parentId}__`}
+        hasFocus={hasFocus}
+      />
+    ) : row.kind === "cold-projects-summary" ? (
+      <ColdProjectsSummaryRow
+        key={key}
+        count={row.count}
+        isSelected={selectedId === "__cold__"}
+        hasFocus={hasFocus}
+        width={width}
+      />
+    ) : (
+      <ColdSessionsSummaryRow
+        key={key}
+        count={row.count}
+        projectName={row.projectName}
+        isSelected={selectedId === `__cold-sessions-${row.projectName}__`}
+        hasFocus={hasFocus}
+        contentWidth={contentWidth}
+      />
+    );
 
   return (
     <Box flexDirection="column" width={width}>
       <Text>{titleLine}</Text>
       {renderCensusRow()}
-      {pinnedRows.map((row, idx) => (
-        <SessionRow
-          key={`pin-${row.session.id}-${idx}`}
-          session={row.session}
-          isSelected={row.session.id === selectedId}
-          hasFocus={hasFocus}
-          prefix={row.prefix}
-          contentWidth={contentWidth}
-        />
-      ))}
-      {pinnedOverflow > 0 && (
-        <Text>
-          {BOX.v} <Text color="green">{overflowLabel}</Text>
-          {" ".repeat(Math.max(0, contentWidth - overflowLabel.length - 1))}
-          {BOX.v}
-        </Text>
-      )}
-      {displayRows.map((row, idx) =>
-        row.kind === "project" ? (
-          <ProjectRow
-            key={`project-${row.project.name}-${idx}`}
-            project={row.project}
-            isSelected={selectedId === row.sentinelId}
-            hasFocus={hasFocus}
-            contentWidth={contentWidth}
-            census={census}
-          />
-        ) : row.kind === "session" ? (
-          <SessionRow
-            key={`${row.session.id}-${idx}`}
-            session={row.session}
-            isSelected={row.session.id === selectedId}
-            hasFocus={hasFocus}
-            prefix={row.prefix}
-            contentWidth={contentWidth}
-          />
-        ) : row.kind === "subagent-summary" ? (
-          <SubagentSummaryRow
-            key={`subagent-summary-${idx}`}
-            coolCount={row.coolCount}
-            coldCount={row.coldCount}
-            contentWidth={contentWidth}
-            isSelected={selectedId === `__sub-${row.parentId}__`}
-            hasFocus={hasFocus}
-          />
-        ) : row.kind === "cold-projects-summary" ? (
-          <ColdProjectsSummaryRow
-            key="cold-summary"
-            count={row.count}
-            isSelected={selectedId === "__cold__"}
-            hasFocus={hasFocus}
-            width={width}
-          />
-        ) : (
-          <ColdSessionsSummaryRow
-            key={`cold-sessions-${row.projectName}`}
-            count={row.count}
-            projectName={row.projectName}
-            isSelected={selectedId === `__cold-sessions-${row.projectName}__`}
-            hasFocus={hasFocus}
-            contentWidth={contentWidth}
-          />
-        ),
-      )}
+      {pinnedRows.map((row, idx) => renderRow(row, `pin-${idx}`))}
+      {displayRows.map((row, idx) => renderRow(row, `row-${idx}`))}
       {hiddenBelow > 0 && (
         <Text>
           {BOX.v} <Text dimColor>{`... ${hiddenBelow} more`}</Text>

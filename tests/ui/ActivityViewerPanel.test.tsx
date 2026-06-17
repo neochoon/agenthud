@@ -266,3 +266,15 @@ describe("ActivityViewerPanel", () => {
     expect(frame).not.toMatch(/Paragraph one\.\s*\n\s*Paragraph two\./);
   });
 });
+
+describe("ActivityViewerPanel — row width alignment", () => {
+  it("pads the empty-state line to the full panel width (right border aligned)", () => {
+    const W = 80;
+    const { lastFrame } = render(
+      <ActivityViewerPanel {...baseProps} activities={[]} width={W} />,
+    );
+    const lines = (lastFrame() ?? "").split("\n").filter(Boolean);
+    expect(lines.some((l) => l.includes("No activity yet"))).toBe(true);
+    for (const l of lines) expect([...l].length).toBe(W);
+  });
+});

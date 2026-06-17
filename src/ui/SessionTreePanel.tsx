@@ -1122,7 +1122,7 @@ export function SessionTreePanel({
         <Text>
           {BOX.v} <Text dimColor>{`... ${hiddenBelow} more`}</Text>
           {" ".repeat(
-            Math.max(0, contentWidth - `... ${hiddenBelow} more`.length - 1),
+            Math.max(0, contentWidth - `... ${hiddenBelow} more`.length),
           )}
           {BOX.v}
         </Text>

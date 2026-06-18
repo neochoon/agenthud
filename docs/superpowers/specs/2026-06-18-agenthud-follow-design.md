@@ -35,6 +35,46 @@ time, then follow live.
   acts).
 - A new TUI. `follow` is a plain line stream, not a curses view.
 
+## Limitations & supervisor architecture (disk vs live)
+
+`follow` is a **disk** observer: it can only emit what Claude Code (et al.)
+has written to the session JSONL. That boundary is fundamental, and it has
+a sharp consequence the supervisor design must account for.
+
+**Claude Code flushes a turn's content at turn boundaries, not
+continuously.** The *user* message is written immediately, but the
+assistant's turn — its text, tool calls, and any **permission prompt** —
+is not persisted until the turn yields back to the user. Empirically
+(2026-06-18, observed on Claude Code 2.1.175):
+
+- An interactive session that yields every turn (e.g. a normal chat)
+  flushes constantly, so `follow`/agenthud track it in near-real-time.
+- A session running a long autonomous turn, **or paused waiting at a
+  permission prompt** ("may I edit this file?"), writes **nothing** to disk
+  for the whole duration. Its JSONL freezes at the last user message;
+  agenthud shows it static. When the turn finally completes, the buffered
+  content lands in one batch.
+
+**The critical blind spot:** the single most valuable event for a
+supervisor — *"the agent is waiting on the user"* (a permission/approval
+prompt) — is **never on disk**. It is a live-TUI-only state: the turn that
+contains it hasn't yielded, so it hasn't flushed, and it can't yield until
+the user answers. A disk observer (`follow`, agenthud's `liveState`) is
+structurally blind to it.
+
+**Conclusion — the supervisor needs two eyes, with split roles:**
+
+- **`agenthud follow` (disk):** the stream of *completed* activity — what
+  agents have *done*. Reliable, structured, machine-parseable. Use it for
+  the activity timeline and post-hoc reasoning.
+- **`tmux capture-pane` (live TUI):** the only real-time source for
+  *in-flight* state — most importantly "agent is asking for permission /
+  input *right now*". Use it for the attention trigger ("call the user").
+
+`follow` deliberately does NOT try to surface in-flight/permission state
+(it can't, from disk). The orchestrator layer pairs it with capture-pane;
+that is part of the separate meta-claude project, not agenthud.
+
 ## User-facing shape
 
 ```

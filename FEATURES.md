@@ -28,6 +28,7 @@ For getting started, see [README.md](./README.md).
 | Summary `--open` | `agenthud summary -o` | v0.12.0 | [Summary open](#summary-open) |
 | Summaries index hub | `agenthud summary --open-index` / `-I` | v0.12.0 | [Summaries index](#summaries-index) |
 | Subagent visibility in reports | `task` include type | v0.13.0 | [Subagent reporting](#subagent-reporting) |
+| Live event stream | `agenthud follow` | v0.19.x | [Follow](#follow) |
 | Global config | `~/.agenthud/config.yaml` | v0.9.0 | [Config](#config) |
 | Effective-options stderr line | (automatic) | v0.12.0 | [Effective options](#effective-options) |
 
@@ -305,6 +306,67 @@ content can't forge the boundary.
 bounded. The TUI detail view still renders those bodies on `↵`.
 
 **Available since:** v0.13.0.
+
+## Follow
+
+`agenthud follow` streams a single, chronologically-merged feed of
+every new event across **all** sessions and sub-agents — a humane
+`tail -f` for "what are all my agents doing," and the
+machine-readable substrate a higher-level supervisor can consume.
+It is read-only: it observes, never acts.
+
+```bash
+agenthud follow [--since SPEC] [--json] [--include TYPES]
+```
+
+**Flags:**
+
+- `--since now|<N>h|<N>m` — where the stream starts (default `now`,
+  i.e. pure tail). `<N>h` / `<N>m` backfill the last N hours/minutes,
+  then follow live. (`HH:MM` / ISO / `last` are deferred.)
+- `--json` — emit NDJSON (one JSON object per line, the stable
+  supervisor contract) instead of human lines.
+- `--include TYPES` — comma list filtering **activity** event
+  subtypes only (same vocabulary as `report.include`:
+  `response,bash,edit,thinking,read,glob,user,task`). `state` and
+  `lifecycle` events always pass — they are the supervisor's trigger
+  signal; `--include` only narrows the activity firehose.
+
+**Event model (the NDJSON contract).** One JSON object per line,
+additive-only:
+
+```ts
+interface FollowEvent {
+  ts: number;                 // epoch ms (activity ts; detection time for state/lifecycle)
+  type: "activity" | "state" | "lifecycle";
+  provider: string;           // "claude" | "codex" | "kiro" | "kiro-ide" | "opencode"
+  project: string;            // project name (basename of cwd)
+  projectPath: string;        // absolute cwd
+  session: string;            // owning top-level session's full id
+  subagent: string | null;    // sub-agent's own id when the event is the sub-agent's; else null
+  // activity:  label?, detail?
+  // state:     from?, to?    (working | waiting | null)
+  // lifecycle: kind?         (session_start | session_end | subagent_spawn | subagent_done)
+}
+```
+
+- **activity** — a new `ActivityEntry` appeared in a session's
+  history (Read / Edit / Bash / Response / …).
+- **state** — a session's `liveState` changed (working↔waiting↔null).
+  `working→waiting` is the headline "this agent is now waiting on the
+  user" trigger.
+- **lifecycle** — a session/sub-agent was first seen or disappeared.
+
+**Human line format** (default, no `--json`):
+`[HH:MM:SS] project/session[/subagent]  <label>  <detail>` — plain,
+width-naive, pipe-safe.
+
+**Consumer note.** Pipe to a supervisor process, or persist with
+`agenthud follow --json > events.ndjson`. Latency equals the refresh
+interval (default 2s, `refreshIntervalMs` in config). Broken pipe
+(e.g. `| head`) exits 0 quietly; SIGINT/SIGTERM stop cleanly.
+
+**Available since:** v0.19.x.
 
 ## Config
 

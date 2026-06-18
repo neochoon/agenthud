@@ -21,13 +21,20 @@ function clock(ts: number): string {
   return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
+/** Collapse newlines/tabs so one event is always exactly one line —
+ * activity `detail` can be the raw multi-line text of a response or a
+ * multi-line shell command, which would otherwise split the stream. */
+function flatten(s: string): string {
+  return s.replace(/[\r\n\t]+/g, " ").trim();
+}
+
 export function formatHuman(e: FollowEvent): string {
   const who = [e.project, e.session.slice(0, 8), e.subagent ?? undefined]
     .filter(Boolean)
     .join("/");
   let what: string;
   if (e.type === "activity") {
-    what = `${e.label}  ${e.detail ?? ""}`.trimEnd();
+    what = `${e.label}  ${e.detail ? flatten(e.detail) : ""}`.trimEnd();
   } else if (e.type === "state") {
     what = `${e.to ?? "idle"}  (was ${e.from ?? "idle"})`;
   } else {

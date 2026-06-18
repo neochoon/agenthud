@@ -53,9 +53,11 @@ function nodeOf(
   return {
     session: top.id,
     subagent,
-    provider: node.provider ?? "claude",
+    provider: node.provider ?? top.provider ?? "claude",
     project,
-    projectPath: node.projectPath,
+    // Always the top-level session's cwd — a sub-agent SessionNode may
+    // not carry one, and the contract guarantees a non-empty projectPath.
+    projectPath: top.projectPath,
     liveState: node.liveState,
     activities: parse(node.filePath),
   };

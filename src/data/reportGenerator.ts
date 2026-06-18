@@ -30,6 +30,7 @@
 
 import { statSync } from "node:fs";
 import type { ActivityEntry, SessionNode } from "../types/index.js";
+import { activityMatchesInclude } from "./activityInclude.js";
 import { parseGitCommits } from "./gitCommits.js";
 import { parseSessionHistory } from "./sessionHistory.js";
 
@@ -39,32 +40,6 @@ export interface ReportOptions {
   format?: "markdown" | "json"; // default: "markdown"
   detailLimit?: number; // max chars for detail field; 0 = unlimited; default: 120
   withGit?: boolean; // merge git commits into activity timeline per session
-}
-
-function activityMatchesInclude(
-  activity: ActivityEntry,
-  include: string[],
-): boolean {
-  const label = activity.label.toLowerCase();
-  const type = activity.type;
-  if (include.includes("response") && type === "response") return true;
-  if (include.includes("thinking") && type === "thinking") return true;
-  if (include.includes("user") && type === "user") return true;
-  if (include.includes("bash") && label === "bash") return true;
-  if (
-    include.includes("edit") &&
-    (label === "edit" || label === "write" || label === "todowrite")
-  )
-    return true;
-  if (
-    include.includes("read") &&
-    (label === "read" || label === "glob" || label === "grep")
-  )
-    return true;
-  if (include.includes("glob") && (label === "glob" || label === "grep"))
-    return true;
-  if (include.includes("task") && label === "task") return true;
-  return false;
 }
 
 function isSameLocalDay(a: Date, b: Date): boolean {

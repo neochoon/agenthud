@@ -118,3 +118,60 @@ describe("diffSnapshots", () => {
     expect(tss).toEqual([...tss].sort((x, y) => x - y));
   });
 });
+
+describe("diffSnapshots — review fixes", () => {
+  it("include 'read' also matches glob/grep (parity with report)", () => {
+    const a = node({ activities: [act("Grep", 10), act("Edit", 20)] });
+    const { events } = diffSnapshots(new Map(), [a], new Set(["read"]), NOW);
+    // session_start (always) + only the Grep activity (Edit filtered out)
+    expect(events.map((e) => e.kind ?? e.label)).toEqual([
+      "session_start",
+      "Grep",
+    ]);
+  });
+
+  it("keeps a new node's session_start adjacent to its older backfilled activities", () => {
+    const s = node({ activities: [act("Read", 10), act("Edit", 20)] });
+    const { events } = diffSnapshots(new Map(), [s], null, NOW);
+    expect(events.map((e) => e.kind ?? e.label)).toEqual([
+      "session_start",
+      "Read",
+      "Edit",
+    ]);
+  });
+
+  it("orders a state-only node after a node bearing older activities", () => {
+    const s1 = node({
+      session: "s1",
+      liveState: "working",
+      activities: [act("Read", 10)],
+    });
+    const s2 = node({
+      session: "s2",
+      liveState: "working",
+      activities: [act("Read", 10)],
+    });
+    const r1 = diffSnapshots(new Map(), [s1, s2], null, NOW);
+    const s1b = node({
+      session: "s1",
+      liveState: "working",
+      activities: [act("Read", 10), act("Edit", 40)],
+    });
+    const s2b = node({
+      session: "s2",
+      liveState: "waiting",
+      activities: [act("Read", 10)],
+    });
+    const { events } = diffSnapshots(
+      r1.nextState,
+      [s1b, s2b],
+      null,
+      NOW + 1000,
+    );
+    expect(events[0]).toMatchObject({ session: "s1", type: "activity" });
+    expect(events[events.length - 1]).toMatchObject({
+      session: "s2",
+      type: "state",
+    });
+  });
+});

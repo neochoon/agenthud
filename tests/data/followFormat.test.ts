@@ -70,3 +70,17 @@ describe("formatHuman", () => {
     expect(formatHuman(e)).toContain("session_end");
   });
 });
+
+describe("formatHuman is newline-safe", () => {
+  it("flattens a multi-line activity detail to a single line", () => {
+    const e: FollowEvent = {
+      ...base,
+      type: "activity",
+      label: "Response",
+      detail: "line one\nline two\tthree",
+    };
+    const line = formatHuman(e);
+    expect(line).not.toContain("\n");
+    expect(line).toContain("line one line two three");
+  });
+});

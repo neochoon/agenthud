@@ -115,3 +115,33 @@ describe("runFollow integration", () => {
     expect(responses[0]).toMatchObject({ project: "proj", provider: "claude" });
   });
 });
+
+describe("buildSnapshots — sub-agent projectPath", () => {
+  it("a sub-agent snapshot inherits the top-level session's projectPath", () => {
+    const tree: SessionTree = {
+      projects: [
+        {
+          name: "proj",
+          projectPath: "/p/proj",
+          hotness: "hot",
+          sessions: [
+            sess({
+              id: "top",
+              projectPath: "/p/proj",
+              subAgents: [
+                sess({ id: "sub", projectPath: "", filePath: "/p/sub.jsonl" }),
+              ],
+            }),
+          ],
+        },
+      ],
+      coldProjects: [],
+      totalCount: 1,
+      timestamp: "",
+      hiddenStats: { total: 0, active: 0 },
+    };
+    const snaps = buildSnapshots(tree, () => []);
+    const sub = snaps.find((s) => s.subagent === "sub");
+    expect(sub?.projectPath).toBe("/p/proj"); // not the sub-agent's empty path
+  });
+});

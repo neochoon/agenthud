@@ -76,12 +76,14 @@ The hero. A split-view TUI: a project tree (top) and an activity viewer (bottom)
 └───────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
+The activity viewer (bottom) **follows your selection** — pick any session *or sub-agent* and it streams what that node is doing right now, the live line bold with a spinner. So when a sub-agent is mid-task you can watch exactly what it's reading, editing, or running; press `↵` on any activity for a scrollable detail view.
+
 The badge tells you, per session, **what the agent is doing right now**:
 
 - `[working]` — there's a pending tool call at the tail; the agent is mid-step.
 - `[waiting]` — the turn yielded back to you (a question, or a finished reply).
 
-These live states are read from the structure of each session's JSONL tail and **override** the time-based recency badges (`[hot]` / `[warm]` / `[cool]` / `[cold]`) whenever a session is live. Each row also carries a colored provider label (`claude` / `codex` / `kiro` / `kiro-ide` / `opencode`), its model, and a context-window gauge; only hot/warm (and live) sessions count as active and render bright. Sub-agents nest under their parent regardless of which agent spawned them, the panel title is a tree-wide census, and cold projects collapse under a `... N cold projects` sentinel. Press `↵` on any activity for a scrollable detail view.
+These live states are read from the structure of each session's JSONL tail and **override** the time-based recency badges (`[hot]` / `[warm]` / `[cool]` / `[cold]`) whenever a session is live. Each row also carries a colored provider label (`claude` / `codex` / `kiro` / `kiro-ide` / `opencode`), its model, and a context-window gauge; only hot/warm (and live) sessions count as active and render bright. Sub-agents nest under their parent regardless of which agent spawned them, the panel title is a tree-wide census, and cold projects collapse under a `... N cold projects` sentinel.
 
 Full keybinding and badge reference: [FEATURES.md](./FEATURES.md#keybindings).
 

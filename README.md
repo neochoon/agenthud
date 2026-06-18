@@ -16,7 +16,7 @@ It's organized as **three layers, by who's reading** — a human at a glance, a 
 
 → **See [FEATURES.md](./FEATURES.md) for the full surface** — every flag, keybinding, config key, file path, and env var. Per-agent session schemas: [Claude Code](./docs/schemas/claude-session.md) · [Codex CLI](./docs/schemas/codex-session.md) · [Kiro IDE](./docs/schemas/kiro-ide-session.md) · [Kiro CLI](./docs/schemas/kiro-session.md) · [opencode](./docs/schemas/opencode-session.md) (or browse [docs/schemas/](./docs/schemas/)).
 
-Requires Node.js 20+. Open agenthud in a separate terminal while you work; press `?` inside the TUI for in-app help.
+Requires Node.js 20+ (opencode sessions need Node 22+ — they're read via the built-in `node:sqlite`; on older Node, opencode is simply skipped and everything else works). Open agenthud in a separate terminal while you work; press `?` inside the TUI for in-app help.
 
 ## Try without installing
 

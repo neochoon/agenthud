@@ -240,15 +240,21 @@ if (options.mode === "follow") {
     sinceMs: since.sinceMs,
     json: !!options.followJson,
     include,
+    once: !!options.followOnce,
   });
-  const shutdown = () => {
-    stop();
-    process.exit(0);
-  };
-  process.on("SIGINT", shutdown);
-  process.on("SIGTERM", shutdown);
   process.stdout.on("error", () => process.exit(0)); // EPIPE on `| head`
-  // Keep the event loop alive on the interval; do not fall through to Ink.
+  // `--once` emitted the backfill synchronously and scheduled no interval, so
+  // the event loop drains and the process exits cleanly. Streaming mode keeps
+  // the loop alive on the interval and exits on a signal.
+  if (!options.followOnce) {
+    const shutdown = () => {
+      stop();
+      process.exit(0);
+    };
+    process.on("SIGINT", shutdown);
+    process.on("SIGTERM", shutdown);
+  }
+  // Do not fall through to Ink.
 } else {
   runWatchOrOnce();
 }

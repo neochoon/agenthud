@@ -645,6 +645,25 @@ describe("parseArgs", () => {
       expect(opts.followInclude).toEqual(["bash", "edit"]);
     });
 
+    it("parses --once for one-shot mode", () => {
+      const opts = parseArgs(["follow", "--since", "60s", "--once"]);
+      expect(opts.mode).toBe("follow");
+      expect(opts.followOnce).toBe(true);
+      expect(opts.followSince).toBe("60s");
+      expect(opts.followError).toBeUndefined();
+    });
+
+    it("leaves followOnce undefined without --once", () => {
+      expect(parseArgs(["follow"]).followOnce).toBeUndefined();
+    });
+
+    it("follow --once (no --since) stays follow mode, not watch once", () => {
+      const opts = parseArgs(["follow", "--once"]);
+      expect(opts.mode).toBe("follow");
+      expect(opts.followOnce).toBe(true);
+      expect(opts.followSince).toBeUndefined();
+    });
+
     it("rejects an unknown --include type", () => {
       const opts = parseArgs(["follow", "--include", "bash,bogus"]);
       expect(opts.followError).toBeDefined();

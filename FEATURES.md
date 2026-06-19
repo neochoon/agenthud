@@ -316,14 +316,15 @@ machine-readable substrate a higher-level supervisor can consume.
 It is read-only: it observes, never acts.
 
 ```bash
-agenthud follow [--since SPEC] [--json] [--include TYPES]
+agenthud follow [--since SPEC] [--json] [--include TYPES] [--once]
 ```
 
 **Flags:**
 
-- `--since now|<N>h|<N>m` — where the stream starts (default `now`,
-  i.e. pure tail). `<N>h` / `<N>m` backfill the last N hours/minutes,
-  then follow live. (`HH:MM` / ISO / `last` are deferred.)
+- `--since now|<N>h|<N>m|<N>s` — where the stream starts (default `now`,
+  i.e. pure tail). `<N>h` / `<N>m` / `<N>s` backfill the last N
+  hours/minutes/seconds, then follow live. (`HH:MM` / ISO / `last` are
+  deferred.)
 - `--json` — emit NDJSON (one JSON object per line, the stable
   supervisor contract) instead of human lines.
 - `--include TYPES` — comma list filtering **activity** event
@@ -331,6 +332,10 @@ agenthud follow [--since SPEC] [--json] [--include TYPES]
   `response,bash,edit,thinking,read,glob,user,task`). `state` and
   `lifecycle` events always pass — they are the supervisor's trigger
   signal; `--include` only narrows the activity firehose.
+- `--once` — emit the backfill since `--since` and exit, instead of
+  streaming (the `tail` to the default's `tail -f`). Handy for scripts
+  and quick "what happened in the last N" checks. Pair with a non-`now`
+  `--since` (e.g. `--since 5m --once`); `--since now --once` emits nothing.
 
 **Event model (the NDJSON contract).** One JSON object per line,
 additive-only:

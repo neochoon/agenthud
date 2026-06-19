@@ -79,6 +79,7 @@ export interface CliOptions {
   followSince?: string; // raw --since spec
   followJson?: boolean;
   followInclude?: string[];
+  followOnce?: boolean; // emit the backfill and exit (no streaming)
   followError?: string;
 }
 
@@ -119,7 +120,12 @@ const KNOWN_SUMMARY_FLAGS = new Set([
   "-I",
   "--open-index",
 ]);
-const KNOWN_FOLLOW_FLAGS = new Set(["--since", "--json", "--include"]);
+const KNOWN_FOLLOW_FLAGS = new Set([
+  "--since",
+  "--json",
+  "--include",
+  "--once",
+]);
 const KNOWN_SUBCOMMANDS = new Set(["watch", "report", "summary", "follow"]);
 
 export function getHelp(): string {
@@ -189,10 +195,12 @@ Commands:
                                 Stream live agent events (activity +
                                 state + lifecycle) across all sessions
                                 and sub-agents, merged chronologically.
-    --since now|<N>h|<N>m       Where to start (default: now)
+    --since now|<N>h|<N>m|<N>s  Where to start (default: now)
     --json                      Emit NDJSON instead of human lines
     --include TYPES             Filter activity types (comma list; same
                                 vocabulary as report's --include)
+    --once                      Emit events since --since and exit, instead
+                                of streaming (like tail vs tail -f)
 
   Defaults for report and summary live under \`report:\` and \`summary:\`
   in ~/.agenthud/config.yaml. Flags override config values per-run; the
@@ -318,7 +326,11 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
   if (args.includes("--version") || args.includes("-V")) {
     return { mode: "watch", command: "version" };
   }
-  if (args.includes("--once")) {
+  // `follow` owns `--once` as its own one-shot flag (handled in its block
+  // below), so exempt it here. Every other entry point keeps the existing
+  // behavior: bare/`watch --once` is the watch one-shot, and report/summary
+  // (which don't define `--once`) continue to be absorbed here as before.
+  if (args[0] !== "follow" && args.includes("--once")) {
     return args.includes("--cwd")
       ? { mode: "once", scopeToCwd: true }
       : { mode: "once" };
@@ -678,6 +690,7 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
     let followSince: string | undefined;
     let followJson: boolean | undefined;
     let followInclude: string[] | undefined;
+    let followOnce: boolean | undefined;
     let followError: string | undefined;
 
     const FLAGS_WITH_VALUE = new Set(["--since", "--include"]);
@@ -702,6 +715,7 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
     }
 
     if (rest.includes("--json")) followJson = true;
+    if (rest.includes("--once")) followOnce = true;
 
     const includeIdx = rest.indexOf("--include");
     if (includeIdx !== -1) {
@@ -733,6 +747,7 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
       followSince,
       followJson,
       followInclude,
+      followOnce,
       followError,
     };
   }

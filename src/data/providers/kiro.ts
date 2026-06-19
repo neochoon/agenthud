@@ -35,7 +35,15 @@
  *   for the Claude provider — useful for tests and mounted volumes.
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+  readSync,
+  statSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import type {
@@ -144,6 +152,38 @@ export function readKiroEnvelopeVersion(lines: string[]): string | undefined {
   return undefined;
 }
 
+// 8 KB covers hundreds of JSONL lines — more than enough to land the
+// first envelope in any real session, while keeping discovery O(const)
+// per file regardless of how large the session grows.
+const ENVELOPE_HEAD_BYTES = 8192;
+
+// Read at most ENVELOPE_HEAD_BYTES from the start of a JSONL file.
+// Falls back to a full readFileSync for small files (≤ threshold) so
+// the unit tests — which mock readFileSync — stay on the plain path.
+function readJsonlHead(filePath: string): string {
+  let size: number;
+  try {
+    size = statSync(filePath).size;
+  } catch {
+    return "";
+  }
+  if (size <= ENVELOPE_HEAD_BYTES) {
+    try {
+      return readFileSync(filePath, "utf-8");
+    } catch {
+      return "";
+    }
+  }
+  const fd = openSync(filePath, "r");
+  try {
+    const buf = Buffer.alloc(ENVELOPE_HEAD_BYTES);
+    const n = readSync(fd, buf, 0, ENVELOPE_HEAD_BYTES, 0);
+    return buf.toString("utf-8", 0, n);
+  } finally {
+    closeSync(fd);
+  }
+}
+
 interface RawSession {
   id: string;
   hideKey: string;
@@ -249,12 +289,12 @@ function readRawSessions(
         ? meta.title
         : null;
 
-    // Read the .jsonl content to capture the envelope schema version.
-    // We already have the mtime from statSync above; this is the only
-    // additional read needed per session and the content is typically small.
+    // Bounded head-read: only the first JSONL line is needed for the
+    // envelope version tag — no reason to load the full (potentially
+    // large) session file during discovery.
     let envelopeVersion: string | undefined;
     try {
-      const jsonlText = readFileSync(jsonlPath, "utf-8");
+      const jsonlText = readJsonlHead(jsonlPath);
       envelopeVersion = readKiroEnvelopeVersion(jsonlText.split("\n"));
     } catch {
       // jsonl absent or unreadable — version stays undefined

@@ -124,10 +124,11 @@ AskUserQuestion, response, thinking; for the others, the equivalent set their
 parser handles.
 
 A regression test loads each fixture, runs the real provider parser, and asserts
-the resulting `ActivityEntry[]` (label / detail / body / type, and the captured
-`version`). This **pins the current shapes**: a later refactor or an encoded
-format change that breaks an old shape turns a test red instead of silently
-blanking a row.
+the resulting `ActivityEntry[]` (label / detail / body / type). This **pins the
+current shapes**: a later refactor or an encoded format change that breaks an old
+shape turns a test red instead of silently blanking a row. Version capture is
+verified separately by the per-provider discovery tests (Tasks 2–6), not by the
+corpus.
 
 ### 4. Convention for adding a branch (documented)
 
@@ -155,7 +156,7 @@ discoverSessions()
 parseSessionHistory() / provider parsers
   └─ produce ActivityEntry[]   (unchanged today; version param threaded only at first branch)
 
-tests/fixtures/parser/<provider>/*  ──►  provider parser  ──►  asserted ActivityEntry[] + version
+tests/fixtures/parser/<provider>/*  ──►  provider parser  ──►  asserted ActivityEntry[] (shapes only)
 ```
 
 ## Error handling

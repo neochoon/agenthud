@@ -71,6 +71,8 @@ export interface RunFollowOptions {
   intervalMs?: number;
   now?: () => number;
   write?: (line: string) => void;
+  /** One-shot: emit the seed backfill and return without streaming. */
+  once?: boolean;
 }
 
 /** The loop. Seeds cursors from `sinceMs`, then diffs every interval. */
@@ -100,6 +102,11 @@ export function runFollow(opts: RunFollowOptions): { stop: () => void } {
       write(fmt(e));
     }
   }
+
+  // One-shot: the seed is the whole output. Don't schedule the loop so the
+  // process exits naturally once stdout flushes (no `process.exit` that could
+  // truncate buffered output).
+  if (opts.once) return { stop: () => {} };
 
   const tick = () => {
     const snaps = buildSnapshots(discoverSessions(opts.config));

@@ -6,9 +6,10 @@
 - **agenthud follow**: a live merged event stream (activity + state +
   lifecycle) across all sessions and sub-agents, emitted chronologically as
   human lines or, with `--json`, NDJSON. The read-only substrate a
-  higher-level supervisor can consume. `--since now|<N>h|<N>m` controls
+  higher-level supervisor can consume. `--since now|<N>h|<N>m|<N>s` controls
   backfill; `--include TYPES` narrows the activity firehose (state/lifecycle
-  always pass). See [FEATURES.md](./FEATURES.md#follow).
+  always pass); `--once` emits the backfill and exits instead of streaming
+  (like `tail` vs `tail -f`). See [FEATURES.md](./FEATURES.md#follow).
 
 ## [0.19.0] - 2026-06-17
 

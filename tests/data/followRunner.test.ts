@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildSnapshots, runFollow } from "../../src/data/followRunner.js";
 import type {
   ActivityEntry,
@@ -113,6 +113,44 @@ describe("runFollow integration", () => {
     );
     expect(responses.length).toBeGreaterThanOrEqual(1);
     expect(responses[0]).toMatchObject({ project: "proj", provider: "claude" });
+  });
+
+  it("once: emits the seed then does not schedule the streaming interval", () => {
+    const lines: string[] = [];
+    const cfg = {
+      refreshIntervalMs: 99999,
+      hiddenSessions: [],
+      hiddenSubAgents: [],
+      filterPresets: [[]],
+      hiddenProjects: [],
+      report: {
+        include: [],
+        detailLimit: 0,
+        withGit: false,
+        format: "markdown" as const,
+      },
+      summary: {},
+    };
+    const spy = vi.spyOn(global, "setInterval");
+    const { stop } = runFollow({
+      config: cfg,
+      sinceMs: 1_000_000,
+      json: true,
+      include: null,
+      now: () => 3_000_000,
+      write: (l) => lines.push(l),
+      once: true,
+    });
+    // The seed (backfill) is still emitted...
+    expect(
+      lines.some(
+        (l) => (JSON.parse(l) as { label?: string }).label === "Response",
+      ),
+    ).toBe(true);
+    // ...but no streaming loop is scheduled.
+    expect(spy).not.toHaveBeenCalled();
+    stop(); // no-op, must be safe to call
+    spy.mockRestore();
   });
 });
 

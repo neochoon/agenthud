@@ -9,6 +9,9 @@
  *   └── <session-uuid>.json  full session state as ONE JSON document
  *                            (not JSONL) — history[], model, context
  *
+ * Version: captured onto SessionNode.version (see the parser
+ * version-drift spec, docs/superpowers/specs/2026-06-19-parser-version-drift-design.md).
+ *
  * Design decisions:
  * - Discovery iterates workspace dirs and reads each `sessions.json`
  *   index, then the per-session file for model/context/history. The

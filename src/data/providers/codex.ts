@@ -10,6 +10,9 @@
  * `response_item`. Full schema + jq verification commands in
  * docs/schemas/codex-session.md.
  *
+ * Version: captured onto SessionNode.version (see the parser
+ * version-drift spec, docs/superpowers/specs/2026-06-19-parser-version-drift-design.md).
+ *
  * Design decisions:
  * - Discovery walks the YYYY/MM/DD tree and parses each rollout for
  *   the few fields the tree needs (cwd, source/parent, model,

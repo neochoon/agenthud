@@ -1,6 +1,9 @@
 /**
  * opencode provider — sessions from opencode's SQLite store.
  *
+ * Version: captured onto SessionNode.version (see the parser
+ * version-drift spec, docs/superpowers/specs/2026-06-19-parser-version-drift-design.md).
+ *
  * Design decisions:
  * - Unlike every other provider (per-session JSON/JSONL files), opencode
  *   keeps all sessions in one SQLite DB. We open it READ-ONLY and query;

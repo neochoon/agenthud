@@ -4,6 +4,9 @@
  * via `KIRO_SESSIONS_DIR`) and translates them into the shared
  * `SessionTree` shape.
  *
+ * Version: captured onto SessionNode.version (see the parser
+ * version-drift spec, docs/superpowers/specs/2026-06-19-parser-version-drift-design.md).
+ *
  * Design decisions:
  * - Each session is a pair of files: `.json` is the metadata sidecar
  *   (`cwd`, `title`, `parent_session_id`, etc.) and `.jsonl` is the

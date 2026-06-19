@@ -5,6 +5,9 @@
  * `findContainingProject` for the `--cwd` scoping feature and
  * `decodeProjectPath` for reversing Claude's directory-name encoding.
  *
+ * Version: captured onto SessionNode.version (see the parser
+ * version-drift spec, docs/superpowers/specs/2026-06-19-parser-version-drift-design.md).
+ *
  * Design decisions:
  * - Project paths are encoded in directory names with hyphens
  *   replacing `/` (e.g., `/Users/neo/myproject` →

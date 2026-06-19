@@ -32,6 +32,7 @@ function setRoot() {
 
 afterEach(() => {
   vi.resetAllMocks();
+  clearCodexMetaCache();
   delete process.env.CODEX_SESSIONS_DIR;
 });
 
@@ -251,7 +252,6 @@ describe("codexProvider.discoverSessions", () => {
 
   it("captures cli_version onto SessionNode.version", () => {
     setRoot();
-    clearCodexMetaCache();
     mockTree({
       "rollout-2026-06-12T16-08-36-version-uuid.jsonl": rollout([
         metaLine({ id: "version-uuid" }),

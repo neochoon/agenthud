@@ -11,9 +11,8 @@ vi.mock("node:fs", () => ({
 const { existsSync, readdirSync, statSync, readFileSync } = await import(
   "node:fs"
 );
-const { codexProvider, parseCodexActivities } = await import(
-  "../../../src/data/providers/codex.js"
-);
+const { codexProvider, parseCodexActivities, clearCodexMetaCache } =
+  await import("../../../src/data/providers/codex.js");
 
 const NOW = 1_700_000_000_000;
 
@@ -248,6 +247,21 @@ describe("codexProvider.discoverSessions", () => {
     const tree = codexProvider.discoverSessions(mockConfig);
     expect(tree.projects).toHaveLength(0);
     expect(tree.totalCount).toBe(0);
+  });
+
+  it("captures cli_version onto SessionNode.version", () => {
+    setRoot();
+    clearCodexMetaCache();
+    mockTree({
+      "rollout-2026-06-12T16-08-36-version-uuid.jsonl": rollout([
+        metaLine({ id: "version-uuid" }),
+        userMsg("check the version"),
+      ]),
+    });
+    const tree = codexProvider.discoverSessions(mockConfig);
+    const node =
+      tree.projects[0]?.sessions[0] ?? tree.coldProjects[0]?.sessions[0];
+    expect(node?.version).toBe("0.121.0");
   });
 });
 

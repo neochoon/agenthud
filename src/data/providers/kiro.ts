@@ -126,6 +126,24 @@ function readMeta(jsonPath: string): KiroSessionMeta | null {
   }
 }
 
+/**
+ * Kiro CLI wraps each JSONL line in `{version, kind, data}`. `version`
+ * is a schema tag (`v1`), not semver. Returns the first envelope's tag,
+ * or undefined if none parse. Pure — unit-tested.
+ */
+export function readKiroEnvelopeVersion(lines: string[]): string | undefined {
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    try {
+      const env = JSON.parse(line);
+      if (typeof env.version === "string") return env.version;
+    } catch {
+      // skip
+    }
+  }
+  return undefined;
+}
+
 interface RawSession {
   id: string;
   hideKey: string;
@@ -138,6 +156,7 @@ interface RawSession {
   hasLock: boolean;
   modelId: string | null;
   contextUsage: { used: number; total: number; percent: number } | null;
+  version?: string;
 }
 
 function shortenModelId(raw: string): string {
@@ -229,6 +248,18 @@ function readRawSessions(
       typeof meta.title === "string" && meta.title.trim().length > 0
         ? meta.title
         : null;
+
+    // Read the .jsonl content to capture the envelope schema version.
+    // We already have the mtime from statSync above; this is the only
+    // additional read needed per session and the content is typically small.
+    let envelopeVersion: string | undefined;
+    try {
+      const jsonlText = readFileSync(jsonlPath, "utf-8");
+      envelopeVersion = readKiroEnvelopeVersion(jsonlText.split("\n"));
+    } catch {
+      // jsonl absent or unreadable — version stays undefined
+    }
+
     out.push({
       id,
       hideKey: `${projectName}/${id}`,
@@ -241,6 +272,7 @@ function readRawSessions(
       hasLock: existsSync(lockPath),
       modelId,
       contextUsage,
+      version: envelopeVersion,
     });
   }
   return out;
@@ -271,6 +303,7 @@ function toSessionNode(raw: RawSession, hidden: boolean): SessionNode {
     liveState,
     provider: "kiro",
     contextUsage: raw.contextUsage ?? undefined,
+    version: raw.version,
   };
   if (hidden) node.hidden = true;
   return node;

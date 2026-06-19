@@ -171,6 +171,24 @@ function parseLatestAssistant(dataJson: string): LatestAssistant | null {
   }
 }
 
+// --- schema version --------------------------------------------------------
+
+/**
+ * OpenCode's schema version = the latest applied migration id (the ids are
+ * timestamp-prefixed, so the lexical max is the newest). DB-wide; read once
+ * per discovery. Undefined when the table is absent or empty.
+ */
+function readSchemaVersion(db: SqliteDb): string | undefined {
+  try {
+    const row = db
+      .prepare("SELECT id FROM migration ORDER BY id DESC LIMIT 1")
+      .get() as { id?: string } | undefined;
+    return typeof row?.id === "string" ? row.id : undefined;
+  } catch {
+    return undefined; // table may not exist on older installs
+  }
+}
+
 // --- discovery -------------------------------------------------------------
 
 interface SessionRow {
@@ -186,6 +204,7 @@ function makeNode(
   row: SessionRow,
   latest: LatestAssistant | undefined,
   hidden: boolean,
+  schemaVersion: string | undefined,
 ): SessionNode {
   const projectName = basename(row.directory);
   const model = readModelId(row.model) ?? latest?.modelID ?? null;
@@ -203,6 +222,7 @@ function makeNode(
     firstUserPrompt: row.title || null,
     liveState: latest?.working ? "working" : null,
     provider: "opencode",
+    version: schemaVersion,
   };
   if (latest && latest.used > 0) {
     node.contextUsage = {
@@ -233,6 +253,8 @@ function discoverSessions(
   if (!db) return emptyTree();
 
   try {
+    const schemaVersion = readSchemaVersion(db);
+
     const rows = db
       .prepare(
         `SELECT id, parent_id, directory, title, model, time_updated
@@ -275,7 +297,7 @@ function discoverSessions(
       const hidden =
         config.hiddenProjects.includes(projectName) ||
         config.hiddenSessions.includes(`${projectName}/${row.id}`);
-      const node = makeNode(row, latestById.get(row.id), hidden);
+      const node = makeNode(row, latestById.get(row.id), hidden, schemaVersion);
       nodesById.set(row.id, node);
       if (hidden) {
         hiddenTotal++;
@@ -295,7 +317,7 @@ function discoverSessions(
       const hidden =
         config.hiddenProjects.includes(projectName) ||
         config.hiddenSubAgents.includes(`${projectName}/${row.id}`);
-      const node = makeNode(row, latestById.get(row.id), hidden);
+      const node = makeNode(row, latestById.get(row.id), hidden, schemaVersion);
       node.agentId = row.id;
       node.taskDescription = row.title || undefined;
       if (hidden) {

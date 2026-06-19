@@ -56,7 +56,13 @@ function buildDb(): void {
       time_created INTEGER, data TEXT);
     CREATE TABLE part (id TEXT PRIMARY KEY, message_id TEXT, session_id TEXT,
       time_created INTEGER, data TEXT);
+    CREATE TABLE migration (id TEXT, time_completed INTEGER);
   `);
+
+  db.exec(
+    "INSERT INTO migration (id, time_completed) VALUES " +
+      "('20260101000000_init', 1), ('20260605042240_add_context_epoch_agent', 2)",
+  );
 
   const ins = db.prepare("INSERT INTO session VALUES (?,?,?,?,?,?,?,?,?)");
   ins.run(
@@ -213,6 +219,12 @@ describe.skipIf(!sqliteAvailable)("opencodeProvider", () => {
     expect(acts[1].label).toBe("read");
     expect(acts[1].detail).toBe("file.ts");
     expect(acts[3].detail).toBe("Here is the answer");
+  });
+
+  it("stamps the latest migration id as the session version", () => {
+    const tree = opencodeProvider.discoverSessions(config);
+    const top = tree.projects[0].sessions.find((s) => s.id === "ses_top");
+    expect(top?.version).toBe("20260605042240_add_context_epoch_agent");
   });
 
   it("skips a single malformed part instead of blanking the timeline", () => {

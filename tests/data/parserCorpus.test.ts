@@ -18,13 +18,14 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { parseActivitiesFromLines } from "../../src/data/providers/claude-activity.js";
 import { parseCodexActivities } from "../../src/data/providers/codex.js";
 import { parseKiroActivitiesFromLines } from "../../src/data/providers/kiro-activity.js";
 import { parseActivities as parseOpencode } from "../../src/data/providers/opencode.js";
 
-const FIX = join(__dirname, "..", "fixtures", "parser");
+const FIX = fileURLToPath(new URL("../fixtures/parser", import.meta.url));
 
 const lines = (rel: string): string[] =>
   readFileSync(join(FIX, rel), "utf8").split("\n").filter(Boolean);

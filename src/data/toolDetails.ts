@@ -35,6 +35,13 @@
 
 import { basename } from "node:path";
 
+export interface AskQuestion {
+  question?: string;
+  header?: string;
+  multiSelect?: boolean;
+  options?: { label?: string; description?: string }[];
+}
+
 export interface ToolInput {
   command?: string;
   file_path?: string;
@@ -47,6 +54,8 @@ export interface ToolInput {
   subject?: string;
   taskId?: string;
   status?: string;
+  // AskUserQuestion: one or more questions, each with selectable options.
+  questions?: AskQuestion[];
 }
 
 interface PatchHunk {
@@ -168,6 +177,21 @@ export function summarizeToolDetail(
     return input?.subject ?? "";
   }
 
+  if (name === "AskUserQuestion") {
+    const qs = input?.questions;
+    if (!qs || qs.length === 0) return "";
+    if (qs.length === 1) return qs[0].question ?? qs[0].header ?? "";
+    // Multiple questions: a count plus each question's compact header
+    // (falling back to its full text when no header was provided).
+    // Drop blank labels so a malformed question can't leave a dangling
+    // " · " separator.
+    const labels = qs
+      .map((q) => q.header ?? q.question ?? "")
+      .filter(Boolean)
+      .join(" · ");
+    return `${qs.length} questions: ${labels}`;
+  }
+
   return getToolDetail(name, input);
 }
 
@@ -207,11 +231,36 @@ function formatBashBody(
   return sections.join("\n\n");
 }
 
+/**
+ * Render AskUserQuestion's questions + options for the TUI detail view:
+ *   Q: <question> (multi-select)
+ *     ○ <label> — <description>
+ * Questions are separated by a blank line. Returns null when there is
+ * nothing to show so the caller falls back to the one-liner only.
+ */
+function formatAskBody(questions: AskQuestion[] | undefined): string | null {
+  if (!questions || questions.length === 0) return null;
+  const blocks = questions.map((q) => {
+    const head = `Q: ${q.question ?? q.header ?? ""}${q.multiSelect ? " (multi-select)" : ""}`;
+    const opts = (q.options ?? []).map(
+      (o) =>
+        `  ○ ${o.label ?? ""}${o.description ? ` — ${o.description}` : ""}`,
+    );
+    return [head, ...opts].join("\n");
+  });
+  return blocks.join("\n\n");
+}
+
 export function buildToolDetailBody(
   name: string,
   input: ToolInput | undefined,
   result: ToolUseResult | undefined,
 ): { text: string; kind: "diff" | "code"; numbered?: boolean } | null {
+  if (name === "AskUserQuestion") {
+    const text = formatAskBody(input?.questions);
+    if (text) return { text, kind: "code" };
+    return null;
+  }
   // Write intentionally shows the written file content (more useful to read
   // than an all-additions diff); the row summary still uses patch stats.
   if (name === "Write") {

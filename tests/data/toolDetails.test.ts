@@ -157,6 +157,78 @@ describe("summarizeToolDetail", () => {
       "foo",
     );
   });
+
+  it("AskUserQuestion: single question shows the question text", () => {
+    expect(
+      summarizeToolDetail(
+        "AskUserQuestion",
+        {
+          questions: [
+            {
+              question: "Which library should we use?",
+              header: "Library",
+              options: [{ label: "A" }, { label: "B" }],
+            },
+          ],
+        },
+        undefined,
+      ),
+    ).toBe("Which library should we use?");
+  });
+
+  it("AskUserQuestion: multiple questions show count + headers", () => {
+    expect(
+      summarizeToolDetail(
+        "AskUserQuestion",
+        {
+          questions: [
+            { question: "Q1?", header: "Auth" },
+            { question: "Q2?", header: "Storage" },
+          ],
+        },
+        undefined,
+      ),
+    ).toBe("2 questions: Auth · Storage");
+  });
+
+  it("AskUserQuestion: multi falls back to question when a header is missing", () => {
+    expect(
+      summarizeToolDetail(
+        "AskUserQuestion",
+        {
+          questions: [{ question: "First?" }, { header: "Second" }],
+        },
+        undefined,
+      ),
+    ).toBe("2 questions: First? · Second");
+  });
+
+  it("AskUserQuestion: single question with only a header uses the header", () => {
+    expect(
+      summarizeToolDetail(
+        "AskUserQuestion",
+        { questions: [{ header: "Approach" }] },
+        undefined,
+      ),
+    ).toBe("Approach");
+  });
+
+  it("AskUserQuestion: multi drops blank labels (no dangling separator)", () => {
+    expect(
+      summarizeToolDetail(
+        "AskUserQuestion",
+        { questions: [{ header: "Auth" }, {}] },
+        undefined,
+      ),
+    ).toBe("2 questions: Auth");
+  });
+
+  it("AskUserQuestion: no questions yields empty detail", () => {
+    expect(
+      summarizeToolDetail("AskUserQuestion", { questions: [] }, undefined),
+    ).toBe("");
+    expect(summarizeToolDetail("AskUserQuestion", {}, undefined)).toBe("");
+  });
 });
 
 describe("buildToolDetailBody", () => {
@@ -408,5 +480,55 @@ describe("buildToolDetailBody", () => {
         stdout: "should not be used",
       } as unknown as never),
     ).toBeNull();
+  });
+
+  it("AskUserQuestion: renders each question with its options", () => {
+    const body = buildToolDetailBody(
+      "AskUserQuestion",
+      {
+        questions: [
+          {
+            question: "Which library?",
+            header: "Library",
+            options: [
+              { label: "A", description: "the first" },
+              { label: "B", description: "the second" },
+            ],
+          },
+        ],
+      },
+      undefined,
+    );
+    expect(body?.kind).toBe("code");
+    expect(body?.text).toBe(
+      "Q: Which library?\n  ○ A — the first\n  ○ B — the second",
+    );
+  });
+
+  it("AskUserQuestion: marks multi-select and separates questions", () => {
+    const body = buildToolDetailBody(
+      "AskUserQuestion",
+      {
+        questions: [
+          {
+            question: "Pick features",
+            multiSelect: true,
+            options: [{ label: "X" }],
+          },
+          { question: "Pick one", options: [{ label: "Y" }] },
+        ],
+      },
+      undefined,
+    );
+    expect(body?.text).toBe(
+      "Q: Pick features (multi-select)\n  ○ X\n\nQ: Pick one\n  ○ Y",
+    );
+  });
+
+  it("AskUserQuestion: no questions returns null", () => {
+    expect(
+      buildToolDetailBody("AskUserQuestion", { questions: [] }, undefined),
+    ).toBeNull();
+    expect(buildToolDetailBody("AskUserQuestion", {}, undefined)).toBeNull();
   });
 });

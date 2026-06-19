@@ -2,7 +2,7 @@
  * Application bootstrap. Loads `~/.agenthud/config.yaml`, parses
  * argv, runs the legacy-config migration check, and dispatches
  * to one of: watch (interactive TUI), once (snapshot), report,
- * or summary.
+ * summary, or follow (headless event stream).
  *
  * Design decisions:
  * - Global config is loaded *before* `parseArgs` so the CLI parser
@@ -220,45 +220,83 @@ if (options.mode === "summary") {
   process.exit(exitCode);
 }
 
-let scopeToProject: string | undefined;
-if (options.scopeToCwd) {
-  const projectsDir = getProjectsDir();
-  let registered: string[] = [];
-  try {
-    registered = (readdirSync(projectsDir) as string[]).map(decodeProjectPath);
-  } catch {
-    // projects dir missing or unreadable — treated as "no match"
+if (options.mode === "follow") {
+  if (options.followError) {
+    process.stderr.write(`agenthud: ${options.followError}\n`);
+    process.exit(2);
   }
-  const safeReal = (p: string): string => {
-    try {
-      return realpathSync(p);
-    } catch {
-      return p;
-    }
-  };
-  const match = findContainingProject(process.cwd(), registered, {
-    realpath: safeReal,
+  const { parseSince } = await import("./data/followSince.js");
+  const { runFollow } = await import("./data/followRunner.js");
+  const since = parseSince(options.followSince, Date.now());
+  if ("error" in since) {
+    process.stderr.write(`agenthud: ${since.error}\n`);
+    process.exit(2);
+  }
+  const include = options.followInclude?.length
+    ? new Set(options.followInclude)
+    : null;
+  const { stop } = runFollow({
+    config: globalConfig,
+    sinceMs: since.sinceMs,
+    json: !!options.followJson,
+    include,
   });
-  if (!match) {
-    process.stderr.write(
-      `agenthud: --cwd: no Claude project found at or above ${process.cwd()}\n`,
-    );
-    process.exit(1);
+  const shutdown = () => {
+    stop();
+    process.exit(0);
+  };
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+  process.stdout.on("error", () => process.exit(0)); // EPIPE on `| head`
+  // Keep the event loop alive on the interval; do not fall through to Ink.
+} else {
+  runWatchOrOnce();
+}
+
+function runWatchOrOnce(): void {
+  const mode = options.mode === "once" ? "once" : "watch";
+  let scopeToProject: string | undefined;
+  if (options.scopeToCwd) {
+    const projectsDir = getProjectsDir();
+    let registered: string[] = [];
+    try {
+      registered = (readdirSync(projectsDir) as string[]).map(
+        decodeProjectPath,
+      );
+    } catch {
+      // projects dir missing or unreadable — treated as "no match"
+    }
+    const safeReal = (p: string): string => {
+      try {
+        return realpathSync(p);
+      } catch {
+        return p;
+      }
+    };
+    const match = findContainingProject(process.cwd(), registered, {
+      realpath: safeReal,
+    });
+    if (!match) {
+      process.stderr.write(
+        `agenthud: --cwd: no Claude project found at or above ${process.cwd()}\n`,
+      );
+      process.exit(1);
+    }
+    scopeToProject = match;
+    process.stderr.write(`scope = ${match}\n`);
   }
-  scopeToProject = match;
-  process.stderr.write(`scope = ${match}\n`);
-}
 
-if (options.mode === "watch") {
-  // Switch to the alternate screen buffer so quitting restores the user's
-  // pre-launch shell instead of leaving the rendered tree behind. The
-  // cleanup hooks ensure we exit alt-screen on q, Ctrl+C, SIGTERM, and
-  // uncaught errors.
-  installAltScreenCleanup();
-  enterAltScreen();
-}
-// Non-watch modes (--once, report, summary) render in place at the
-// cursor so the user's existing scrollback is preserved — like any
-// CLI utility.
+  if (mode === "watch") {
+    // Switch to the alternate screen buffer so quitting restores the user's
+    // pre-launch shell instead of leaving the rendered tree behind. The
+    // cleanup hooks ensure we exit alt-screen on q, Ctrl+C, SIGTERM, and
+    // uncaught errors.
+    installAltScreenCleanup();
+    enterAltScreen();
+  }
+  // Non-watch modes (--once, report, summary) render in place at the
+  // cursor so the user's existing scrollback is preserved — like any
+  // CLI utility.
 
-render(React.createElement(App, { mode: options.mode, scopeToProject }));
+  render(React.createElement(App, { mode, scopeToProject }));
+}

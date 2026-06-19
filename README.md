@@ -13,6 +13,7 @@ It's organized as **three layers, by who's reading** — a human at a glance, a 
 - **`agenthud`** — **the live HUD.** A real-time TUI showing which session is `[working]` versus `[waiting]` on you, right now, across every agent. Glance at it in a side terminal and know what all your agents are doing. *This is the hero — the name is HUD for a reason.*
 - **`agenthud summary`** — **the daily digest.** Fold a day (or a week) into an LLM engineering summary — a standup-in-one-command habit, via whichever agent CLI you have installed (claude, codex, or kiro-cli, auto-detected).
 - **`agenthud report`** — **the machine layer.** Structured Markdown / JSON. `summary` is literally `report` piped into an agent CLI, so the daily digest isn't a black box — and you can pipe `report` into anything else, too.
+- **`agenthud follow`** — **the live machine feed.** A chronologically-merged stream of every event (activity + state + lifecycle) across all sessions and sub-agents, as human lines or `--json` NDJSON — the read-only substrate a higher-level supervisor can consume. See [FEATURES.md](./FEATURES.md#follow).
 
 → **See [FEATURES.md](./FEATURES.md) for the full surface** — every flag, keybinding, config key, file path, and env var. Per-agent session schemas: [Claude Code](./docs/schemas/claude-session.md) · [Codex CLI](./docs/schemas/codex-session.md) · [Kiro IDE](./docs/schemas/kiro-ide-session.md) · [Kiro CLI](./docs/schemas/kiro-session.md) · [opencode](./docs/schemas/opencode-session.md) (or browse [docs/schemas/](./docs/schemas/)).
 

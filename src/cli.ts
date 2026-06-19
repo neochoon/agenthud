@@ -43,7 +43,7 @@ const ALL_TYPES = [
 ];
 
 export interface CliOptions {
-  mode: "watch" | "once" | "report" | "summary";
+  mode: "watch" | "once" | "report" | "summary" | "follow";
   command?: "version" | "help";
   error?: string;
   reportDate?: Date;
@@ -74,6 +74,12 @@ export interface CliOptions {
   summaryOpenIndex?: boolean;
   summaryError?: string;
   scopeToCwd?: boolean;
+
+  // follow
+  followSince?: string; // raw --since spec
+  followJson?: boolean;
+  followInclude?: string[];
+  followError?: string;
 }
 
 const KNOWN_WATCH_FLAGS = new Set([
@@ -113,7 +119,8 @@ const KNOWN_SUMMARY_FLAGS = new Set([
   "-I",
   "--open-index",
 ]);
-const KNOWN_SUBCOMMANDS = new Set(["watch", "report", "summary"]);
+const KNOWN_FOLLOW_FLAGS = new Set(["--since", "--json", "--include"]);
+const KNOWN_SUBCOMMANDS = new Set(["watch", "report", "summary", "follow"]);
 
 export function getHelp(): string {
   return `Usage: agenthud [command] [options]
@@ -177,6 +184,15 @@ Commands:
     -I, --open-index            Launch ~/.agenthud/summaries/index.md
                                 in your OS default app. Combinable with
                                 -o (e.g. -oI opens both).
+
+  follow [--since SPEC] [--json] [--include TYPES]
+                                Stream live agent events (activity +
+                                state + lifecycle) across all sessions
+                                and sub-agents, merged chronologically.
+    --since now|<N>h|<N>m       Where to start (default: now)
+    --json                      Emit NDJSON instead of human lines
+    --include TYPES             Filter activity types (comma list; same
+                                vocabulary as report's --include)
 
   Defaults for report and summary live under \`report:\` and \`summary:\`
   in ~/.agenthud/config.yaml. Flags override config values per-run; the
@@ -654,6 +670,70 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
       summaryOpen,
       summaryOpenIndex,
       summaryError,
+    };
+  }
+
+  if (args[0] === "follow") {
+    const rest = args.slice(1);
+    let followSince: string | undefined;
+    let followJson: boolean | undefined;
+    let followInclude: string[] | undefined;
+    let followError: string | undefined;
+
+    const FLAGS_WITH_VALUE = new Set(["--since", "--include"]);
+    for (let i = 0; i < rest.length; i++) {
+      const arg = rest[i];
+      if (!arg.startsWith("-")) continue;
+      if (!KNOWN_FOLLOW_FLAGS.has(arg)) {
+        followError = `Unknown option: "${arg}". Run agenthud --help for usage.`;
+        break;
+      }
+      if (FLAGS_WITH_VALUE.has(arg)) i++;
+    }
+
+    const sinceIdx = rest.indexOf("--since");
+    if (sinceIdx !== -1) {
+      const val = rest[sinceIdx + 1];
+      if (!val) {
+        followError = followError ?? "Invalid --since: missing value.";
+      } else {
+        followSince = val;
+      }
+    }
+
+    if (rest.includes("--json")) followJson = true;
+
+    const includeIdx = rest.indexOf("--include");
+    if (includeIdx !== -1) {
+      const includeStr = rest[includeIdx + 1];
+      if (!includeStr) {
+        followError = followError ?? "Invalid --include: missing value.";
+      } else if (includeStr === "all") {
+        followInclude = ALL_TYPES;
+      } else {
+        const tokens = includeStr
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+        const unknown = tokens.filter((t) => !ALL_TYPES.includes(t));
+        if (unknown.length > 0) {
+          followError =
+            followError ??
+            `Unknown --include type${unknown.length > 1 ? "s" : ""}: ${unknown
+              .map((u) => `"${u}"`)
+              .join(", ")}. Valid types: ${ALL_TYPES.join(", ")} (or "all").`;
+        } else {
+          followInclude = tokens;
+        }
+      }
+    }
+
+    return {
+      mode: "follow",
+      followSince,
+      followJson,
+      followInclude,
+      followError,
     };
   }
 

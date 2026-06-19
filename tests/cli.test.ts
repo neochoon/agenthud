@@ -625,6 +625,36 @@ describe("parseArgs", () => {
       });
     });
   });
+
+  describe("follow subcommand", () => {
+    it("returns follow mode by default", () => {
+      const opts = parseArgs(["follow"]);
+      expect(opts.mode).toBe("follow");
+      expect(opts.followError).toBeUndefined();
+    });
+
+    it("parses --json and --since", () => {
+      const opts = parseArgs(["follow", "--json", "--since", "2h"]);
+      expect(opts.mode).toBe("follow");
+      expect(opts.followJson).toBe(true);
+      expect(opts.followSince).toBe("2h");
+    });
+
+    it("parses --include into a token list", () => {
+      const opts = parseArgs(["follow", "--include", "bash,edit"]);
+      expect(opts.followInclude).toEqual(["bash", "edit"]);
+    });
+
+    it("rejects an unknown --include type", () => {
+      const opts = parseArgs(["follow", "--include", "bash,bogus"]);
+      expect(opts.followError).toBeDefined();
+    });
+
+    it("sets followError on an unknown flag", () => {
+      const opts = parseArgs(["follow", "--bogus"]);
+      expect(opts.followError).toBeDefined();
+    });
+  });
 });
 
 describe("formatEffectiveOptionsLine", () => {
@@ -671,5 +701,9 @@ describe("getHelp", () => {
 
   it("mentions config path", () => {
     expect(getHelp()).toContain("~/.agenthud/config.yaml");
+  });
+
+  it("documents the follow subcommand", () => {
+    expect(getHelp()).toContain("follow");
   });
 });

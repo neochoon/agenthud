@@ -10,6 +10,9 @@
  * `response_item`. Full schema + jq verification commands in
  * docs/schemas/codex-session.md.
  *
+ * Version: captured onto SessionNode.version (see the parser
+ * version-drift spec, docs/superpowers/specs/2026-06-19-parser-version-drift-design.md).
+ *
  * Design decisions:
  * - Discovery walks the YYYY/MM/DD tree and parses each rollout for
  *   the few fields the tree needs (cwd, source/parent, model,
@@ -88,6 +91,7 @@ interface CodexRecord {
     parent_thread_id?: string;
     agent_role?: string;
     agent_nickname?: string;
+    cli_version?: string;
     // turn_context
     model?: string;
     // event_msg / user_message
@@ -115,6 +119,7 @@ interface CodexMeta {
   model: string | null;
   title: string | null;
   contextUsage: { used: number; total: number; percent: number } | null;
+  version?: string;
 }
 
 // Parse cache keyed by (path, mtime). Cold rollout files never
@@ -144,6 +149,7 @@ function parseMeta(path: string, mtimeMs: number): CodexMeta | null {
     let isSubagent = false;
     let parentThreadId: string | null = null;
     let model: string | null = null;
+    let cliVersion: string | null = null;
     const userMessages: string[] = [];
     let contextUsage: CodexMeta["contextUsage"] = null;
 
@@ -163,6 +169,7 @@ function parseMeta(path: string, mtimeMs: number): CodexMeta | null {
         cwd = typeof p.cwd === "string" ? p.cwd : null;
         parentThreadId =
           typeof p.parent_thread_id === "string" ? p.parent_thread_id : null;
+        cliVersion = typeof p.cli_version === "string" ? p.cli_version : null;
         // source: "cli" (top-level) vs { subagent: ... } (sub-agent)
         isSubagent =
           typeof p.source === "object" &&
@@ -202,6 +209,7 @@ function parseMeta(path: string, mtimeMs: number): CodexMeta | null {
         model,
         title: pickLatestUserTitle(userMessages, isEnvContext),
         contextUsage,
+        version: cliVersion ?? undefined,
       };
     }
   } catch {
@@ -258,6 +266,7 @@ function makeNode(
     liveState: null,
     provider: "codex",
     contextUsage: meta.contextUsage ?? undefined,
+    version: meta.version,
   };
   if (hidden) node.hidden = true;
   return node;

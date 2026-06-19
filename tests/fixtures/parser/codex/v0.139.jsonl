@@ -1,0 +1,6 @@
+{"type":"session_meta","timestamp":"2026-06-19T00:00:00Z","payload":{"id":"sess-abc123","cwd":"/projects/myapp","source":"cli","cli_version":"0.139.0"}}
+{"type":"turn_context","timestamp":"2026-06-19T00:00:01Z","payload":{"model":"gpt-4o"}}
+{"type":"event_msg","timestamp":"2026-06-19T00:00:02Z","payload":{"type":"user_message","message":"Fix the broken tests in the auth module"}}
+{"type":"response_item","timestamp":"2026-06-19T00:00:03Z","payload":{"type":"function_call","name":"exec_command","arguments":"{\"cmd\":\"npm test -- auth\"}"}}
+{"type":"event_msg","timestamp":"2026-06-19T00:00:04Z","payload":{"type":"agent_message","message":"I've run the tests and fixed the failing assertions in the auth module."}}
+{"type":"response_item","timestamp":"2026-06-19T00:00:05Z","payload":{"type":"function_call","name":"spawn_agent","arguments":"{\"message\":\"Review the auth module changes for security issues\"}"}}

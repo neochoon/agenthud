@@ -4,6 +4,9 @@
  * via `KIRO_SESSIONS_DIR`) and translates them into the shared
  * `SessionTree` shape.
  *
+ * Version: captured onto SessionNode.version (see the parser
+ * version-drift spec, docs/superpowers/specs/2026-06-19-parser-version-drift-design.md).
+ *
  * Design decisions:
  * - Each session is a pair of files: `.json` is the metadata sidecar
  *   (`cwd`, `title`, `parent_session_id`, etc.) and `.jsonl` is the
@@ -35,7 +38,15 @@
  *   for the Claude provider — useful for tests and mounted volumes.
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+  readSync,
+  statSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import type {
@@ -126,6 +137,56 @@ function readMeta(jsonPath: string): KiroSessionMeta | null {
   }
 }
 
+/**
+ * Kiro CLI wraps each JSONL line in `{version, kind, data}`. `version`
+ * is a schema tag (`v1`), not semver. Returns the first envelope's tag,
+ * or undefined if none parse. Pure — unit-tested.
+ */
+export function readKiroEnvelopeVersion(lines: string[]): string | undefined {
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    try {
+      const env = JSON.parse(line);
+      if (typeof env.version === "string") return env.version;
+    } catch {
+      // skip
+    }
+  }
+  return undefined;
+}
+
+// 8 KB covers hundreds of JSONL lines — more than enough to land the
+// first envelope in any real session, while keeping discovery O(const)
+// per file regardless of how large the session grows.
+const ENVELOPE_HEAD_BYTES = 8192;
+
+// Read at most ENVELOPE_HEAD_BYTES from the start of a JSONL file.
+// Falls back to a full readFileSync for small files (≤ threshold) so
+// the unit tests — which mock readFileSync — stay on the plain path.
+function readJsonlHead(filePath: string): string {
+  let size: number;
+  try {
+    size = statSync(filePath).size;
+  } catch {
+    return "";
+  }
+  if (size <= ENVELOPE_HEAD_BYTES) {
+    try {
+      return readFileSync(filePath, "utf-8");
+    } catch {
+      return "";
+    }
+  }
+  const fd = openSync(filePath, "r");
+  try {
+    const buf = Buffer.alloc(ENVELOPE_HEAD_BYTES);
+    const n = readSync(fd, buf, 0, ENVELOPE_HEAD_BYTES, 0);
+    return buf.toString("utf-8", 0, n);
+  } finally {
+    closeSync(fd);
+  }
+}
+
 interface RawSession {
   id: string;
   hideKey: string;
@@ -138,6 +199,7 @@ interface RawSession {
   hasLock: boolean;
   modelId: string | null;
   contextUsage: { used: number; total: number; percent: number } | null;
+  version?: string;
 }
 
 function shortenModelId(raw: string): string {
@@ -229,6 +291,18 @@ function readRawSessions(
       typeof meta.title === "string" && meta.title.trim().length > 0
         ? meta.title
         : null;
+
+    // Bounded head-read: only the first JSONL line is needed for the
+    // envelope version tag — no reason to load the full (potentially
+    // large) session file during discovery.
+    let envelopeVersion: string | undefined;
+    try {
+      const jsonlText = readJsonlHead(jsonlPath);
+      envelopeVersion = readKiroEnvelopeVersion(jsonlText.split("\n"));
+    } catch {
+      // jsonl absent or unreadable — version stays undefined
+    }
+
     out.push({
       id,
       hideKey: `${projectName}/${id}`,
@@ -241,6 +315,7 @@ function readRawSessions(
       hasLock: existsSync(lockPath),
       modelId,
       contextUsage,
+      version: envelopeVersion,
     });
   }
   return out;
@@ -271,6 +346,7 @@ function toSessionNode(raw: RawSession, hidden: boolean): SessionNode {
     liveState,
     provider: "kiro",
     contextUsage: raw.contextUsage ?? undefined,
+    version: raw.version,
   };
   if (hidden) node.hidden = true;
   return node;

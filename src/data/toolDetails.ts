@@ -18,6 +18,13 @@
  * - Task's body is intentionally exposed to the markdown report
  *   (see `reportGenerator.ts:formatTaskBody`). Other tools'
  *   bodies stay TUI-only to keep LLM payload size bounded.
+ * - Tool shapes can drift across provider versions. When a row goes
+ *   blank/wrong after a CLI upgrade, follow the version-gated-branch
+ *   convention in
+ *   docs/superpowers/specs/2026-06-19-parser-version-drift-design.md:
+ *   add a synthetic fixture for the new shape, then branch on the
+ *   session's `version` (thread the param here at that point). Keep the
+ *   old fixture — old logs must still parse.
  *
  * Gotchas:
  * - Claude Code's JSONL stores tool results in a `toolUseResult`

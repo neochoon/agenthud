@@ -11,7 +11,9 @@ vi.mock("node:fs", () => ({
 const { existsSync, readdirSync, statSync, readFileSync } = await import(
   "node:fs"
 );
-const { kiroProvider } = await import("../../../src/data/providers/kiro.js");
+const { kiroProvider, readKiroEnvelopeVersion } = await import(
+  "../../../src/data/providers/kiro.js"
+);
 
 const NOW = 1_700_000_000_000;
 
@@ -435,6 +437,46 @@ describe("kiroProvider.discoverSessions", () => {
     expect(tree.projects[0].sessions[0].liveState).toBe("waiting");
   });
 
+  it("stamps node.version from the first jsonl envelope version tag", () => {
+    const id = "ver11111-vvvv-vvvv-vvvv-vvvvvvvvvvvv";
+
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockReturnValue([
+      `${id}.json`,
+      `${id}.jsonl`,
+    ] as unknown as ReturnType<typeof readdirSync>);
+    vi.mocked(statSync).mockImplementation(
+      () =>
+        ({
+          isDirectory: () => false,
+          mtimeMs: NOW - 60_000,
+          size: 100,
+        }) as ReturnType<typeof statSync>,
+    );
+    vi.mocked(readFileSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path.endsWith(".json")) {
+        return JSON.stringify({
+          session_id: id,
+          cwd: "/Users/neo/p",
+          title: "t",
+          parent_session_id: null,
+        });
+      }
+      if (path.endsWith(".jsonl")) {
+        return [
+          JSON.stringify({ version: "v1", kind: "Prompt", data: {} }),
+          JSON.stringify({ version: "v1", kind: "AssistantMessage", data: {} }),
+        ].join("\n");
+      }
+      return "";
+    });
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+
+    const tree = kiroProvider.discoverSessions(mockConfig);
+    expect(tree.projects[0].sessions[0].version).toBe("v1");
+  });
+
   it("respects hiddenSessions config (marks but keeps in tree)", () => {
     const id = "eee55555-eeee-eeee-eeee-eeeeeeeeeeee";
 
@@ -471,5 +513,21 @@ describe("kiroProvider.discoverSessions", () => {
     expect(tree.projects[0].sessions[0].hidden).toBe(true);
     expect(tree.hiddenStats.total).toBe(1);
     expect(tree.hiddenStats.active).toBe(1);
+  });
+});
+
+describe("readKiroEnvelopeVersion", () => {
+  it("returns the first envelope's version tag", () => {
+    const lines = [
+      JSON.stringify({ version: "v1", kind: "Prompt", data: {} }),
+      JSON.stringify({ version: "v1", kind: "AssistantMessage", data: {} }),
+    ];
+    expect(readKiroEnvelopeVersion(lines)).toBe("v1");
+  });
+  it("returns undefined when no line carries a version", () => {
+    expect(
+      readKiroEnvelopeVersion([JSON.stringify({ kind: "Prompt" })]),
+    ).toBeUndefined();
+    expect(readKiroEnvelopeVersion(["nope"])).toBeUndefined();
   });
 });

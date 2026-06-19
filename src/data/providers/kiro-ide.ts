@@ -9,6 +9,9 @@
  *   └── <session-uuid>.json  full session state as ONE JSON document
  *                            (not JSONL) — history[], model, context
  *
+ * Version: captured onto SessionNode.version (see the parser
+ * version-drift spec, docs/superpowers/specs/2026-06-19-parser-version-drift-design.md).
+ *
  * Design decisions:
  * - Discovery iterates workspace dirs and reads each `sessions.json`
  *   index, then the per-session file for model/context/history. The
@@ -31,6 +34,10 @@
  *   them from execution files.
  *
  * Gotchas:
+ * - `version` is best-effort: no version/schema field was observed in
+ *   Kiro IDE session JSON on the dev host, so SessionNode.version is
+ *   usually undefined for this provider. The read is wired so it lights
+ *   up automatically if a future Kiro IDE build adds the field.
  * - `contextUsagePercentage` is a percent with no window size in
  *   the file. `used`/`total` are synthesized against an assumed
  *   200K window (Kiro CLI reports 200_000 for the same models);
@@ -120,6 +127,7 @@ interface IdeSessionFile {
   selectedModel?: unknown;
   contextUsagePercentage?: number | null;
   history?: IdeHistoryEntry[];
+  version?: string;
 }
 
 // Kiro CLI reports context_window_tokens: 200000 for the same
@@ -185,6 +193,7 @@ function toNode(
     liveState: null,
     provider: "kiro-ide",
     contextUsage,
+    version: typeof file?.version === "string" ? file.version : undefined,
   };
   if (hidden) node.hidden = true;
   return node;

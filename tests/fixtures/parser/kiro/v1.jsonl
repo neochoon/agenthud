@@ -1,0 +1,3 @@
+{"version":"v1","kind":"Prompt","data":{"message_id":"msg-1","content":[{"kind":"text","data":"Refactor the database connection pool"}],"meta":{"timestamp":1750291200}}}
+{"version":"v1","kind":"AssistantMessage","data":{"message_id":"msg-2","content":[{"kind":"text","data":"I'll refactor the connection pool for better reliability."},{"kind":"toolUse","data":{"toolUseId":"tu-1","name":"read","input":{"path":"/src/db/pool.ts"}}}]}}
+{"version":"v1","kind":"AssistantMessage","data":{"message_id":"msg-3","content":[{"kind":"toolUse","data":{"toolUseId":"tu-2","name":"edit","input":{"file_path":"/src/db/pool.ts","content":"new content"}}},{"kind":"text","data":"The connection pool has been refactored with retry logic."}]}}

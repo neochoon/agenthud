@@ -457,6 +457,56 @@ describe("kiroIdeProvider sub-agents from execution files", () => {
   });
 });
 
+describe("kiroIdeProvider.discoverSessions – version field", () => {
+  /**
+   * Helper: mock the minimum filesystem for a single-session
+   * workspace using the given session-JSON overrides, then return the
+   * first discovered SessionNode (or null if none).
+   */
+  function sessionFrom(overrides: Record<string, unknown> = {}) {
+    setRoot();
+    const wsDir = join(ROOT, WS_B64);
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readdirSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path === ROOT)
+        return [WS_B64] as unknown as ReturnType<typeof readdirSync>;
+      if (path === wsDir)
+        return ["sessions.json", "ide-1111.json"] as unknown as ReturnType<
+          typeof readdirSync
+        >;
+      return [] as unknown as ReturnType<typeof readdirSync>;
+    });
+    vi.mocked(statSync).mockImplementation(
+      (p) =>
+        ({
+          isDirectory: () => !String(p).endsWith(".json"),
+          mtimeMs: NOW - 60_000,
+          size: 100,
+        }) as ReturnType<typeof statSync>,
+    );
+    vi.mocked(readFileSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path.endsWith("sessions.json")) return indexJson();
+      if (path.endsWith("ide-1111.json")) return sessionJson(overrides);
+      return "";
+    });
+    vi.spyOn(Date, "now").mockReturnValue(NOW);
+    const tree = kiroIdeProvider.discoverSessions(mockConfig);
+    return tree.projects[0]?.sessions[0] ?? null;
+  }
+
+  it("captures a version field from the session JSON when present", () => {
+    const node = sessionFrom({ version: "ide-3" });
+    expect(node?.version).toBe("ide-3");
+  });
+
+  it("leaves version undefined when the JSON has no version field", () => {
+    const node = sessionFrom();
+    expect(node?.version).toBeUndefined();
+  });
+});
+
 describe("parseKiroIdeActivities", () => {
   it("maps history user/assistant entries to activities", () => {
     const lines = sessionJson().split("\n");

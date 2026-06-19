@@ -37,6 +37,15 @@ export interface SessionNode {
   hidden?: boolean; // true when matched by hiddenSessions/hiddenSubAgents, or descendant of a hidden project
   provider?: "claude" | "kiro" | "kiro-ide" | "codex" | "opencode"; // origin source of this node. Renderer uses it for a small per-row label so users can tell at a glance which CLI created the session.
   /**
+   * Origin CLI/schema version of this session, captured per provider:
+   * claude per-line `version` (`2.1.148`), codex `session_meta.cli_version`
+   * (`0.139.0`), kiro envelope `version` (`v1`), opencode latest `migration`
+   * id, kiro-ide best-effort. An OPAQUE, provider-defined string — do not
+   * assume semver in shared code (see src/data/version.ts). Undefined when
+   * the source is absent. The seam for version-gated parsing of format drift.
+   */
+  version?: string;
+  /**
    * Most-recent context-window usage observed for this session.
    * `percent` is the fraction-of-window (0..100) the renderer shows
    * as a small colored gauge so users can spot sessions approaching

@@ -30,9 +30,6 @@
  * - `CLAUDE_PROJECTS_DIR` env var overrides the default
  *   `~/.claude/projects` location — useful for backups or mounted
  *   volumes. Read once at module load via `getProjectsDir()`.
- * - Imports `ONE_HOUR_MS` / `THIRTY_MINUTES_MS` from
- *   `ui/constants.ts` — same layer-violation note as
- *   `sessionLiveness.ts`.
  */
 
 import {
@@ -54,7 +51,7 @@ import type {
   SessionStatus,
   SessionTree,
 } from "../../types/index.js";
-import { ONE_HOUR_MS, THIRTY_MINUTES_MS } from "../../ui/constants.js";
+import { ONE_HOUR_MS, THIRTY_MINUTES_MS } from "../../utils/timeConstants.js";
 import { detectLiveState } from "../sessionLiveness.js";
 import { parseActivitiesFromLines, parseModelName } from "./claude-activity.js";
 import type { DiscoverOptions, SessionProvider } from "./types.js";

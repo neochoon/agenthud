@@ -57,7 +57,7 @@ import type {
   SessionStatus,
   SessionTree,
 } from "../../types/index.js";
-import { ONE_HOUR_MS, THIRTY_MINUTES_MS } from "../../ui/constants.js";
+import { ONE_HOUR_MS, THIRTY_MINUTES_MS } from "../../utils/timeConstants.js";
 import { parseKiroActivitiesFromLines } from "./kiro-activity.js";
 import { pickLatestUserTitle } from "./sessionTitle.js";
 import type { DiscoverOptions, SessionProvider } from "./types.js";

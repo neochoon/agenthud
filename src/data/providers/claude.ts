@@ -138,6 +138,7 @@ const tailCache: Memo<{
   modelName: string | null;
   liveState: LiveState | null;
   contextUsage: { used: number; total: number; percent: number } | null;
+  version: string | undefined;
 }> = new Map();
 const promptCache: Memo<string | null> = new Map();
 const entrypointCache: Memo<string | null> = new Map();
@@ -165,6 +166,25 @@ export function clearClaudeFileCaches(): void {
   promptCache.clear();
   entrypointCache.clear();
   subAgentInfoCache.clear();
+}
+
+/**
+ * The session's representative version = the version of the LAST tail
+ * entry that carries one. Claude stamps `version` on every message
+ * entry; a long session that spanned a CLI upgrade reports its latest.
+ * Returns undefined when no entry has a version. Pure — unit-tested.
+ */
+export function readClaudeVersion(tailLines: string[]): string | undefined {
+  let version: string | undefined;
+  for (const line of tailLines) {
+    try {
+      const entry = JSON.parse(line);
+      if (typeof entry.version === "string") version = entry.version;
+    } catch {
+      // skip non-JSON lines
+    }
+  }
+  return version;
 }
 
 /** Test hook: total entries across the per-file caches (bound check). */
@@ -304,6 +324,7 @@ function readSessionTail(
   modelName: string | null;
   liveState: LiveState | null;
   contextUsage: { used: number; total: number; percent: number } | null;
+  version: string | undefined;
 } {
   // `isSubAgent` is a fixed property of the file's location (the
   // subagents/ dir), so it never varies for a given path.
@@ -321,9 +342,15 @@ function computeSessionTail(
   modelName: string | null;
   liveState: LiveState | null;
   contextUsage: { used: number; total: number; percent: number } | null;
+  version: string | undefined;
 } {
   if (!existsSync(filePath))
-    return { modelName: null, liveState: null, contextUsage: null };
+    return {
+      modelName: null,
+      liveState: null,
+      contextUsage: null,
+      version: undefined,
+    };
   try {
     const content = readTailText(filePath, TAIL_READ_BYTES);
     const tail = content.trim().split("\n").filter(Boolean).slice(-50);
@@ -372,9 +399,15 @@ function computeSessionTail(
       modelName,
       liveState: detectLiveState(tail, mtimeMs, now, isSubAgent),
       contextUsage,
+      version: readClaudeVersion(tail),
     };
   } catch {
-    return { modelName: null, liveState: null, contextUsage: null };
+    return {
+      modelName: null,
+      liveState: null,
+      contextUsage: null,
+      version: undefined,
+    };
   }
 }
 
@@ -525,12 +558,13 @@ function buildSubAgents(
             filePath,
             stat.mtimeMs,
           );
-          const { modelName, liveState, contextUsage } = readSessionTail(
-            filePath,
-            stat.mtimeMs,
-            Date.now(),
-            true, // sub-agent: a yielded turn means done, not waiting
-          );
+          const { modelName, liveState, contextUsage, version } =
+            readSessionTail(
+              filePath,
+              stat.mtimeMs,
+              Date.now(),
+              true, // sub-agent: a yielded turn means done, not waiting
+            );
           return {
             id,
             hideKey,
@@ -548,6 +582,7 @@ function buildSubAgents(
             liveState,
             provider: "claude",
             contextUsage: contextUsage ?? undefined,
+            version,
           };
         } catch {
           return null;
@@ -673,7 +708,7 @@ export function discoverSessions(
         const subAgents = buildSubAgents(id, projectDir, config, projectName);
         const nonInteractive =
           readEntrypoint(filePath, stat.mtimeMs) === "sdk-cli";
-        const { modelName, liveState, contextUsage } = readSessionTail(
+        const { modelName, liveState, contextUsage, version } = readSessionTail(
           filePath,
           stat.mtimeMs,
           Date.now(),
@@ -693,6 +728,7 @@ export function discoverSessions(
           liveState: nonInteractive ? null : liveState,
           provider: "claude",
           contextUsage: contextUsage ?? undefined,
+          version,
         });
       } catch {}
     }

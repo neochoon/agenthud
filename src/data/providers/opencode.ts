@@ -35,7 +35,7 @@ import type {
   SessionTree,
 } from "../../types/index.js";
 import { ICONS } from "../../types/index.js";
-import { ONE_HOUR_MS, THIRTY_MINUTES_MS } from "../../ui/constants.js";
+import { ONE_HOUR_MS, THIRTY_MINUTES_MS } from "../../utils/timeConstants.js";
 import type { DiscoverOptions, ParseResult, SessionProvider } from "./types.js";
 
 export const OPENCODE_PATH_PREFIX = "opencode:";

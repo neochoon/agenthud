@@ -11,19 +11,6 @@ surfaced during reviews.
 
 ## Quality / refactors
 
-### data → ui layer violation: time constants
-
-`src/data/sessions.ts` and `src/data/sessionLiveness.ts` import
-`THIRTY_MINUTES_MS` / `ONE_HOUR_MS` from `src/ui/constants.ts`.
-Flagged in the file headers of all four files. Time constants
-shouldn't live in the UI layer — move them to
-`src/utils/timeConstants.ts` (or onto `types/index.ts` alongside
-`ICONS`).
-
-- **Effort:** ~30 min. Pure mechanical move + update imports.
-- **When:** Any quiet PR window. Doesn't gate anything.
-- **Risk:** None — name-only change, no behavior shift.
-
 ### Viewer cursor: track by activity index, not screen row
 
 `viewerCursorLine` (`src/ui/App.tsx:424`) is a screen-row index
@@ -184,6 +171,9 @@ place (we have those now).
 These were discussed and decided against — kept here briefly so the
 decisions don't get re-litigated:
 
+- **data → ui layer violation: time constants** — done 2026-06-20
+  (#192). The four time constants moved from `ui/constants.ts` to
+  `src/utils/timeConstants.ts`; the six data-layer importers repointed.
 - **`o` key to open file in detail view** — declined 2026-06-09.
   Reasons: detail view is "inspection mode" not "actor", race
   with concurrent Claude edits, default-app association is

@@ -22,13 +22,10 @@
  * - Returns `null` outside the 30-minute recency window;
  *   upstream falls back to the time-based `[hot/warm/cool/cold]`
  *   ladder.
- * - Imports `THIRTY_MINUTES_MS` from `ui/constants.ts` — a known
- *   data → ui layer violation. Should move to `utils/` or a
- *   shared time-constants module on a future refactor.
  */
 
 import type { LiveState } from "../types/index.js";
-import { THIRTY_MINUTES_MS } from "../ui/constants.js";
+import { THIRTY_MINUTES_MS } from "../utils/timeConstants.js";
 
 interface ContentBlock {
   type?: string;

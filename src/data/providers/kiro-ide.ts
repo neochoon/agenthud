@@ -61,7 +61,7 @@ import type {
   SessionTree,
 } from "../../types/index.js";
 import { ICONS } from "../../types/index.js";
-import { ONE_HOUR_MS, THIRTY_MINUTES_MS } from "../../ui/constants.js";
+import { ONE_HOUR_MS, THIRTY_MINUTES_MS } from "../../utils/timeConstants.js";
 import { pickLatestUserTitle } from "./sessionTitle.js";
 import type { ParseContext, ParseResult, SessionProvider } from "./types.js";
 

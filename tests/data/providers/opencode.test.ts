@@ -216,7 +216,8 @@ describe.skipIf(!sqliteAvailable)("opencodeProvider", () => {
       "response",
     ]);
     expect(acts[0].detail).toBe("Explain repo");
-    expect(acts[1].label).toBe("read");
+    expect(acts[1].label).toBe("Read"); // canonicalized from raw "read"
+    expect(acts[1].icon).toBe("○"); // ICONS.Read, not the default glyph
     expect(acts[1].detail).toBe("file.ts");
     expect(acts[3].detail).toBe("Here is the answer");
   });
@@ -275,7 +276,33 @@ describe("opencode parseActivities (pure)", () => {
     ];
     const { activities } = parseActivities(lines);
     expect(activities.map((a) => a.type)).toEqual(["user", "thinking", "tool"]); // step-start skipped
-    expect(activities[2].label).toBe("bash");
+    expect(activities[2].label).toBe("Bash"); // canonicalized from raw "bash"
+    expect(activities[2].icon).toBe("$"); // ICONS.Bash
     expect(activities[2].detail).toBe("ls");
+  });
+
+  it("canonicalizes known tools and keeps unknown (MCP) tools as-is", () => {
+    const mk = (tool: string) =>
+      JSON.stringify({
+        role: "assistant",
+        t: 1000,
+        part: { type: "tool", tool, state: { title: "x" } },
+      });
+    const { activities } = parseActivities([
+      mk("read"),
+      mk("grep"),
+      mk("glob"),
+      mk("webfetch"),
+      mk("mcp_acme_doThing"), // uncatalogued → preserved verbatim
+    ]);
+    expect(activities.map((a) => a.label)).toEqual([
+      "Read",
+      "Grep",
+      "Glob",
+      "WebFetch",
+      "mcp_acme_doThing",
+    ]);
+    // Unknown tool still gets a printable icon, not a blank.
+    expect(activities[4].icon).toBe("$"); // ICONS.Default
   });
 });

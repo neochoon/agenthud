@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Fixed
+
 - **opencode tool labels** are now canonicalized (`read` → `Read`, `grep` →
   `Grep`, …) and carry per-tool icons, matching the claude/kiro providers
   instead of surfacing raw lowercase names with the default glyph. The

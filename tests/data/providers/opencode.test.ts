@@ -277,7 +277,10 @@ describe("opencode parseActivities (pure)", () => {
     const { activities } = parseActivities(lines);
     expect(activities.map((a) => a.type)).toEqual(["user", "thinking", "tool"]); // step-start skipped
     expect(activities[2].label).toBe("Bash"); // canonicalized from raw "bash"
-    expect(activities[2].icon).toBe("$"); // ICONS.Bash
+    // "$" is ICONS.Bash, which equals ICONS.Default by design — icons aren't
+    // unique per label (Glob/Grep both "*", etc.). Distinctive-icon coverage
+    // lives in the canonicalization test below.
+    expect(activities[2].icon).toBe("$");
     expect(activities[2].detail).toBe("ls");
   });
 
@@ -294,6 +297,7 @@ describe("opencode parseActivities (pure)", () => {
       mk("glob"),
       mk("webfetch"),
       mk("mcp_acme_doThing"), // uncatalogued → preserved verbatim
+      mk("__proto__"), // prototype key must not return an inherited value
     ]);
     expect(activities.map((a) => a.label)).toEqual([
       "Read",
@@ -301,8 +305,14 @@ describe("opencode parseActivities (pure)", () => {
       "Glob",
       "WebFetch",
       "mcp_acme_doThing",
+      "__proto__",
     ]);
-    // Unknown tool still gets a printable icon, not a blank.
-    expect(activities[4].icon).toBe("$"); // ICONS.Default
+    // Distinctive per-tool icons prove the mapping (not just the default glyph).
+    expect(activities[0].icon).toBe("○"); // ICONS.Read
+    expect(activities[3].icon).toBe("@"); // ICONS.WebFetch
+    // Unknown and prototype-key labels fall back to a printable default,
+    // never an inherited Object.prototype value.
+    expect(activities[4].icon).toBe("$"); // ICONS.Default (MCP tool)
+    expect(activities[5].icon).toBe("$"); // ICONS.Default (__proto__ guarded)
   });
 });

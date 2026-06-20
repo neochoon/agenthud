@@ -63,7 +63,11 @@ export function canonicalToolLabel(raw: string): string {
 /** Icon for a canonical label. Canonical labels match the keys of the
  * shared ICONS table, so this is a straight lookup; anything we don't
  * recognize (a passed-through raw tool name) falls back to
- * `ICONS.Default` — still a printable glyph, not blank. */
+ * `ICONS.Default` — still a printable glyph, not blank. `Object.hasOwn`
+ * guards against a pass-through label like `__proto__`/`constructor`
+ * resolving an inherited prototype value instead of `ICONS.Default`. */
 export function iconForCanonicalLabel(label: string): string {
-  return (ICONS as Record<string, string>)[label] ?? ICONS.Default;
+  return Object.hasOwn(ICONS, label)
+    ? (ICONS as Record<string, string>)[label]
+    : ICONS.Default;
 }

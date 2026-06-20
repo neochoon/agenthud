@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **opencode tool labels** are now canonicalized (`read` → `Read`, `grep` →
+  `Grep`, …) and carry per-tool icons, matching the claude/kiro providers
+  instead of surfacing raw lowercase names with the default glyph. The
+  provider-agnostic `canonicalToolLabel` / `iconForCanonicalLabel` helpers in
+  `toolLabels.ts` are now shared by kiro and opencode.
+
 ### Added
 - **agenthud follow**: a live merged event stream (activity + state +
   lifecycle) across all sessions and sub-agents, emitted chronologically as

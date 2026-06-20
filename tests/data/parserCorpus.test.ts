@@ -99,7 +99,7 @@ describe("parser corpus: opencode parts", () => {
       [
         "User:Add error handling to the API client",
         "Thinking:I should wrap the fetch calls in try/catch blocks.",
-        "read:/src/api/client.ts",
+        "Read:/src/api/client.ts",
         "Response:I've added error handling to the API client.",
       ]
     `);

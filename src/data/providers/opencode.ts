@@ -36,6 +36,7 @@ import type {
 } from "../../types/index.js";
 import { ICONS } from "../../types/index.js";
 import { ONE_HOUR_MS, THIRTY_MINUTES_MS } from "../../utils/timeConstants.js";
+import { canonicalToolLabel, iconForCanonicalLabel } from "./toolLabels.js";
 import type { DiscoverOptions, ParseResult, SessionProvider } from "./types.js";
 
 export const OPENCODE_PATH_PREFIX = "opencode:";
@@ -455,12 +456,12 @@ export function parseActivities(lines: string[]): ParseResult {
         break;
       }
       case "tool": {
-        const tool = part.tool ?? "tool";
+        const label = canonicalToolLabel(part.tool ?? "tool");
         activities.push({
           timestamp: ts,
           type: "tool",
-          icon: ICONS.Default,
-          label: tool,
+          icon: iconForCanonicalLabel(label),
+          label,
           detail: part.state?.title ?? "",
         });
         break;

@@ -791,7 +791,13 @@ describe("viewer search → Enter opens Detail View", () => {
     ];
 
     const { stdin, lastFrame } = render(<App mode="watch" />);
-    await tick();
+    // Activities load asynchronously; wait for the viewer to render them before
+    // interacting. A fixed tick is race-prone under CI load (the search would
+    // have nothing to match, so Enter closes search without opening detail).
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("auth.ts"), {
+      timeout: 3000,
+      interval: 25,
+    });
     stdin.write("\t"); // focus tree → viewer
     await tick();
     stdin.write("/"); // open viewer search
@@ -800,6 +806,13 @@ describe("viewer search → Enter opens Detail View", () => {
       stdin.write(ch); // type char-by-char (ink delivers each as length-1 input)
       await tick();
     }
+    // Wait until the search input reports exactly one match (`/auth   1/1`)
+    // before pressing Enter, so Enter is guaranteed to navigate to the match
+    // rather than firing while hits are still being computed.
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1/1"), {
+      timeout: 3000,
+      interval: 25,
+    });
     stdin.write("\r"); // Enter → open the matched activity's Detail View
 
     // The Detail View renders the matched activity's body — the bug was that

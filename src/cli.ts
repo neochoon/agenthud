@@ -144,6 +144,13 @@ Commands:
                                 the current directory. Exits 1 if no
                                 such project is found.
 
+  TUI keybindings (detail view):
+    /                           Open search — jump to first match,
+                                matches highlighted
+    n / N                       Next / previous match
+    Esc                         Close search, stay in detail view
+    ↑↓/jk, Ctrl+U/D            Scroll; ↵/Esc/q to close detail
+
   report [--date DATE] [--include TYPES] [--format FORMAT]
          [--detail-limit N] [--with-git]
                                 Print activity report for a date

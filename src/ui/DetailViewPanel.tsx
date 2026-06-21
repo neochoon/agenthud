@@ -41,6 +41,7 @@ import {
   getLineStyle,
   type LineCategory,
 } from "./lineColoring.js";
+import { matchRanges } from "./search/matcher.js";
 
 export function wrapText(text: string, maxWidth: number): string[] {
   if (!text) return ["(empty)"];
@@ -150,6 +151,63 @@ export interface DetailViewPanelProps {
   width: number;
   visibleRows: number;
   scrollOffset: number;
+  /** Non-empty string activates in-line match highlighting. */
+  searchQuery?: string;
+  /** Index into the raw source lines that is the active (current) match.
+   * The panel scrolls to keep this line in the visible window. */
+  activeMatchLine?: number | null;
+}
+
+/** Render a line with matched substrings highlighted via inverse video.
+ * The active match line uses a yellow background; other matched lines use
+ * inverse. Falls through to a plain `<Text>` when no ranges match. */
+function renderHighlightedLine(
+  text: string,
+  query: string,
+  isActiveLine: boolean,
+  lineColor: string | undefined,
+  lineDimColor: boolean | undefined,
+): React.ReactElement {
+  const ranges = matchRanges(text, query);
+  if (ranges.length === 0) {
+    return (
+      <Text color={lineColor} dimColor={lineDimColor}>
+        {text}
+      </Text>
+    );
+  }
+  const parts: React.ReactElement[] = [];
+  let cursor = 0;
+  for (let r = 0; r < ranges.length; r++) {
+    const { start, end } = ranges[r];
+    if (cursor < start) {
+      parts.push(
+        <Text key={`pre-${r}`} color={lineColor} dimColor={lineDimColor}>
+          {text.slice(cursor, start)}
+        </Text>,
+      );
+    }
+    parts.push(
+      isActiveLine ? (
+        <Text key={`match-${r}`} backgroundColor="yellow" color="black">
+          {text.slice(start, end)}
+        </Text>
+      ) : (
+        <Text key={`match-${r}`} inverse>
+          {text.slice(start, end)}
+        </Text>
+      ),
+    );
+    cursor = end;
+  }
+  if (cursor < text.length) {
+    parts.push(
+      <Text key="tail" color={lineColor} dimColor={lineDimColor}>
+        {text.slice(cursor)}
+      </Text>,
+    );
+  }
+  return <>{parts}</>;
 }
 
 export function DetailViewPanel({
@@ -157,6 +215,8 @@ export function DetailViewPanel({
   width,
   visibleRows,
   scrollOffset,
+  searchQuery = "",
+  activeMatchLine = null,
 }: DetailViewPanelProps): React.ReactElement {
   const innerWidth = getInnerWidth(width);
   const contentWidth = innerWidth - 1;
@@ -174,17 +234,76 @@ export function DetailViewPanel({
     activity.detailKind === "diff" ||
     activity.detailKind === "code" ||
     activity.type === "commit";
-  const allLines = wrapClassified(
-    body,
-    contentWidth,
-    classifier,
-    preserveWhitespace,
-  );
+
+  // Build wrapped lines annotated with the source line index so we can
+  // scroll the active match into view without a second scroll system.
+  const sourceLines = (body ?? "").split("\n");
+  const categories = classifier(sourceLines);
+  const allLines: Array<{
+    text: string;
+    category: LineCategory;
+    sourceLineIdx: number;
+  }> = [];
+  if (!body) {
+    allLines.push({ text: "(empty)", category: "prose", sourceLineIdx: 0 });
+  } else {
+    for (let si = 0; si < sourceLines.length; si++) {
+      const line = sourceLines[si];
+      const cat = categories[si] ?? "prose";
+      if (!line) {
+        allLines.push({ text: "", category: cat, sourceLineIdx: si });
+        continue;
+      }
+      if (preserveWhitespace) {
+        for (const chunk of hardWrapByWidth(line, contentWidth)) {
+          allLines.push({ text: chunk, category: cat, sourceLineIdx: si });
+        }
+      } else {
+        const words = line.split(" ");
+        let current = "";
+        for (const word of words) {
+          if (!current) {
+            current = word;
+          } else if (getDisplayWidth(`${current} ${word}`) <= contentWidth) {
+            current += ` ${word}`;
+          } else {
+            allLines.push({ text: current, category: cat, sourceLineIdx: si });
+            current = word;
+          }
+        }
+        if (current)
+          allLines.push({ text: current, category: cat, sourceLineIdx: si });
+      }
+    }
+    if (allLines.length === 0)
+      allLines.push({ text: "(empty)", category: "prose", sourceLineIdx: 0 });
+  }
+
   const totalLines = allLines.length;
-  const clampedOffset = Math.min(
+
+  // If there is an active match, find the first rendered line for that source
+  // line and snap the scroll offset so it appears in the visible window.
+  let effectiveOffset = Math.min(
     scrollOffset,
     Math.max(0, totalLines - visibleRows),
   );
+  if (activeMatchLine !== null && activeMatchLine !== undefined) {
+    const renderedIdx = allLines.findIndex(
+      (l) => l.sourceLineIdx === activeMatchLine,
+    );
+    if (renderedIdx !== -1) {
+      // Scroll up if active match is above the window.
+      if (renderedIdx < effectiveOffset) effectiveOffset = renderedIdx;
+      // Scroll down if active match is below the window.
+      if (renderedIdx >= effectiveOffset + visibleRows)
+        effectiveOffset = Math.min(
+          renderedIdx,
+          Math.max(0, totalLines - visibleRows),
+        );
+    }
+  }
+
+  const clampedOffset = effectiveOffset;
   const visibleSlice = allLines.slice(
     clampedOffset,
     clampedOffset + visibleRows,
@@ -209,22 +328,49 @@ export function DetailViewPanel({
 
   const contentRows: React.ReactElement[] = [];
   for (let i = 0; i < visibleRows; i++) {
-    const entry = visibleSlice[i] ?? { text: "", category: "prose" as const };
+    const entry = visibleSlice[i] ?? {
+      text: "",
+      category: "prose" as const,
+      sourceLineIdx: -1,
+    };
     const padding = Math.max(0, contentWidth - getDisplayWidth(entry.text));
     const lineStyle = getLineStyle(entry.category);
     const gutterSplit = activity.detailNumbered
       ? splitLineNumberGutter(entry.text)
       : null;
+    const isActiveLine =
+      searchQuery !== "" &&
+      activeMatchLine !== null &&
+      activeMatchLine !== undefined &&
+      entry.sourceLineIdx === activeMatchLine;
     contentRows.push(
       <Text key={i}>
         {BOX.v}{" "}
         {gutterSplit ? (
           <>
             <Text dimColor>{gutterSplit[0]}</Text>
-            <Text color={lineStyle.color} dimColor={lineStyle.dimColor}>
-              {gutterSplit[1]}
-            </Text>
+            {searchQuery ? (
+              renderHighlightedLine(
+                gutterSplit[1],
+                searchQuery,
+                isActiveLine,
+                lineStyle.color,
+                lineStyle.dimColor,
+              )
+            ) : (
+              <Text color={lineStyle.color} dimColor={lineStyle.dimColor}>
+                {gutterSplit[1]}
+              </Text>
+            )}
           </>
+        ) : searchQuery ? (
+          renderHighlightedLine(
+            entry.text,
+            searchQuery,
+            isActiveLine,
+            lineStyle.color,
+            lineStyle.dimColor,
+          )
         ) : (
           <Text color={lineStyle.color} dimColor={lineStyle.dimColor}>
             {entry.text}

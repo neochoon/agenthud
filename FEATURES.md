@@ -475,6 +475,9 @@ the `?` overlay renders in-app.
 |---|---|
 | `↑` `↓` / `k` `j` | Scroll |
 | `↵` / `Esc` / `q` | Close |
+| `/` | Open search — type to jump to first match; matches highlighted |
+| `n` / `N` | Next / previous match (while search is open) |
+| `Esc` | Close search, stay in detail view |
 
 ### Always available
 

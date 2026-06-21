@@ -76,6 +76,9 @@ const SECTIONS: HelpSection[] = [
     rows: [
       ["↑ ↓ / k j", "Scroll"],
       ["↵ / Esc / q", "Close"],
+      ["/", "Open search (jump to first match; body unchanged)"],
+      ["n / N", "Next / previous match (while search is open)"],
+      ["Esc", "Close search (stay in detail view)"],
     ],
   },
   {

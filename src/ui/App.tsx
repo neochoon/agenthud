@@ -73,7 +73,16 @@ import { useHotkeys } from "./hooks/useHotkeys.js";
 import { useSpinner } from "./hooks/useSpinner.js";
 import { useTick } from "./hooks/useTick.js";
 import { SessionTreePanel } from "./SessionTreePanel.js";
+import { detailMatchLines } from "./search/detailMatches.js";
+import { SearchInput } from "./search/SearchInput.js";
 import { adjustViewerCursorOnNewActivities } from "./viewerCursor.js";
+
+type SearchSurface = "tree" | "viewer" | "detail";
+interface SearchState {
+  surface: SearchSurface;
+  query: string;
+  index: number; // current match index (detail: line-match #; lists: selected match row)
+}
 
 const VIEWER_HEIGHT_FRACTION = 0.55;
 
@@ -668,6 +677,9 @@ export function App({
   // `discoverSessions` always carries hidden items + their `hidden`
   // marks so toggling can flip the view instantly without a refetch.
   const [showHidden, setShowHidden] = useState(false);
+
+  // In-pane search state. null = search closed.
+  const [search, setSearch] = useState<SearchState | null>(null);
 
   // Tree as the renderer sees it. Defaults to the hidden-stripped
   // view; flips to the full source tree when `showHidden` is on.
@@ -1483,13 +1495,54 @@ export function App({
     onQuit: exit,
     onFilter: () => setFilterIndex((i) => (i + 1) % filterPresets.length),
     filterLabel,
-    // TODO(Task 3): replace these stubs with real search state
-    searchActive: false,
-    onOpenSearch: () => {},
-    onSearchKey: () => {},
+    searchActive: search !== null,
+    onOpenSearch: () => {
+      const surface: SearchSurface = detailMode ? "detail" : focus;
+      setSearch({ surface, query: "", index: 0 });
+    },
+    onSearchKey: (input, key) => {
+      setSearch((s) => {
+        if (!s) return s;
+        if (key.escape) return null; // cancel
+        if (s.surface === "detail") {
+          if (key.return || input === "n") return { ...s, index: s.index + 1 };
+          if (input === "N") return { ...s, index: s.index - 1 };
+        }
+        if (key.delete || key.backspace)
+          return { ...s, query: s.query.slice(0, -1) };
+        if (input && !key.ctrl && input.length === 1)
+          return { ...s, query: s.query + input, index: 0 };
+        return s;
+      });
+    },
   });
 
   useInput((input, key) => handleInput(input, key), { isActive: isWatchMode });
+
+  // Detail search: derive the raw source lines from the active detail body
+  // (split by \n, before wrapping) so detailMatchLines can index into them.
+  const detailRawLines = useMemo(() => {
+    if (!detailActivity) return [];
+    const body = detailActivity.detailBody ?? detailActivity.detail ?? "";
+    return body.split("\n");
+  }, [detailActivity]);
+
+  const detailHits = useMemo(
+    () =>
+      search?.surface === "detail" && search.query
+        ? detailMatchLines(detailRawLines, search.query)
+        : [],
+    [search, detailRawLines],
+  );
+
+  // Wrap index into the valid match range (modular arithmetic, handles negatives).
+  const detailCurrentLine =
+    detailHits.length > 0
+      ? detailHits[
+          (((search?.index ?? 0) % detailHits.length) + detailHits.length) %
+            detailHits.length
+        ]
+      : null;
 
   const rawSelected = allFlat.find((s) => s.id === selectedId);
   // For project sentinels, resolve to the project's hottest session so the
@@ -1561,7 +1614,22 @@ export function App({
             items = items.slice(1);
             shortcuts = items.join(sep);
           }
-          return (
+          return search ? (
+            <Box marginBottom={1} width={width}>
+              <SearchInput
+                query={search.query}
+                total={search.surface === "detail" ? detailHits.length : 0}
+                current={
+                  detailHits.length
+                    ? (((search.index % detailHits.length) +
+                        detailHits.length) %
+                        detailHits.length) +
+                      1
+                    : 0
+                }
+              />
+            </Box>
+          ) : (
             <Box marginBottom={1} justifyContent="space-between" width={width}>
               <Text dimColor>{showBranding ? branding : ""}</Text>
               <Text dimColor>{shortcuts}</Text>
@@ -1610,6 +1678,8 @@ export function App({
                 scrollOffset={detailScrollOffset}
                 visibleRows={viewerRows}
                 width={width}
+                searchQuery={search?.surface === "detail" ? search.query : ""}
+                activeMatchLine={detailCurrentLine}
               />
             ) : (
               <ActivityViewerPanel

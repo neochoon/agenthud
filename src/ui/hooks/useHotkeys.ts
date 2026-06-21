@@ -198,6 +198,10 @@ export function useHotkeys({
     }
 
     if (detailMode) {
+      if (input === "/" && !key.ctrl) {
+        onOpenSearch();
+        return;
+      }
       if (key.ctrl && input === "u") {
         onDetailScrollHalfPageUp();
         return;

@@ -81,10 +81,10 @@ describe("applyDetailSearchKey — detail surface", () => {
     expect(r).toMatchObject({ query: "fnc", committed: false, index: 0 });
   });
 
-  it("after commit backspace edits query and un-commits", () => {
+  it("after commit backspace edits query and un-commits, resetting index to 0", () => {
     const s = committed("fn", 3);
     const r = applyDetailSearchKey(s, "", { backspace: true });
-    expect(r).toMatchObject({ query: "f", committed: false });
+    expect(r).toMatchObject({ query: "f", committed: false, index: 0 });
   });
 
   it("after commit Return is a no-op (already committed)", () => {

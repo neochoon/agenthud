@@ -194,9 +194,9 @@ describe("scrollOffsetForCursor", () => {
     expect(scrollOffsetForCursor(100, 99, 20)).toBe(0);
   });
 
-  it("returns 0 when hit is within the live window", () => {
+  it("returns a non-zero within-window offset when hit is near (but not at) the live edge", () => {
     // hitIndex = 85 in a 100-item list with viewerRows = 20
-    // raw = 14; max = 80; 14 <= 80 → 14
+    // raw = 100 - 1 - 85 = 14; max = max(0, 100 - 20) = 80; 14 <= 80 → 14
     expect(scrollOffsetForCursor(100, 85, 20)).toBe(14);
   });
 

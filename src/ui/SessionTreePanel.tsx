@@ -1123,11 +1123,23 @@ export function SessionTreePanel({
     return false;
   });
 
-  // Compute scrollTop so the selected tail row stays visible.
+  // When search is active, anchor the scroll window on the search hit
+  // (searchHitId) so the highlighted row stays on-screen, rather than
+  // the regular selection which may be elsewhere.
+  const searchHitRestIndex =
+    searchHitId !== undefined
+      ? restRows.findIndex(
+          (row) => row.kind === "session" && row.session.id === searchHitId,
+        )
+      : -1;
+  const anchorRestIndex =
+    searchHitRestIndex >= 0 ? searchHitRestIndex : selectedRestIndex;
+
+  // Compute scrollTop so the anchor tail row stays visible.
   const treeVisibleCount = Math.max(1, visibleCount - pinnedRows.length);
   let scrollTop = 0;
-  if (restTotal > treeVisibleCount && selectedRestIndex >= 0) {
-    scrollTop = Math.max(0, selectedRestIndex - treeVisibleCount + 1);
+  if (restTotal > treeVisibleCount && anchorRestIndex >= 0) {
+    scrollTop = Math.max(0, anchorRestIndex - treeVisibleCount + 1);
     scrollTop = Math.min(scrollTop, Math.max(0, restTotal - treeVisibleCount));
   }
 

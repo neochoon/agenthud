@@ -691,5 +691,26 @@ describe("useHotkeys", () => {
       act(() => result.current.handleInput("/", noopKey));
       expect(onOpenSearch).toHaveBeenCalledTimes(1);
     });
+
+    it("'/' opens search while detailMode is active", () => {
+      // The detailMode block returns early before reaching the main-section
+      // '/' handler, so this test verifies the fix that adds '/' interception
+      // inside the detailMode block itself.
+      const onOpenSearch = vi.fn();
+      const onDetailClose = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(
+          makeOptions({
+            detailMode: true,
+            searchActive: false,
+            onOpenSearch,
+            onDetailClose,
+          }),
+        ),
+      );
+      act(() => result.current.handleInput("/", noopKey));
+      expect(onOpenSearch).toHaveBeenCalledTimes(1);
+      expect(onDetailClose).not.toHaveBeenCalled();
+    });
   });
 });

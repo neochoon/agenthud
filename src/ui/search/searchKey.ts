@@ -43,8 +43,15 @@ export function applyDetailSearchKey(
   if (key.escape) return null;
 
   // Backspace / delete: remove last character, return to uncommitted.
+  // Reset index to 0 so the display jumps to the first match in the
+  // shorter query — the old index is stale after a character is removed.
   if (key.backspace || key.delete) {
-    return { ...state, query: state.query.slice(0, -1), committed: false };
+    return {
+      ...state,
+      query: state.query.slice(0, -1),
+      committed: false,
+      index: 0,
+    };
   }
 
   // Enter: commit if not yet committed; no-op if already committed.

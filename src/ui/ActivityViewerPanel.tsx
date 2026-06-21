@@ -350,8 +350,17 @@ export function ActivityViewerPanel({
         </Text>,
       );
     } else {
-      for (let i = 0; i < searchHits.length; i++) {
-        const actIdx = searchHits[i];
+      // Window the hit list so the selected hit stays visible within
+      // `visibleRows`. Mirror the normal render path's slice logic.
+      const windowStart = Math.max(
+        0,
+        Math.min(safeSelected, searchHits.length - visibleRows),
+      );
+      const windowEnd = Math.min(searchHits.length, windowStart + visibleRows);
+      const windowedHits = searchHits.slice(windowStart, windowEnd);
+      for (let wi = 0; wi < windowedHits.length; wi++) {
+        const i = windowStart + wi; // global hit index
+        const actIdx = windowedHits[wi];
         const activity = activities[actIdx];
         if (!activity) continue;
         const isSelected = i === safeSelected;
@@ -399,7 +408,7 @@ export function ActivityViewerPanel({
           : fullText;
 
         lines.push(
-          <Text key={`search-row-${i}`}>
+          <Text key={`search-row-${wi}`}>
             {BOX.v}{" "}
             <Text backgroundColor={isSelected ? "blue" : undefined}>
               <Text dimColor={!isSelected}>{timestamp}</Text>

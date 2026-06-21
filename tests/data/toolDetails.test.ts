@@ -229,6 +229,33 @@ describe("summarizeToolDetail", () => {
     ).toBe("");
     expect(summarizeToolDetail("AskUserQuestion", {}, undefined)).toBe("");
   });
+
+  it("Skill: name only when no args", () => {
+    expect(
+      summarizeToolDetail("Skill", { skill: "add-issue" }, undefined),
+    ).toBe("add-issue");
+    expect(
+      summarizeToolDetail(
+        "Skill",
+        { skill: "superpowers:brainstorming" },
+        undefined,
+      ),
+    ).toBe("superpowers:brainstorming");
+  });
+
+  it("Skill: name — args when args present", () => {
+    expect(
+      summarizeToolDetail(
+        "Skill",
+        { skill: "loop", args: "do stuff" },
+        undefined,
+      ),
+    ).toBe("loop — do stuff");
+  });
+
+  it("Skill: no skill yields empty detail", () => {
+    expect(summarizeToolDetail("Skill", {}, undefined)).toBe("");
+  });
 });
 
 describe("buildToolDetailBody", () => {
@@ -530,5 +557,22 @@ describe("buildToolDetailBody", () => {
       buildToolDetailBody("AskUserQuestion", { questions: [] }, undefined),
     ).toBeNull();
     expect(buildToolDetailBody("AskUserQuestion", {}, undefined)).toBeNull();
+  });
+
+  it("Skill: shows the args as a code body", () => {
+    expect(
+      buildToolDetailBody(
+        "Skill",
+        { skill: "loop", args: "line1\nline2" },
+        undefined,
+      ),
+    ).toEqual({ text: "line1\nline2", kind: "code" });
+  });
+
+  it("Skill: no args returns null (the one-liner name is enough)", () => {
+    expect(
+      buildToolDetailBody("Skill", { skill: "add-issue" }, undefined),
+    ).toBeNull();
+    expect(buildToolDetailBody("Skill", {}, undefined)).toBeNull();
   });
 });

@@ -63,6 +63,9 @@ export interface ToolInput {
   status?: string;
   // AskUserQuestion: one or more questions, each with selectable options.
   questions?: AskQuestion[];
+  // Skill: the invoked skill name (may be `plugin:skill`) + optional args.
+  skill?: string;
+  args?: string;
 }
 
 interface PatchHunk {
@@ -199,6 +202,12 @@ export function summarizeToolDetail(
     return `${qs.length} questions: ${labels}`;
   }
 
+  if (name === "Skill") {
+    const skill = input?.skill;
+    if (!skill) return "";
+    return input?.args ? `${skill} — ${input.args}` : skill;
+  }
+
   return getToolDetail(name, input);
 }
 
@@ -267,6 +276,11 @@ export function buildToolDetailBody(
     const text = formatAskBody(input?.questions);
     if (text) return { text, kind: "code" };
     return null;
+  }
+  // Skill: surface the args (the prompt handed to the skill) in the detail
+  // view. No args → null; the one-liner already shows the skill name.
+  if (name === "Skill") {
+    return input?.args ? { text: input.args, kind: "code" } : null;
   }
   // Write intentionally shows the written file content (more useful to read
   // than an all-additions diff); the row summary still uses patch stats.

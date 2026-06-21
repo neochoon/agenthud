@@ -177,6 +177,7 @@ export const ICONS = {
   Task: "»",
   TodoWrite: "~",
   AskUserQuestion: "?",
+  Skill: "✦",
   Commit: "◆",
   Default: "$",
 } as const;

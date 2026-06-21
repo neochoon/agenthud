@@ -56,6 +56,10 @@ const SECTIONS: HelpSection[] = [
       ],
       ["Tab", "Switch focus to activity viewer"],
       ["r", "Refresh now"],
+      [
+        "/",
+        "Narrow-finder: type to filter; ↑↓ select hit; ↵ select session (viewer follows); Esc cancel",
+      ],
     ],
   },
   {

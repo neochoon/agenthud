@@ -43,6 +43,7 @@ import {
   getInnerWidth,
   truncateByWidth,
 } from "./constants.js";
+import { matchRanges } from "./search/matcher.js";
 
 export interface SessionTreePanelProps {
   projects: ProjectNode[];
@@ -75,6 +76,59 @@ export interface SessionTreePanelProps {
    * `(N active)` hidden alert is preserved as long as possible.
    */
   census?: TreeCensus;
+  /** Active search query for the tree narrow-finder; when set, matched
+   * spans are highlighted in session/project rows. */
+  searchQuery?: string;
+  /** Id of the currently-selected search hit (the row ↑/↓ points at);
+   * that row gets an extra emphasis to distinguish it from the tree
+   * selection highlight. */
+  searchHitId?: string;
+}
+
+/**
+ * Render `text` with matched substrings highlighted (yellow, bold).
+ * Falls back to plain `<Text>{text}</Text>` when there are no ranges or
+ * no query. Accepts `dim` so callers can propagate their dim state.
+ */
+function HighlightedText({
+  text,
+  query,
+  dim,
+}: {
+  text: string;
+  query?: string;
+  dim?: boolean;
+}): React.ReactElement {
+  if (!query) return <Text dimColor={dim}>{text}</Text>;
+  const ranges = matchRanges(text, query);
+  if (ranges.length === 0) return <Text dimColor={dim}>{text}</Text>;
+
+  const parts: React.ReactElement[] = [];
+  let cursor = 0;
+  for (let i = 0; i < ranges.length; i++) {
+    const { start, end } = ranges[i];
+    if (start > cursor) {
+      parts.push(
+        <Text key={`pre-${i}`} dimColor={dim}>
+          {text.slice(cursor, start)}
+        </Text>,
+      );
+    }
+    parts.push(
+      <Text key={`match-${i}`} color="yellow" bold>
+        {text.slice(start, end)}
+      </Text>,
+    );
+    cursor = end;
+  }
+  if (cursor < text.length) {
+    parts.push(
+      <Text key="tail" dimColor={dim}>
+        {text.slice(cursor)}
+      </Text>,
+    );
+  }
+  return <>{parts}</>;
 }
 
 /**
@@ -155,6 +209,8 @@ interface SessionRowProps {
   hasFocus: boolean;
   prefix: string;
   contentWidth: number;
+  searchQuery?: string;
+  isSearchHit?: boolean;
 }
 
 function formatProjectPath(projectPath: string): string {
@@ -171,6 +227,8 @@ function SessionRow({
   hasFocus,
   prefix,
   contentWidth,
+  searchQuery,
+  isSearchHit,
 }: SessionRowProps): React.ReactElement {
   const isParent = prefix === "    ";
   const { text: badge, color: badgeColor } = getBadge(session);
@@ -284,7 +342,8 @@ function SessionRow({
 
   const focused = isSelected && hasFocus;
   const muted = isSelected && !hasFocus;
-  const showBg = focused || muted;
+  const showBg = focused || muted || isSearchHit;
+  const bgColor = focused || isSearchHit ? "blue" : muted ? "blue" : undefined;
   // Dim everything that isn't "active" so the bold-bright rows match
   // the active count (hot + warm). cool/cold are recent-but-idle —
   // cool stays expanded and visible (unlike collapsed cold) but
@@ -297,17 +356,26 @@ function SessionRow({
     <Text>
       {BOX.v}{" "}
       <Text
-        backgroundColor={showBg ? "blue" : undefined}
-        bold={focused}
-        dimColor={shouldDim && !focused}
+        backgroundColor={showBg ? bgColor : undefined}
+        bold={focused || isSearchHit}
+        dimColor={shouldDim && !focused && !isSearchHit}
       >
-        <Text dimColor={shouldDim && !focused}>{prefix}</Text>
-        <Text bold={!shouldDim}>{rawName}</Text>
+        <Text dimColor={shouldDim && !focused && !isSearchHit}>{prefix}</Text>
+        <Text bold={!shouldDim || isSearchHit}>{rawName}</Text>
         {shortIdDisplay ? <Text dimColor>{shortIdDisplay}</Text> : null}
         <Text> </Text>
         {session.hidden ? <Text dimColor>{"⊘ "}</Text> : null}
         <Text color={badgeColor}>{badge}</Text>
-        {middleText ? <Text dimColor>{middleSection}</Text> : null}
+        {middleText ? searchQuery ? <Text> </Text> : null : null}
+        {middleText && searchQuery ? (
+          <HighlightedText
+            text={middleText}
+            query={searchQuery}
+            dim={shouldDim && !focused && !isSearchHit}
+          />
+        ) : middleText ? (
+          <Text dimColor>{middleSection}</Text>
+        ) : null}
         <Text>{gap}</Text>
         <Text dimColor>{elapsed}</Text>
         {ctxTag ? <Text color={ctxColor}>{` ${ctxTag}`}</Text> : null}
@@ -919,6 +987,8 @@ export function SessionTreePanel({
   spinner = "",
   scopeLabel,
   census,
+  searchQuery,
+  searchHitId,
 }: SessionTreePanelProps): React.ReactElement {
   const innerWidth = getInnerWidth(width);
   const contentWidth = innerWidth - 1; // account for space after │
@@ -1083,6 +1153,10 @@ export function SessionTreePanel({
         hasFocus={hasFocus}
         prefix={row.prefix}
         contentWidth={contentWidth}
+        searchQuery={searchQuery}
+        isSearchHit={
+          searchHitId !== undefined && row.session.id === searchHitId
+        }
       />
     ) : row.kind === "subagent-summary" ? (
       <SubagentSummaryRow

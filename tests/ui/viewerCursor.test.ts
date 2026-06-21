@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { adjustViewerCursorOnNewActivities, scrollOffsetForCursor } from "../../src/ui/viewerCursor.js";
+import {
+  adjustViewerCursorOnNewActivities,
+  scrollOffsetForCursor,
+} from "../../src/ui/viewerCursor.js";
 
 describe("adjustViewerCursorOnNewActivities", () => {
   // Contract reminder: viewerCursorLine counts rows from the LIVE EDGE

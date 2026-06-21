@@ -78,6 +78,7 @@ import { detailMatchLines } from "./search/detailMatches.js";
 import { SearchInput } from "./search/SearchInput.js";
 import type { SearchState } from "./search/searchKey.js";
 import { applyDetailSearchKey } from "./search/searchKey.js";
+import { filterTreeBySearch, treeSearchHits } from "./search/treeSearch.js";
 import {
   adjustViewerCursorOnNewActivities,
   scrollOffsetForCursor,
@@ -1558,18 +1559,63 @@ export function App({
         }
         return;
       }
+
+      // Tree surface: narrow-finder. ↑/↓ move index over hits (mod length);
+      // Enter selects the hit + restores full tree; Esc cancels.
+      if (search?.surface === "tree") {
+        if (key.escape) {
+          setSearch(null);
+          return;
+        }
+        const hits = treeSearchHits(displayTree, search.query);
+        if (key.upArrow) {
+          if (hits.length === 0) return;
+          const n = hits.length;
+          setSearch((s) =>
+            s ? { ...s, index: (((s.index - 1) % n) + n) % n } : s,
+          );
+          return;
+        }
+        if (key.downArrow) {
+          if (hits.length === 0) return;
+          const n = hits.length;
+          setSearch((s) => (s ? { ...s, index: (s.index + 1) % n } : s));
+          return;
+        }
+        if (key.return) {
+          if (hits.length > 0) {
+            const safeIndex =
+              ((search.index % hits.length) + hits.length) % hits.length;
+            const hitId = hits[safeIndex];
+            if (hitId !== undefined) {
+              setSelectedId(hitId);
+              stopTracking();
+            }
+          }
+          setSearch(null);
+          return;
+        }
+        if (key.delete || key.backspace) {
+          setSearch((s) =>
+            s ? { ...s, query: s.query.slice(0, -1), index: 0 } : s,
+          );
+          return;
+        }
+        if (input && !key.ctrl && input.length === 1) {
+          setSearch((s) =>
+            s ? { ...s, query: s.query + input, index: 0 } : s,
+          );
+          return;
+        }
+        return;
+      }
+
       setSearch((s) => {
         if (!s) return s;
         // Detail surface: delegate to the two-phase pure reducer.
         if (s.surface === "detail") {
           return applyDetailSearchKey(s, input, key);
         }
-        // Tree surface: simple single-phase logic.
-        if (key.escape) return null; // cancel
-        if (key.delete || key.backspace)
-          return { ...s, query: s.query.slice(0, -1) };
-        if (input && !key.ctrl && input.length === 1)
-          return { ...s, query: s.query + input, index: 0 };
         return s;
       });
     },
@@ -1600,6 +1646,20 @@ export function App({
         ? activityMatches(mergedActivities, search.query)
         : [],
     [search, mergedActivities],
+  );
+
+  // Tree search: narrowed tree + matching session/sub-agent ids.
+  const treeSearchQuery = search?.surface === "tree" ? search.query : undefined;
+  const narrowedTree = useMemo(
+    () =>
+      treeSearchQuery
+        ? filterTreeBySearch(displayTree, treeSearchQuery)
+        : displayTree,
+    [treeSearchQuery, displayTree],
+  );
+  const treeHits = useMemo(
+    () => (treeSearchQuery ? treeSearchHits(displayTree, treeSearchQuery) : []),
+    [treeSearchQuery, displayTree],
   );
 
   // Wrap index into the valid match range (modular arithmetic, handles negatives).
@@ -1690,7 +1750,9 @@ export function App({
                     ? detailHits.length
                     : search.surface === "viewer"
                       ? viewerHits.length
-                      : 0
+                      : search.surface === "tree"
+                        ? treeHits.length
+                        : 0
                 }
                 current={
                   search.surface === "detail" && detailHits.length
@@ -1703,7 +1765,12 @@ export function App({
                           viewerHits.length) %
                           viewerHits.length) +
                         1
-                      : 0
+                      : search.surface === "tree" && treeHits.length
+                        ? (((search.index % treeHits.length) +
+                            treeHits.length) %
+                            treeHits.length) +
+                          1
+                        : 0
                 }
               />
             </Box>
@@ -1735,8 +1802,8 @@ export function App({
           )}
 
           <SessionTreePanel
-            projects={displayTree.projects ?? []}
-            coldProjects={displayTree.coldProjects ?? []}
+            projects={narrowedTree.projects ?? []}
+            coldProjects={narrowedTree.coldProjects ?? []}
             selectedId={selectedId}
             hasFocus={focus === "tree"}
             width={width}
@@ -1746,6 +1813,15 @@ export function App({
             spinner={spinner}
             scopeLabel={scopeToProject ? basename(scopeToProject) : undefined}
             census={isWatchMode ? census : undefined}
+            searchQuery={search?.surface === "tree" ? search.query : undefined}
+            searchHitId={
+              search?.surface === "tree" && treeHits.length > 0
+                ? treeHits[
+                    ((search.index % treeHits.length) + treeHits.length) %
+                      treeHits.length
+                  ]
+                : undefined
+            }
           />
 
           <Box marginTop={1}>

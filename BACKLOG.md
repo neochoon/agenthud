@@ -41,6 +41,26 @@ suffers from poor coverage.
 
 ## Features
 
+### Detail View: `tab` exits to the tree pane
+
+In the Detail View overlay (opened with `↵` on a viewer activity), `tab`
+is currently swallowed — nothing happens (`useHotkeys.ts` `detailMode`
+block returns early on unhandled keys). Users press `tab` expecting to
+switch panes and get no feedback, which is confusing.
+
+Fix (Option B, agreed): `tab` in the Detail View closes the overlay AND
+moves focus to the tree (Projects) pane — `onDetailClose()` then
+`onSwitchFocus()`. This keeps "`tab` always navigates panes" consistent;
+`esc`/`↵`/`q` remain "close and stay in the viewer", so the two roles
+don't overlap. The overlay can't coexist with tree focus (it renders the
+viewer's selected activity), so closing-on-tab is necessary anyway.
+
+- **Effort:** ~30 min. One branch in `useHotkeys.ts` detailMode + a test
+  (the existing "swallow everything else" test gets `tab` as an
+  exception), plus help-text sync (`getHelp()`, `HelpPanel` SECTIONS, and
+  the Detail View footer hint if present).
+- **When:** Any time. Low risk.
+
 ### Selection mode for mouse copy-paste
 
 Mouse drag-to-copy fails in the TUI because the 150ms spinner +

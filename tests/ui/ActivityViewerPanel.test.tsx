@@ -278,3 +278,41 @@ describe("ActivityViewerPanel — row width alignment", () => {
     for (const l of lines) expect([...l].length).toBe(W);
   });
 });
+
+describe("ActivityViewerPanel search", () => {
+  const acts = [
+    makeActivity("Read", 0),
+    makeActivity("Bash", 1),
+    makeActivity("Edit", 2),
+  ];
+
+  it("empty query shows the full list (no narrow)", () => {
+    const { lastFrame } = render(
+      <ActivityViewerPanel
+        {...baseProps}
+        activities={acts}
+        searchQuery=""
+        searchHits={[]}
+        searchSelected={0}
+      />,
+    );
+    const f = lastFrame() ?? "";
+    expect(f).toContain("Read");
+    expect(f).toContain("Bash");
+    expect(f).toContain("Edit");
+    expect(f).not.toContain("No matches");
+  });
+
+  it("non-empty query with zero matches narrows to empty", () => {
+    const { lastFrame } = render(
+      <ActivityViewerPanel
+        {...baseProps}
+        activities={acts}
+        searchQuery="zzz"
+        searchHits={[]}
+        searchSelected={0}
+      />,
+    );
+    expect(lastFrame() ?? "").toContain("No matches");
+  });
+});

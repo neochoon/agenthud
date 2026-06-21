@@ -144,11 +144,11 @@ Commands:
                                 the current directory. Exits 1 if no
                                 such project is found.
 
-  TUI keybindings (detail view):
-    /                           Open search — jump to first match,
-                                matches highlighted
-    n / N                       Next / previous match
-    Esc                         Close search, stay in detail view
+  TUI keybindings:
+    /                           Search the focused pane — tree/viewer
+                                narrow to matches (↑↓ select, ↵ jump),
+                                detail view jumps (n/N next/prev)
+    Esc                         Close search, stay in focused pane
     ↑↓/jk, Ctrl+U/D            Scroll; ↵/Esc/q to close detail
 
   report [--date DATE] [--include TYPES] [--format FORMAT]

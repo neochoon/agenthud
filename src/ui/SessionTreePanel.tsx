@@ -343,7 +343,7 @@ function SessionRow({
   const focused = isSelected && hasFocus;
   const muted = isSelected && !hasFocus;
   const showBg = focused || muted || isSearchHit;
-  const bgColor = focused || isSearchHit ? "blue" : muted ? "blue" : undefined;
+  const bgColor = showBg ? "blue" : undefined;
   // Dim everything that isn't "active" so the bold-bright rows match
   // the active count (hot + warm). cool/cold are recent-but-idle —
   // cool stays expanded and visible (unlike collapsed cold) but

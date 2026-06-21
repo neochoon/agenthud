@@ -75,10 +75,10 @@ const SECTIONS: HelpSection[] = [
     title: "Detail view",
     rows: [
       ["↑ ↓ / k j", "Scroll"],
-      ["↵ / Esc / q", "Close"],
+      ["↵ / q", "Close"],
+      ["Esc", "Close (or close search if open, staying in detail view)"],
       ["/", "Open search (jump to first match; body unchanged)"],
-      ["n / N", "Next / previous match (while search is open)"],
-      ["Esc", "Close search (stay in detail view)"],
+      ["n / N", "Next / prev match (after ↵ to commit the query)"],
     ],
   },
   {

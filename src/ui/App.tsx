@@ -75,14 +75,11 @@ import { useTick } from "./hooks/useTick.js";
 import { SessionTreePanel } from "./SessionTreePanel.js";
 import { detailMatchLines } from "./search/detailMatches.js";
 import { SearchInput } from "./search/SearchInput.js";
+import type { SearchState } from "./search/searchKey.js";
+import { applyDetailSearchKey } from "./search/searchKey.js";
 import { adjustViewerCursorOnNewActivities } from "./viewerCursor.js";
 
 type SearchSurface = "tree" | "viewer" | "detail";
-interface SearchState {
-  surface: SearchSurface;
-  query: string;
-  index: number; // current match index (detail: line-match #; lists: selected match row)
-}
 
 const VIEWER_HEIGHT_FRACTION = 0.55;
 
@@ -1498,16 +1495,17 @@ export function App({
     searchActive: search !== null,
     onOpenSearch: () => {
       const surface: SearchSurface = detailMode ? "detail" : focus;
-      setSearch({ surface, query: "", index: 0 });
+      setSearch({ surface, query: "", index: 0, committed: false });
     },
     onSearchKey: (input, key) => {
       setSearch((s) => {
         if (!s) return s;
-        if (key.escape) return null; // cancel
+        // Detail surface: delegate to the two-phase pure reducer.
         if (s.surface === "detail") {
-          if (key.return || input === "n") return { ...s, index: s.index + 1 };
-          if (input === "N") return { ...s, index: s.index - 1 };
+          return applyDetailSearchKey(s, input, key);
         }
+        // Tree / viewer surfaces: simple single-phase logic.
+        if (key.escape) return null; // cancel
         if (key.delete || key.backspace)
           return { ...s, query: s.query.slice(0, -1) };
         if (input && !key.ctrl && input.length === 1)

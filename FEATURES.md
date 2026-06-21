@@ -474,10 +474,10 @@ the `?` overlay renders in-app.
 | Key | Action |
 |---|---|
 | `↑` `↓` / `k` `j` | Scroll |
-| `↵` / `Esc` / `q` | Close |
+| `↵` / `q` | Close |
+| `Esc` | Close (or close search if open, staying in detail view) |
 | `/` | Open search — type to jump to first match; matches highlighted |
-| `n` / `N` | Next / previous match (while search is open) |
-| `Esc` | Close search, stay in detail view |
+| `n` / `N` | Next / previous match (after pressing `↵` to commit the query) |
 
 ### Always available
 

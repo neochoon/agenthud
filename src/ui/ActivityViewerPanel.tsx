@@ -333,8 +333,10 @@ export function ActivityViewerPanel({
   const innerWidth = getInnerWidth(width);
   const contentWidth = innerWidth - 1;
 
-  // Narrow-finder mode: when searchHits is provided, render only matched rows.
-  if (searchHits !== undefined && searchQuery !== undefined) {
+  // Narrow-finder mode: only narrow once there's a query. An empty query
+  // (search just opened, nothing typed) shows the full list — narrowing to
+  // zero rows on the first `/` keystroke would blank the viewer.
+  if (searchHits !== undefined && searchQuery) {
     const safeSelected =
       searchHits.length > 0
         ? (((searchSelected ?? 0) % searchHits.length) + searchHits.length) %

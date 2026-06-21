@@ -468,6 +468,7 @@ the `?` overlay renders in-app.
 | `↵` | Open detail view for selected activity |
 | `f` | Cycle filter preset (set in `config.yaml`) |
 | `Tab` | Switch focus to project tree |
+| `/` | Narrow-finder: type to filter visible activities, `↑`/`↓` to select, `↵` to jump cursor to the chosen activity and restore the full stream, `Esc` to cancel. Composes (AND) with the `f` type-filter. |
 
 ### Detail view
 

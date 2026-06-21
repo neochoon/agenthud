@@ -33,7 +33,7 @@ describe("HelpPanel", () => {
   });
 
   it("documents config file locations", () => {
-    const { lastFrame } = render(<HelpPanel width={80} height={50} />);
+    const { lastFrame } = render(<HelpPanel width={80} height={60} />);
     const out = lastFrame() ?? "";
     expect(out).toContain("~/.agenthud/config.yaml");
     expect(out).toContain("~/.agenthud/state.yaml");

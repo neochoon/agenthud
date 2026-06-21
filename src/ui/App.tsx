@@ -73,6 +73,7 @@ import { useHotkeys } from "./hooks/useHotkeys.js";
 import { useSpinner } from "./hooks/useSpinner.js";
 import { useTick } from "./hooks/useTick.js";
 import { SessionTreePanel } from "./SessionTreePanel.js";
+import { activityMatches } from "./search/activityMatch.js";
 import { detailMatchLines } from "./search/detailMatches.js";
 import { SearchInput } from "./search/SearchInput.js";
 import type { SearchState } from "./search/searchKey.js";
@@ -1498,13 +1499,66 @@ export function App({
       setSearch({ surface, query: "", index: 0, committed: false });
     },
     onSearchKey: (input, key) => {
+      // Viewer surface: narrow-finder. ↑/↓ move selection; Enter jumps cursor + closes; Esc cancels.
+      // These keys can't be handled inside setSearch's functional updater (side effects needed),
+      // so we dispatch them imperatively here while search is still the current closed-over value.
+      if (search?.surface === "viewer") {
+        if (key.escape) {
+          setSearch(null);
+          return;
+        }
+        const hits = activityMatches(mergedActivities, search.query);
+        if (key.upArrow) {
+          if (hits.length === 0) return;
+          const n = hits.length;
+          setSearch((s) =>
+            s ? { ...s, index: (((s.index - 1) % n) + n) % n } : s,
+          );
+          return;
+        }
+        if (key.downArrow) {
+          if (hits.length === 0) return;
+          const n = hits.length;
+          setSearch((s) => (s ? { ...s, index: (s.index + 1) % n } : s));
+          return;
+        }
+        if (key.return) {
+          if (hits.length > 0) {
+            const safeIndex =
+              ((search.index % hits.length) + hits.length) % hits.length;
+            const hitIndex = hits[safeIndex];
+            if (hitIndex !== undefined) {
+              // cursorLine = "entries back from newest" → filteredActivities.length - 1 - hitIndex
+              const newCursorLine = mergedActivities.length - 1 - hitIndex;
+              setViewerCursorLine(Math.max(0, newCursorLine));
+              setIsLive(false);
+              setScrollOffset(0);
+            }
+          }
+          setSearch(null);
+          return;
+        }
+        if (key.delete || key.backspace) {
+          setSearch((s) =>
+            s ? { ...s, query: s.query.slice(0, -1), index: 0 } : s,
+          );
+          return;
+        }
+        if (input && !key.ctrl && input.length === 1) {
+          setSearch((s) =>
+            s ? { ...s, query: s.query + input, index: 0 } : s,
+          );
+          return;
+        }
+        return;
+      }
       setSearch((s) => {
         if (!s) return s;
         // Detail surface: delegate to the two-phase pure reducer.
         if (s.surface === "detail") {
           return applyDetailSearchKey(s, input, key);
         }
-        // Tree / viewer surfaces: simple single-phase logic.
+        // Tree surface: simple single-phase logic.
         if (key.escape) return null; // cancel
         if (key.delete || key.backspace)
           return { ...s, query: s.query.slice(0, -1) };
@@ -1531,6 +1585,15 @@ export function App({
         ? detailMatchLines(detailRawLines, search.query)
         : [],
     [search, detailRawLines],
+  );
+
+  // Viewer search: indices into mergedActivities that match the query.
+  const viewerHits = useMemo(
+    () =>
+      search?.surface === "viewer" && search.query
+        ? activityMatches(mergedActivities, search.query)
+        : [],
+    [search, mergedActivities],
   );
 
   // Wrap index into the valid match range (modular arithmetic, handles negatives).
@@ -1616,14 +1679,25 @@ export function App({
             <Box marginBottom={1} width={width}>
               <SearchInput
                 query={search.query}
-                total={search.surface === "detail" ? detailHits.length : 0}
+                total={
+                  search.surface === "detail"
+                    ? detailHits.length
+                    : search.surface === "viewer"
+                      ? viewerHits.length
+                      : 0
+                }
                 current={
-                  detailHits.length
+                  search.surface === "detail" && detailHits.length
                     ? (((search.index % detailHits.length) +
                         detailHits.length) %
                         detailHits.length) +
                       1
-                    : 0
+                    : search.surface === "viewer" && viewerHits.length
+                      ? (((search.index % viewerHits.length) +
+                          viewerHits.length) %
+                          viewerHits.length) +
+                        1
+                      : 0
                 }
               />
             </Box>
@@ -1694,6 +1768,15 @@ export function App({
                 hasFocus={focus === "viewer"}
                 spinner={spinner}
                 filterLabel={filterLabel}
+                searchQuery={
+                  search?.surface === "viewer" ? search.query : undefined
+                }
+                searchHits={
+                  search?.surface === "viewer" ? viewerHits : undefined
+                }
+                searchSelected={
+                  search?.surface === "viewer" ? search.index : undefined
+                }
               />
             )}
           </Box>

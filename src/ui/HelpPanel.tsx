@@ -69,6 +69,10 @@ const SECTIONS: HelpSection[] = [
       ["↵", "Open detail view for selected activity"],
       ["f", "Cycle filter preset (set in config.yaml)"],
       ["Tab", "Switch focus to project tree"],
+      [
+        "/",
+        "Narrow-finder: type to filter; ↑↓ select; ↵ jump to activity; Esc cancel",
+      ],
     ],
   },
   {

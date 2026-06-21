@@ -56,6 +56,10 @@ const SECTIONS: HelpSection[] = [
       ],
       ["Tab", "Switch focus to activity viewer"],
       ["r", "Refresh now"],
+      [
+        "/",
+        "Narrow-finder: type to filter; ↑↓ select hit; ↵ select session (viewer follows); Esc cancel",
+      ],
     ],
   },
   {
@@ -69,13 +73,20 @@ const SECTIONS: HelpSection[] = [
       ["↵", "Open detail view for selected activity"],
       ["f", "Cycle filter preset (set in config.yaml)"],
       ["Tab", "Switch focus to project tree"],
+      [
+        "/",
+        "Narrow-finder: type to filter; ↑↓ select; ↵ jump to activity; Esc cancel",
+      ],
     ],
   },
   {
     title: "Detail view",
     rows: [
       ["↑ ↓ / k j", "Scroll"],
-      ["↵ / Esc / q", "Close"],
+      ["↵ / q", "Close"],
+      ["Esc", "Close (or close search if open, staying in detail view)"],
+      ["/", "Open search (jump to first match; body unchanged)"],
+      ["n / N", "Next / prev match (after ↵ to commit the query)"],
     ],
   },
   {

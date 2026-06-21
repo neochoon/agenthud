@@ -55,6 +55,28 @@ interface UseHotkeysOptions {
   onToggleShowHidden?: () => void;
   filterLabel: string; // e.g. "all", "response", "commit"
   trackingOn?: boolean;
+  /** True while the in-pane search input is open. */
+  searchActive: boolean;
+  /** Called when the user presses `/` to open search. */
+  onOpenSearch: () => void;
+  /** Called for every keystroke while searchActive is true. */
+  onSearchKey: (
+    input: string,
+    key: {
+      upArrow: boolean;
+      downArrow: boolean;
+      tab: boolean;
+      pageUp: boolean;
+      pageDown: boolean;
+      return: boolean;
+      ctrl: boolean;
+      escape?: boolean;
+      leftArrow?: boolean;
+      rightArrow?: boolean;
+      backspace?: boolean;
+      delete?: boolean;
+    },
+  ) => void;
 }
 
 export interface UseHotkeysResult {
@@ -71,6 +93,8 @@ export interface UseHotkeysResult {
       escape?: boolean;
       leftArrow?: boolean;
       rightArrow?: boolean;
+      backspace?: boolean;
+      delete?: boolean;
     },
   ) => void;
   statusBarItems: string[];
@@ -107,6 +131,9 @@ export function useHotkeys({
   onToggleShowHidden,
   filterLabel,
   trackingOn = false,
+  searchActive,
+  onOpenSearch,
+  onSearchKey,
 }: UseHotkeysOptions): UseHotkeysResult {
   const handleInput = (
     input: string,
@@ -121,8 +148,16 @@ export function useHotkeys({
       escape?: boolean;
       leftArrow?: boolean;
       rightArrow?: boolean;
+      backspace?: boolean;
+      delete?: boolean;
     },
   ) => {
+    // Search mode swallows every key and routes it to the search handler.
+    if (searchActive) {
+      onSearchKey(input, key);
+      return;
+    }
+
     if (helpMode) {
       if (key.return || key.escape || input === "q" || input === "?") {
         onHelp(); // toggle = close
@@ -163,6 +198,10 @@ export function useHotkeys({
     }
 
     if (detailMode) {
+      if (input === "/" && !key.ctrl) {
+        onOpenSearch();
+        return;
+      }
       if (key.ctrl && input === "u") {
         onDetailScrollHalfPageUp();
         return;
@@ -188,6 +227,10 @@ export function useHotkeys({
 
     if (input === "q") {
       onQuit();
+      return;
+    }
+    if (input === "/" && !key.ctrl) {
+      onOpenSearch();
       return;
     }
     if (key.tab) {

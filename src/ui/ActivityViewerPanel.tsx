@@ -39,6 +39,7 @@ import {
   getDisplayWidth,
   getInnerWidth,
 } from "./constants.js";
+import { matchRanges } from "./search/matcher.js";
 
 export interface ActivityStyle {
   color?: string;
@@ -125,6 +126,18 @@ export interface ActivityViewerPanelProps {
   hasFocus: boolean;
   spinner?: string;
   filterLabel?: string;
+  /** When set (viewer narrow-finder active), only matched rows are rendered. */
+  searchHits?: number[];
+  /** The search query used to compute `searchHits` — used for match highlighting. */
+  searchQuery?: string;
+  /** Index into `searchHits` identifying the currently selected match (0-based). */
+  searchSelected?: number;
+  /**
+   * Persisted edge-scroll window start for viewer narrow-finder. When provided,
+   * this value is used directly (with defensive clamp) instead of computing
+   * windowStart from safeSelected, enabling fzf-style stable-window scrolling.
+   */
+  searchWindowStart?: number;
 }
 
 function formatActivityTime(date: Date, now: Date): string {
@@ -271,6 +284,33 @@ const ActivityRow = memo(function ActivityRow({
   );
 });
 
+/**
+ * Render a text string with match ranges highlighted in yellow.
+ * Segments outside matches are plain text; matched segments are bold+yellow.
+ */
+function renderHighlighted(text: string, query: string): React.ReactElement {
+  const ranges = matchRanges(text, query);
+  if (ranges.length === 0) return <>{text}</>;
+  const segments: React.ReactElement[] = [];
+  let pos = 0;
+  for (let i = 0; i < ranges.length; i++) {
+    const { start, end } = ranges[i];
+    if (start > pos) {
+      segments.push(<Text key={`pre-${i}`}>{text.slice(pos, start)}</Text>);
+    }
+    segments.push(
+      <Text key={`match-${i}`} color="yellow" bold>
+        {text.slice(start, end)}
+      </Text>,
+    );
+    pos = end;
+  }
+  if (pos < text.length) {
+    segments.push(<Text key="tail">{text.slice(pos)}</Text>);
+  }
+  return <>{segments}</>;
+}
+
 export function ActivityViewerPanel({
   activities,
   sessionName,
@@ -285,9 +325,136 @@ export function ActivityViewerPanel({
   hasFocus,
   spinner = "",
   filterLabel,
+  searchHits,
+  searchQuery,
+  searchSelected,
+  searchWindowStart,
 }: ActivityViewerPanelProps): React.ReactElement {
   const innerWidth = getInnerWidth(width);
   const contentWidth = innerWidth - 1;
+
+  // Narrow-finder mode: when searchHits is provided, render only matched rows.
+  if (searchHits !== undefined && searchQuery !== undefined) {
+    const safeSelected =
+      searchHits.length > 0
+        ? (((searchSelected ?? 0) % searchHits.length) + searchHits.length) %
+          searchHits.length
+        : 0;
+    const now = new Date();
+    const lines: React.ReactElement[] = [];
+    const filterSuffix =
+      filterLabel && filterLabel !== "all" ? ` · ${filterLabel}` : "";
+    const titleSuffix = `[SEARCH${filterSuffix}]`;
+
+    if (searchHits.length === 0) {
+      const emptyText = searchQuery ? "No matches" : "No activity yet";
+      const emptyPadding = Math.max(0, contentWidth - emptyText.length);
+      lines.push(
+        <Text key="empty">
+          {BOX.v} <Text dimColor>{emptyText}</Text>
+          {" ".repeat(emptyPadding)}
+          {BOX.v}
+        </Text>,
+      );
+    } else {
+      // Window the hit list so the selected hit stays visible within
+      // `visibleRows`. Use the persisted edge-scroll start from App when
+      // available (fzf-style stable window); fall back to pinning the
+      // selected hit at the top (legacy behaviour) when it isn't.
+      const maxWindowStart = Math.max(0, searchHits.length - visibleRows);
+      const windowStart =
+        searchWindowStart !== undefined
+          ? Math.max(0, Math.min(searchWindowStart, maxWindowStart))
+          : Math.max(0, Math.min(safeSelected, maxWindowStart));
+      const windowEnd = Math.min(searchHits.length, windowStart + visibleRows);
+      const windowedHits = searchHits.slice(windowStart, windowEnd);
+      for (let wi = 0; wi < windowedHits.length; wi++) {
+        const i = windowStart + wi; // global hit index
+        const actIdx = windowedHits[wi];
+        const activity = activities[actIdx];
+        if (!activity) continue;
+        const isSelected = i === safeSelected;
+        const style = getActivityStyle(activity);
+        const timestamp = `[${formatActivityTime(activity.timestamp, now)}] `;
+        const timestampWidth = timestamp.length;
+        const icon = activity.icon;
+        const iconWidth = getDisplayWidth(icon);
+        const label = activity.label;
+        const detail = activity.detail;
+        const count = activity.count;
+        const countSuffix = count && count > 1 ? ` (×${count})` : "";
+        const labelPart = detail ? `${label}: ` : label;
+        const labelWidth = labelPart.length;
+        const detailMaxWidth =
+          width -
+          2 -
+          timestampWidth -
+          iconWidth -
+          1 -
+          labelWidth -
+          countSuffix.length -
+          1;
+        const flatDetail = detail ? flattenForOneLine(detail) : "";
+        const truncatedDetail = flatDetail
+          ? truncateDetail(flatDetail, Math.max(0, detailMaxWidth))
+          : "";
+        const labelContent = detail
+          ? `${labelPart}${truncatedDetail}${countSuffix}`
+          : label + countSuffix;
+        const usedWidth =
+          1 +
+          1 +
+          timestampWidth +
+          iconWidth +
+          1 +
+          getDisplayWidth(labelContent) +
+          1;
+        const padding = Math.max(0, width - usedWidth);
+
+        // Build highlighted label content
+        const fullText = labelContent;
+        const highlightedContent = searchQuery
+          ? renderHighlighted(fullText, searchQuery)
+          : fullText;
+
+        lines.push(
+          <Text key={`search-row-${wi}`}>
+            {BOX.v}{" "}
+            <Text backgroundColor={isSelected ? "blue" : undefined}>
+              <Text dimColor={!isSelected}>{timestamp}</Text>
+              <Text color="cyan">{icon}</Text>{" "}
+              <Text
+                color={isSelected ? undefined : style.color}
+                dimColor={!isSelected && style.dimColor}
+              >
+                {highlightedContent}
+              </Text>
+              {" ".repeat(padding)}
+            </Text>
+            {BOX.v}
+          </Text>,
+        );
+      }
+    }
+
+    const emptyRow = `${BOX.v}${" ".repeat(contentWidth + 1)}${BOX.v}`;
+    const padCount = Math.max(0, visibleRows - lines.length);
+    const padded: React.ReactElement[] = [];
+    for (let i = 0; i < padCount; i++) {
+      padded.push(<Text key={`pad-${i}`}>{emptyRow}</Text>);
+    }
+    const finalLines = [...padded, ...lines];
+
+    return (
+      <Box flexDirection="column" width={width}>
+        <Text color="cyan">
+          {createTitleLine(sessionName, titleSuffix, width)}
+        </Text>
+        {finalLines}
+        <Text>{createBottomLine(width)}</Text>
+      </Box>
+    );
+  }
 
   const filterSuffix =
     filterLabel && filterLabel !== "all" ? ` · ${filterLabel}` : "";

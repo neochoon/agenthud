@@ -144,6 +144,13 @@ Commands:
                                 the current directory. Exits 1 if no
                                 such project is found.
 
+  TUI keybindings:
+    /                           Search the focused pane — tree/viewer
+                                narrow to matches (↑↓ select, ↵ jump),
+                                detail view jumps (n/N next/prev)
+    Esc                         Close search, stay in focused pane
+    ↑↓/jk, Ctrl+U/D            Scroll; ↵/Esc/q to close detail
+
   report [--date DATE] [--include TYPES] [--format FORMAT]
          [--detail-limit N] [--with-git]
                                 Print activity report for a date

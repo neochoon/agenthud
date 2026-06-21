@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { adjustViewerCursorOnNewActivities } from "../../src/ui/viewerCursor.js";
+import {
+  adjustViewerCursorOnNewActivities,
+  scrollOffsetForCursor,
+} from "../../src/ui/viewerCursor.js";
 
 describe("adjustViewerCursorOnNewActivities", () => {
   // Contract reminder: viewerCursorLine counts rows from the LIVE EDGE
@@ -169,5 +172,41 @@ describe("adjustViewerCursorOnNewActivities", () => {
         viewerRows: 1,
       }),
     ).toEqual({ cursorLine: 0, autoPause: false, scrollDelta: 0 });
+  });
+});
+
+describe("scrollOffsetForCursor", () => {
+  it("places a mid-history hit: raw = total - 1 - hitIndex, clamped to total - viewerRows", () => {
+    // 100 activities, viewerRows = 20, hitIndex = 10 (deep in history)
+    // raw = 100 - 1 - 10 = 89; max = max(0, 100 - 20) = 80; clamped to 80
+    expect(scrollOffsetForCursor(100, 10, 20)).toBe(80);
+  });
+
+  it("clamps to max(0, total - viewerRows) when hitIndex is very old", () => {
+    // 100 activities, viewerRows = 20, hitIndex = 0 (oldest)
+    // raw = 99, max = 80 → clamped to 80
+    expect(scrollOffsetForCursor(100, 0, 20)).toBe(80);
+  });
+
+  it("returns 0 when hit is in the live-edge window (near newest)", () => {
+    // 100 activities, viewerRows = 20, hitIndex = 99 (newest)
+    // raw = 0 → scrollOffset = 0 (live edge)
+    expect(scrollOffsetForCursor(100, 99, 20)).toBe(0);
+  });
+
+  it("returns a non-zero within-window offset when hit is near (but not at) the live edge", () => {
+    // hitIndex = 85 in a 100-item list with viewerRows = 20
+    // raw = 100 - 1 - 85 = 14; max = max(0, 100 - 20) = 80; 14 <= 80 → 14
+    expect(scrollOffsetForCursor(100, 85, 20)).toBe(14);
+  });
+
+  it("handles total < viewerRows (history shorter than viewport)", () => {
+    // 5 activities, viewerRows = 20, hitIndex = 0
+    // raw = 4; max(0, 5-20) = 0 → clamped to 0
+    expect(scrollOffsetForCursor(5, 0, 20)).toBe(0);
+  });
+
+  it("handles hitIndex = total - 1 (the newest entry)", () => {
+    expect(scrollOffsetForCursor(50, 49, 10)).toBe(0);
   });
 });

@@ -453,6 +453,7 @@ the `?` overlay renders in-app.
 | `t` | Track: auto-follow the newest live sub-agent (any nav key turns it off) |
 | `Tab` | Switch focus to activity viewer |
 | `r` | Refresh now |
+| `/` | Narrow-finder: type to filter sessions/sub-agents; `↑`/`↓` to select a hit; `↵` to select that session (viewer follows) and restore the full tree; `Esc` to cancel. |
 
 > **Note (v0.14.0):** Hide moved from `h` to `Shift+H` and became a toggle. The lowercase `h` is now the vim-left alias for `←` (jump to parent). Press `a` to reveal hidden items in the tree (they render dim with a `⊘` marker); `H` on a hidden row unhides it. A status-bar indicator surfaces hidden-but-still-active items so an accidentally-hidden hot session never becomes invisible.
 
@@ -468,13 +469,17 @@ the `?` overlay renders in-app.
 | `↵` | Open detail view for selected activity |
 | `f` | Cycle filter preset (set in `config.yaml`) |
 | `Tab` | Switch focus to project tree |
+| `/` | Narrow-finder: type to filter visible activities, `↑`/`↓` to select, `↵` to jump cursor to the chosen activity and restore the full stream, `Esc` to cancel. Composes (AND) with the `f` type-filter. |
 
 ### Detail view
 
 | Key | Action |
 |---|---|
 | `↑` `↓` / `k` `j` | Scroll |
-| `↵` / `Esc` / `q` | Close |
+| `↵` / `q` | Close |
+| `Esc` | Close (or close search if open, staying in detail view) |
+| `/` | Open search — type to jump to first match; matches highlighted |
+| `n` / `N` | Next / previous match (after pressing `↵` to commit the query) |
 
 ### Always available
 

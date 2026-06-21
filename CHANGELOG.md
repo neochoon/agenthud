@@ -11,6 +11,12 @@
   `toolLabels.ts` are now shared by kiro and opencode.
 
 ### Added
+- **In-pane search (`/`)**: text search scoped to the focused pane, distinct
+  from the `f` type-filter. The Session Tree and Activity Viewer are transient
+  fzf-style narrow-finders (type to narrow, `↑`/`↓` select, `↵` jump, `Esc`
+  cancel); the Detail View is a less-style jump (type → first match, `↵`
+  commits then `n`/`N` cycle, matches highlighted). Substring + smart-case;
+  the Viewer search composes (AND) with the `f` filter.
 - **agenthud follow**: a live merged event stream (activity + state +
   lifecycle) across all sessions and sub-agents, emitted chronologically as
   human lines or, with `--json`, NDJSON. The read-only substrate a

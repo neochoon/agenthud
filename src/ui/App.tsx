@@ -73,7 +73,19 @@ import { useHotkeys } from "./hooks/useHotkeys.js";
 import { useSpinner } from "./hooks/useSpinner.js";
 import { useTick } from "./hooks/useTick.js";
 import { SessionTreePanel } from "./SessionTreePanel.js";
-import { adjustViewerCursorOnNewActivities } from "./viewerCursor.js";
+import { activityMatches } from "./search/activityMatch.js";
+import { detailMatchLines } from "./search/detailMatches.js";
+import { edgeScrollWindowStart } from "./search/edgeScroll.js";
+import { SearchInput } from "./search/SearchInput.js";
+import type { SearchState } from "./search/searchKey.js";
+import { applyDetailSearchKey } from "./search/searchKey.js";
+import { filterTreeBySearch, treeSearchHits } from "./search/treeSearch.js";
+import {
+  adjustViewerCursorOnNewActivities,
+  scrollOffsetForCursor,
+} from "./viewerCursor.js";
+
+type SearchSurface = "tree" | "viewer" | "detail";
 
 const VIEWER_HEIGHT_FRACTION = 0.55;
 
@@ -668,6 +680,14 @@ export function App({
   // `discoverSessions` always carries hidden items + their `hidden`
   // marks so toggling can flip the view instantly without a refetch.
   const [showHidden, setShowHidden] = useState(false);
+
+  // In-pane search state. null = search closed.
+  const [search, setSearch] = useState<SearchState | null>(null);
+
+  // Persisted window-start for viewer narrow-finder edge-scroll. Reset to 0
+  // when search opens or query resets (index → 0 on query change). Updated
+  // via edgeScrollWindowStart on every ↑/↓ in viewer search mode.
+  const [viewerSearchWindowStart, setViewerSearchWindowStart] = useState(0);
 
   // Tree as the renderer sees it. Defaults to the hidden-stripped
   // view; flips to the full source tree when `showHidden` is on.
@@ -1483,9 +1503,188 @@ export function App({
     onQuit: exit,
     onFilter: () => setFilterIndex((i) => (i + 1) % filterPresets.length),
     filterLabel,
+    searchActive: search !== null,
+    onOpenSearch: () => {
+      const surface: SearchSurface = detailMode ? "detail" : focus;
+      setSearch({ surface, query: "", index: 0, committed: false });
+      if (!detailMode && focus === "viewer") setViewerSearchWindowStart(0);
+    },
+    onSearchKey: (input, key) => {
+      // Viewer surface: narrow-finder. ↑/↓ move selection; Enter jumps cursor + closes; Esc cancels.
+      // These keys can't be handled inside setSearch's functional updater (side effects needed),
+      // so we dispatch them imperatively here while search is still the current closed-over value.
+      if (search?.surface === "viewer") {
+        if (key.escape) {
+          setSearch(null);
+          return;
+        }
+        const hits = activityMatches(mergedActivities, search.query);
+        if (key.upArrow) {
+          if (hits.length === 0) return;
+          const n = hits.length;
+          const newIndex = (((search.index - 1) % n) + n) % n;
+          setSearch((s) => (s ? { ...s, index: newIndex } : s));
+          setViewerSearchWindowStart((prev) =>
+            edgeScrollWindowStart(prev, newIndex, viewerRows, hits.length),
+          );
+          return;
+        }
+        if (key.downArrow) {
+          if (hits.length === 0) return;
+          const n = hits.length;
+          const newIndex = (search.index + 1) % n;
+          setSearch((s) => (s ? { ...s, index: newIndex } : s));
+          setViewerSearchWindowStart((prev) =>
+            edgeScrollWindowStart(prev, newIndex, viewerRows, hits.length),
+          );
+          return;
+        }
+        if (key.return) {
+          if (hits.length > 0) {
+            const safeIndex =
+              ((search.index % hits.length) + hits.length) % hits.length;
+            const hitIndex = hits[safeIndex];
+            if (hitIndex !== undefined) {
+              const newScrollOffset = scrollOffsetForCursor(
+                mergedActivities.length,
+                hitIndex,
+                viewerRows,
+              );
+              setViewerCursorLine(0);
+              setIsLive(false);
+              setScrollOffset(newScrollOffset);
+            }
+          }
+          setSearch(null);
+          return;
+        }
+        if (key.delete || key.backspace) {
+          setSearch((s) =>
+            s ? { ...s, query: s.query.slice(0, -1), index: 0 } : s,
+          );
+          setViewerSearchWindowStart(0);
+          return;
+        }
+        if (input && !key.ctrl && input.length === 1) {
+          setSearch((s) =>
+            s ? { ...s, query: s.query + input, index: 0 } : s,
+          );
+          setViewerSearchWindowStart(0);
+          return;
+        }
+        return;
+      }
+
+      // Tree surface: narrow-finder. ↑/↓ move index over hits (mod length);
+      // Enter selects the hit + restores full tree; Esc cancels.
+      if (search?.surface === "tree") {
+        if (key.escape) {
+          setSearch(null);
+          return;
+        }
+        const hits = treeSearchHits(displayTree, search.query);
+        if (key.upArrow) {
+          if (hits.length === 0) return;
+          const n = hits.length;
+          setSearch((s) =>
+            s ? { ...s, index: (((s.index - 1) % n) + n) % n } : s,
+          );
+          return;
+        }
+        if (key.downArrow) {
+          if (hits.length === 0) return;
+          const n = hits.length;
+          setSearch((s) => (s ? { ...s, index: (s.index + 1) % n } : s));
+          return;
+        }
+        if (key.return) {
+          if (hits.length > 0) {
+            const safeIndex =
+              ((search.index % hits.length) + hits.length) % hits.length;
+            const hitId = hits[safeIndex];
+            if (hitId !== undefined) {
+              setSelectedId(hitId);
+              stopTracking();
+            }
+          }
+          setSearch(null);
+          return;
+        }
+        if (key.delete || key.backspace) {
+          setSearch((s) =>
+            s ? { ...s, query: s.query.slice(0, -1), index: 0 } : s,
+          );
+          return;
+        }
+        if (input && !key.ctrl && input.length === 1) {
+          setSearch((s) =>
+            s ? { ...s, query: s.query + input, index: 0 } : s,
+          );
+          return;
+        }
+        return;
+      }
+
+      setSearch((s) => {
+        if (!s) return s;
+        // Detail surface: delegate to the two-phase pure reducer.
+        if (s.surface === "detail") {
+          return applyDetailSearchKey(s, input, key);
+        }
+        return s;
+      });
+    },
   });
 
   useInput((input, key) => handleInput(input, key), { isActive: isWatchMode });
+
+  // Detail search: derive the raw source lines from the active detail body
+  // (split by \n, before wrapping) so detailMatchLines can index into them.
+  const detailRawLines = useMemo(() => {
+    if (!detailActivity) return [];
+    const body = detailActivity.detailBody ?? detailActivity.detail ?? "";
+    return body.split("\n");
+  }, [detailActivity]);
+
+  const detailHits = useMemo(
+    () =>
+      search?.surface === "detail" && search.query
+        ? detailMatchLines(detailRawLines, search.query)
+        : [],
+    [search, detailRawLines],
+  );
+
+  // Viewer search: indices into mergedActivities that match the query.
+  const viewerHits = useMemo(
+    () =>
+      search?.surface === "viewer" && search.query
+        ? activityMatches(mergedActivities, search.query)
+        : [],
+    [search, mergedActivities],
+  );
+
+  // Tree search: narrowed tree + matching session/sub-agent ids.
+  const treeSearchQuery = search?.surface === "tree" ? search.query : undefined;
+  const narrowedTree = useMemo(
+    () =>
+      treeSearchQuery
+        ? filterTreeBySearch(displayTree, treeSearchQuery)
+        : displayTree,
+    [treeSearchQuery, displayTree],
+  );
+  const treeHits = useMemo(
+    () => (treeSearchQuery ? treeSearchHits(displayTree, treeSearchQuery) : []),
+    [treeSearchQuery, displayTree],
+  );
+
+  // Wrap index into the valid match range (modular arithmetic, handles negatives).
+  const detailCurrentLine =
+    detailHits.length > 0
+      ? detailHits[
+          (((search?.index ?? 0) % detailHits.length) + detailHits.length) %
+            detailHits.length
+        ]
+      : null;
 
   const rawSelected = allFlat.find((s) => s.id === selectedId);
   // For project sentinels, resolve to the project's hottest session so the
@@ -1557,7 +1756,40 @@ export function App({
             items = items.slice(1);
             shortcuts = items.join(sep);
           }
-          return (
+          return search ? (
+            <Box marginBottom={1} width={width}>
+              <SearchInput
+                query={search.query}
+                total={
+                  search.surface === "detail"
+                    ? detailHits.length
+                    : search.surface === "viewer"
+                      ? viewerHits.length
+                      : search.surface === "tree"
+                        ? treeHits.length
+                        : 0
+                }
+                current={
+                  search.surface === "detail" && detailHits.length
+                    ? (((search.index % detailHits.length) +
+                        detailHits.length) %
+                        detailHits.length) +
+                      1
+                    : search.surface === "viewer" && viewerHits.length
+                      ? (((search.index % viewerHits.length) +
+                          viewerHits.length) %
+                          viewerHits.length) +
+                        1
+                      : search.surface === "tree" && treeHits.length
+                        ? (((search.index % treeHits.length) +
+                            treeHits.length) %
+                            treeHits.length) +
+                          1
+                        : 0
+                }
+              />
+            </Box>
+          ) : (
             <Box marginBottom={1} justifyContent="space-between" width={width}>
               <Text dimColor>{showBranding ? branding : ""}</Text>
               <Text dimColor>{shortcuts}</Text>
@@ -1585,8 +1817,8 @@ export function App({
           )}
 
           <SessionTreePanel
-            projects={displayTree.projects ?? []}
-            coldProjects={displayTree.coldProjects ?? []}
+            projects={narrowedTree.projects ?? []}
+            coldProjects={narrowedTree.coldProjects ?? []}
             selectedId={selectedId}
             hasFocus={focus === "tree"}
             width={width}
@@ -1596,6 +1828,15 @@ export function App({
             spinner={spinner}
             scopeLabel={scopeToProject ? basename(scopeToProject) : undefined}
             census={isWatchMode ? census : undefined}
+            searchQuery={search?.surface === "tree" ? search.query : undefined}
+            searchHitId={
+              search?.surface === "tree" && treeHits.length > 0
+                ? treeHits[
+                    ((search.index % treeHits.length) + treeHits.length) %
+                      treeHits.length
+                  ]
+                : undefined
+            }
           />
 
           <Box marginTop={1}>
@@ -1606,6 +1847,8 @@ export function App({
                 scrollOffset={detailScrollOffset}
                 visibleRows={viewerRows}
                 width={width}
+                searchQuery={search?.surface === "detail" ? search.query : ""}
+                activeMatchLine={detailCurrentLine}
               />
             ) : (
               <ActivityViewerPanel
@@ -1622,6 +1865,20 @@ export function App({
                 hasFocus={focus === "viewer"}
                 spinner={spinner}
                 filterLabel={filterLabel}
+                searchQuery={
+                  search?.surface === "viewer" ? search.query : undefined
+                }
+                searchHits={
+                  search?.surface === "viewer" ? viewerHits : undefined
+                }
+                searchSelected={
+                  search?.surface === "viewer" ? search.index : undefined
+                }
+                searchWindowStart={
+                  search?.surface === "viewer"
+                    ? viewerSearchWindowStart
+                    : undefined
+                }
               />
             )}
           </Box>

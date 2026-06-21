@@ -132,6 +132,12 @@ export interface ActivityViewerPanelProps {
   searchQuery?: string;
   /** Index into `searchHits` identifying the currently selected match (0-based). */
   searchSelected?: number;
+  /**
+   * Persisted edge-scroll window start for viewer narrow-finder. When provided,
+   * this value is used directly (with defensive clamp) instead of computing
+   * windowStart from safeSelected, enabling fzf-style stable-window scrolling.
+   */
+  searchWindowStart?: number;
 }
 
 function formatActivityTime(date: Date, now: Date): string {
@@ -322,6 +328,7 @@ export function ActivityViewerPanel({
   searchHits,
   searchQuery,
   searchSelected,
+  searchWindowStart,
 }: ActivityViewerPanelProps): React.ReactElement {
   const innerWidth = getInnerWidth(width);
   const contentWidth = innerWidth - 1;
@@ -351,11 +358,14 @@ export function ActivityViewerPanel({
       );
     } else {
       // Window the hit list so the selected hit stays visible within
-      // `visibleRows`. Mirror the normal render path's slice logic.
-      const windowStart = Math.max(
-        0,
-        Math.min(safeSelected, searchHits.length - visibleRows),
-      );
+      // `visibleRows`. Use the persisted edge-scroll start from App when
+      // available (fzf-style stable window); fall back to pinning the
+      // selected hit at the top (legacy behaviour) when it isn't.
+      const maxWindowStart = Math.max(0, searchHits.length - visibleRows);
+      const windowStart =
+        searchWindowStart !== undefined
+          ? Math.max(0, Math.min(searchWindowStart, maxWindowStart))
+          : Math.max(0, Math.min(safeSelected, maxWindowStart));
       const windowEnd = Math.min(searchHits.length, windowStart + visibleRows);
       const windowedHits = searchHits.slice(windowStart, windowEnd);
       for (let wi = 0; wi < windowedHits.length; wi++) {

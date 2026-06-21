@@ -75,6 +75,7 @@ import { useTick } from "./hooks/useTick.js";
 import { SessionTreePanel } from "./SessionTreePanel.js";
 import { activityMatches } from "./search/activityMatch.js";
 import { detailMatchLines } from "./search/detailMatches.js";
+import { edgeScrollWindowStart } from "./search/edgeScroll.js";
 import { SearchInput } from "./search/SearchInput.js";
 import type { SearchState } from "./search/searchKey.js";
 import { applyDetailSearchKey } from "./search/searchKey.js";
@@ -682,6 +683,11 @@ export function App({
 
   // In-pane search state. null = search closed.
   const [search, setSearch] = useState<SearchState | null>(null);
+
+  // Persisted window-start for viewer narrow-finder edge-scroll. Reset to 0
+  // when search opens or query resets (index → 0 on query change). Updated
+  // via edgeScrollWindowStart on every ↑/↓ in viewer search mode.
+  const [viewerSearchWindowStart, setViewerSearchWindowStart] = useState(0);
 
   // Tree as the renderer sees it. Defaults to the hidden-stripped
   // view; flips to the full source tree when `showHidden` is on.
@@ -1501,6 +1507,7 @@ export function App({
     onOpenSearch: () => {
       const surface: SearchSurface = detailMode ? "detail" : focus;
       setSearch({ surface, query: "", index: 0, committed: false });
+      if (!detailMode && focus === "viewer") setViewerSearchWindowStart(0);
     },
     onSearchKey: (input, key) => {
       // Viewer surface: narrow-finder. ↑/↓ move selection; Enter jumps cursor + closes; Esc cancels.
@@ -1515,15 +1522,21 @@ export function App({
         if (key.upArrow) {
           if (hits.length === 0) return;
           const n = hits.length;
-          setSearch((s) =>
-            s ? { ...s, index: (((s.index - 1) % n) + n) % n } : s,
+          const newIndex = (((search.index - 1) % n) + n) % n;
+          setSearch((s) => (s ? { ...s, index: newIndex } : s));
+          setViewerSearchWindowStart((prev) =>
+            edgeScrollWindowStart(prev, newIndex, viewerRows, hits.length),
           );
           return;
         }
         if (key.downArrow) {
           if (hits.length === 0) return;
           const n = hits.length;
-          setSearch((s) => (s ? { ...s, index: (s.index + 1) % n } : s));
+          const newIndex = (search.index + 1) % n;
+          setSearch((s) => (s ? { ...s, index: newIndex } : s));
+          setViewerSearchWindowStart((prev) =>
+            edgeScrollWindowStart(prev, newIndex, viewerRows, hits.length),
+          );
           return;
         }
         if (key.return) {
@@ -1549,12 +1562,14 @@ export function App({
           setSearch((s) =>
             s ? { ...s, query: s.query.slice(0, -1), index: 0 } : s,
           );
+          setViewerSearchWindowStart(0);
           return;
         }
         if (input && !key.ctrl && input.length === 1) {
           setSearch((s) =>
             s ? { ...s, query: s.query + input, index: 0 } : s,
           );
+          setViewerSearchWindowStart(0);
           return;
         }
         return;
@@ -1858,6 +1873,11 @@ export function App({
                 }
                 searchSelected={
                   search?.surface === "viewer" ? search.index : undefined
+                }
+                searchWindowStart={
+                  search?.surface === "viewer"
+                    ? viewerSearchWindowStart
+                    : undefined
                 }
               />
             )}

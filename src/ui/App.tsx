@@ -1483,6 +1483,10 @@ export function App({
     onQuit: exit,
     onFilter: () => setFilterIndex((i) => (i + 1) % filterPresets.length),
     filterLabel,
+    // TODO(Task 3): replace these stubs with real search state
+    searchActive: false,
+    onOpenSearch: () => {},
+    onSearchKey: () => {},
   });
 
   useInput((input, key) => handleInput(input, key), { isActive: isWatchMode });

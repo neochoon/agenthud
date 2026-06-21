@@ -68,6 +68,7 @@ function makeOptions(overrides = {}) {
     focus: "tree" as const,
     detailMode: false,
     helpMode: false,
+    searchActive: false,
     onSwitchFocus: vi.fn(),
     onScrollUp: vi.fn(),
     onScrollDown: vi.fn(),
@@ -88,6 +89,8 @@ function makeOptions(overrides = {}) {
     onDetailScrollHalfPageDown: vi.fn(),
     onFilter: vi.fn(),
     onHelp: vi.fn(),
+    onOpenSearch: vi.fn(),
+    onSearchKey: vi.fn(),
     filterLabel: "all",
     ...overrides,
   };
@@ -665,6 +668,28 @@ describe("useHotkeys", () => {
       );
       act(() => result.current.handleInput("d", { ...noopKey, ctrl: true }));
       expect(onDetailScrollHalfPageDown).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("search mode", () => {
+    it("routes all keys to onSearchKey while searchActive, before other modes", () => {
+      const onSearchKey = vi.fn();
+      const onQuit = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ searchActive: true, onSearchKey, onQuit })),
+      );
+      act(() => result.current.handleInput("q", noopKey));
+      expect(onSearchKey).toHaveBeenCalledWith("q", expect.any(Object));
+      expect(onQuit).not.toHaveBeenCalled(); // search swallows it
+    });
+
+    it("'/' opens search for the focused surface when not active", () => {
+      const onOpenSearch = vi.fn();
+      const { result } = renderHook(() =>
+        useHotkeys(makeOptions({ searchActive: false, onOpenSearch })),
+      );
+      act(() => result.current.handleInput("/", noopKey));
+      expect(onOpenSearch).toHaveBeenCalledTimes(1);
     });
   });
 });

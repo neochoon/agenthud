@@ -187,6 +187,25 @@ export function readClaudeVersion(tailLines: string[]): string | undefined {
   return version;
 }
 
+/**
+ * The authoritative project path = the `cwd` from the first entry that
+ * carries one. Claude stamps `cwd` on message entries; reading it avoids
+ * the lossy folder-name decode (`decodeProjectPath` turns every `-` into
+ * `/`, so a real dir like `meta-claude` would become `meta/claude`).
+ * Returns undefined when no entry has a cwd. Pure — unit-tested.
+ */
+export function readSessionCwd(lines: string[]): string | undefined {
+  for (const line of lines) {
+    try {
+      const entry = JSON.parse(line);
+      if (typeof entry.cwd === "string" && entry.cwd) return entry.cwd;
+    } catch {
+      // skip non-JSON lines
+    }
+  }
+  return undefined;
+}
+
 /** Test hook: total entries across the per-file caches (bound check). */
 export function claudeFileCacheEntryCount(): number {
   return (
@@ -686,9 +705,6 @@ export function discoverSessions(
 
   for (const encodedDir of projectDirs) {
     const projectDir = join(projectsDir, encodedDir);
-    const decodedPath = decodeProjectPath(encodedDir);
-    if (scope !== null && decodedPath !== scope) continue;
-    const projectName = basename(decodedPath);
 
     let files: string[];
     try {
@@ -698,6 +714,26 @@ export function discoverSessions(
     } catch {
       continue;
     }
+
+    // Prefer the authoritative `cwd` from a session over the lossy
+    // folder-name decode — `decodeProjectPath` turns every `-` into `/`,
+    // so a real dir like `meta-claude` would show as `meta/claude`.
+    let projectPath = decodeProjectPath(encodedDir);
+    for (const f of files) {
+      try {
+        const cwd = readSessionCwd(
+          readHeadText(join(projectDir, f), HEAD_READ_BYTES).split("\n"),
+        );
+        if (cwd) {
+          projectPath = cwd;
+          break;
+        }
+      } catch {
+        // unreadable session file — try the next one
+      }
+    }
+    if (scope !== null && projectPath !== scope) continue;
+    const projectName = basename(projectPath);
 
     for (const file of files) {
       const id = file.replace(/\.jsonl$/, "");
@@ -717,7 +753,7 @@ export function discoverSessions(
           id,
           hideKey,
           filePath,
-          projectPath: decodedPath,
+          projectPath,
           projectName,
           lastModifiedMs: stat.mtimeMs,
           status: getSessionStatus(stat.mtimeMs),

@@ -799,9 +799,23 @@ describe("viewer search → Enter opens Detail View", () => {
       interval: 25,
     });
     stdin.write("\t"); // focus tree → viewer
-    await tick();
+    // The `/` handler reads the CURRENT focus to decide the search surface
+    // (tree vs viewer). A fixed tick is race-prone: under CI load the focus
+    // switch from Tab may not have committed, so `/` opens a TREE search whose
+    // Enter only selects a node — it never opens the activity Detail View.
+    // Wait for the viewer footer ("↵: detail") to confirm focus is on the
+    // viewer before opening search. ("↵: expand" is the tree-focus footer.)
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("↵: detail"), {
+      timeout: 3000,
+      interval: 25,
+    });
     stdin.write("/"); // open viewer search
-    await tick();
+    // Wait for the search prompt (empty query renders "0/0") so typed
+    // characters are routed to the search input, not the viewer hotkeys.
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("0/0"), {
+      timeout: 3000,
+      interval: 25,
+    });
     for (const ch of "auth") {
       stdin.write(ch); // type char-by-char (ink delivers each as length-1 input)
       await tick();

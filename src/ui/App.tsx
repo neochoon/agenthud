@@ -1062,6 +1062,23 @@ export function App({
     if (tracking) setTracking(false);
   };
 
+  // Open the Detail View for a given activity. Shared by normal viewer Enter
+  // (`onEnter`) and the viewer search-finder Enter so both open detail the
+  // same way (incl. resolving a commit's full `git show` body).
+  const openActivityDetail = (act: ActivityEntry) => {
+    if (act.type === "commit") {
+      const node = allFlatRef.current.find((s) => s.id === selectedId);
+      const detail = node?.projectPath
+        ? (getCommitDetail(node.projectPath, act.label) ?? act.detail)
+        : act.detail;
+      setDetailActivity({ ...act, detail });
+    } else {
+      setDetailActivity(act);
+    }
+    setDetailMode(true);
+    setDetailScrollOffset(0);
+  };
+
   const { handleInput, statusBarItems } = useHotkeys({
     focus,
     detailMode,
@@ -1260,19 +1277,7 @@ export function App({
           viewerRows,
           viewerCursorLine,
         );
-        if (act) {
-          if (act.type === "commit") {
-            const node = allFlatRef.current.find((s) => s.id === selectedId);
-            const detail = node?.projectPath
-              ? (getCommitDetail(node.projectPath, act.label) ?? act.detail)
-              : act.detail;
-            setDetailActivity({ ...act, detail });
-          } else {
-            setDetailActivity(act);
-          }
-          setDetailMode(true);
-          setDetailScrollOffset(0);
-        }
+        if (act) openActivityDetail(act);
         return;
       }
       if (focus !== "tree" || !selectedId) return;
@@ -1553,6 +1558,10 @@ export function App({
               setViewerCursorLine(0);
               setIsLive(false);
               setScrollOffset(newScrollOffset);
+              // Searching was to inspect the match — open its Detail View,
+              // not just position the cursor.
+              const act = mergedActivities[hitIndex];
+              if (act) openActivityDetail(act);
             }
           }
           setSearch(null);

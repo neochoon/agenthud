@@ -2,6 +2,7 @@
 import { render } from "ink-testing-library";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
+  ActivityEntry,
   ProjectNode,
   SessionNode,
   SessionTree,
@@ -30,8 +31,9 @@ vi.mock("../../src/data/sessions.js", () => ({
   getProjectsDir: () => "/tmp/nonexistent-projects-dir",
 }));
 
+let mockActivities: ActivityEntry[] = [];
 vi.mock("../../src/data/sessionHistory.js", () => ({
-  parseSessionHistory: () => [],
+  parseSessionHistory: () => mockActivities,
 }));
 
 const {
@@ -76,6 +78,7 @@ const makeColdProject = (name: string): ProjectNode => ({
 
 beforeEach(() => {
   mockTree = emptyTree();
+  mockActivities = [];
 });
 
 describe("App", () => {
@@ -734,3 +737,77 @@ function sessionStub(id: string) {
     liveState: null,
   };
 }
+
+describe("viewer search → Enter opens Detail View", () => {
+  const tick = () => new Promise((r) => setTimeout(r, 50));
+
+  it("opens the matched activity's detail on Enter (not just select+exit)", async () => {
+    mockTree = {
+      projects: [
+        {
+          name: "proj",
+          projectPath: "/tmp/proj",
+          hotness: "hot",
+          sessions: [
+            {
+              id: "s1",
+              hideKey: "proj/s1",
+              filePath: "/tmp/proj/s1.jsonl",
+              projectPath: "/tmp/proj",
+              projectName: "proj",
+              lastModifiedMs: Date.now(),
+              status: "hot",
+              modelName: null,
+              subAgents: [],
+              nonInteractive: false,
+              firstUserPrompt: "do auth",
+              liveState: null,
+            },
+          ],
+        },
+      ],
+      coldProjects: [],
+      totalCount: 1,
+      timestamp: new Date().toISOString(),
+      hiddenStats: { total: 0, active: 0 },
+    };
+    mockActivities = [
+      {
+        timestamp: new Date(),
+        type: "tool",
+        icon: "○",
+        label: "Read",
+        detail: "auth.ts",
+        detailBody: "DETAIL_BODY_MARKER",
+        detailKind: "code",
+      },
+      {
+        timestamp: new Date(),
+        type: "tool",
+        icon: "$",
+        label: "Bash",
+        detail: "npm test",
+      },
+    ];
+
+    const { stdin, lastFrame } = render(<App mode="watch" />);
+    await tick();
+    stdin.write("\t"); // focus tree → viewer
+    await tick();
+    stdin.write("/"); // open viewer search
+    await tick();
+    for (const ch of "auth") {
+      stdin.write(ch); // type char-by-char (ink delivers each as length-1 input)
+      await tick();
+    }
+    stdin.write("\r"); // Enter → open the matched activity's Detail View
+
+    // The Detail View renders the matched activity's body — the bug was that
+    // Enter only positioned the cursor + closed search without opening detail.
+    // waitFor polls so the assertion is robust to render-flush timing.
+    await vi.waitFor(
+      () => expect(lastFrame() ?? "").toContain("DETAIL_BODY_MARKER"),
+      { timeout: 3000, interval: 25 },
+    );
+  });
+});

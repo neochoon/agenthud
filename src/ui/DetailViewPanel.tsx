@@ -12,10 +12,10 @@
  *   highlighters. Goal is structural cues (added vs removed,
  *   prose vs code), not real syntax highlighting — keeps the
  *   dependency surface tiny and the renderer fast.
- * - Scroll-only overlay: `↑/↓/j/k` to scroll, `Esc/q/↵` to close.
- *   No find/search/copy — Ink's text rendering would have to
- *   reimplement them and they're easily available outside the
- *   TUI.
+ * - Navigation: `↑/↓/j/k` + `Ctrl+U/D` scroll, `Esc/q/↵` close,
+ *   and `/` opens a less-style in-body search (jump to first
+ *   match, `n`/`N` next/prev, matched spans highlighted via
+ *   `matchRanges`). Copy is still left to outside the TUI.
  *
  * Gotcha:
  * - Indentation and whitespace inside code and diff bodies must

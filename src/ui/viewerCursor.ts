@@ -25,6 +25,10 @@
  *   a `useEffect` and applies the result to setViewerCursorLine /
  *   setIsLive / setScrollOffset / setNewCount. Tests run as plain
  *   unit tests with no React surface.
+ * - `scrollOffsetForCursor` computes the scrollOffset needed to
+ *   place a search hit at cursorLine 0 (bottom of viewport) in
+ *   PAUSED mode. Used by the viewer search Enter handler so the
+ *   selected match is always visible, not just highlighted off-screen.
  */
 
 export interface AdjustViewerCursorArgs {
@@ -100,4 +104,22 @@ export function adjustViewerCursorOnNewActivities(
     autoPause: true,
     scrollDelta: delta - upwardRoom,
   };
+}
+
+/**
+ * Compute the scrollOffset that places the activity at `hitIndex`
+ * (0 = oldest, total-1 = newest) at cursorLine 0 (the bottom of the
+ * viewport). Caller must also set viewerCursorLine = 0.
+ *
+ * Derivation: PAUSED slice → absolute cursor index = total - scrollOffset - 1 - cursorLine.
+ * At cursorLine = 0: scrollOffset = total - 1 - hitIndex.
+ * Clamped to [0, max(0, total - viewerRows)] so we never scroll past the oldest.
+ */
+export function scrollOffsetForCursor(
+  total: number,
+  hitIndex: number,
+  viewerRows: number,
+): number {
+  const raw = total - 1 - hitIndex;
+  return Math.max(0, Math.min(raw, Math.max(0, total - viewerRows)));
 }

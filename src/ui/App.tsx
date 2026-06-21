@@ -78,7 +78,10 @@ import { detailMatchLines } from "./search/detailMatches.js";
 import { SearchInput } from "./search/SearchInput.js";
 import type { SearchState } from "./search/searchKey.js";
 import { applyDetailSearchKey } from "./search/searchKey.js";
-import { adjustViewerCursorOnNewActivities } from "./viewerCursor.js";
+import {
+  adjustViewerCursorOnNewActivities,
+  scrollOffsetForCursor,
+} from "./viewerCursor.js";
 
 type SearchSurface = "tree" | "viewer" | "detail";
 
@@ -1528,11 +1531,14 @@ export function App({
               ((search.index % hits.length) + hits.length) % hits.length;
             const hitIndex = hits[safeIndex];
             if (hitIndex !== undefined) {
-              // cursorLine = "entries back from newest" → filteredActivities.length - 1 - hitIndex
-              const newCursorLine = mergedActivities.length - 1 - hitIndex;
-              setViewerCursorLine(Math.max(0, newCursorLine));
+              const newScrollOffset = scrollOffsetForCursor(
+                mergedActivities.length,
+                hitIndex,
+                viewerRows,
+              );
+              setViewerCursorLine(0);
               setIsLive(false);
-              setScrollOffset(0);
+              setScrollOffset(newScrollOffset);
             }
           }
           setSearch(null);

@@ -1062,6 +1062,23 @@ export function App({
     if (tracking) setTracking(false);
   };
 
+  // Open the Detail View for a given activity. Shared by normal viewer Enter
+  // (`onEnter`) and the viewer search-finder Enter so both open detail the
+  // same way (incl. resolving a commit's full `git show` body).
+  const openActivityDetail = (act: ActivityEntry) => {
+    if (act.type === "commit") {
+      const node = allFlatRef.current.find((s) => s.id === selectedId);
+      const detail = node?.projectPath
+        ? (getCommitDetail(node.projectPath, act.label) ?? act.detail)
+        : act.detail;
+      setDetailActivity({ ...act, detail });
+    } else {
+      setDetailActivity(act);
+    }
+    setDetailMode(true);
+    setDetailScrollOffset(0);
+  };
+
   const { handleInput, statusBarItems } = useHotkeys({
     focus,
     detailMode,
@@ -1260,19 +1277,7 @@ export function App({
           viewerRows,
           viewerCursorLine,
         );
-        if (act) {
-          if (act.type === "commit") {
-            const node = allFlatRef.current.find((s) => s.id === selectedId);
-            const detail = node?.projectPath
-              ? (getCommitDetail(node.projectPath, act.label) ?? act.detail)
-              : act.detail;
-            setDetailActivity({ ...act, detail });
-          } else {
-            setDetailActivity(act);
-          }
-          setDetailMode(true);
-          setDetailScrollOffset(0);
-        }
+        if (act) openActivityDetail(act);
         return;
       }
       if (focus !== "tree" || !selectedId) return;
@@ -1553,6 +1558,10 @@ export function App({
               setViewerCursorLine(0);
               setIsLive(false);
               setScrollOffset(newScrollOffset);
+              // Searching was to inspect the match — open its Detail View,
+              // not just position the cursor.
+              const act = mergedActivities[hitIndex];
+              if (act) openActivityDetail(act);
             }
           }
           setSearch(null);
@@ -1636,7 +1645,24 @@ export function App({
     },
   });
 
-  useInput((input, key) => handleInput(input, key), { isActive: isWatchMode });
+  // `handleInput` is rebuilt every render with fresh closures over state
+  // (focus, search query/surface, merged activities). Ink's `useInput`
+  // re-subscribes its stdin listener from a `useEffect` that runs AFTER
+  // commit, so for a short window the SUBSCRIBED handler is a previous
+  // render's closure. A keystroke arriving in that window is processed
+  // against stale state — observed on CI as `/` opening a TREE search even
+  // though focus had already committed to the viewer, and typed characters
+  // being dropped. Subscribe a stable callback once and dispatch through a
+  // ref that always points at the latest handler, so input is never handled
+  // by an outdated closure (and per-render listener churn is removed).
+  const handleInputRef = useRef(handleInput);
+  handleInputRef.current = handleInput;
+  const stableHandleInput = useCallback(
+    (input: string, key: Parameters<typeof handleInput>[1]) =>
+      handleInputRef.current(input, key),
+    [],
+  );
+  useInput(stableHandleInput, { isActive: isWatchMode });
 
   // Detail search: derive the raw source lines from the active detail body
   // (split by \n, before wrapping) so detailMatchLines can index into them.

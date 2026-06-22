@@ -2,6 +2,7 @@
 import { render } from "ink-testing-library";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
+  ActivityEntry,
   ProjectNode,
   SessionNode,
   SessionTree,
@@ -30,8 +31,9 @@ vi.mock("../../src/data/sessions.js", () => ({
   getProjectsDir: () => "/tmp/nonexistent-projects-dir",
 }));
 
+let mockActivities: ActivityEntry[] = [];
 vi.mock("../../src/data/sessionHistory.js", () => ({
-  parseSessionHistory: () => [],
+  parseSessionHistory: () => mockActivities,
 }));
 
 const {
@@ -76,6 +78,7 @@ const makeColdProject = (name: string): ProjectNode => ({
 
 beforeEach(() => {
   mockTree = emptyTree();
+  mockActivities = [];
 });
 
 describe("App", () => {
@@ -734,3 +737,104 @@ function sessionStub(id: string) {
     liveState: null,
   };
 }
+
+describe("viewer search → Enter opens Detail View", () => {
+  const tick = () => new Promise((r) => setTimeout(r, 50));
+
+  it("opens the matched activity's detail on Enter (not just select+exit)", async () => {
+    mockTree = {
+      projects: [
+        {
+          name: "proj",
+          projectPath: "/tmp/proj",
+          hotness: "hot",
+          sessions: [
+            {
+              id: "s1",
+              hideKey: "proj/s1",
+              filePath: "/tmp/proj/s1.jsonl",
+              projectPath: "/tmp/proj",
+              projectName: "proj",
+              lastModifiedMs: Date.now(),
+              status: "hot",
+              modelName: null,
+              subAgents: [],
+              nonInteractive: false,
+              firstUserPrompt: "do auth",
+              liveState: null,
+            },
+          ],
+        },
+      ],
+      coldProjects: [],
+      totalCount: 1,
+      timestamp: new Date().toISOString(),
+      hiddenStats: { total: 0, active: 0 },
+    };
+    mockActivities = [
+      {
+        timestamp: new Date(),
+        type: "tool",
+        icon: "○",
+        label: "Read",
+        detail: "auth.ts",
+        detailBody: "DETAIL_BODY_MARKER",
+        detailKind: "code",
+      },
+      {
+        timestamp: new Date(),
+        type: "tool",
+        icon: "$",
+        label: "Bash",
+        detail: "npm test",
+      },
+    ];
+
+    const { stdin, lastFrame } = render(<App mode="watch" />);
+    // Activities load asynchronously; wait for the viewer to render them before
+    // interacting. A fixed tick is race-prone under CI load (the search would
+    // have nothing to match, so Enter closes search without opening detail).
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("auth.ts"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write("\t"); // focus tree → viewer
+    // The `/` handler reads the CURRENT focus to decide the search surface
+    // (tree vs viewer). A fixed tick is race-prone: under CI load the focus
+    // switch from Tab may not have committed, so `/` opens a TREE search whose
+    // Enter only selects a node — it never opens the activity Detail View.
+    // Wait for the viewer footer ("↵: detail") to confirm focus is on the
+    // viewer before opening search. ("↵: expand" is the tree-focus footer.)
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("↵: detail"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write("/"); // open viewer search
+    // Wait for the search prompt (empty query renders "0/0") so typed
+    // characters are routed to the search input, not the viewer hotkeys.
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("0/0"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    for (const ch of "auth") {
+      stdin.write(ch); // type char-by-char (ink delivers each as length-1 input)
+      await tick();
+    }
+    // Wait until the search input reports exactly one match (`/auth   1/1`)
+    // before pressing Enter, so Enter is guaranteed to navigate to the match
+    // rather than firing while hits are still being computed.
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1/1"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write("\r"); // Enter → open the matched activity's Detail View
+
+    // The Detail View renders the matched activity's body — the bug was that
+    // Enter only positioned the cursor + closed search without opening detail.
+    // waitFor polls so the assertion is robust to render-flush timing.
+    await vi.waitFor(
+      () => expect(lastFrame() ?? "").toContain("DETAIL_BODY_MARKER"),
+      { timeout: 3000, interval: 25 },
+    );
+  });
+});

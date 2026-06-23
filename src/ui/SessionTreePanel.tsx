@@ -1101,18 +1101,7 @@ export function SessionTreePanel({
     }
     livePrefixCount++;
   }
-  // Cap the sticky prefix so it can't swallow the whole panel — always
-  // leave at least one row for the scrollable tail.
-  const pinnedCount = needsOverflow
-    ? Math.min(livePrefixCount, Math.max(0, visibleCount - 1))
-    : 0;
-  const pinnedRows = flatRows.slice(0, pinnedCount);
-  const restRows = flatRows.slice(pinnedCount);
-  const restTotal = restRows.length;
-
-  // Index of the selected row within the scrollable tail (pinned rows are
-  // always visible, so a selection there needs no scroll).
-  const selectedRestIndex = restRows.findIndex((row) => {
+  const isSelectedRow = (row: FlatRow) => {
     if (row.kind === "project") return selectedId === row.sentinelId;
     if (row.kind === "session") return row.session.id === selectedId;
     if (row.kind === "subagent-summary")
@@ -1121,17 +1110,44 @@ export function SessionTreePanel({
     if (row.kind === "cold-sessions-summary")
       return selectedId === `__cold-sessions-${row.projectName}__`;
     return false;
-  });
+  };
+  const isSearchHitRow = (row: FlatRow) =>
+    row.kind === "session" && row.session.id === searchHitId;
+
+  // The scroll anchor in the FULL row list (search hit if searching, else the
+  // selection). Used to decide whether pinning the live prefix is appropriate.
+  const anchorFlatIndex =
+    searchHitId !== undefined
+      ? flatRows.findIndex(isSearchHitRow)
+      : flatRows.findIndex(isSelectedRow);
+
+  // Pin the sticky live prefix ONLY when the anchor is BELOW it (browsing the
+  // cold/idle tail) — that is the feature's purpose: keep live work visible
+  // while scrolling cold. When the anchor is INSIDE the live prefix the user is
+  // navigating the active list, so pinning the whole block would freeze the top
+  // and leave a one-row scroll tail (the cursor would appear stuck on the last
+  // row). In that case pin nothing and let the window follow the cursor.
+  const anchorInPrefix =
+    anchorFlatIndex >= 0 && anchorFlatIndex < livePrefixCount;
+  // Cap the sticky prefix so it can't swallow the whole panel — always
+  // leave at least one row for the scrollable tail.
+  const pinnedCount =
+    needsOverflow && !anchorInPrefix
+      ? Math.min(livePrefixCount, Math.max(0, visibleCount - 1))
+      : 0;
+  const pinnedRows = flatRows.slice(0, pinnedCount);
+  const restRows = flatRows.slice(pinnedCount);
+  const restTotal = restRows.length;
+
+  // Index of the selected row within the scrollable tail (pinned rows are
+  // always visible, so a selection there needs no scroll).
+  const selectedRestIndex = restRows.findIndex(isSelectedRow);
 
   // When search is active, anchor the scroll window on the search hit
   // (searchHitId) so the highlighted row stays on-screen, rather than
   // the regular selection which may be elsewhere.
   const searchHitRestIndex =
-    searchHitId !== undefined
-      ? restRows.findIndex(
-          (row) => row.kind === "session" && row.session.id === searchHitId,
-        )
-      : -1;
+    searchHitId !== undefined ? restRows.findIndex(isSearchHitRow) : -1;
   const anchorRestIndex =
     searchHitRestIndex >= 0 ? searchHitRestIndex : selectedRestIndex;
 

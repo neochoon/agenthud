@@ -115,7 +115,14 @@ then a second Esc closes Detail and restores it).
   `search=null` (viewer search stashed) — its `/` opens a fresh detail-surface
   search; the layering test is a guard, not RED-first (passes on Task 2 code).
 
-**Deviations from the plan:** None.
+**Deviations from the plan:** None in behavior. Post-merge-review fix: the
+layering test's detail-search steps originally used fixed `tick()`s (as the plan
+showed) and flaked on CI macos-22 (the second Esc raced the search-reset commit
+and was re-routed into the still-open detail search, so the viewer search never
+restored). Converted those steps to condition-waits (`0/0` → `1/1` →
+`↵/Esc: close` → `2/2`); the `↵/Esc: close` detail footer only renders when
+detailMode is on and no search is active, so it confirms the reset committed
+before the next Esc. Test-only; no product change.
 
 **Files touched:** `src/ui/App.tsx`, `tests/ui/App.test.tsx`.
 

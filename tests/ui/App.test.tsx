@@ -1228,15 +1228,34 @@ describe("viewer search → Enter opens Detail View", () => {
     });
 
     // Detail's own body search, then Esc to reset it (stay in Detail).
+    // Condition-wait each transition: a fixed tick is race-prone under CI load,
+    // and if the search-reset has not committed when the second Esc arrives, that
+    // Esc is routed back into the (still-open) detail search instead of closing
+    // the Detail — so the viewer search is never restored.
     stdin.write("/");
-    await tick();
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("0/0"), {
+      timeout: 3000,
+      interval: 25,
+    });
     for (const ch of "beta") {
       stdin.write(ch);
       await tick();
     }
-    await tick();
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1/1"), {
+      timeout: 3000,
+      interval: 25,
+    });
     stdin.write(ESC); // Esc → reset Detail search only (still in Detail)
-    await tick();
+    // Detail search cleared but still in Detail: the detail footer ("↵/Esc:
+    // close") only renders when detailMode is on AND no search is active, so it
+    // confirms the reset committed before we send the next Esc.
+    await vi.waitFor(
+      () => expect(lastFrame() ?? "").toContain("↵/Esc: close"),
+      {
+        timeout: 3000,
+        interval: 25,
+      },
+    );
     expect(lastFrame() ?? "").toContain("alpha"); // still in Detail body
 
     // Esc again → close Detail → viewer search restored.

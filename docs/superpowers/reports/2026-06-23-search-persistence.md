@@ -7,6 +7,40 @@ A durable, committed record of why each task was built the way it was —
 decisions and deviations a diff cannot show. Per-task entries are appended after
 a clean review; a one-page digest is synthesized at PR time.
 
+## Feature digest (PR catch-up)
+
+In-pane search is now a **persistent state** instead of a transient finder that
+closed on Enter. One new flag drives it: `SearchState.navigated` — set by ↑/↓,
+reset by any query edit.
+
+- **Enter on a list (Viewer/Tree):** no navigation → *filter-confirm* (the
+  matches-only view stays, search remains open); after ↑/↓ → *row action*
+  (Viewer opens the match's Detail; Tree selects/expands the node) and search
+  stays alive.
+- **Viewer → Detail → back:** a navigated-Enter snapshots the viewer search into
+  `savedViewerSearch` (query + selection + hit-window) before opening the Detail;
+  closing the Detail restores it with the cursor on the matched row. The Detail's
+  own `/` body search is independent — resetting it doesn't touch the snapshot.
+- **Esc is layered:** inside Detail it clears the Detail's own search first, then
+  a second Esc closes the Detail (restoring the viewer search); a base list-search
+  Esc still ends the search and restores the full view.
+
+Detail's existing two-phase (type → Enter commit → n/N) model is unchanged.
+Matching/narrowing logic is untouched.
+
+**Built across 3 TDD tasks** (each implemented + independently reviewed):
+Task 1 viewer Enter (`d75a75c..813dea9`), Task 2 round-trip restore
+(`3bc0682..a147940`), Task 3 tree Enter (`ecbaec1..6c20039`). 905 tests green,
+tsc clean, Biome clean. Final whole-branch review: **Ready to merge**.
+
+**Deliberate deviation:** the spec's filter-confirm "set `committed = true`" is
+not implemented for Viewer/Tree — nothing reads it there (YAGNI); `committed`
+stays Detail-only.
+
+**Known follow-up (not in this PR):** a viewer navigated-Enter when the hit list
+has shrunk to zero (live update under a fixed query) still ends the search,
+whereas Tree keeps it — a small viewer/tree asymmetry to align in a follow-up.
+
 ## Ledger
 
 - Task 1: complete (commits d75a75c..813dea9, review clean — Approved)

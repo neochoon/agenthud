@@ -1636,17 +1636,26 @@ export function App({
           if (hits.length === 0) return;
           const n = hits.length;
           setSearch((s) =>
-            s ? { ...s, index: (((s.index - 1) % n) + n) % n } : s,
+            s
+              ? { ...s, index: (((s.index - 1) % n) + n) % n, navigated: true }
+              : s,
           );
           return;
         }
         if (key.downArrow) {
           if (hits.length === 0) return;
           const n = hits.length;
-          setSearch((s) => (s ? { ...s, index: (s.index + 1) % n } : s));
+          setSearch((s) =>
+            s ? { ...s, index: (s.index + 1) % n, navigated: true } : s,
+          );
           return;
         }
         if (key.return) {
+          if (!search.navigated) {
+            // Filter-confirm: keep the narrowed tree search open.
+            return;
+          }
+          // Navigated to a hit → select/expand it, keep the search open.
           if (hits.length > 0) {
             const safeIndex =
               ((search.index % hits.length) + hits.length) % hits.length;
@@ -1656,18 +1665,26 @@ export function App({
               stopTracking();
             }
           }
-          setSearch(null);
           return;
         }
         if (key.delete || key.backspace) {
           setSearch((s) =>
-            s ? { ...s, query: s.query.slice(0, -1), index: 0 } : s,
+            s
+              ? {
+                  ...s,
+                  query: s.query.slice(0, -1),
+                  index: 0,
+                  navigated: false,
+                }
+              : s,
           );
           return;
         }
         if (input && !key.ctrl && input.length === 1) {
           setSearch((s) =>
-            s ? { ...s, query: s.query + input, index: 0 } : s,
+            s
+              ? { ...s, query: s.query + input, index: 0, navigated: false }
+              : s,
           );
           return;
         }

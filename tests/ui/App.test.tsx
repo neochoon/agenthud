@@ -738,6 +738,122 @@ function sessionStub(id: string) {
   };
 }
 
+describe("tree search → Enter keeps search alive", () => {
+  const tick = () => new Promise((r) => setTimeout(r, 50));
+  const ESC = String.fromCharCode(27);
+  const DOWN = ESC + "[B";
+
+  const twoMatchingSessions = (): SessionTree => ({
+    projects: [
+      {
+        name: "proj",
+        projectPath: "/tmp/proj",
+        hotness: "hot",
+        sessions: [
+          {
+            id: "s1",
+            hideKey: "proj/s1",
+            filePath: "/tmp/proj/s1.jsonl",
+            projectPath: "/tmp/proj",
+            projectName: "proj",
+            lastModifiedMs: Date.now(),
+            status: "hot",
+            modelName: null,
+            subAgents: [],
+            nonInteractive: false,
+            firstUserPrompt: "auth login",
+            liveState: null,
+          },
+          {
+            id: "s2",
+            hideKey: "proj/s2",
+            filePath: "/tmp/proj/s2.jsonl",
+            projectPath: "/tmp/proj",
+            projectName: "proj",
+            lastModifiedMs: Date.now(),
+            status: "hot",
+            modelName: null,
+            subAgents: [],
+            nonInteractive: false,
+            firstUserPrompt: "auth logout",
+            liveState: null,
+          },
+        ],
+      },
+    ],
+    coldProjects: [],
+    totalCount: 2,
+    timestamp: new Date().toISOString(),
+    hiddenStats: { total: 0, active: 0 },
+  });
+
+  it("bare Enter filter-confirms without closing the tree search", async () => {
+    mockTree = twoMatchingSessions();
+    mockActivities = [];
+
+    const { stdin, lastFrame } = render(<App mode="watch" />);
+    // Tree is focused at boot ("↵: expand" footer); open tree search directly.
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("↵: expand"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write("/");
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("0/0"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    for (const ch of "auth") {
+      stdin.write(ch);
+      await tick();
+    }
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1/2"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write("\r"); // bare Enter
+
+    // Search stays open (count still rendered), not torn down.
+    await tick();
+    await tick();
+    expect(lastFrame() ?? "").toContain("1/2");
+  });
+
+  it("↓ then Enter selects the navigated node and keeps the search open", async () => {
+    mockTree = twoMatchingSessions();
+    mockActivities = [];
+
+    const { stdin, lastFrame } = render(<App mode="watch" />);
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("↵: expand"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write("/");
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("0/0"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    for (const ch of "auth") {
+      stdin.write(ch);
+      await tick();
+    }
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1/2"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write(DOWN); // ↓ navigate
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("2/2"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write("\r"); // Enter → select node
+
+    // Search remains open after the selection (count still at the navigated 2/2).
+    await tick();
+    await tick();
+    expect(lastFrame() ?? "").toContain("2/2");
+  });
+});
+
 describe("viewer search → Enter opens Detail View", () => {
   const tick = () => new Promise((r) => setTimeout(r, 50));
   const ESC = String.fromCharCode(27);

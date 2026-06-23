@@ -10,6 +10,7 @@ a clean review; a one-page digest is synthesized at PR time.
 ## Ledger
 
 - Task 1: complete (commits d75a75c..813dea9, review clean — Approved)
+- Task 2: complete (commits 3bc0682..a147940, review clean — Approved)
 
 ---
 
@@ -51,3 +52,36 @@ Enter.
   an inline note.
 - Pre-existing (not a regression): a navigated Enter with `hits.length === 0`
   still closes the search without opening Detail.
+
+---
+
+## Task 2 — Viewer ↔ Detail round-trip: preserve & restore the viewer search
+
+**Intent:** Opening a Detail from a viewer-search row, then Esc-ing back, should
+land in the same viewer search with the cursor on the matched row; the Detail's
+own body search must be independent.
+
+**What was built:** Added `savedViewerSearch: { search; windowStart } | null`
+state in `App.tsx` (right after `search`). The viewer navigated-Enter branch
+snapshots `{ search, windowStart: viewerSearchWindowStart }` into it *before*
+opening the Detail (then still `setSearch(null)`). `onDetailClose` restores the
+snapshot (`setSearch` + `setViewerSearchWindowStart`) and clears the slot when
+present. Two tests: the round-trip restore (RED→GREEN) and a layering guard
+(Detail's own `/` search resets on Esc without losing the saved viewer search,
+then a second Esc closes Detail and restores it).
+
+**Key decisions / trade-offs:**
+- Snapshot captures the render-closure `search` by value before `setSearch(null)`
+  runs; React batches event-handler updates so the snapshot is never clobbered.
+- Restore is guarded by `if (savedViewerSearch)`, so a Detail opened by a plain
+  Enter (no active search) closes normally with no stale-search resurrection
+  (verified by the reviewer as the key risk).
+- Detail's independent body search "just works" because entering Detail sets
+  `search=null` (viewer search stashed) — its `/` opens a fresh detail-surface
+  search; the layering test is a guard, not RED-first (passes on Task 2 code).
+
+**Deviations from the plan:** None.
+
+**Files touched:** `src/ui/App.tsx`, `tests/ui/App.test.tsx`.
+
+**Follow-ups / known gaps:** None. (`committed` still Detail-only, as agreed.)

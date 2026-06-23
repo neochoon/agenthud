@@ -179,6 +179,20 @@ export function isProjectAlive(project: ProjectNode): boolean {
   return false;
 }
 
+/**
+ * A sub-agent is "running" — shown individually in the tree — when it is hot
+ * or live working/waiting. One-shot sub-agents that have finished (warm/cool/
+ * cold and not live) fold into the summary. Mirror of App's `isSubAgentRunning`
+ * (nav side); keep the two in sync.
+ */
+function isSubAgentRunning(sub: SessionNode): boolean {
+  return (
+    sub.status === "hot" ||
+    sub.liveState === "working" ||
+    sub.liveState === "waiting"
+  );
+}
+
 function getStatusColor(status: SessionStatus): string {
   switch (status) {
     case "hot":
@@ -398,6 +412,7 @@ type FlatRow =
   | {
       kind: "subagent-summary";
       parentId: string;
+      warmCount: number;
       coolCount: number;
       coldCount: number;
     }
@@ -425,14 +440,18 @@ function appendSessionRows(
   const subAgentsFullyExpanded =
     expandedIds.has(session.id) ||
     (isCold && expandedIds.has(sessionExpandedKey));
-  const hotWarm = session.subAgents.filter(
-    (s) => s.status === "hot" || s.status === "warm",
+  // Only RUNNING sub-agents (hot or live working/waiting) show individually;
+  // finished ones — warm/cool/cold — fold into the summary. Must match App's
+  // `isSubAgentRunning` (nav side).
+  const running = session.subAgents.filter(isSubAgentRunning);
+  const warm = session.subAgents.filter(
+    (s) => !isSubAgentRunning(s) && s.status === "warm",
   );
   const cool = session.subAgents.filter((s) => s.status === "cool");
   const cold = session.subAgents.filter((s) => s.status === "cold");
 
   if (subAgentsFullyExpanded) {
-    const all = [...hotWarm, ...cool, ...cold];
+    const all = [...running, ...warm, ...cool, ...cold];
     for (let i = 0; i < all.length; i++) {
       const isLast = i === all.length - 1;
       result.push({
@@ -442,12 +461,12 @@ function appendSessionRows(
       });
     }
   } else {
-    const hasSummary = cool.length > 0 || cold.length > 0;
-    for (let i = 0; i < hotWarm.length; i++) {
-      const isLast = i === hotWarm.length - 1 && !hasSummary;
+    const hasSummary = warm.length > 0 || cool.length > 0 || cold.length > 0;
+    for (let i = 0; i < running.length; i++) {
+      const isLast = i === running.length - 1 && !hasSummary;
       result.push({
         kind: "session",
-        session: hotWarm[i],
+        session: running[i],
         prefix: `        ${isLast ? "└─ " : "├─ "}» `,
       });
     }
@@ -455,6 +474,7 @@ function appendSessionRows(
       result.push({
         kind: "subagent-summary",
         parentId: session.id,
+        warmCount: warm.length,
         coolCount: cool.length,
         coldCount: cold.length,
       });
@@ -691,12 +711,14 @@ function ProjectRow({
 }
 
 function SubagentSummaryRow({
+  warmCount,
   coolCount,
   coldCount,
   contentWidth,
   isSelected,
   hasFocus,
 }: {
+  warmCount: number;
   coolCount: number;
   coldCount: number;
   contentWidth: number;
@@ -704,6 +726,7 @@ function SubagentSummaryRow({
   hasFocus: boolean;
 }): React.ReactElement {
   const parts: string[] = [];
+  if (warmCount > 0) parts.push(`${warmCount} warm`);
   if (coolCount > 0) parts.push(`${coolCount} cool`);
   if (coldCount > 0) parts.push(`${coldCount} cold`);
   const baseText = `        └─ ... ${parts.join("  ")}`;
@@ -1189,6 +1212,7 @@ export function SessionTreePanel({
     ) : row.kind === "subagent-summary" ? (
       <SubagentSummaryRow
         key={key}
+        warmCount={row.warmCount}
         coolCount={row.coolCount}
         coldCount={row.coldCount}
         contentWidth={contentWidth}

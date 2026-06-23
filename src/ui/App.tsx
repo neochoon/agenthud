@@ -117,6 +117,17 @@ const subSummarySentinel = (parentId: string): SessionNode =>
   makeSentinel(`__sub-${parentId}__`);
 
 /**
+ * A sub-agent is "running" — and so shown individually in the tree — when it
+ * is hot or its live state is working/waiting. Sub-agents are one-shot, so a
+ * finished one (warm/cool/cold and not live) is folded into the summary.
+ * Duplicated in SessionTreePanel (display side); keep the two in sync.
+ */
+const isSubAgentRunning = (sub: SessionNode): boolean =>
+  sub.status === "hot" ||
+  sub.liveState === "working" ||
+  sub.liveState === "waiting";
+
+/**
  * Sentinel row for "N cold sessions" inside an active project.
  * Default collapsed: cold sessions are historical context, not
  * what the user is working on right now. Press Enter on the
@@ -161,16 +172,12 @@ export function appendSubAgentRows(
   if (subAgentsFullyExpanded) {
     result.push(...session.subAgents);
   } else {
-    result.push(
-      ...session.subAgents.filter(
-        (sub) => sub.status === "hot" || sub.status === "warm",
-      ),
-    );
-    if (
-      session.subAgents.some(
-        (sub) => sub.status === "cool" || sub.status === "cold",
-      )
-    ) {
+    // Only RUNNING sub-agents show individually — hot, or live working/waiting.
+    // Sub-agents are one-shot, so a finished one (warm/cool/cold) is clutter;
+    // fold warm in with cool/cold under the summary. Must match
+    // SessionTreePanel's `isSubAgentRunning` split.
+    result.push(...session.subAgents.filter(isSubAgentRunning));
+    if (session.subAgents.some((sub) => !isSubAgentRunning(sub))) {
       result.push(subSummarySentinel(session.id));
     }
   }

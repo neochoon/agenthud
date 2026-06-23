@@ -171,6 +171,54 @@ describe("SessionTreePanel", () => {
     expect(frame).toContain("2 cool");
   });
 
+  it("groups finished warm sub-agents into the summary (only running shown)", () => {
+    const session = makeSession({
+      subAgents: [
+        makeSession({ id: "run1", projectName: "", status: "hot" }),
+        makeSession({ id: "warm1", projectName: "", status: "warm" }),
+        makeSession({ id: "warm2", projectName: "", status: "warm" }),
+      ],
+    });
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[makeProject("myproject", [session])]}
+        coldProjects={[]}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+      />,
+    );
+    const frame = lastFrame() ?? "";
+    expect(frame).toContain("»"); // the running (hot) sub-agent shows individually
+    expect(frame).toContain("2 warm"); // finished warm ones folded into the summary
+  });
+
+  it("keeps a live (working) sub-agent individual even when warm", () => {
+    const session = makeSession({
+      subAgents: [
+        makeSession({
+          id: "livewarm",
+          projectName: "",
+          status: "warm",
+          liveState: "working",
+        }),
+        makeSession({ id: "donewarm", projectName: "", status: "warm" }),
+      ],
+    });
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[makeProject("myproject", [session])]}
+        coldProjects={[]}
+        selectedId={null}
+        hasFocus={false}
+        width={80}
+      />,
+    );
+    const frame = lastFrame() ?? "";
+    expect(frame).toContain("»"); // the live (working) sub-agent shows
+    expect(frame).toContain("1 warm"); // the finished warm one is grouped
+  });
+
   it("shows a 4-char short session ID for parent sessions with a project name", () => {
     const session = makeSession({ id: "abc12345", projectName: "myproject" });
     const project = makeProject("myproject", [session]);

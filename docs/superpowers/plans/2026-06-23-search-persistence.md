@@ -14,8 +14,9 @@
 - Run `npx biome check --write <files>` before every commit (CI lints whole-repo Biome).
 - TDD: write the failing test first, see it fail for the right reason, then implement.
 - Never commit to `main` — work on branch `feat/210-search-persistence`.
-- Input reliability in tests: send arrow keys as ANSI escapes (`[B` = down, `[A` = up). In search mode `j`/`k` are typed into the query, not navigation.
-- Test timing: use condition waits (`vi.waitFor`) on committed frames, not fixed ticks. Established markers: viewer-focus footer contains `↵: detail`; an open search prompt renders the count (`0/0`, `2/2`, …).
+- **Key escape sequences in tests (verified in this repo's ink-testing-library):** build them from the ESC byte via `String.fromCharCode(27)` — never paste a raw ESC byte into source. At the top of each `describe` that needs them: `const ESC = String.fromCharCode(27); const DOWN = ESC + "[B"; const UP = ESC + "[A";`. Then `stdin.write(DOWN)` / `stdin.write(ESC)`. A bare `"[B"` (no ESC prefix) types two literal characters into the query. In search mode `j`/`k` are typed into the query, not navigation.
+- **Search prompt count is `current/total`, 1-BASED.** Empty query → `0/0`. Two matches at the first selection → `1/2`. After one ↓ → `2/2`. One match → `1/1`. Assert the exact count for the selection you expect, not the match total.
+- Test timing: use condition waits (`vi.waitFor`) on committed frames, not fixed ticks. Footer markers: viewer focus → `↵: detail`; tree focus → `↵: expand`.
 - Matching/narrowing logic (`activityMatch`, `treeSearch`, smart-case, panel hit-windowing) is **not** changed.
 
 ## Durable Implementation Record (controller protocol, not a code task)
@@ -57,7 +58,7 @@ entry.
 
 **Interfaces:**
 - Consumes: existing `activityMatches(mergedActivities, query)`, `scrollOffsetForCursor`, `openActivityDetail`, `setSearch`, `viewerSearchWindowStart`, `setViewerSearchWindowStart`, `edgeScrollWindowStart`.
-- Produces: `SearchState.navigated?: boolean` (default-false semantics); Viewer Enter behavior — bare Enter keeps search open (filter-confirm), `↓`/`↑` then Enter opens the selected match's Detail (and, as before this task, closes the viewer search via `setSearch(null)` — the round-trip preservation is added in Task 2).
+- Produces: `SearchState.navigated?: boolean` (default-false semantics); Viewer Enter behavior — bare Enter keeps search open (filter-confirm), `↓`/`↑` then Enter opens the selected match's Detail (and, as before this task, closes the viewer search via `setSearch(null)` — round-trip preservation is added in Task 2).
 
 - [ ] **Step 1: Add `navigated` to `SearchState`**
 
@@ -85,9 +86,18 @@ onOpenSearch: () => {
 },
 ```
 
-- [ ] **Step 3: Write the failing test — bare Enter keeps the viewer search open**
+- [ ] **Step 3: Add the shared key constants to the viewer-search describe**
 
-Add to `tests/ui/App.test.tsx` inside the `describe("viewer search → Enter opens Detail View", ...)` block (it already provides `tick`). Two matching activities so the count is `2/2`:
+In `tests/ui/App.test.tsx`, in the `describe("viewer search → Enter opens Detail View", ...)` block, add right after the existing `const tick = ...` line:
+
+```ts
+  const ESC = String.fromCharCode(27);
+  const DOWN = ESC + "[B";
+```
+
+- [ ] **Step 4: Write the failing test — bare Enter keeps the viewer search open**
+
+Add inside the same `describe`. Two matching activities so the count is `1/2`:
 
 ```ts
 it("bare Enter (no arrow) filter-confirms: search stays open, no detail", async () => {
@@ -112,10 +122,10 @@ it("bare Enter (no arrow) filter-confirms: search stays open, no detail", async 
     timestamp: new Date().toISOString(), hiddenStats: { total: 0, active: 0 },
   };
   mockActivities = [
-    { timestamp: new Date(), type: "tool", icon: "○", label: "Read",
-      detail: "auth.ts", detailBody: "READ_MARKER", detailKind: "code" },
-    { timestamp: new Date(), type: "tool", icon: "○", label: "Write",
-      detail: "auth.test.ts", detailBody: "WRITE_MARKER", detailKind: "code" },
+    { timestamp: new Date(2026, 0, 1, 9, 0, 0), type: "tool", icon: "○",
+      label: "Read", detail: "auth.ts", detailBody: "READ_MARKER", detailKind: "code" },
+    { timestamp: new Date(2026, 0, 1, 9, 0, 1), type: "tool", icon: "○",
+      label: "Write", detail: "auth.test.ts", detailBody: "WRITE_MARKER", detailKind: "code" },
   ];
 
   const { stdin, lastFrame } = render(<App mode="watch" />);
@@ -131,7 +141,7 @@ it("bare Enter (no arrow) filter-confirms: search stays open, no detail", async 
     timeout: 3000, interval: 25,
   });
   for (const ch of "auth") { stdin.write(ch); await tick(); }
-  await vi.waitFor(() => expect(lastFrame() ?? "").toContain("2/2"), {
+  await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1/2"), {
     timeout: 3000, interval: 25,
   });
   stdin.write("\r"); // bare Enter — no arrow navigation
@@ -139,20 +149,20 @@ it("bare Enter (no arrow) filter-confirms: search stays open, no detail", async 
   // Filter-confirm: search stays open (count still shown), no Detail opened.
   await tick();
   await tick();
-  expect(lastFrame() ?? "").toContain("2/2");
+  expect(lastFrame() ?? "").toContain("1/2");
   expect(lastFrame() ?? "").not.toContain("READ_MARKER");
   expect(lastFrame() ?? "").not.toContain("WRITE_MARKER");
 });
 ```
 
-- [ ] **Step 4: Run it to verify it fails**
+- [ ] **Step 5: Run it to verify it fails**
 
 Run: `npx vitest run tests/ui/App.test.tsx -t "filter-confirms"`
-Expected: FAIL — current code opens the Detail (frame contains a marker) and closes search (no `2/2`).
+Expected: FAIL — current code opens the Detail (frame contains a marker) and closes search (no `1/2`).
 
-- [ ] **Step 5: Implement the Enter branch + `navigated` set/reset**
+- [ ] **Step 6: Implement the Enter branch + `navigated` set/reset**
 
-In `src/ui/App.tsx`, in the `if (search?.surface === "viewer")` block:
+In `src/ui/App.tsx`, in the `if (search?.surface === "viewer")` block.
 
 Set `navigated: true` on both arrow handlers (keep the existing window-scroll calls):
 
@@ -221,14 +231,14 @@ if (input && !key.ctrl && input.length === 1) {
 }
 ```
 
-- [ ] **Step 6: Run the new test to verify it passes**
+- [ ] **Step 7: Run the new test to verify it passes**
 
 Run: `npx vitest run tests/ui/App.test.tsx -t "filter-confirms"`
 Expected: PASS.
 
-- [ ] **Step 7: Update the existing `#209` test to navigate before Enter**
+- [ ] **Step 8: Update the existing `#209` test to navigate before Enter**
 
-The pre-existing test `opens the matched activity's detail on Enter (not just select+exit)` now requires navigation (bare Enter no longer opens Detail). It uses a single matching activity (`auth.ts`, `DETAIL_BODY_MARKER`). Add a down-arrow before the Enter, and update the comment. Locate:
+The pre-existing test `opens the matched activity's detail on Enter (not just select+exit)` now requires navigation (bare Enter no longer opens Detail). It uses a single matching activity (`auth.ts`, `DETAIL_BODY_MARKER`, count `1/1`). Locate:
 
 ```ts
   await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1/1"), {
@@ -238,7 +248,7 @@ The pre-existing test `opens the matched activity's detail on Enter (not just se
   stdin.write("\r"); // Enter → open the matched activity's Detail View
 ```
 
-Replace with:
+Replace with (uses the `DOWN` constant added in Step 3):
 
 ```ts
   await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1/1"), {
@@ -246,18 +256,19 @@ Replace with:
     interval: 25,
   });
   // Navigating the selection (↓) makes Enter a row action; a bare Enter would
-  // now filter-confirm instead of opening the Detail View.
-  stdin.write("[B"); // ↓ — mark the selection as navigated
+  // now filter-confirm instead of opening the Detail View. With one match the
+  // count stays 1/1; the ↓ only sets the navigated flag.
+  stdin.write(DOWN); // ↓ — mark the selection as navigated
   await tick();
   stdin.write("\r"); // Enter → open the navigated match's Detail View
 ```
 
-- [ ] **Step 8: Run the full viewer-search describe + verify GREEN**
+- [ ] **Step 9: Run the full viewer-search describe + verify GREEN**
 
 Run: `npx vitest run tests/ui/App.test.tsx -t "viewer search"`
 Expected: PASS (both the updated `#209` test and the new filter-confirm test).
 
-- [ ] **Step 9: Lint + commit**
+- [ ] **Step 10: Lint + commit**
 
 ```bash
 npx biome check --write src/ui/search/searchKey.ts src/ui/App.tsx tests/ui/App.test.tsx
@@ -274,12 +285,12 @@ git commit -m "feat(search): viewer Enter filter-confirms unless a match was nav
 - Test: `tests/ui/App.test.tsx`
 
 **Interfaces:**
-- Consumes: Task 1's Viewer navigated-Enter branch; `viewerSearchWindowStart`/`setViewerSearchWindowStart`; `setSearch`; `setDetailMode`.
+- Consumes: Task 1's Viewer navigated-Enter branch; the `ESC`/`DOWN` constants added to the viewer-search describe in Task 1 Step 3; `viewerSearchWindowStart`/`setViewerSearchWindowStart`; `setSearch`; `setDetailMode`.
 - Produces: `savedViewerSearch: { search: SearchState; windowStart: number } | null` state; on navigated-Enter the viewer search is snapshotted before opening Detail; `onDetailClose` restores it (search + hit-window) when present and clears the slot.
 
 - [ ] **Step 1: Write the failing test — round-trip restores the viewer search + matched row**
 
-Add to the same `describe`:
+Add to the same `describe("viewer search → Enter opens Detail View", ...)` block (uses `tick`, `ESC`, `DOWN` from Task 1). Two matching activities, distinct timestamps so `Write` is index 1:
 
 ```ts
 it("restores the viewer search and the matched row after Esc out of Detail", async () => {
@@ -302,10 +313,10 @@ it("restores the viewer search and the matched row after Esc out of Detail", asy
     timestamp: new Date().toISOString(), hiddenStats: { total: 0, active: 0 },
   };
   mockActivities = [
-    { timestamp: new Date(), type: "tool", icon: "○", label: "Read",
-      detail: "auth.ts", detailBody: "READ_MARKER", detailKind: "code" },
-    { timestamp: new Date(), type: "tool", icon: "○", label: "Write",
-      detail: "auth.test.ts", detailBody: "WRITE_MARKER", detailKind: "code" },
+    { timestamp: new Date(2026, 0, 1, 9, 0, 0), type: "tool", icon: "○",
+      label: "Read", detail: "auth.ts", detailBody: "READ_MARKER", detailKind: "code" },
+    { timestamp: new Date(2026, 0, 1, 9, 0, 1), type: "tool", icon: "○",
+      label: "Write", detail: "auth.test.ts", detailBody: "WRITE_MARKER", detailKind: "code" },
   ];
 
   const { stdin, lastFrame } = render(<App mode="watch" />);
@@ -321,18 +332,20 @@ it("restores the viewer search and the matched row after Esc out of Detail", asy
     timeout: 3000, interval: 25,
   });
   for (const ch of "auth") { stdin.write(ch); await tick(); }
+  await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1/2"), {
+    timeout: 3000, interval: 25,
+  });
+  stdin.write(DOWN); // ↓ → navigate to 2nd match (Write / auth.test.ts)
   await vi.waitFor(() => expect(lastFrame() ?? "").toContain("2/2"), {
     timeout: 3000, interval: 25,
   });
-  stdin.write("[B"); // ↓ → navigate to 2nd match (Write / auth.test.ts)
-  await tick();
   stdin.write("\r"); // Enter → open that match's Detail
   await vi.waitFor(() => expect(lastFrame() ?? "").toContain("WRITE_MARKER"), {
     timeout: 3000, interval: 25,
   });
-  stdin.write(""); // Esc → close Detail, back to viewer
+  stdin.write(ESC); // Esc → close Detail, back to viewer
 
-  // Viewer search is restored (count shown again), Detail closed.
+  // Viewer search restored at the navigated selection (2/2), Detail closed.
   await vi.waitFor(() => expect(lastFrame() ?? "").toContain("2/2"), {
     timeout: 3000, interval: 25,
   });
@@ -420,10 +433,10 @@ it("Detail's own search resets on Esc without losing the saved viewer search", a
     timestamp: new Date().toISOString(), hiddenStats: { total: 0, active: 0 },
   };
   mockActivities = [
-    { timestamp: new Date(), type: "tool", icon: "○", label: "Read",
-      detail: "auth.ts", detailBody: "alpha beta gamma", detailKind: "code" },
-    { timestamp: new Date(), type: "tool", icon: "○", label: "Write",
-      detail: "auth.test.ts", detailBody: "alpha beta gamma", detailKind: "code" },
+    { timestamp: new Date(2026, 0, 1, 9, 0, 0), type: "tool", icon: "○",
+      label: "Read", detail: "auth.ts", detailBody: "alpha beta gamma", detailKind: "code" },
+    { timestamp: new Date(2026, 0, 1, 9, 0, 1), type: "tool", icon: "○",
+      label: "Write", detail: "auth.test.ts", detailBody: "alpha beta gamma", detailKind: "code" },
   ];
 
   const { stdin, lastFrame } = render(<App mode="watch" />);
@@ -439,11 +452,13 @@ it("Detail's own search resets on Esc without losing the saved viewer search", a
     timeout: 3000, interval: 25,
   });
   for (const ch of "auth") { stdin.write(ch); await tick(); }
+  await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1/2"), {
+    timeout: 3000, interval: 25,
+  });
+  stdin.write(DOWN); // ↓ navigate to 2nd match
   await vi.waitFor(() => expect(lastFrame() ?? "").toContain("2/2"), {
     timeout: 3000, interval: 25,
   });
-  stdin.write("[B"); // ↓ navigate
-  await tick();
   stdin.write("\r"); // open Detail
   await vi.waitFor(() => expect(lastFrame() ?? "").toContain("alpha"), {
     timeout: 3000, interval: 25,
@@ -454,12 +469,12 @@ it("Detail's own search resets on Esc without losing the saved viewer search", a
   await tick();
   for (const ch of "beta") { stdin.write(ch); await tick(); }
   await tick();
-  stdin.write(""); // Esc → reset Detail search only (still in Detail)
+  stdin.write(ESC); // Esc → reset Detail search only (still in Detail)
   await tick();
   expect(lastFrame() ?? "").toContain("alpha"); // still in Detail body
 
   // Esc again → close Detail → viewer search restored.
-  stdin.write("");
+  stdin.write(ESC);
   await vi.waitFor(() => expect(lastFrame() ?? "").toContain("2/2"), {
     timeout: 3000, interval: 25,
   });
@@ -496,38 +511,42 @@ Expected: full suite green.
 
 - [ ] **Step 1: Write the failing test — tree Enter keeps the search open**
 
-Add a new top-level `describe` in `tests/ui/App.test.tsx` (define a local `tick` as the other search describe does). Two matching sessions so the tree search has a non-trivial hit list:
+Add a new top-level `describe` in `tests/ui/App.test.tsx`. Two matching sessions so the tree search has 2 hits:
 
 ```ts
 describe("tree search → Enter keeps search alive", () => {
   const tick = () => new Promise((r) => setTimeout(r, 50));
+  const ESC = String.fromCharCode(27);
+  const DOWN = ESC + "[B";
+
+  const twoMatchingSessions = (): SessionTree => ({
+    projects: [
+      {
+        name: "proj", projectPath: "/tmp/proj", hotness: "hot",
+        sessions: [
+          {
+            id: "s1", hideKey: "proj/s1", filePath: "/tmp/proj/s1.jsonl",
+            projectPath: "/tmp/proj", projectName: "proj",
+            lastModifiedMs: Date.now(), status: "hot", modelName: null,
+            subAgents: [], nonInteractive: false,
+            firstUserPrompt: "auth login", liveState: null,
+          },
+          {
+            id: "s2", hideKey: "proj/s2", filePath: "/tmp/proj/s2.jsonl",
+            projectPath: "/tmp/proj", projectName: "proj",
+            lastModifiedMs: Date.now(), status: "hot", modelName: null,
+            subAgents: [], nonInteractive: false,
+            firstUserPrompt: "auth logout", liveState: null,
+          },
+        ],
+      },
+    ],
+    coldProjects: [], totalCount: 2,
+    timestamp: new Date().toISOString(), hiddenStats: { total: 0, active: 0 },
+  });
 
   it("bare Enter filter-confirms without closing the tree search", async () => {
-    mockTree = {
-      projects: [
-        {
-          name: "proj", projectPath: "/tmp/proj", hotness: "hot",
-          sessions: [
-            {
-              id: "s1", hideKey: "proj/s1", filePath: "/tmp/proj/s1.jsonl",
-              projectPath: "/tmp/proj", projectName: "proj",
-              lastModifiedMs: Date.now(), status: "hot", modelName: null,
-              subAgents: [], nonInteractive: false,
-              firstUserPrompt: "auth login", liveState: null,
-            },
-            {
-              id: "s2", hideKey: "proj/s2", filePath: "/tmp/proj/s2.jsonl",
-              projectPath: "/tmp/proj", projectName: "proj",
-              lastModifiedMs: Date.now(), status: "hot", modelName: null,
-              subAgents: [], nonInteractive: false,
-              firstUserPrompt: "auth logout", liveState: null,
-            },
-          ],
-        },
-      ],
-      coldProjects: [], totalCount: 2,
-      timestamp: new Date().toISOString(), hiddenStats: { total: 0, active: 0 },
-    };
+    mockTree = twoMatchingSessions();
     mockActivities = [];
 
     const { stdin, lastFrame } = render(<App mode="watch" />);
@@ -540,7 +559,7 @@ describe("tree search → Enter keeps search alive", () => {
       timeout: 3000, interval: 25,
     });
     for (const ch of "auth") { stdin.write(ch); await tick(); }
-    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("2/2"), {
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1/2"), {
       timeout: 3000, interval: 25,
     });
     stdin.write("\r"); // bare Enter
@@ -548,7 +567,7 @@ describe("tree search → Enter keeps search alive", () => {
     // Search stays open (count still rendered), not torn down.
     await tick();
     await tick();
-    expect(lastFrame() ?? "").toContain("2/2");
+    expect(lastFrame() ?? "").toContain("1/2");
   });
 });
 ```
@@ -625,31 +644,7 @@ Add inside the same `describe`:
 
 ```ts
 it("↓ then Enter selects the navigated node and keeps the search open", async () => {
-  mockTree = {
-    projects: [
-      {
-        name: "proj", projectPath: "/tmp/proj", hotness: "hot",
-        sessions: [
-          {
-            id: "s1", hideKey: "proj/s1", filePath: "/tmp/proj/s1.jsonl",
-            projectPath: "/tmp/proj", projectName: "proj",
-            lastModifiedMs: Date.now(), status: "hot", modelName: null,
-            subAgents: [], nonInteractive: false,
-            firstUserPrompt: "auth login", liveState: null,
-          },
-          {
-            id: "s2", hideKey: "proj/s2", filePath: "/tmp/proj/s2.jsonl",
-            projectPath: "/tmp/proj", projectName: "proj",
-            lastModifiedMs: Date.now(), status: "hot", modelName: null,
-            subAgents: [], nonInteractive: false,
-            firstUserPrompt: "auth logout", liveState: null,
-          },
-        ],
-      },
-    ],
-    coldProjects: [], totalCount: 2,
-    timestamp: new Date().toISOString(), hiddenStats: { total: 0, active: 0 },
-  };
+  mockTree = twoMatchingSessions();
   mockActivities = [];
 
   const { stdin, lastFrame } = render(<App mode="watch" />);
@@ -661,14 +656,16 @@ it("↓ then Enter selects the navigated node and keeps the search open", async 
     timeout: 3000, interval: 25,
   });
   for (const ch of "auth") { stdin.write(ch); await tick(); }
+  await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1/2"), {
+    timeout: 3000, interval: 25,
+  });
+  stdin.write(DOWN); // ↓ navigate
   await vi.waitFor(() => expect(lastFrame() ?? "").toContain("2/2"), {
     timeout: 3000, interval: 25,
   });
-  stdin.write("[B"); // ↓ navigate
-  await tick();
   stdin.write("\r"); // Enter → select node
 
-  // Search remains open after the selection.
+  // Search remains open after the selection (count still at the navigated 2/2).
   await tick();
   await tick();
   expect(lastFrame() ?? "").toContain("2/2");
@@ -696,11 +693,11 @@ Expected: full suite green.
 ## Self-Review
 
 **Spec coverage:**
-- State model `navigated` → Task 1 (Step 1–2, 5). `savedViewerSearch` slot → Task 2.
+- State model `navigated` → Task 1 (Steps 1–2, 6). `savedViewerSearch` slot → Task 2.
 - Enter (Viewer) filter-confirm vs row-action → Task 1.
 - Enter (Tree) filter-confirm vs select-node → Task 3.
 - Enter (Detail) two-phase unchanged → no task (regression covered by full-suite runs in Tasks 2–3 and existing `searchKey.test.ts`).
-- Esc layering rows 1–2 (Detail's own search reset; Detail close restores viewer search) → Task 2 (round-trip + layering tests). Esc row 3 (base Viewer/Tree search ends on Esc) → unchanged existing behavior; covered implicitly (search blocks still `setSearch(null)` on `key.escape`).
+- Esc layering rows 1–2 (Detail's own search reset; Detail close restores viewer search) → Task 2 (round-trip + layering tests). Esc row 3 (base Viewer/Tree search ends on Esc) → unchanged existing behavior; the search blocks still `setSearch(null)` on `key.escape`.
 - Viewer↔Detail round-trip incl. matched-row cursor → Task 2.
 - Detail independent body search → Task 2 Step 7.
 - `committed=true` on filter-confirm → **deviation**: not implemented (YAGNI, nothing reads it for Viewer/Tree); recorded in the Durable Record section + Task 1 entry.
@@ -708,3 +705,5 @@ Expected: full suite green.
 **Placeholder scan:** none — every step has concrete code/commands.
 
 **Type consistency:** `navigated?: boolean` defined in Task 1 Step 1; read as `!search.navigated` / `search.navigated` and written `navigated: true|false` consistently in Tasks 1 & 3. `savedViewerSearch` shape `{ search: SearchState; windowStart: number }` defined and consumed consistently in Task 2.
+
+**Test-mechanics consistency:** all arrow/Esc sends use `String.fromCharCode(27)`-built `DOWN`/`ESC` constants; all count assertions are 1-based (`0/0` empty, `1/2` first of two, `2/2` after one ↓, `1/1` single match). No raw ESC bytes in source.

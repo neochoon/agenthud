@@ -889,22 +889,29 @@ describe("viewer search → Enter opens Detail View", () => {
       timestamp: new Date().toISOString(),
       hiddenStats: { total: 0, active: 0 },
     };
+    // Two activities both matching "auth", distinct timestamps so the second
+    // (carrying DETAIL_BODY_MARKER) is index 1. Navigating ↓ to it makes the
+    // count change 1/2 → 2/2, which is observable — so the test can wait for the
+    // navigation to commit before pressing Enter (a single match would leave the
+    // count at 1/1, giving nothing to wait on and racing the navigated flag).
     mockActivities = [
       {
-        timestamp: new Date(),
+        timestamp: new Date(2026, 0, 1, 9, 0, 0),
         type: "tool",
         icon: "○",
         label: "Read",
         detail: "auth.ts",
-        detailBody: "DETAIL_BODY_MARKER",
+        detailBody: "FIRST_MARKER",
         detailKind: "code",
       },
       {
-        timestamp: new Date(),
+        timestamp: new Date(2026, 0, 1, 9, 0, 1),
         type: "tool",
-        icon: "$",
-        label: "Bash",
-        detail: "npm test",
+        icon: "○",
+        label: "Read",
+        detail: "auth.test.ts",
+        detailBody: "DETAIL_BODY_MARKER",
+        detailKind: "code",
       },
     ];
 
@@ -938,18 +945,19 @@ describe("viewer search → Enter opens Detail View", () => {
       stdin.write(ch); // type char-by-char (ink delivers each as length-1 input)
       await tick();
     }
-    // Wait until the search input reports exactly one match (`/auth   1/1`)
-    // before pressing Enter, so Enter is guaranteed to navigate to the match
-    // rather than firing while hits are still being computed.
-    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1/1"), {
+    // Wait until both matches are computed (`/auth   1/2`) before navigating.
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1/2"), {
       timeout: 3000,
       interval: 25,
     });
     // Navigating the selection (↓) makes Enter a row action; a bare Enter would
-    // now filter-confirm instead of opening the Detail View. With one match the
-    // count stays 1/1; the ↓ only sets the navigated flag.
-    stdin.write(DOWN); // ↓ — mark the selection as navigated
-    await tick();
+    // now filter-confirm instead of opening the Detail View. Wait for the count
+    // to advance to 2/2 so the navigated flag is committed before Enter.
+    stdin.write(DOWN); // ↓ → second match (carries DETAIL_BODY_MARKER)
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("2/2"), {
+      timeout: 3000,
+      interval: 25,
+    });
     stdin.write("\r"); // Enter → open the navigated match's Detail View
 
     // The Detail View renders the matched activity's body — the bug was that

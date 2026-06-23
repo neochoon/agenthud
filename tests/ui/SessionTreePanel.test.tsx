@@ -1238,6 +1238,36 @@ describe("SessionTreePanel — sticky live projects", () => {
     expect(frame).toContain("6 cold"); // the cold tail (selected) scrolled into view
   });
 
+  it("scrolls within a tall live project when the cursor is deep inside it (top not frozen)", () => {
+    // Regression for the reported bug: with more sessions than fit, moving the
+    // cursor down into the active list must scroll the window to follow it. The
+    // sticky live-prefix must NOT pin the whole block when the SELECTION itself
+    // is inside that block — otherwise only the bottom row changes and the top
+    // stays frozen.
+    const sessions = Array.from({ length: 15 }, (_, i) =>
+      makeSession({
+        id: `sess${String(i).padStart(2, "0")}xx`,
+        status: "hot",
+        liveState: i === 0 ? "working" : null, // first session makes the project live
+        firstUserPrompt: i === 0 ? "TOPROW" : i === 10 ? "SELROW" : `row${i}`,
+        projectName: "liveproj",
+      }),
+    );
+    const { lastFrame } = render(
+      <SessionTreePanel
+        projects={[makeProject("liveproj", sessions)]}
+        coldProjects={[]}
+        selectedId="sess10xx"
+        hasFocus={true}
+        width={120}
+        maxRows={8}
+      />,
+    );
+    const frame = lastFrame() ?? "";
+    expect(frame).toContain("SELROW"); // the deep selected row is visible
+    expect(frame).not.toContain("TOPROW"); // the top row scrolled off (window followed the cursor)
+  });
+
   it("scrolls a selected cold row into view while the live project stays pinned", () => {
     const live = makeSession({
       id: "liveAAAA",

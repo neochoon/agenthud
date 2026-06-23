@@ -36,6 +36,15 @@ vi.mock("../../src/data/sessionHistory.js", () => ({
   parseSessionHistory: () => mockActivities,
 }));
 
+// The search integration tests drive many sequential keystrokes, each gated on
+// a condition wait. On slow CI runners (notably Windows) the *sum* of those
+// steps can exceed Vitest's default 5s per-test budget — the layering test died
+// at ~5082ms there while passing on macOS/Linux. Raise the ceiling for the whole
+// file; fast tests are unaffected (a higher cap doesn't slow a quick test), and
+// each `vi.waitFor` keeps its own 3s timeout so a genuinely stuck condition
+// still fails fast.
+vi.setConfig({ testTimeout: 20000 });
+
 const {
   App,
   appendSubAgentRows,
@@ -738,8 +747,126 @@ function sessionStub(id: string) {
   };
 }
 
+describe("tree search → Enter keeps search alive", () => {
+  const tick = () => new Promise((r) => setTimeout(r, 50));
+  const ESC = String.fromCharCode(27);
+  const DOWN = ESC + "[B";
+
+  const twoMatchingSessions = (): SessionTree => ({
+    projects: [
+      {
+        name: "proj",
+        projectPath: "/tmp/proj",
+        hotness: "hot",
+        sessions: [
+          {
+            id: "s1",
+            hideKey: "proj/s1",
+            filePath: "/tmp/proj/s1.jsonl",
+            projectPath: "/tmp/proj",
+            projectName: "proj",
+            lastModifiedMs: Date.now(),
+            status: "hot",
+            modelName: null,
+            subAgents: [],
+            nonInteractive: false,
+            firstUserPrompt: "auth login",
+            liveState: null,
+          },
+          {
+            id: "s2",
+            hideKey: "proj/s2",
+            filePath: "/tmp/proj/s2.jsonl",
+            projectPath: "/tmp/proj",
+            projectName: "proj",
+            lastModifiedMs: Date.now(),
+            status: "hot",
+            modelName: null,
+            subAgents: [],
+            nonInteractive: false,
+            firstUserPrompt: "auth logout",
+            liveState: null,
+          },
+        ],
+      },
+    ],
+    coldProjects: [],
+    totalCount: 2,
+    timestamp: new Date().toISOString(),
+    hiddenStats: { total: 0, active: 0 },
+  });
+
+  it("bare Enter filter-confirms without closing the tree search", async () => {
+    mockTree = twoMatchingSessions();
+    mockActivities = [];
+
+    const { stdin, lastFrame } = render(<App mode="watch" />);
+    // Tree is focused at boot ("↵: expand" footer); open tree search directly.
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("↵: expand"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write("/");
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("0/0"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    for (const ch of "auth") {
+      stdin.write(ch);
+      await tick();
+    }
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1/2"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write("\r"); // bare Enter
+
+    // Search stays open (count still rendered), not torn down.
+    await tick();
+    await tick();
+    expect(lastFrame() ?? "").toContain("1/2");
+  });
+
+  it("↓ then Enter selects the navigated node and keeps the search open", async () => {
+    mockTree = twoMatchingSessions();
+    mockActivities = [];
+
+    const { stdin, lastFrame } = render(<App mode="watch" />);
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("↵: expand"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write("/");
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("0/0"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    for (const ch of "auth") {
+      stdin.write(ch);
+      await tick();
+    }
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1/2"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write(DOWN); // ↓ navigate
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("2/2"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write("\r"); // Enter → select node
+
+    // Search remains open after the selection (count still at the navigated 2/2).
+    await tick();
+    await tick();
+    expect(lastFrame() ?? "").toContain("2/2");
+  });
+});
+
 describe("viewer search → Enter opens Detail View", () => {
   const tick = () => new Promise((r) => setTimeout(r, 50));
+  const ESC = String.fromCharCode(27);
+  const DOWN = `${ESC}[B`;
 
   it("opens the matched activity's detail on Enter (not just select+exit)", async () => {
     mockTree = {
@@ -771,22 +898,29 @@ describe("viewer search → Enter opens Detail View", () => {
       timestamp: new Date().toISOString(),
       hiddenStats: { total: 0, active: 0 },
     };
+    // Two activities both matching "auth", distinct timestamps so the second
+    // (carrying DETAIL_BODY_MARKER) is index 1. Navigating ↓ to it makes the
+    // count change 1/2 → 2/2, which is observable — so the test can wait for the
+    // navigation to commit before pressing Enter (a single match would leave the
+    // count at 1/1, giving nothing to wait on and racing the navigated flag).
     mockActivities = [
       {
-        timestamp: new Date(),
+        timestamp: new Date(2026, 0, 1, 9, 0, 0),
         type: "tool",
         icon: "○",
         label: "Read",
         detail: "auth.ts",
-        detailBody: "DETAIL_BODY_MARKER",
+        detailBody: "FIRST_MARKER",
         detailKind: "code",
       },
       {
-        timestamp: new Date(),
+        timestamp: new Date(2026, 0, 1, 9, 0, 1),
         type: "tool",
-        icon: "$",
-        label: "Bash",
-        detail: "npm test",
+        icon: "○",
+        label: "Read",
+        detail: "auth.test.ts",
+        detailBody: "DETAIL_BODY_MARKER",
+        detailKind: "code",
       },
     ];
 
@@ -820,14 +954,20 @@ describe("viewer search → Enter opens Detail View", () => {
       stdin.write(ch); // type char-by-char (ink delivers each as length-1 input)
       await tick();
     }
-    // Wait until the search input reports exactly one match (`/auth   1/1`)
-    // before pressing Enter, so Enter is guaranteed to navigate to the match
-    // rather than firing while hits are still being computed.
-    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1/1"), {
+    // Wait until both matches are computed (`/auth   1/2`) before navigating.
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1/2"), {
       timeout: 3000,
       interval: 25,
     });
-    stdin.write("\r"); // Enter → open the matched activity's Detail View
+    // Navigating the selection (↓) makes Enter a row action; a bare Enter would
+    // now filter-confirm instead of opening the Detail View. Wait for the count
+    // to advance to 2/2 so the navigated flag is committed before Enter.
+    stdin.write(DOWN); // ↓ → second match (carries DETAIL_BODY_MARKER)
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("2/2"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write("\r"); // Enter → open the navigated match's Detail View
 
     // The Detail View renders the matched activity's body — the bug was that
     // Enter only positioned the cursor + closed search without opening detail.
@@ -836,5 +976,310 @@ describe("viewer search → Enter opens Detail View", () => {
       () => expect(lastFrame() ?? "").toContain("DETAIL_BODY_MARKER"),
       { timeout: 3000, interval: 25 },
     );
+  });
+
+  it("restores the viewer search and the matched row after Esc out of Detail", async () => {
+    mockTree = {
+      projects: [
+        {
+          name: "proj",
+          projectPath: "/tmp/proj",
+          hotness: "hot",
+          sessions: [
+            {
+              id: "s1",
+              hideKey: "proj/s1",
+              filePath: "/tmp/proj/s1.jsonl",
+              projectPath: "/tmp/proj",
+              projectName: "proj",
+              lastModifiedMs: Date.now(),
+              status: "hot",
+              modelName: null,
+              subAgents: [],
+              nonInteractive: false,
+              firstUserPrompt: "do auth",
+              liveState: null,
+            },
+          ],
+        },
+      ],
+      coldProjects: [],
+      totalCount: 1,
+      timestamp: new Date().toISOString(),
+      hiddenStats: { total: 0, active: 0 },
+    };
+    mockActivities = [
+      {
+        timestamp: new Date(2026, 0, 1, 9, 0, 0),
+        type: "tool",
+        icon: "○",
+        label: "Read",
+        detail: "auth.ts",
+        detailBody: "READ_MARKER",
+        detailKind: "code",
+      },
+      {
+        timestamp: new Date(2026, 0, 1, 9, 0, 1),
+        type: "tool",
+        icon: "○",
+        label: "Write",
+        detail: "auth.test.ts",
+        detailBody: "WRITE_MARKER",
+        detailKind: "code",
+      },
+    ];
+
+    const { stdin, lastFrame } = render(<App mode="watch" />);
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("auth.ts"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write("\t");
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("↵: detail"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write("/");
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("0/0"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    for (const ch of "auth") {
+      stdin.write(ch);
+      await tick();
+    }
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1/2"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write(DOWN); // ↓ → navigate to 2nd match (Write / auth.test.ts)
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("2/2"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write("\r"); // Enter → open that match's Detail
+    await vi.waitFor(
+      () => expect(lastFrame() ?? "").toContain("WRITE_MARKER"),
+      {
+        timeout: 3000,
+        interval: 25,
+      },
+    );
+    stdin.write(ESC); // Esc → close Detail, back to viewer
+
+    // Viewer search restored at the navigated selection (2/2), Detail closed.
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("2/2"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    expect(lastFrame() ?? "").not.toContain("WRITE_MARKER");
+  });
+
+  it("bare Enter (no arrow) filter-confirms: search stays open, no detail", async () => {
+    mockTree = {
+      projects: [
+        {
+          name: "proj",
+          projectPath: "/tmp/proj",
+          hotness: "hot",
+          sessions: [
+            {
+              id: "s1",
+              hideKey: "proj/s1",
+              filePath: "/tmp/proj/s1.jsonl",
+              projectPath: "/tmp/proj",
+              projectName: "proj",
+              lastModifiedMs: Date.now(),
+              status: "hot",
+              modelName: null,
+              subAgents: [],
+              nonInteractive: false,
+              firstUserPrompt: "do auth",
+              liveState: null,
+            },
+          ],
+        },
+      ],
+      coldProjects: [],
+      totalCount: 1,
+      timestamp: new Date().toISOString(),
+      hiddenStats: { total: 0, active: 0 },
+    };
+    mockActivities = [
+      {
+        timestamp: new Date(2026, 0, 1, 9, 0, 0),
+        type: "tool",
+        icon: "○",
+        label: "Read",
+        detail: "auth.ts",
+        detailBody: "READ_MARKER",
+        detailKind: "code",
+      },
+      {
+        timestamp: new Date(2026, 0, 1, 9, 0, 1),
+        type: "tool",
+        icon: "○",
+        label: "Write",
+        detail: "auth.test.ts",
+        detailBody: "WRITE_MARKER",
+        detailKind: "code",
+      },
+    ];
+
+    const { stdin, lastFrame } = render(<App mode="watch" />);
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("auth.ts"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write("\t");
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("↵: detail"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write("/");
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("0/0"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    for (const ch of "auth") {
+      stdin.write(ch);
+      await tick();
+    }
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1/2"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write("\r"); // bare Enter — no arrow navigation
+
+    // Filter-confirm: search stays open (count still shown), no Detail opened.
+    await tick();
+    await tick();
+    expect(lastFrame() ?? "").toContain("1/2");
+    expect(lastFrame() ?? "").not.toContain("READ_MARKER");
+    expect(lastFrame() ?? "").not.toContain("WRITE_MARKER");
+  });
+
+  it("Detail's own search resets on Esc without losing the saved viewer search", async () => {
+    mockTree = {
+      projects: [
+        {
+          name: "proj",
+          projectPath: "/tmp/proj",
+          hotness: "hot",
+          sessions: [
+            {
+              id: "s1",
+              hideKey: "proj/s1",
+              filePath: "/tmp/proj/s1.jsonl",
+              projectPath: "/tmp/proj",
+              projectName: "proj",
+              lastModifiedMs: Date.now(),
+              status: "hot",
+              modelName: null,
+              subAgents: [],
+              nonInteractive: false,
+              firstUserPrompt: "do auth",
+              liveState: null,
+            },
+          ],
+        },
+      ],
+      coldProjects: [],
+      totalCount: 1,
+      timestamp: new Date().toISOString(),
+      hiddenStats: { total: 0, active: 0 },
+    };
+    mockActivities = [
+      {
+        timestamp: new Date(2026, 0, 1, 9, 0, 0),
+        type: "tool",
+        icon: "○",
+        label: "Read",
+        detail: "auth.ts",
+        detailBody: "alpha beta gamma",
+        detailKind: "code",
+      },
+      {
+        timestamp: new Date(2026, 0, 1, 9, 0, 1),
+        type: "tool",
+        icon: "○",
+        label: "Write",
+        detail: "auth.test.ts",
+        detailBody: "alpha beta gamma",
+        detailKind: "code",
+      },
+    ];
+
+    const { stdin, lastFrame } = render(<App mode="watch" />);
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("auth.ts"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write("\t");
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("↵: detail"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write("/");
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("0/0"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    for (const ch of "auth") {
+      stdin.write(ch);
+      await tick();
+    }
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1/2"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write(DOWN); // ↓ navigate to 2nd match
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("2/2"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write("\r"); // open Detail
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("alpha"), {
+      timeout: 3000,
+      interval: 25,
+    });
+
+    // Detail's own body search, then Esc to reset it (stay in Detail).
+    // Condition-wait each transition: a fixed tick is race-prone under CI load,
+    // and if the search-reset has not committed when the second Esc arrives, that
+    // Esc is routed back into the (still-open) detail search instead of closing
+    // the Detail — so the viewer search is never restored.
+    stdin.write("/");
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("0/0"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    for (const ch of "beta") {
+      stdin.write(ch);
+      await tick();
+    }
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1/1"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write(ESC); // Esc → reset Detail search only (still in Detail)
+    // Detail search cleared but still in Detail: the detail footer ("↵/Esc:
+    // close") only renders when detailMode is on AND no search is active, so it
+    // confirms the reset committed before we send the next Esc.
+    await vi.waitFor(
+      () => expect(lastFrame() ?? "").toContain("↵/Esc: close"),
+      {
+        timeout: 3000,
+        interval: 25,
+      },
+    );
+    expect(lastFrame() ?? "").toContain("alpha"); // still in Detail body
+
+    // Esc again → close Detail → viewer search restored.
+    stdin.write(ESC);
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("2/2"), {
+      timeout: 3000,
+      interval: 25,
+    });
   });
 });

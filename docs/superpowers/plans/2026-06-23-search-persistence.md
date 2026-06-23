@@ -22,8 +22,9 @@
 
 After each task's review comes back clean, the SDD controller appends a 6-field
 entry to a **committed** report log and a ledger line, per the user's global
-workflow. The SDD `task-N-report.md` (under `.git/sdd/`, discarded with the
-worktree) is the *source*; the durable record is committed to the branch.
+workflow. The SDD `task-N-report.md` (under `.superpowers/sdd/` in the working
+tree on superpowers ≥6.0.3 — git-ignored scratch, deleted by `git clean -fdx`)
+is the *source*; the durable record is committed to the branch.
 
 - File: `docs/superpowers/reports/2026-06-23-search-persistence.md`
 - Per task entry (after clean review): **Intent** (one line from this plan) ·

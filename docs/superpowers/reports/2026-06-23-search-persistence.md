@@ -11,6 +11,7 @@ a clean review; a one-page digest is synthesized at PR time.
 
 - Task 1: complete (commits d75a75c..813dea9, review clean — Approved)
 - Task 2: complete (commits 3bc0682..a147940, review clean — Approved)
+- Task 3: complete (commits ecbaec1..6c20039, review clean — Approved)
 
 ---
 
@@ -85,3 +86,31 @@ then a second Esc closes Detail and restores it).
 **Files touched:** `src/ui/App.tsx`, `tests/ui/App.test.tsx`.
 
 **Follow-ups / known gaps:** None. (`committed` still Detail-only, as agreed.)
+
+---
+
+## Task 3 — Tree Enter: filter-confirm vs select-node, keep search alive
+
+**Intent:** Apply the same `navigated`-driven Enter to the tree surface: bare
+Enter filter-confirms (keeps the narrowed tree search), ↓/↑ then Enter
+selects/expands the node — both keep the search open; Esc still ends it.
+
+**What was built:** In `App.tsx`'s `if (search?.surface === "tree")` block: ↑/↓
+now set `navigated:true`; typing/backspace reset `navigated:false`; the Enter
+handler returns early when `!navigated` (filter-confirm) and otherwise
+`setSelectedId` + `stopTracking` **without** the old `setSearch(null)`. The
+`key.escape → setSearch(null)` path is untouched (Esc still exits search). New
+top-level describe `tree search → Enter keeps search alive` with two tests
+(bare-Enter filter-confirm; ↓+Enter selects node, search stays), each RED→GREEN.
+
+**Key decisions / trade-offs:**
+- Mirrors the viewer surface exactly (same `navigated` semantics), so the three
+  list surfaces behave consistently.
+- Tree tests open `/` directly (tree is focused at boot; `↵: expand` footer
+  confirms) — no Tab needed, unlike the viewer tests.
+
+**Deviations from the plan:** None.
+
+**Files touched:** `src/ui/App.tsx`, `tests/ui/App.test.tsx`.
+
+**Follow-ups / known gaps:** None.

@@ -684,6 +684,14 @@ export function App({
   // In-pane search state. null = search closed.
   const [search, setSearch] = useState<SearchState | null>(null);
 
+  // When a Detail is opened from an active viewer search, stash the search so
+  // closing the Detail (Esc) drops the user back into the same search with the
+  // matched row selected. Null when a Detail was opened without a viewer search.
+  const [savedViewerSearch, setSavedViewerSearch] = useState<{
+    search: SearchState;
+    windowStart: number;
+  } | null>(null);
+
   // Persisted window-start for viewer narrow-finder edge-scroll. Reset to 0
   // when search opens or query resets (index → 0 on query change). Updated
   // via edgeScrollWindowStart on every ↑/↓ in viewer search mode.
@@ -1252,6 +1260,12 @@ export function App({
     },
     onDetailClose: () => {
       setDetailMode(false);
+      if (savedViewerSearch) {
+        // Came here from a viewer search → restore it with the matched row.
+        setSearch(savedViewerSearch.search);
+        setViewerSearchWindowStart(savedViewerSearch.windowStart);
+        setSavedViewerSearch(null);
+      }
     },
     onDetailScrollUp: () => {
       setDetailScrollOffset((o) => Math.max(0, o - 1));
@@ -1570,6 +1584,10 @@ export function App({
                 hitIndex,
                 viewerRows,
               );
+              setSavedViewerSearch({
+                search,
+                windowStart: viewerSearchWindowStart,
+              });
               setViewerCursorLine(0);
               setIsLive(false);
               setScrollOffset(newScrollOffset);

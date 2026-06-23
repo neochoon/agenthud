@@ -36,6 +36,15 @@ vi.mock("../../src/data/sessionHistory.js", () => ({
   parseSessionHistory: () => mockActivities,
 }));
 
+// The search integration tests drive many sequential keystrokes, each gated on
+// a condition wait. On slow CI runners (notably Windows) the *sum* of those
+// steps can exceed Vitest's default 5s per-test budget — the layering test died
+// at ~5082ms there while passing on macOS/Linux. Raise the ceiling for the whole
+// file; fast tests are unaffected (a higher cap doesn't slow a quick test), and
+// each `vi.waitFor` keeps its own 3s timeout so a genuinely stuck condition
+// still fails fast.
+vi.setConfig({ testTimeout: 20000 });
+
 const {
   App,
   appendSubAgentRows,

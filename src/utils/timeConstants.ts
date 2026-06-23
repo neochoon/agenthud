@@ -6,5 +6,6 @@
  * Keeping them here avoids a data → ui import.
  */
 
+export const FIVE_MINUTES_MS = 5 * 60 * 1000;
 export const THIRTY_MINUTES_MS = 30 * 60 * 1000;
 export const ONE_HOUR_MS = 60 * 60 * 1000;

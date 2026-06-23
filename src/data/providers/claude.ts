@@ -51,7 +51,11 @@ import type {
   SessionStatus,
   SessionTree,
 } from "../../types/index.js";
-import { ONE_HOUR_MS, THIRTY_MINUTES_MS } from "../../utils/timeConstants.js";
+import {
+  FIVE_MINUTES_MS,
+  ONE_HOUR_MS,
+  THIRTY_MINUTES_MS,
+} from "../../utils/timeConstants.js";
 import { detectLiveState } from "../sessionLiveness.js";
 import { parseActivitiesFromLines, parseModelName } from "./claude-activity.js";
 import type { DiscoverOptions, SessionProvider } from "./types.js";
@@ -72,10 +76,16 @@ export function decodeProjectPath(encoded: string): string {
   return encoded.replace(/-/g, "/");
 }
 
-function getSessionStatus(mtimeMs: number): SessionStatus {
-  const now = Date.now();
+// Classify staleness from mtime. `hotThresholdMs` is the only axis that
+// differs between top-level sessions and sub-agents (see the two wrappers
+// below); warm/cool/cold are shared. `now` is injectable for tests.
+function classifyStatus(
+  mtimeMs: number,
+  hotThresholdMs: number,
+  now: number,
+): SessionStatus {
   const age = now - mtimeMs;
-  if (age < THIRTY_MINUTES_MS) return "hot";
+  if (age < hotThresholdMs) return "hot";
   if (age < ONE_HOUR_MS) return "warm";
 
   // Use UTC date comparison for timezone-consistent behavior.
@@ -89,6 +99,23 @@ function getSessionStatus(mtimeMs: number): SessionStatus {
     return "cool";
   }
   return "cold";
+}
+
+export function getSessionStatus(
+  mtimeMs: number,
+  now: number = Date.now(),
+): SessionStatus {
+  return classifyStatus(mtimeMs, THIRTY_MINUTES_MS, now);
+}
+
+// Sub-agents are typically one-shot: a finished sub-agent shouldn't read as
+// "hot" for half an hour. Give them a short (5-min) hot window; warm/cool/cold
+// thresholds match sessions.
+export function getSubAgentStatus(
+  mtimeMs: number,
+  now: number = Date.now(),
+): SessionStatus {
+  return classifyStatus(mtimeMs, FIVE_MINUTES_MS, now);
 }
 
 // Generous safety cap to keep arbitrarily long sub-agent task headers or
@@ -591,7 +618,7 @@ function buildSubAgents(
             projectPath: "",
             projectName: "",
             lastModifiedMs: stat.mtimeMs,
-            status: getSessionStatus(stat.mtimeMs),
+            status: getSubAgentStatus(stat.mtimeMs),
             modelName,
             subAgents: [],
             agentId: agentId ?? undefined,

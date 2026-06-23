@@ -740,6 +740,8 @@ function sessionStub(id: string) {
 
 describe("viewer search → Enter opens Detail View", () => {
   const tick = () => new Promise((r) => setTimeout(r, 50));
+  const ESC = String.fromCharCode(27);
+  const DOWN = `${ESC}[B`;
 
   it("opens the matched activity's detail on Enter (not just select+exit)", async () => {
     mockTree = {
@@ -827,7 +829,12 @@ describe("viewer search → Enter opens Detail View", () => {
       timeout: 3000,
       interval: 25,
     });
-    stdin.write("\r"); // Enter → open the matched activity's Detail View
+    // Navigating the selection (↓) makes Enter a row action; a bare Enter would
+    // now filter-confirm instead of opening the Detail View. With one match the
+    // count stays 1/1; the ↓ only sets the navigated flag.
+    stdin.write(DOWN); // ↓ — mark the selection as navigated
+    await tick();
+    stdin.write("\r"); // Enter → open the navigated match's Detail View
 
     // The Detail View renders the matched activity's body — the bug was that
     // Enter only positioned the cursor + closed search without opening detail.
@@ -836,5 +843,89 @@ describe("viewer search → Enter opens Detail View", () => {
       () => expect(lastFrame() ?? "").toContain("DETAIL_BODY_MARKER"),
       { timeout: 3000, interval: 25 },
     );
+  });
+
+  it("bare Enter (no arrow) filter-confirms: search stays open, no detail", async () => {
+    mockTree = {
+      projects: [
+        {
+          name: "proj",
+          projectPath: "/tmp/proj",
+          hotness: "hot",
+          sessions: [
+            {
+              id: "s1",
+              hideKey: "proj/s1",
+              filePath: "/tmp/proj/s1.jsonl",
+              projectPath: "/tmp/proj",
+              projectName: "proj",
+              lastModifiedMs: Date.now(),
+              status: "hot",
+              modelName: null,
+              subAgents: [],
+              nonInteractive: false,
+              firstUserPrompt: "do auth",
+              liveState: null,
+            },
+          ],
+        },
+      ],
+      coldProjects: [],
+      totalCount: 1,
+      timestamp: new Date().toISOString(),
+      hiddenStats: { total: 0, active: 0 },
+    };
+    mockActivities = [
+      {
+        timestamp: new Date(2026, 0, 1, 9, 0, 0),
+        type: "tool",
+        icon: "○",
+        label: "Read",
+        detail: "auth.ts",
+        detailBody: "READ_MARKER",
+        detailKind: "code",
+      },
+      {
+        timestamp: new Date(2026, 0, 1, 9, 0, 1),
+        type: "tool",
+        icon: "○",
+        label: "Write",
+        detail: "auth.test.ts",
+        detailBody: "WRITE_MARKER",
+        detailKind: "code",
+      },
+    ];
+
+    const { stdin, lastFrame } = render(<App mode="watch" />);
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("auth.ts"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write("\t");
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("↵: detail"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write("/");
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("0/0"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    for (const ch of "auth") {
+      stdin.write(ch);
+      await tick();
+    }
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1/2"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write("\r"); // bare Enter — no arrow navigation
+
+    // Filter-confirm: search stays open (count still shown), no Detail opened.
+    await tick();
+    await tick();
+    expect(lastFrame() ?? "").toContain("1/2");
+    expect(lastFrame() ?? "").not.toContain("READ_MARKER");
+    expect(lastFrame() ?? "").not.toContain("WRITE_MARKER");
   });
 });

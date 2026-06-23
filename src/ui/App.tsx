@@ -1511,7 +1511,13 @@ export function App({
     searchActive: search !== null,
     onOpenSearch: () => {
       const surface: SearchSurface = detailMode ? "detail" : focus;
-      setSearch({ surface, query: "", index: 0, committed: false });
+      setSearch({
+        surface,
+        query: "",
+        index: 0,
+        committed: false,
+        navigated: false,
+      });
       if (!detailMode && focus === "viewer") setViewerSearchWindowStart(0);
     },
     onSearchKey: (input, key) => {
@@ -1528,7 +1534,9 @@ export function App({
           if (hits.length === 0) return;
           const n = hits.length;
           const newIndex = (((search.index - 1) % n) + n) % n;
-          setSearch((s) => (s ? { ...s, index: newIndex } : s));
+          setSearch((s) =>
+            s ? { ...s, index: newIndex, navigated: true } : s,
+          );
           setViewerSearchWindowStart((prev) =>
             edgeScrollWindowStart(prev, newIndex, viewerRows, hits.length),
           );
@@ -1538,13 +1546,20 @@ export function App({
           if (hits.length === 0) return;
           const n = hits.length;
           const newIndex = (search.index + 1) % n;
-          setSearch((s) => (s ? { ...s, index: newIndex } : s));
+          setSearch((s) =>
+            s ? { ...s, index: newIndex, navigated: true } : s,
+          );
           setViewerSearchWindowStart((prev) =>
             edgeScrollWindowStart(prev, newIndex, viewerRows, hits.length),
           );
           return;
         }
         if (key.return) {
+          if (!search.navigated) {
+            // Filter-confirm: keep the narrowed search open; do NOT open a Detail.
+            return;
+          }
+          // Navigated to a specific match → open its Detail View.
           if (hits.length > 0) {
             const safeIndex =
               ((search.index % hits.length) + hits.length) % hits.length;
@@ -1558,8 +1573,6 @@ export function App({
               setViewerCursorLine(0);
               setIsLive(false);
               setScrollOffset(newScrollOffset);
-              // Searching was to inspect the match — open its Detail View,
-              // not just position the cursor.
               const act = mergedActivities[hitIndex];
               if (act) openActivityDetail(act);
             }
@@ -1569,14 +1582,23 @@ export function App({
         }
         if (key.delete || key.backspace) {
           setSearch((s) =>
-            s ? { ...s, query: s.query.slice(0, -1), index: 0 } : s,
+            s
+              ? {
+                  ...s,
+                  query: s.query.slice(0, -1),
+                  index: 0,
+                  navigated: false,
+                }
+              : s,
           );
           setViewerSearchWindowStart(0);
           return;
         }
         if (input && !key.ctrl && input.length === 1) {
           setSearch((s) =>
-            s ? { ...s, query: s.query + input, index: 0 } : s,
+            s
+              ? { ...s, query: s.query + input, index: 0, navigated: false }
+              : s,
           );
           setViewerSearchWindowStart(0);
           return;

@@ -18,7 +18,8 @@ export interface SearchState {
   surface: SearchSurface;
   query: string;
   index: number; // current match index (detail: line-match #; lists: selected match row)
-  committed: boolean; // true after Enter; false while typing
+  committed: boolean; // true after Enter; false while typing (Detail surface)
+  navigated?: boolean; // Tree/Viewer: has the user moved the selection with ↑/↓? default false
 }
 
 export interface SearchKey {

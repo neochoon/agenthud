@@ -128,6 +128,7 @@ Full schema, file paths, and env vars: [FEATURES.md → Config](./FEATURES.md#co
 ## More
 
 - **Reference:** [FEATURES.md](./FEATURES.md) — every flag, keybinding, config key, file path, env var
+- **Feature history:** [FEATURE-HISTORY.md](./FEATURE-HISTORY.md) — headline features by version
 - **Release history:** [CHANGELOG.md](./CHANGELOG.md)
 - **Deferred items:** [BACKLOG.md](./BACKLOG.md)
 - **Issues / PRs:** [GitHub](https://github.com/neochoon/agenthud)

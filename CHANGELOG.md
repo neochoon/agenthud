@@ -9,14 +9,43 @@
   instead of surfacing raw lowercase names with the default glyph. The
   provider-agnostic `canonicalToolLabel` / `iconForCanonicalLabel` helpers in
   `toolLabels.ts` are now shared by kiro and opencode.
+- **Tall live-project scrolling** (#213): in the Projects panel, moving the
+  cursor down through a live project taller than the pane now scrolls the
+  window to follow it instead of freezing the top rows and only changing the
+  last line. The sticky live-prefix pins only when the cursor is in the
+  cold/idle tail below it.
+- **Skill / Read / cwd-based project path** edge cases fixed alongside search
+  (#201, #204, #205).
 
 ### Added
-- **In-pane search (`/`)**: text search scoped to the focused pane, distinct
-  from the `f` type-filter. The Session Tree and Activity Viewer are transient
-  fzf-style narrow-finders (type to narrow, `↑`/`↓` select, `↵` jump, `Esc`
-  cancel); the Detail View is a less-style jump (type → first match, `↵`
-  commits then `n`/`N` cycle, matches highlighted). Substring + smart-case;
-  the Viewer search composes (AND) with the `f` filter.
+- **In-pane search (`/`)** — text search scoped to the focused pane, distinct
+  from the `f` type-filter. **Search persists**: typing narrows to matches;
+  `↵` with no `↑`/`↓` navigation *filter-confirms* (keeps the narrowed view
+  open), while `↑`/`↓` then `↵` fires the row action (Viewer → open the match's
+  Detail; Tree → select the node) without tearing search down. A Viewer search
+  survives a Viewer → Detail → back round-trip (the Detail's own body search is
+  independent), and `Esc` peels one layer at a time. The Detail View is a
+  less-style jump (type → first match, `↵` commits then `n`/`N` cycle).
+  Substring + smart-case; the Viewer search composes (AND) with the `f` filter.
+  (#198, #209, #210)
+- **agenthud follow**: a live merged event stream (activity + state +
+  lifecycle) across all sessions and sub-agents, emitted chronologically as
+  human lines or, with `--json`, NDJSON. The read-only substrate a
+  higher-level supervisor can consume. `--since now|<N>h|<N>m|<N>s` controls
+  backfill; `--include TYPES` narrows the activity firehose (state/lifecycle
+  always pass); `--once` emits the backfill and exits instead of streaming
+  (like `tail` vs `tail -f`). See [FEATURES.md](./FEATURES.md#follow).
+
+### Changed
+- **Sub-agent hotness** (#214): sub-agents use a 5-minute "hot" window (was 30
+  min, shared with sessions). One-shot sub-agents stop reading as hot long
+  after they finish; sessions keep the 30-minute window.
+- **Sub-agent tree display** (#219): only *running* sub-agents (hot, or live
+  working/waiting) show individually; finished `warm` ones fold into the
+  `... N warm  M cool  K cold` summary alongside cool/cold.
+- **Re-collapse a revealed session** (#215): from a sub-agent revealed by
+  expanding its parent, `←` or `↵` collapses that reveal (hiding the cold rows)
+  and returns to the parent — previously `↵` on a leaf child was a no-op.
 - **agenthud follow**: a live merged event stream (activity + state +
   lifecycle) across all sessions and sub-agents, emitted chronologically as
   human lines or, with `--json`, NDJSON. The read-only substrate a

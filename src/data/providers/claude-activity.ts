@@ -96,6 +96,45 @@ interface JsonlUserEntry {
   timestamp: string;
 }
 
+// Error-result texts that mean the tool call NEVER RAN — harness/permission/
+// user rejections (input validation, permission denial, user cancel, sandbox
+// block, session isolation, symlink refusal, classifier unavailable). Such
+// calls did no work, so their activity rows are dropped (see #222). Errors
+// NOT matching these (Bash non-zero exit, Edit precondition failures, etc.)
+// are kept — the tool ran and genuinely failed, which is real activity worth
+// seeing. Fail-open: an unrecognized error is kept, not hidden.
+const NEVER_EXECUTED_ERROR_PATTERNS = [
+  "InputValidationError:",
+  "Permission for this action was denied",
+  "The user doesn't want to proceed",
+  "Blocked:",
+  "This session is now isolated",
+  "Refusing to write through symlink",
+  "temporarily unavailable, so auto mode cannot determine",
+];
+
+function isNeverExecutedError(text: string): boolean {
+  return NEVER_EXECUTED_ERROR_PATTERNS.some((p) => text.includes(p));
+}
+
+/** A tool_result block's content is either a string or an array of
+ * `{ type: "text", text }` parts; flatten to a single string. */
+function toolResultText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((c) =>
+        c &&
+        typeof c === "object" &&
+        typeof (c as { text?: unknown }).text === "string"
+          ? (c as { text: string }).text
+          : "",
+      )
+      .join(" ");
+  }
+  return "";
+}
+
 export function parseActivitiesFromLines(lines: string[]): ParseResult {
   const activities: ActivityEntry[] = [];
   let tokenCount = 0;
@@ -108,6 +147,10 @@ export function parseActivitiesFromLines(lines: string[]): ParseResult {
   // one tool_result per user entry (even for parallel tool calls each result
   // is its own entry), so the entry's single `toolUseResult` covers it.
   const resultsById = new Map<string, ToolUseResult>();
+  // tool_use_id → error text for results flagged `is_error` (the flag and text
+  // live on the tool_result BLOCK, separate from `toolUseResult`, and a
+  // rejected call may have no `toolUseResult` at all — so capture independently).
+  const errorTextById = new Map<string, string>();
   for (const line of lines) {
     let entry: {
       type?: string;
@@ -120,13 +163,21 @@ export function parseActivitiesFromLines(lines: string[]): ParseResult {
       continue;
     }
     if (entry.type !== "user") continue;
-    const tur = entry.toolUseResult;
-    if (!tur || typeof tur !== "object") continue;
     const content = entry.message?.content;
     if (!Array.isArray(content)) continue;
-    for (const b of content as Array<{ type?: string; tool_use_id?: string }>) {
+    const tur = entry.toolUseResult;
+    const turValid = !!tur && typeof tur === "object";
+    for (const b of content as Array<{
+      type?: string;
+      tool_use_id?: string;
+      is_error?: boolean;
+      content?: unknown;
+    }>) {
       if (b?.type === "tool_result" && typeof b.tool_use_id === "string") {
-        resultsById.set(b.tool_use_id, tur as ToolUseResult);
+        if (turValid) resultsById.set(b.tool_use_id, tur as ToolUseResult);
+        if (b.is_error === true) {
+          errorTextById.set(b.tool_use_id, toolResultText(b.content));
+        }
       }
     }
   }
@@ -196,6 +247,9 @@ export function parseActivitiesFromLines(lines: string[]): ParseResult {
             });
           } else if (block.type === "tool_use" && block.name) {
             if (block.name === "TodoWrite") continue;
+            // Drop calls that never ran (harness/permission/user rejection).
+            const errText = block.id ? errorTextById.get(block.id) : undefined;
+            if (errText && isNeverExecutedError(errText)) continue;
             const icon =
               (ICONS as Record<string, string>)[block.name] ?? ICONS.Default;
             const result = block.id ? resultsById.get(block.id) : undefined;

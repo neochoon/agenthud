@@ -255,7 +255,7 @@ describe("appendSubAgentRows", () => {
     expect(result.map((n) => n.id)).toEqual(["a", "b", "c"]);
   });
 
-  it("alive session default appends hot/warm sub-agents plus a sub-summary sentinel for the rest", () => {
+  it("alive session default shows only running sub-agents + a sub-summary sentinel for the rest", () => {
     const session = sessionWith("s1", "warm", [
       baseSubAgent("a", "hot"),
       baseSubAgent("b", "warm"),
@@ -263,7 +263,8 @@ describe("appendSubAgentRows", () => {
     ]);
     const result: SessionNode[] = [];
     appendSubAgentRows(result, session, new Set());
-    expect(result.map((n) => n.id)).toEqual(["a", "b", "__sub-s1__"]);
+    // Only the running (hot) sub-agent shows; warm + cold fold into the summary.
+    expect(result.map((n) => n.id)).toEqual(["a", "__sub-s1__"]);
   });
 
   it("alive session with session.id in expandedIds appends ALL sub-agents", () => {
@@ -284,6 +285,35 @@ describe("appendSubAgentRows", () => {
     const result: SessionNode[] = [];
     appendSubAgentRows(result, session, new Set(["__collapsed-session-s1"]));
     expect(result).toEqual([]);
+  });
+
+  it("shows only running (hot) sub-agents individually; groups warm under the summary", () => {
+    const session = sessionWith("s1", "hot", [
+      baseSubAgent("run", "hot"),
+      baseSubAgent("done", "warm"),
+      baseSubAgent("old", "cool"),
+    ]);
+    const result: SessionNode[] = [];
+    appendSubAgentRows(result, session, new Set());
+    const ids = result.map((n) => n.id);
+    expect(ids).toContain("run"); // running shown individually
+    expect(ids).not.toContain("done"); // finished (warm) now grouped
+    expect(ids).toContain("__sub-s1__"); // summary present
+  });
+
+  it("keeps a live (working) sub-agent individual even when its status is warm", () => {
+    const live = baseSubAgent("livewarm", "warm");
+    live.liveState = "working";
+    const session = sessionWith("s2", "hot", [
+      live,
+      baseSubAgent("done", "warm"),
+    ]);
+    const result: SessionNode[] = [];
+    appendSubAgentRows(result, session, new Set());
+    const ids = result.map((n) => n.id);
+    expect(ids).toContain("livewarm"); // live → shown despite warm
+    expect(ids).not.toContain("done"); // non-live warm → grouped
+    expect(ids).toContain("__sub-s2__");
   });
 });
 

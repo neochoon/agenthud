@@ -76,6 +76,7 @@ import { SessionTreePanel } from "./SessionTreePanel.js";
 import { activityMatches } from "./search/activityMatch.js";
 import { detailMatchLines } from "./search/detailMatches.js";
 import { edgeScrollWindowStart } from "./search/edgeScroll.js";
+import { hasMatch } from "./search/matcher.js";
 import { SearchInput } from "./search/SearchInput.js";
 import type { SearchState } from "./search/searchKey.js";
 import { applyDetailSearchKey } from "./search/searchKey.js";
@@ -597,6 +598,26 @@ export function collapseTargetForChild(
   next.delete(parent.id); // alive: back to the cool/cold summary
   next.delete(expandKey); // cold: hide the sub-agents again
   return { parentId: parent.id, nextExpandedIds: next };
+}
+
+/**
+ * When a Viewer-search hit is opened into the Detail View, carry the query
+ * into a committed Detail body search so the user lands on the matched text
+ * (the Viewer matches the full one-line `detail`, but the match is often
+ * past the truncated row and buried in a long body — see #224). Returns the
+ * Detail SearchState to seed, or null when the body doesn't contain the query
+ * (e.g. the Viewer matched the one-line summary of a tool whose body differs),
+ * in which case the Detail opens with no search. The body searched mirrors
+ * `detailRawLines` (`detailBody ?? detail`).
+ */
+export function seededDetailSearch(
+  act: ActivityEntry,
+  query: string,
+): SearchState | null {
+  if (!query) return null;
+  const body = act.detailBody ?? act.detail ?? "";
+  if (!hasMatch(body, query)) return null;
+  return { surface: "detail", query, index: 0, committed: true };
 }
 
 /**
@@ -1647,6 +1668,7 @@ export function App({
             return;
           }
           // Navigated to a specific match → open its Detail View.
+          let seeded: SearchState | null = null;
           if (hits.length > 0) {
             const safeIndex =
               ((search.index % hits.length) + hits.length) % hits.length;
@@ -1665,10 +1687,15 @@ export function App({
               setIsLive(false);
               setScrollOffset(newScrollOffset);
               const act = mergedActivities[hitIndex];
-              if (act) openActivityDetail(act);
+              if (act) {
+                openActivityDetail(act);
+                // Carry the query into the Detail so the user lands on the
+                // matched text (the row only shows the truncated head).
+                seeded = seededDetailSearch(act, search.query);
+              }
             }
           }
-          setSearch(null);
+          setSearch(seeded);
           return;
         }
         if (key.delete || key.backspace) {

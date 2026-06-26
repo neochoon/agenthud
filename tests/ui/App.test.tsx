@@ -50,6 +50,7 @@ const {
   appendSubAgentRows,
   findParentTarget,
   collapseTargetForChild,
+  seededDetailSearch,
   initialSelectedId,
   initialExpandedIds,
   filterTreeByHidden,
@@ -398,6 +399,52 @@ describe("collapseTargetForChild", () => {
     expect(
       collapseTargetForChild("p4", tree, new Set(["__expanded-session-p4"])),
     ).toBeNull();
+  });
+});
+
+describe("seededDetailSearch", () => {
+  const act = (over: Partial<ActivityEntry>): ActivityEntry => ({
+    timestamp: new Date(),
+    type: "tool",
+    icon: "○",
+    label: "Tool",
+    detail: "",
+    ...over,
+  });
+
+  it("seeds a committed detail search when the body (detail) contains the query", () => {
+    // user/thinking-style entry: no detailBody, detail = full text
+    const a = act({
+      type: "thinking",
+      label: "Thinking",
+      detail: "first line\n...lean on the AskUserQuestion tool to surface...",
+    });
+    const seed = seededDetailSearch(a, "AskUserQuestion");
+    expect(seed).toEqual({
+      surface: "detail",
+      query: "AskUserQuestion",
+      index: 0,
+      committed: true,
+    });
+  });
+
+  it("uses detailBody as the body when present", () => {
+    const a = act({
+      detail: "npm test",
+      detailBody: "line 1\nFAIL auth.test.ts\nline 3",
+    });
+    expect(seededDetailSearch(a, "FAIL")?.surface).toBe("detail");
+  });
+
+  it("returns null when the body lacks the query (matched only the one-line detail)", () => {
+    // Viewer matched the one-line `detail`, but the Detail body is detailBody
+    // which doesn't contain it → don't seed an empty search.
+    const a = act({ detail: "run modal", detailBody: "alpha\nbeta\ngamma" });
+    expect(seededDetailSearch(a, "modal")).toBeNull();
+  });
+
+  it("returns null for an empty query", () => {
+    expect(seededDetailSearch(act({ detail: "x" }), "")).toBeNull();
   });
 });
 
@@ -1272,6 +1319,101 @@ describe("viewer search → Enter opens Detail View", () => {
     expect(lastFrame() ?? "").toContain("1/2");
     expect(lastFrame() ?? "").not.toContain("READ_MARKER");
     expect(lastFrame() ?? "").not.toContain("WRITE_MARKER");
+  });
+
+  it("navigated Enter seeds the Detail body search with the query (jumps to the match)", async () => {
+    mockTree = {
+      projects: [
+        {
+          name: "proj",
+          projectPath: "/tmp/proj",
+          hotness: "hot",
+          sessions: [
+            {
+              id: "s1",
+              hideKey: "proj/s1",
+              filePath: "/tmp/proj/s1.jsonl",
+              projectPath: "/tmp/proj",
+              projectName: "proj",
+              lastModifiedMs: Date.now(),
+              status: "hot",
+              modelName: null,
+              subAgents: [],
+              nonInteractive: false,
+              firstUserPrompt: "do auth",
+              liveState: null,
+            },
+          ],
+        },
+      ],
+      coldProjects: [],
+      totalCount: 1,
+      timestamp: new Date().toISOString(),
+      hiddenStats: { total: 0, active: 0 },
+    };
+    // Two activities both matching "config" in the one-line detail, so ↓
+    // advances the count 1/2 → 2/2 (observable — lets the test wait for the
+    // navigated flag to commit before Enter; a single match leaves it 1/1 and
+    // races, exactly the #209 trap). The 2nd carries "config" in its body so
+    // opening it seeds a committed body search.
+    mockActivities = [
+      {
+        timestamp: new Date(2026, 0, 1, 9, 0, 0),
+        type: "tool",
+        icon: "○",
+        label: "Read",
+        detail: "config one",
+        detailBody: "irrelevant body",
+        detailKind: "code",
+      },
+      {
+        timestamp: new Date(2026, 0, 1, 9, 0, 1),
+        type: "tool",
+        icon: "○",
+        label: "Read",
+        detail: "config two",
+        detailBody: "line A\nuse config here SEED_MARKER\nline C",
+        detailKind: "code",
+      },
+    ];
+
+    const { stdin, lastFrame } = render(<App mode="watch" />);
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("config two"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write("\t");
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("↵: detail"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write("/");
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("0/0"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    for (const ch of "config") {
+      stdin.write(ch);
+      await tick();
+    }
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1/2"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write(DOWN); // ↓ → 2nd match; wait for the count to commit
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("2/2"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write("\r"); // Enter → open the 2nd match's Detail, seeded with "config"
+
+    // Detail open, the matched line jumped into view, and the seeded body
+    // search is active (the `/config` prompt with its own count is shown).
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("SEED_MARKER"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    expect(lastFrame() ?? "").toContain("/config");
   });
 
   it("Detail's own search resets on Esc without losing the saved viewer search", async () => {

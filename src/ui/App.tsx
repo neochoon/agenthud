@@ -554,6 +554,45 @@ export function findParentTarget(
 }
 
 /**
+ * When the tree selection sits on a sub-agent that is only visible because
+ * its parent session is expanded (a cold session opened via Enter, or an
+ * alive session whose cool/cold sub-agents were revealed), return the parent
+ * id plus an `expandedIds` set with that reveal collapsed. Used by `←` and by
+ * Enter-on-a-child so the user can re-hide the revealed (cold) rows from where
+ * the cursor landed after expanding — otherwise Enter on a leaf sub-agent is a
+ * no-op and the only way back is to navigate up to the session row first.
+ *
+ * Returns null when the selection is not such a child, or when nothing extra
+ * is revealed (so the caller falls back to plain jump-to-parent / no-op).
+ */
+export function collapseTargetForChild(
+  selectedId: string,
+  tree: SessionTree,
+  expandedIds: Set<string>,
+): { parentId: string; nextExpandedIds: Set<string> } | null {
+  const allSessions = [
+    ...tree.projects.flatMap((p) => p.sessions),
+    ...tree.coldProjects.flatMap((p) => p.sessions),
+  ];
+  const parent = allSessions.find((s) =>
+    s.subAgents.some((sa) => sa.id === selectedId),
+  );
+  if (!parent) return null;
+
+  const isCold = parent.status === "cold";
+  const expandKey = `__expanded-session-${parent.id}`;
+  // Mirrors appendSubAgentRows' "subAgentsFullyExpanded" rule.
+  const fullyExpanded =
+    expandedIds.has(parent.id) || (isCold && expandedIds.has(expandKey));
+  if (!fullyExpanded) return null;
+
+  const next = new Set(expandedIds);
+  next.delete(parent.id); // alive: back to the cool/cold summary
+  next.delete(expandKey); // cold: hide the sub-agents again
+  return { parentId: parent.id, nextExpandedIds: next };
+}
+
+/**
  * Keep the tree selection on a row that is actually visible. The
  * `selectedId` is a stable id, but the flattened view it points into
  * changes underneath it — a refresh that cools the selected session into
@@ -1121,6 +1160,19 @@ export function App({
       if (focus !== "tree") return;
       stopTracking();
       if (!selectedId) return;
+      // On a revealed sub-agent, ← first collapses the parent's expansion
+      // (hiding the cold rows) and lands on the parent; only jump to the
+      // parent when there's nothing expanded to collapse.
+      const collapse = collapseTargetForChild(
+        selectedId,
+        displayTree,
+        expandedIds,
+      );
+      if (collapse) {
+        setExpandedIds(collapse.nextExpandedIds);
+        setSelectedId(collapse.parentId);
+        return;
+      }
       const target = findParentTarget(selectedId, displayTree, allFlat);
       if (target && target !== selectedId) setSelectedId(target);
     },
@@ -1423,6 +1475,20 @@ export function App({
           return next;
         });
         return;
+      }
+
+      // Enter on a leaf sub-agent that was revealed by expanding its parent:
+      // collapse that reveal (hide the cold rows) and return to the parent —
+      // the same as ← from here. Without this, Enter on a child is a no-op and
+      // the cold rows can't be re-hidden from where the cursor landed.
+      const collapse = collapseTargetForChild(
+        selectedId,
+        displayTree,
+        expandedIds,
+      );
+      if (collapse) {
+        setExpandedIds(collapse.nextExpandedIds);
+        setSelectedId(collapse.parentId);
       }
     },
     onHide: () => {

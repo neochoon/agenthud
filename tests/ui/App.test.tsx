@@ -49,6 +49,7 @@ const {
   App,
   appendSubAgentRows,
   findParentTarget,
+  collapseTargetForChild,
   initialSelectedId,
   initialExpandedIds,
   filterTreeByHidden,
@@ -283,6 +284,90 @@ describe("appendSubAgentRows", () => {
     const result: SessionNode[] = [];
     appendSubAgentRows(result, session, new Set(["__collapsed-session-s1"]));
     expect(result).toEqual([]);
+  });
+});
+
+describe("collapseTargetForChild", () => {
+  const node = (
+    id: string,
+    status: SessionNode["status"],
+    subAgents: SessionNode[] = [],
+  ): SessionNode => ({
+    id,
+    hideKey: `p/${id}`,
+    filePath: `/tmp/${id}.jsonl`,
+    projectPath: "/tmp/p",
+    projectName: "p",
+    lastModifiedMs: 0,
+    status,
+    modelName: null,
+    subAgents,
+    nonInteractive: false,
+    firstUserPrompt: null,
+    liveState: null,
+  });
+  const treeWith = (
+    activeSessions: SessionNode[],
+    coldSessions: SessionNode[],
+  ): SessionTree => ({
+    projects: activeSessions.length
+      ? [
+          {
+            name: "p",
+            projectPath: "/tmp/p",
+            sessions: activeSessions,
+            hotness: "hot",
+          },
+        ]
+      : [],
+    coldProjects: coldSessions.length
+      ? [
+          {
+            name: "cp",
+            projectPath: "/tmp/cp",
+            sessions: coldSessions,
+            hotness: "cold",
+          },
+        ]
+      : [],
+    totalCount: activeSessions.length + coldSessions.length,
+    timestamp: new Date().toISOString(),
+    hiddenStats: { total: 0, active: 0 },
+  });
+
+  it("collapses a cold session's `__expanded-session-` reveal from a child sub-agent", () => {
+    const parent = node("p1", "cold", [node("a", "cold")]);
+    const tree = treeWith([], [parent]);
+    const result = collapseTargetForChild(
+      "a",
+      tree,
+      new Set(["__expanded-session-p1"]),
+    );
+    expect(result).not.toBeNull();
+    expect(result?.parentId).toBe("p1");
+    expect(result?.nextExpandedIds.has("__expanded-session-p1")).toBe(false);
+  });
+
+  it("collapses an alive session's cool/cold reveal (bare id key) from a child", () => {
+    const parent = node("p2", "hot", [node("b", "cool")]);
+    const tree = treeWith([parent], []);
+    const result = collapseTargetForChild("b", tree, new Set(["p2"]));
+    expect(result?.parentId).toBe("p2");
+    expect(result?.nextExpandedIds.has("p2")).toBe(false);
+  });
+
+  it("returns null when the parent is not expanded (nothing extra to hide)", () => {
+    const parent = node("p3", "cold", [node("c", "cold")]);
+    const tree = treeWith([], [parent]);
+    expect(collapseTargetForChild("c", tree, new Set())).toBeNull();
+  });
+
+  it("returns null when the selected row is not a sub-agent", () => {
+    const parent = node("p4", "cold", [node("d", "cold")]);
+    const tree = treeWith([], [parent]);
+    expect(
+      collapseTargetForChild("p4", tree, new Set(["__expanded-session-p4"])),
+    ).toBeNull();
   });
 });
 

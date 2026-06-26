@@ -1351,22 +1351,34 @@ describe("viewer search → Enter opens Detail View", () => {
       timestamp: new Date().toISOString(),
       hiddenStats: { total: 0, active: 0 },
     };
-    // Query "config" matches the one-line detail (viewer) AND appears once deep
-    // in the body, so opening the Detail should seed a committed body search.
+    // Two activities both matching "config" in the one-line detail, so ↓
+    // advances the count 1/2 → 2/2 (observable — lets the test wait for the
+    // navigated flag to commit before Enter; a single match leaves it 1/1 and
+    // races, exactly the #209 trap). The 2nd carries "config" in its body so
+    // opening it seeds a committed body search.
     mockActivities = [
       {
         timestamp: new Date(2026, 0, 1, 9, 0, 0),
         type: "tool",
         icon: "○",
         label: "Read",
-        detail: "config.ts",
-        detailBody: "line A\nline B\nuse config here SEED_MARKER\nline D",
+        detail: "config one",
+        detailBody: "irrelevant body",
+        detailKind: "code",
+      },
+      {
+        timestamp: new Date(2026, 0, 1, 9, 0, 1),
+        type: "tool",
+        icon: "○",
+        label: "Read",
+        detail: "config two",
+        detailBody: "line A\nuse config here SEED_MARKER\nline C",
         detailKind: "code",
       },
     ];
 
     const { stdin, lastFrame } = render(<App mode="watch" />);
-    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("config.ts"), {
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("config two"), {
       timeout: 3000,
       interval: 25,
     });
@@ -1384,13 +1396,16 @@ describe("viewer search → Enter opens Detail View", () => {
       stdin.write(ch);
       await tick();
     }
-    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1/1"), {
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1/2"), {
       timeout: 3000,
       interval: 25,
     });
-    stdin.write(DOWN); // mark navigated (single match → index stays 0)
-    await tick();
-    stdin.write("\r"); // Enter → open Detail, seeded with "config"
+    stdin.write(DOWN); // ↓ → 2nd match; wait for the count to commit
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("2/2"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write("\r"); // Enter → open the 2nd match's Detail, seeded with "config"
 
     // Detail open, the matched line jumped into view, and the seeded body
     // search is active (the `/config` prompt with its own count is shown).

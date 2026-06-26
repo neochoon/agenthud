@@ -281,3 +281,84 @@ describe("parseActivitiesFromLines", () => {
     expect(edit?.detailKind).toBeUndefined();
   });
 });
+
+describe("parseActivitiesFromLines — drop never-executed (is_error) tool calls", () => {
+  const assistantTool = (id: string, name: string, input: unknown) =>
+    JSON.stringify({
+      type: "assistant",
+      message: { content: [{ type: "tool_use", id, name, input }] },
+      timestamp: "2025-01-15T10:00:00.000Z",
+    });
+  const errorResult = (id: string, content: string) =>
+    JSON.stringify({
+      type: "user",
+      toolUseResult: { stdout: "", stderr: "" },
+      message: {
+        content: [
+          { type: "tool_result", tool_use_id: id, is_error: true, content },
+        ],
+      },
+      timestamp: "2025-01-15T10:00:01.000Z",
+    });
+
+  it("drops an AskUserQuestion rejected by InputValidationError", () => {
+    const lines = [
+      assistantTool("t1", "AskUserQuestion", {}),
+      errorResult(
+        "t1",
+        "<tool_use_error>InputValidationError: AskUserQuestion failed due to the following issue:\nThe required parameter `questions` is missing</tool_use_error>",
+      ),
+    ];
+    const { activities } = parseActivitiesFromLines(lines);
+    expect(
+      activities.find((a) => a.label === "AskUserQuestion"),
+    ).toBeUndefined();
+  });
+
+  it("drops a harness-Blocked Bash call", () => {
+    const lines = [
+      assistantTool("t2", "Bash", { command: "sleep 45" }),
+      errorResult(
+        "t2",
+        "<tool_use_error>Blocked: sleep 45 followed by ...</tool_use_error>",
+      ),
+    ];
+    const { activities } = parseActivitiesFromLines(lines);
+    expect(activities.find((a) => a.label === "Bash")).toBeUndefined();
+  });
+
+  it("drops a permission-denied call", () => {
+    const lines = [
+      assistantTool("t2b", "Bash", { command: "rm -rf x" }),
+      errorResult(
+        "t2b",
+        "Permission for this action was denied by the Claude Code auto mode classifier.",
+      ),
+    ];
+    const { activities } = parseActivitiesFromLines(lines);
+    expect(activities.find((a) => a.label === "Bash")).toBeUndefined();
+  });
+
+  it("KEEPS a Bash that executed and failed (exit code)", () => {
+    const lines = [
+      assistantTool("t3", "Bash", { command: "npm test" }),
+      errorResult("t3", "Exit code 1\n5 tests failed"),
+    ];
+    const { activities } = parseActivitiesFromLines(lines);
+    const bash = activities.find((a) => a.label === "Bash");
+    expect(bash).toBeDefined();
+    expect(bash?.detail).toBe("npm test");
+  });
+
+  it("KEEPS an Edit that ran its precondition check and failed", () => {
+    const lines = [
+      assistantTool("t4", "Edit", { file_path: "/src/a.ts" }),
+      errorResult(
+        "t4",
+        "<tool_use_error>String to replace not found in file.</tool_use_error>",
+      ),
+    ];
+    const { activities } = parseActivitiesFromLines(lines);
+    expect(activities.find((a) => a.label === "Edit")).toBeDefined();
+  });
+});

@@ -279,6 +279,45 @@ describe("ActivityViewerPanel — row width alignment", () => {
   });
 });
 
+describe("ActivityViewerPanel — sub-agent summary header", () => {
+  const summary = {
+    status: "done" as const,
+    steps: 3,
+    durationMs: 134000,
+    intent: "Research the thing",
+    result: "Recommends option B",
+    model: "sonnet-4.6",
+  };
+
+  it("renders the header (intent/result/steps) when subAgentSummary is set", () => {
+    const { lastFrame } = render(
+      <ActivityViewerPanel
+        {...baseProps}
+        activities={[makeActivity("Read", 0)]}
+        subAgentSummary={summary}
+      />,
+    );
+    const out = lastFrame() ?? "";
+    expect(out).toContain("Research the thing"); // intent
+    expect(out).toContain("3 steps"); // metric chip
+    expect(out).toContain("Recommends option B"); // result
+    expect(out).toContain("activity"); // divider label
+    expect(out).toContain("Read"); // stream still present below
+  });
+
+  it("renders no header for a main session (prop absent)", () => {
+    const { lastFrame } = render(
+      <ActivityViewerPanel
+        {...baseProps}
+        activities={[makeActivity("Read", 0)]}
+      />,
+    );
+    const out = lastFrame() ?? "";
+    expect(out).not.toContain("3 steps");
+    expect(out).not.toContain("↵ drill in");
+  });
+});
+
 describe("ActivityViewerPanel search", () => {
   const acts = [
     makeActivity("Read", 0),

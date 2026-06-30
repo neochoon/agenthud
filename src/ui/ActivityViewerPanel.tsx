@@ -38,8 +38,11 @@ import {
   createTitleLine,
   getDisplayWidth,
   getInnerWidth,
+  truncateByWidth,
 } from "./constants.js";
 import { matchRanges } from "./search/matcher.js";
+import type { SubAgentSummary } from "./subAgentSummary.js";
+import { formatDuration } from "./subAgentSummary.js";
 
 export interface ActivityStyle {
   color?: string;
@@ -138,6 +141,9 @@ export interface ActivityViewerPanelProps {
    * windowStart from safeSelected, enabling fzf-style stable-window scrolling.
    */
   searchWindowStart?: number;
+  /** When the selected node is a sub-agent, its black-box summary; renders a
+   * header above the (demoted) activity stream. Absent for main sessions. */
+  subAgentSummary?: SubAgentSummary | null;
 }
 
 function formatActivityTime(date: Date, now: Date): string {
@@ -329,6 +335,7 @@ export function ActivityViewerPanel({
   searchQuery,
   searchSelected,
   searchWindowStart,
+  subAgentSummary,
 }: ActivityViewerPanelProps): React.ReactElement {
   const innerWidth = getInnerWidth(width);
   const contentWidth = innerWidth - 1;
@@ -470,16 +477,46 @@ export function ActivityViewerPanel({
     titleSuffix = `[PAUSED ↑${scrollOffset}${badge}${filterSuffix}]`;
   }
 
+  // Sub-agent black-box header (P1): fixed rows above the stream. The stream's
+  // row budget shrinks by the header height so the box stays `visibleRows` tall.
+  const headerLines: React.ReactElement[] = [];
+  if (subAgentSummary) {
+    const s = subAgentSummary;
+    const boxRow = (key: string, text: string) => {
+      const t = truncateByWidth(text, contentWidth - 1);
+      const pad = Math.max(0, contentWidth - 1 - getDisplayWidth(t));
+      return (
+        <Text key={key}>
+          {BOX.v} {t}
+          {" ".repeat(pad)}
+          {BOX.v}
+        </Text>
+      );
+    };
+    const dur =
+      s.durationMs === null ? "" : ` · ${formatDuration(s.durationMs)}`;
+    const model = s.model ? ` · ${s.model}` : "";
+    const chip = `${s.status} · ${s.steps} steps${dur}${model}`;
+    headerLines.push(boxRow("sa-chip", `${chip}  ${s.intent}`.trimEnd()));
+    if (s.result) {
+      headerLines.push(
+        boxRow("sa-result", `Result: ${s.result.replace(/\s+/g, " ").trim()}`),
+      );
+    }
+    headerLines.push(boxRow("sa-div", "─ activity (↵ drill in)"));
+  }
+  const streamRows = Math.max(1, visibleRows - headerLines.length);
+
   // Take a chronological slice (oldest -> newest within the slice). The slice
   // ends `scrollOffset` entries from the newest; live = scrollOffset 0.
   let visibleActivities: ActivityEntry[];
   if (activities.length === 0) {
     visibleActivities = [];
   } else if (isLive) {
-    visibleActivities = activities.slice(-visibleRows);
+    visibleActivities = activities.slice(-streamRows);
   } else {
     const end = Math.max(0, activities.length - scrollOffset);
-    const start = Math.max(0, end - visibleRows);
+    const start = Math.max(0, end - streamRows);
     visibleActivities = activities.slice(start, end);
   }
 
@@ -535,12 +572,12 @@ export function ActivityViewerPanel({
   // The live-edge cue now lives ON the newest activity row (spinner + bold)
   // rather than in a separate slot below.
   const emptyRow = `${BOX.v}${" ".repeat(contentWidth + 1)}${BOX.v}`;
-  const padCount = Math.max(0, visibleRows - lines.length);
+  const padCount = Math.max(0, streamRows - lines.length);
   const padded: React.ReactElement[] = [];
   for (let i = 0; i < padCount; i++) {
     padded.push(<Text key={`pad-${i}`}>{emptyRow}</Text>);
   }
-  const finalLines = [...padded, ...lines];
+  const finalLines = [...headerLines, ...padded, ...lines];
 
   return (
     <Box flexDirection="column" width={width}>

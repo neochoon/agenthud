@@ -1615,17 +1615,18 @@ describe("App — sub-agent viewer summary header", () => {
       timeout: 3000,
       interval: 25,
     });
-    // Navigate down to the sub-agent. It is the LAST nav row (sentinel →
-    // session → sub-agent), so over-pressing ↓ is safe — `onScrollDown` clamps
-    // at the bottom row. Sending extra ↓ keeps this robust against a CI race
-    // where a later ↓ would otherwise read a not-yet-committed selectedIndex
-    // and stop short of the sub-agent.
-    for (let i = 0; i < 4; i++) {
+    // Navigate down to the sub-agent (the LAST nav row: sentinel → session →
+    // sub-agent). Press ↓ repeatedly until the header appears, NOT a fixed
+    // count: on slow CI a render can take longer than one tick to commit the
+    // new selectedIndex, so a burst of ↓ stalls at the session row. Re-pressing
+    // is safe (↓ clamps at the bottom), and selecting the sub-agent scrolls its
+    // otherwise-folded row into view. `1 steps` is the header-only chip (the
+    // true discriminator — `taskDescription` also shows in the tree row).
+    for (let i = 0; i < 60; i++) {
+      if ((lastFrame() ?? "").includes("1 steps")) break;
       stdin.write(DOWN);
       await tick();
     }
-    // The summary header (intent) only renders when the sub-agent is selected;
-    // `DO_THE_THING` (full, untruncated) and the `1 steps` chip are header-only.
     await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1 steps"), {
       timeout: 5000,
       interval: 25,

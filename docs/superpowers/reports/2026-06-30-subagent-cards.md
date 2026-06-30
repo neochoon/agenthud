@@ -7,6 +7,35 @@
 Durable per-task record (decisions + deviations a diff can't show). Entries
 appended after each clean review; digest synthesized at PR time.
 
+## Feature digest (PR catch-up)
+
+Sub-agents now read as **black boxes** in the live HUD. When the selected tree
+node is a sub-agent (`node.agentId` set), the Activity Viewer shows a **summary
+header** above the (still-present) activity stream: a `status · N steps ·
+<duration> · <model>` chip with the intent, an optional `Result:` line, and a
+`─ activity (↵ drill in)` divider. Main sessions are untouched — they keep their
+full-detail view (they're the hero). The skill/workflow *fleet* overload problem
+is addressed by raising the altitude of each fleet member to one summarized card.
+
+All data is existing (zero new collection): intent = `taskDescription`, status =
+`liveState` (`running`/`done`; no `failed` — no reliable signal, deferred),
+steps = tool-call count, duration = first→last activity span, result = last
+`response`. New pure module `src/ui/subAgentSummary.ts` derives it; `App` passes
+it to `ActivityViewerPanel`, which renders the header and shrinks the stream's
+row budget so the box height is unchanged.
+
+**Built across 3 TDD tasks**, each independently reviewed (+ a final whole-branch
+review = Ready to merge): Task 1 pure helper (`7652357..40c7955`), Task 2 panel
+header (`534c19b..310d4ca`, incl. a width-alignment fix caught in review), Task 3
+App wiring (`0f04eb4..671ec02`). 938 tests green, tsc + Biome clean.
+
+**Deferred to #226 follow-ups (out of P1 scope):** cost field + task/PR cost
+roll-up (P2); skill-fleet roll-up on the parent (P3); `failed` status (needs a
+real signal). **Review-noted minors (non-blocking):** no test pins total panel
+height with a header present; narrow-width (`--once` < 80 cols) truncates the
+chip rather than dropping fields in the spec's stated priority order; `1 steps`
+isn't pluralized.
+
 ## Ledger
 
 - Task 1: complete (commits 7652357..40c7955, review clean — Approved)

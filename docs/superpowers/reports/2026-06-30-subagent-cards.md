@@ -11,6 +11,7 @@ appended after each clean review; digest synthesized at PR time.
 
 - Task 1: complete (commits 7652357..40c7955, review clean — Approved)
 - Task 2: complete (commits 534c19b..310d4ca, review clean — Approved after 1 fix)
+- Task 3: complete (commits 0f04eb4..671ec02, review clean — Approved)
 
 ---
 
@@ -70,3 +71,31 @@ is left as the historical record (this report is the correction note).
 **Files touched:** `src/ui/ActivityViewerPanel.tsx`, `tests/ui/ActivityViewerPanel.test.tsx`.
 
 **Follow-ups / known gaps:** None.
+
+---
+
+## Task 3 — App wires the summary to the viewer
+
+**Intent:** Compute the summary for the selected node and pass it to the viewer,
+so a selected sub-agent gets the header end-to-end.
+
+**What was built:** In `App.tsx`, `const subAgentSummary = selectedSession ?
+buildSubAgentSummary(selectedSession, mergedActivities) : null;` (computed where
+both are in scope) passed as `subAgentSummary={subAgentSummary}` to the existing
+`<ActivityViewerPanel/>`. Integration test navigates (↓↓) to a running sub-agent
+row and asserts the header-only markers `DO_THE_THING` (intent) + `1 steps`
+(chip); the `1 steps` chip is the true discriminator (taskDescription also shows
+in the tree row).
+
+**Key decisions / trade-offs:**
+- Sentinel/main-session safety comes for free: `buildSubAgentSummary` returns
+  null for nodes without `agentId` (`__sub-`/`__cold__` sentinels, main
+  sessions), so no guard needed at the call site.
+- Not wrapped in `useMemo` — pure + cheap, and `mergedActivities` is already
+  memoized upstream (review-confirmed acceptable).
+
+**Deviations from the plan:** None.
+
+**Files touched:** `src/ui/App.tsx`, `tests/ui/App.test.tsx`.
+
+**Follow-ups / known gaps:** None. Full suite 938/938, tsc clean.

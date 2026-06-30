@@ -10,6 +10,7 @@ appended after each clean review; digest synthesized at PR time.
 ## Ledger
 
 - Task 1: complete (commits 7652357..40c7955, review clean — Approved)
+- Task 2: complete (commits 534c19b..310d4ca, review clean — Approved after 1 fix)
 
 ---
 
@@ -35,5 +36,37 @@ module-not-found).
 time — the panel reuses its existing title; recorded in the plan's self-review.)
 
 **Files touched:** `src/ui/subAgentSummary.ts`, `tests/ui/subAgentSummary.test.ts`.
+
+**Follow-ups / known gaps:** None.
+
+---
+
+## Task 2 — Viewer renders the sub-agent summary header
+
+**Intent:** When `subAgentSummary` is set, render a header (chip · intent /
+optional Result / `─ activity (↵ drill in)` divider) above the activity stream,
+keeping the box `visibleRows` tall; main session unchanged.
+
+**What was built:** `ActivityViewerPanel` gained an optional
+`subAgentSummary?: SubAgentSummary | null` prop. In the non-search render tail a
+`boxRow` helper builds the header lines; `streamRows = max(1, visibleRows -
+headerLines.length)` shrinks the stream slice + pad so total height is unchanged;
+`finalLines = [...headerLines, ...padded, ...lines]`. Search path and main-session
+path untouched. Tests: header content, no-header for main session, and full-width
+alignment.
+
+**Key decisions / trade-offs:**
+- Header pinned at top, stream stays bottom-aligned beneath it.
+- Result line normalized to one line (`\s+`→space) and omitted when empty.
+
+**Deviations from the plan:** The plan's `boxRow` snippet had an **off-by-one**
+(`contentWidth - 1`) that rendered header rows one cell too narrow (right border
+misaligned). Caught by task review; fixed to `contentWidth` for both truncate
+budget and pad base (commit 310d4ca) — matches the existing `emptyRow`
+(`contentWidth + 3` cells). Added a width-alignment test (RED 79 → GREEN 80) so
+the class can't regress. Plan code corrected in spirit; the plan file's snippet
+is left as the historical record (this report is the correction note).
+
+**Files touched:** `src/ui/ActivityViewerPanel.tsx`, `tests/ui/ActivityViewerPanel.test.tsx`.
 
 **Follow-ups / known gaps:** None.

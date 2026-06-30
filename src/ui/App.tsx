@@ -81,6 +81,7 @@ import { SearchInput } from "./search/SearchInput.js";
 import type { SearchState } from "./search/searchKey.js";
 import { applyDetailSearchKey } from "./search/searchKey.js";
 import { filterTreeBySearch, treeSearchHits } from "./search/treeSearch.js";
+import { buildSubAgentSummary } from "./subAgentSummary.js";
 import {
   adjustViewerCursorOnNewActivities,
   scrollOffsetForCursor,
@@ -1899,6 +1900,10 @@ export function App({
         ? selectedSession.projectName || selectedSession.id.slice(0, 8)
         : (selectedSession.agentId ?? selectedSession.id.slice(0, 8));
 
+  const subAgentSummary = selectedSession
+    ? buildSubAgentSummary(selectedSession, mergedActivities)
+    : null;
+
   const MIN_WIDTH = 80;
   const MIN_HEIGHT = 20;
   if (isWatchMode && (width < MIN_WIDTH || height + 1 < MIN_HEIGHT)) {
@@ -2062,6 +2067,7 @@ export function App({
                     ? viewerSearchWindowStart
                     : undefined
                 }
+                subAgentSummary={subAgentSummary}
               />
             )}
           </Box>

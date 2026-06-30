@@ -1540,3 +1540,93 @@ describe("viewer search → Enter opens Detail View", () => {
     });
   });
 });
+
+describe("App — sub-agent viewer summary header", () => {
+  const tick = () => new Promise((r) => setTimeout(r, 50));
+  const DOWN = String.fromCharCode(27) + "[B"; // ESC prefix REQUIRED (see prior CI fixes)
+
+  it("shows the intent header when a sub-agent row is selected", async () => {
+    mockTree = {
+      projects: [
+        {
+          name: "proj",
+          projectPath: "/tmp/proj",
+          hotness: "hot",
+          sessions: [
+            {
+              id: "s1",
+              hideKey: "proj/s1",
+              filePath: "/tmp/proj/s1.jsonl",
+              projectPath: "/tmp/proj",
+              projectName: "proj",
+              lastModifiedMs: Date.now(),
+              status: "hot",
+              modelName: "sonnet-4.6",
+              nonInteractive: false,
+              firstUserPrompt: "parent",
+              liveState: null,
+              subAgents: [
+                {
+                  id: "a1",
+                  hideKey: "proj/a1",
+                  filePath: "/tmp/proj/a1.jsonl",
+                  projectPath: "/tmp/proj",
+                  projectName: "",
+                  lastModifiedMs: Date.now(),
+                  status: "hot",
+                  modelName: "sonnet-4.6",
+                  subAgents: [],
+                  nonInteractive: false,
+                  firstUserPrompt: null,
+                  liveState: "working",
+                  agentId: "agent-abc123",
+                  taskDescription: "DO_THE_THING",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      coldProjects: [],
+      totalCount: 1,
+      timestamp: new Date().toISOString(),
+      hiddenStats: { total: 0, active: 0 },
+    };
+    mockActivities = [
+      {
+        timestamp: new Date(2026, 0, 1, 9, 0, 0),
+        type: "tool",
+        icon: "○",
+        label: "Read",
+        detail: "x.ts",
+      },
+      {
+        timestamp: new Date(2026, 0, 1, 9, 0, 2),
+        type: "response",
+        icon: "✦",
+        label: "Response",
+        detail: "RESULT_TEXT",
+      },
+    ];
+
+    const { stdin, lastFrame } = render(<App mode="watch" />);
+    // Tree is focused at boot; selection starts on the project sentinel.
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("↵: expand"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    // ↓ to the session, ↓ to the (running) sub-agent row.
+    stdin.write(DOWN);
+    await tick();
+    stdin.write(DOWN);
+    // The summary header (intent) only renders when the sub-agent is selected.
+    await vi.waitFor(
+      () => expect(lastFrame() ?? "").toContain("DO_THE_THING"),
+      {
+        timeout: 5000,
+        interval: 25,
+      },
+    );
+    expect(lastFrame() ?? "").toContain("1 steps"); // metric chip (header-only)
+  });
+});

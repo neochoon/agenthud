@@ -483,8 +483,8 @@ export function ActivityViewerPanel({
   if (subAgentSummary) {
     const s = subAgentSummary;
     const boxRow = (key: string, text: string) => {
-      const t = truncateByWidth(text, contentWidth - 1);
-      const pad = Math.max(0, contentWidth - 1 - getDisplayWidth(t));
+      const t = truncateByWidth(text, contentWidth);
+      const pad = Math.max(0, contentWidth - getDisplayWidth(t));
       return (
         <Text key={key}>
           {BOX.v} {t}

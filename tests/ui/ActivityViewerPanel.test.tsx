@@ -289,6 +289,21 @@ describe("ActivityViewerPanel — sub-agent summary header", () => {
     model: "sonnet-4.6",
   };
 
+  it("pads every header row to the full panel width (right border aligned)", () => {
+    const W = 80;
+    const { lastFrame } = render(
+      <ActivityViewerPanel
+        {...baseProps}
+        activities={[makeActivity("Read", 0)]}
+        width={W}
+        subAgentSummary={summary}
+      />,
+    );
+    const lines = (lastFrame() ?? "").split("\n").filter(Boolean);
+    expect(lines.some((l) => l.includes("Research the thing"))).toBe(true);
+    for (const l of lines) expect([...l].length).toBe(W);
+  });
+
   it("renders the header (intent/result/steps) when subAgentSummary is set", () => {
     const { lastFrame } = render(
       <ActivityViewerPanel

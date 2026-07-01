@@ -339,6 +339,9 @@ export function ActivityViewerPanel({
 }: ActivityViewerPanelProps): React.ReactElement {
   const innerWidth = getInnerWidth(width);
   const contentWidth = innerWidth - 1;
+  // A blank bordered row (│…│), used to pad both the search and normal paths
+  // up to `visibleRows`.
+  const emptyRow = `${BOX.v}${" ".repeat(contentWidth + 1)}${BOX.v}`;
 
   // Sub-agent black-box header (P1): fixed rows above the stream, rendered the
   // same way in both the normal and the search/narrow-finder path. The stream's
@@ -364,7 +367,8 @@ export function ActivityViewerPanel({
     const dur =
       s.durationMs === null ? "" : ` · ${formatDuration(s.durationMs)}`;
     const model = s.model ? ` · ${s.model}` : "";
-    const chip = `${s.status} · ${s.steps} steps${dur}${model}`;
+    const steps = `${s.steps} step${s.steps === 1 ? "" : "s"}`;
+    const chip = `${s.status} · ${steps}${dur}${model}`;
     headerLines.push(boxRow("sa-chip", `${chip}  ${s.intent}`));
     if (s.result) {
       headerLines.push(boxRow("sa-result", `Result: ${s.result}`));
@@ -481,7 +485,6 @@ export function ActivityViewerPanel({
       }
     }
 
-    const emptyRow = `${BOX.v}${" ".repeat(contentWidth + 1)}${BOX.v}`;
     const padCount = Math.max(0, searchRows - lines.length);
     const padded: React.ReactElement[] = [];
     for (let i = 0; i < padCount; i++) {
@@ -580,7 +583,6 @@ export function ActivityViewerPanel({
   // Bottom-aligned: pad at the TOP so newest sits on the last content row.
   // The live-edge cue now lives ON the newest activity row (spinner + bold)
   // rather than in a separate slot below.
-  const emptyRow = `${BOX.v}${" ".repeat(contentWidth + 1)}${BOX.v}`;
   const padCount = Math.max(0, streamRows - lines.length);
   const padded: React.ReactElement[] = [];
   for (let i = 0; i < padCount; i++) {

@@ -31,7 +31,7 @@ Out of scope for P1 (tracked on #226 for later):
 
 ## Layout (chosen: header + stream below)
 
-```
+```text
 ┌─ » <name>   [running|done] · N steps · <duration> ────────────┐
 │ Intent: <taskDescription, truncated>                          │
 │ Result: <last response text, truncated>                       │

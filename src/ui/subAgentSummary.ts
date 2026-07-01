@@ -56,6 +56,12 @@ export function subAgentHeaderRowCount(
   return 2 + (summary.result ? 1 : 0); // chip + [result] + divider
 }
 
+/**
+ * Format a *span* (start→end duration) compactly: `5s`, `2m14s`, `1h1m`.
+ * Distinct on purpose from SessionTreePanel's `formatElapsed`, which formats
+ * *time-since-now* as a single coarse unit (`49m`, `3d`, `2mo`). A span reads
+ * better compound; an age reads better as one bucket — do not merge them.
+ */
 export function formatDuration(ms: number): string {
   const secs = Math.max(0, Math.round(ms / 1000));
   const h = Math.floor(secs / 3600);

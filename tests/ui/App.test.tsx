@@ -1609,18 +1609,18 @@ describe("App — sub-agent viewer summary header", () => {
       detail: "RESULT_TEXT",
     },
   ];
-  // Press ↓ until the header-only `1 steps` chip appears (↓ clamps at the
+  // Press ↓ until the header-only `1 step` chip appears (↓ clamps at the
   // bottom row; selecting the sub-agent scrolls its folded row into view).
   const selectSubAgent = async (
     stdin: { write: (s: string) => void },
     lastFrame: () => string | undefined,
   ) => {
     for (let i = 0; i < 60; i++) {
-      if ((lastFrame() ?? "").includes("1 steps")) break;
+      if ((lastFrame() ?? "").includes("1 step")) break;
       stdin.write(DOWN);
       await tick();
     }
-    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1 steps"), {
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1 step"), {
       timeout: 5000,
       interval: 25,
     });
@@ -1653,7 +1653,7 @@ describe("App — sub-agent viewer summary header", () => {
     // Focus the viewer and cycle the type filter to "response" (filterPresets
     // = [[], ["response"], ["commit"]]). That drops the tool from the viewer's
     // *merged/filtered* stream — but the sub-agent summary must reflect the
-    // agent's OWN raw activity (1 tool), so the chip must stay `1 steps`, not
+    // agent's OWN raw activity (1 tool), so the chip must stay `1 step`, not
     // collapse to `0 steps`.
     stdin.write("\t"); // focus tree → viewer
     await vi.waitFor(() => expect(lastFrame() ?? "").toContain("↵: detail"), {
@@ -1666,7 +1666,7 @@ describe("App — sub-agent viewer summary header", () => {
       interval: 25,
     });
     // Header still counts the raw tool call.
-    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1 steps"), {
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1 step"), {
       timeout: 3000,
       interval: 25,
     });

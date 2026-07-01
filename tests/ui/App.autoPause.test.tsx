@@ -9,9 +9,13 @@ import { render } from "ink-testing-library";
 import { describe, expect, it, vi } from "vitest";
 import type { ActivityEntry, SessionTree } from "../../src/types/index.js";
 
+// Short refresh interval: the test advances fake time to fire the refresh poll,
+// and advancing the real 60s interval steps through hundreds of spinner-timer
+// ticks (each a render) — slow enough to time out on CI. 300ms keeps the single
+// advance tiny while still exercising the same refresh → grow-activities path.
 vi.mock("../../src/config/globalConfig.js", () => ({
   loadGlobalConfig: () => ({
-    refreshIntervalMs: 60000,
+    refreshIntervalMs: 300,
     hiddenSessions: [],
     hiddenSubAgents: [],
     filterPresets: [[], ["response"], ["commit"]],
@@ -154,11 +158,11 @@ describe("App — cursor-anchor auto-pause budget", () => {
         },
       ];
       mockTree = agentSessionTree();
-      await vi.advanceTimersByTimeAsync(60000); // fire the refresh poll
-      // Let the re-render settle; poll so a lagged frame doesn't flake.
+      // Fire the refresh poll (300ms interval) and let the re-render settle;
+      // poll so a lagged frame doesn't flake.
       for (let i = 0; i < 20; i++) {
         if ((lastFrame() ?? "").includes("PAUSED")) break;
-        await vi.advanceTimersByTimeAsync(100);
+        await vi.advanceTimersByTimeAsync(350);
       }
       expect(lastFrame() ?? "").toContain("PAUSED");
     } finally {

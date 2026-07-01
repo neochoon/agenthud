@@ -340,6 +340,38 @@ export function ActivityViewerPanel({
   const innerWidth = getInnerWidth(width);
   const contentWidth = innerWidth - 1;
 
+  // Sub-agent black-box header (P1): fixed rows above the stream, rendered the
+  // same way in both the normal and the search/narrow-finder path. The stream's
+  // row budget shrinks by the header height so the box stays `visibleRows` tall.
+  const headerLines: React.ReactElement[] = [];
+  if (subAgentSummary) {
+    const s = subAgentSummary;
+    const boxRow = (key: string, text: string) => {
+      // Flatten newlines/tabs on EVERY header row — an un-flattened value (e.g.
+      // a multi-line taskDescription) would inject a line break and blow out the
+      // box border for the whole header.
+      const flat = text.replace(/[\r\n\t]+/g, " ").trim();
+      const t = truncateByWidth(flat, contentWidth);
+      const pad = Math.max(0, contentWidth - getDisplayWidth(t));
+      return (
+        <Text key={key}>
+          {BOX.v} {t}
+          {" ".repeat(pad)}
+          {BOX.v}
+        </Text>
+      );
+    };
+    const dur =
+      s.durationMs === null ? "" : ` · ${formatDuration(s.durationMs)}`;
+    const model = s.model ? ` · ${s.model}` : "";
+    const chip = `${s.status} · ${s.steps} steps${dur}${model}`;
+    headerLines.push(boxRow("sa-chip", `${chip}  ${s.intent}`));
+    if (s.result) {
+      headerLines.push(boxRow("sa-result", `Result: ${s.result}`));
+    }
+    headerLines.push(boxRow("sa-div", "─ activity (↵ drill in)"));
+  }
+
   // Narrow-finder mode: only narrow once there's a query. An empty query
   // (search just opened, nothing typed) shows the full list — narrowing to
   // zero rows on the first `/` keystroke would blank the viewer.
@@ -354,6 +386,9 @@ export function ActivityViewerPanel({
     const filterSuffix =
       filterLabel && filterLabel !== "all" ? ` · ${filterLabel}` : "";
     const titleSuffix = `[SEARCH${filterSuffix}]`;
+    // Reserve rows for the sub-agent header so the search window matches the
+    // same stream budget the normal path uses (App scrolls against this too).
+    const searchRows = Math.max(1, visibleRows - headerLines.length);
 
     if (searchHits.length === 0) {
       const emptyText = searchQuery ? "No matches" : "No activity yet";
@@ -370,12 +405,12 @@ export function ActivityViewerPanel({
       // `visibleRows`. Use the persisted edge-scroll start from App when
       // available (fzf-style stable window); fall back to pinning the
       // selected hit at the top (legacy behaviour) when it isn't.
-      const maxWindowStart = Math.max(0, searchHits.length - visibleRows);
+      const maxWindowStart = Math.max(0, searchHits.length - searchRows);
       const windowStart =
         searchWindowStart !== undefined
           ? Math.max(0, Math.min(searchWindowStart, maxWindowStart))
           : Math.max(0, Math.min(safeSelected, maxWindowStart));
-      const windowEnd = Math.min(searchHits.length, windowStart + visibleRows);
+      const windowEnd = Math.min(searchHits.length, windowStart + searchRows);
       const windowedHits = searchHits.slice(windowStart, windowEnd);
       for (let wi = 0; wi < windowedHits.length; wi++) {
         const i = windowStart + wi; // global hit index
@@ -447,12 +482,12 @@ export function ActivityViewerPanel({
     }
 
     const emptyRow = `${BOX.v}${" ".repeat(contentWidth + 1)}${BOX.v}`;
-    const padCount = Math.max(0, visibleRows - lines.length);
+    const padCount = Math.max(0, searchRows - lines.length);
     const padded: React.ReactElement[] = [];
     for (let i = 0; i < padCount; i++) {
       padded.push(<Text key={`pad-${i}`}>{emptyRow}</Text>);
     }
-    const finalLines = [...padded, ...lines];
+    const finalLines = [...headerLines, ...padded, ...lines];
 
     return (
       <Box flexDirection="column" width={width}>
@@ -477,34 +512,8 @@ export function ActivityViewerPanel({
     titleSuffix = `[PAUSED ↑${scrollOffset}${badge}${filterSuffix}]`;
   }
 
-  // Sub-agent black-box header (P1): fixed rows above the stream. The stream's
-  // row budget shrinks by the header height so the box stays `visibleRows` tall.
-  const headerLines: React.ReactElement[] = [];
-  if (subAgentSummary) {
-    const s = subAgentSummary;
-    const boxRow = (key: string, text: string) => {
-      const t = truncateByWidth(text, contentWidth);
-      const pad = Math.max(0, contentWidth - getDisplayWidth(t));
-      return (
-        <Text key={key}>
-          {BOX.v} {t}
-          {" ".repeat(pad)}
-          {BOX.v}
-        </Text>
-      );
-    };
-    const dur =
-      s.durationMs === null ? "" : ` · ${formatDuration(s.durationMs)}`;
-    const model = s.model ? ` · ${s.model}` : "";
-    const chip = `${s.status} · ${s.steps} steps${dur}${model}`;
-    headerLines.push(boxRow("sa-chip", `${chip}  ${s.intent}`.trimEnd()));
-    if (s.result) {
-      headerLines.push(
-        boxRow("sa-result", `Result: ${s.result.replace(/\s+/g, " ").trim()}`),
-      );
-    }
-    headerLines.push(boxRow("sa-div", "─ activity (↵ drill in)"));
-  }
+  // headerLines is built once at the top of the render (shared with the search
+  // path); the stream budget shrinks by its height so the box stays visibleRows.
   const streamRows = Math.max(1, visibleRows - headerLines.length);
 
   // Take a chronological slice (oldest -> newest within the slice). The slice

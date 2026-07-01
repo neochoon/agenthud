@@ -1653,7 +1653,12 @@ export function App({
             s ? { ...s, index: newIndex, navigated: true } : s,
           );
           setViewerSearchWindowStart((prev) =>
-            edgeScrollWindowStart(prev, newIndex, viewerRows, hits.length),
+            edgeScrollWindowStart(
+              prev,
+              newIndex,
+              viewerStreamRows,
+              hits.length,
+            ),
           );
           return;
         }
@@ -1665,7 +1670,12 @@ export function App({
             s ? { ...s, index: newIndex, navigated: true } : s,
           );
           setViewerSearchWindowStart((prev) =>
-            edgeScrollWindowStart(prev, newIndex, viewerRows, hits.length),
+            edgeScrollWindowStart(
+              prev,
+              newIndex,
+              viewerStreamRows,
+              hits.length,
+            ),
           );
           return;
         }
@@ -1684,7 +1694,7 @@ export function App({
               const newScrollOffset = scrollOffsetForCursor(
                 mergedActivities.length,
                 hitIndex,
-                viewerRows,
+                viewerStreamRows,
               );
               setSavedViewerSearch({
                 search,

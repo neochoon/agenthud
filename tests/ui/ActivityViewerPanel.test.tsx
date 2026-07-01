@@ -320,6 +320,27 @@ describe("ActivityViewerPanel — sub-agent summary header", () => {
     expect(out).toContain("Read"); // stream still present below
   });
 
+  it("flattens newlines in every header row so the border stays aligned", () => {
+    const W = 80;
+    const { lastFrame } = render(
+      <ActivityViewerPanel
+        {...baseProps}
+        activities={[makeActivity("Read", 0)]}
+        width={W}
+        subAgentSummary={{
+          ...summary,
+          intent: "line one\nline two", // newline in intent (was un-flattened)
+          result: "res\tone\ntwo",
+        }}
+      />,
+    );
+    const lines = (lastFrame() ?? "").split("\n").filter(Boolean);
+    // Every line stays exactly W wide — a stray newline would split a header
+    // row and break the right border.
+    for (const l of lines) expect([...l].length).toBe(W);
+    expect(lines.some((l) => l.includes("line one line two"))).toBe(true);
+  });
+
   it("renders no header for a main session (prop absent)", () => {
     const { lastFrame } = render(
       <ActivityViewerPanel
@@ -368,5 +389,35 @@ describe("ActivityViewerPanel search", () => {
       />,
     );
     expect(lastFrame() ?? "").toContain("No matches");
+  });
+
+  it("renders the sub-agent header in the search path too", () => {
+    const W = 80;
+    const { lastFrame } = render(
+      <ActivityViewerPanel
+        {...baseProps}
+        width={W}
+        activities={acts}
+        searchQuery="ea"
+        searchHits={[0]} // "Read" matches
+        searchSelected={0}
+        subAgentSummary={{
+          status: "done",
+          steps: 3,
+          durationMs: 134000,
+          intent: "Research the thing",
+          result: "Recommends option B",
+          model: "sonnet-4.6",
+        }}
+      />,
+    );
+    const out = lastFrame() ?? "";
+    // Header stays visible while narrowed.
+    expect(out).toContain("Research the thing"); // intent
+    expect(out).toContain("3 steps"); // metric chip
+    expect(out).toContain("↵ drill in"); // divider
+    // Border stays aligned with the header rows present.
+    const lines = out.split("\n").filter(Boolean);
+    for (const l of lines) expect([...l].length).toBe(W);
   });
 });

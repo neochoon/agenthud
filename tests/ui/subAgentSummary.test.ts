@@ -66,6 +66,24 @@ describe("buildSubAgentSummary", () => {
     expect(s?.status).toBe("running");
   });
 
+  it("reports running (not done) when liveState is waiting", () => {
+    // A "waiting" agent is alive/yielded, not finished. Unreachable for Claude
+    // sub-agents today (sessionLiveness maps sub-agent yield → null), but the
+    // header must not lie if a provider ever emits agentId + waiting.
+    const s = buildSubAgentSummary(
+      node({ agentId: "a", liveState: "waiting" }),
+      [tool(0)],
+    );
+    expect(s?.status).toBe("running");
+  });
+
+  it("reports done when there is no live signal (liveState null)", () => {
+    const s = buildSubAgentSummary(node({ agentId: "a", liveState: null }), [
+      tool(0),
+    ]);
+    expect(s?.status).toBe("done");
+  });
+
   it("handles 0 and 1 activities (null duration, empty result)", () => {
     expect(buildSubAgentSummary(node({ agentId: "a" }), [])).toMatchObject({
       steps: 0,

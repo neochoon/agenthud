@@ -32,8 +32,14 @@ export function buildSubAgentSummary(
       break;
     }
   }
+  // "working" and "waiting" both mean the agent is alive/in-progress; only a
+  // missing live signal (null) reads as done. Mapping "waiting" → "done" would
+  // show an agent that's blocked on a tool/approval as finished.
   return {
-    status: node.liveState === "working" ? "running" : "done",
+    status:
+      node.liveState === "working" || node.liveState === "waiting"
+        ? "running"
+        : "done",
     steps,
     durationMs,
     intent: node.taskDescription ?? "",

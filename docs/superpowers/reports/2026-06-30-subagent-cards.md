@@ -182,3 +182,37 @@ border-wrapping); #9 documented why `formatDuration` (compound span) and
 `src/ui/subAgentSummary.ts`, `tests/ui/App.test.tsx`,
 `tests/ui/ActivityViewerPanel.test.tsx`, `tests/ui/subAgentSummary.test.ts`,
 spec doc. Full suite 944/944, tsc clean, biome clean.
+
+---
+
+## Review-fix round 2 (PR #227, CodeRabbit COMMENTED)
+
+The re-review (non-blocking `COMMENTED`) re-raised two Major findings; both
+verified against current code before acting.
+
+**Auto-pause budget (Major).** The cursor-anchor auto-pause effect still fed the
+full `viewerRows` into `adjustViewerCursorOnNewActivities` — a call site the
+round-1 B fix missed (`viewerStreamRows` wasn't even in scope there). For a live
+selected sub-agent the cursor could drift header-height rows past the visible top
+before pausing. Fixed by hoisting the `subAgentSummary`/`viewerStreamRows`
+computation above the effect and routing it through `viewerStreamRows`. The
+regression test drives fake timers to advance the 60s refresh poll; it lives in
+its **own file** (`App.autoPause.test.tsx`) because fake timers bleed with the
+~50 real-timer tests in `App.test.tsx` (order-dependent otherwise). Verified it
+fails pre-fix, passes post-fix.
+
+**Waiting status (Major → accepted as a robustness fix).** `status` mapped every
+non-working `liveState` (incl. `waiting`) to `done`. Re-verified reachability:
+Claude sub-agents map a yield to `null` not `waiting` (`sessionLiveness.ts:57`),
+opencode is `working|null`, and kiro/kiro-ide can be `waiting` but attach no
+`agentId` (so `buildSubAgentSummary` returns null) — so it's unreachable *today*.
+But the invariant is fragile and `waiting` means in-progress, so mapped
+`working|waiting → running`, `null → done`. No new status variant (YAGNI: the
+header has no distinct waiting rendering).
+
+**Non-bug (test-only nit).** CodeRabbit asked for a `waiting` test "once the
+status is fixed" — added, plus a `null → done` case.
+
+**Files touched:** `src/ui/App.tsx`, `src/ui/subAgentSummary.ts`,
+`tests/ui/App.test.tsx`, `tests/ui/App.autoPause.test.tsx` (new),
+`tests/ui/subAgentSummary.test.ts`. Full suite 947/947, tsc + biome clean.

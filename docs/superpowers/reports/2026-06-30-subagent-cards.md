@@ -128,3 +128,57 @@ in the tree row).
 **Files touched:** `src/ui/App.tsx`, `tests/ui/App.test.tsx`.
 
 **Follow-ups / known gaps:** None. Full suite 938/938, tsc clean.
+
+---
+
+## Review-fix round (PR #227)
+
+CodeRabbit (`CHANGES_REQUESTED`, 6 comments) and the user's `/code-review`
+(4 Confirmed + 6 Plausible) surfaced findings the per-task and final opus
+reviews had missed. Triaged into must-fix (A–E), cleanup (#9/#10), nits, and
+documented non-bugs (#5/#7/#8).
+
+**A + C — summary from raw activities + memoize.** The header was built from the
+viewer's *filtered/merged* stream, so cycling the type filter to "response" made
+the step count collapse (e.g. `1 step` → `0 steps`). Fixed to build from the
+sub-agent's own raw `activities`, wrapped in `useMemo` keyed on
+`[selectedSession, activities]`. (Supersedes the prior "not wrapped in useMemo"
+note above.) New App test: filter→response, assert chip stays `1 step`.
+
+**B — viewer scroll/cursor/selection account for header height.** The header
+consumes rows, but scroll/cursor/PgUp-Dn/half-page/onScrollTop/getSelectedActivity
+still budgeted against the full `viewerRows`, desyncing selection from what's on
+screen. Introduced `subAgentHeaderRowCount(summary)` (single source of truth,
+2 + result?1:0) and `viewerStreamRows = viewerRows − headerRowCount`; routed all
+stream-relative math through it.
+
+**D — flatten every header row.** Only the Result row normalized whitespace; a
+multi-line `taskDescription` in the chip/intent row would inject a newline and
+break the box border. `boxRow` now flattens `[\r\n\t]+` on every row.
+
+**E — render header in the search path + consistent budget.** The
+search/narrow-finder branch returned before the header, so narrowing hid it.
+Lifted `headerLines` to the top of the render (shared by both paths); the search
+window and App's search scroll math (`edgeScrollWindowStart`,
+`scrollOffsetForCursor`) now budget against `viewerStreamRows` too.
+
+**Cleanup:** #10 hoisted the duplicated blank-row literal to one shared const
+(boxRow/padLine deliberately NOT merged — boxRow is display-width-aware and
+border-wrapping); #9 documented why `formatDuration` (compound span) and
+`formatElapsed` (single-unit age) differ rather than merging.
+
+**Nits:** pluralize step chip (`1 step` / `N steps`); tag spec ASCII fence
+`text` (MD040).
+
+**Documented non-bugs (not fixed):**
+- #5 box-height overflow — guarded: `viewerRows ≥ 5` always exceeds header
+  height ≤ 3.
+- #7 `waiting` status — sub-agents never report `waiting` (suppressed in
+  `detectLiveState`), so only `running`/`done` are reachable.
+- #8 one-line Result — by design for a fixed-height header; full text lives in
+  the drill-in Detail View.
+
+**Files touched:** `src/ui/App.tsx`, `src/ui/ActivityViewerPanel.tsx`,
+`src/ui/subAgentSummary.ts`, `tests/ui/App.test.tsx`,
+`tests/ui/ActivityViewerPanel.test.tsx`, `tests/ui/subAgentSummary.test.ts`,
+spec doc. Full suite 944/944, tsc clean, biome clean.

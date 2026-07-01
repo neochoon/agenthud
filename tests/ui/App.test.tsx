@@ -1545,83 +1545,76 @@ describe("App — sub-agent viewer summary header", () => {
   const tick = () => new Promise((r) => setTimeout(r, 50));
   const DOWN = String.fromCharCode(27) + "[B"; // ESC prefix REQUIRED (see prior CI fixes)
 
-  it("shows the intent header when a sub-agent row is selected", async () => {
-    mockTree = {
-      projects: [
-        {
-          name: "proj",
-          projectPath: "/tmp/proj",
-          hotness: "hot",
-          sessions: [
-            {
-              id: "s1",
-              hideKey: "proj/s1",
-              filePath: "/tmp/proj/s1.jsonl",
-              projectPath: "/tmp/proj",
-              projectName: "proj",
-              lastModifiedMs: Date.now(),
-              status: "hot",
-              modelName: "sonnet-4.6",
-              nonInteractive: false,
-              firstUserPrompt: "parent",
-              liveState: null,
-              subAgents: [
-                {
-                  id: "a1",
-                  hideKey: "proj/a1",
-                  filePath: "/tmp/proj/a1.jsonl",
-                  projectPath: "/tmp/proj",
-                  projectName: "",
-                  lastModifiedMs: Date.now(),
-                  status: "hot",
-                  modelName: "sonnet-4.6",
-                  subAgents: [],
-                  nonInteractive: false,
-                  firstUserPrompt: null,
-                  liveState: "working",
-                  agentId: "agent-abc123",
-                  taskDescription: "DO_THE_THING",
-                },
-              ],
-            },
-          ],
-        },
-      ],
-      coldProjects: [],
-      totalCount: 1,
-      timestamp: new Date().toISOString(),
-      hiddenStats: { total: 0, active: 0 },
-    };
-    mockActivities = [
+  // Tree: proj → session s1 → running sub-agent a1 (intent DO_THE_THING).
+  const subAgentTree = (): SessionTree => ({
+    projects: [
       {
-        timestamp: new Date(2026, 0, 1, 9, 0, 0),
-        type: "tool",
-        icon: "○",
-        label: "Read",
-        detail: "x.ts",
+        name: "proj",
+        projectPath: "/tmp/proj",
+        hotness: "hot",
+        sessions: [
+          {
+            id: "s1",
+            hideKey: "proj/s1",
+            filePath: "/tmp/proj/s1.jsonl",
+            projectPath: "/tmp/proj",
+            projectName: "proj",
+            lastModifiedMs: Date.now(),
+            status: "hot",
+            modelName: "sonnet-4.6",
+            subAgents: [
+              {
+                id: "a1",
+                hideKey: "proj/a1",
+                filePath: "/tmp/proj/a1.jsonl",
+                projectPath: "/tmp/proj",
+                projectName: "",
+                lastModifiedMs: Date.now(),
+                status: "hot",
+                modelName: "sonnet-4.6",
+                subAgents: [],
+                nonInteractive: false,
+                firstUserPrompt: null,
+                liveState: "working",
+                agentId: "agent-abc123",
+                taskDescription: "DO_THE_THING",
+              },
+            ],
+            nonInteractive: false,
+            firstUserPrompt: "parent",
+            liveState: null,
+          },
+        ],
       },
-      {
-        timestamp: new Date(2026, 0, 1, 9, 0, 2),
-        type: "response",
-        icon: "✦",
-        label: "Response",
-        detail: "RESULT_TEXT",
-      },
-    ];
-
-    const { stdin, lastFrame } = render(<App mode="watch" />);
-    // Tree is focused at boot; selection starts on the project sentinel.
-    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("↵: expand"), {
-      timeout: 3000,
-      interval: 25,
-    });
-    // Navigate down to the sub-agent (the LAST nav row: sentinel → session →
-    // sub-agent). Press ↓ repeatedly until the header appears, NOT a fixed
-    // count: on slow CI a render can take longer than one tick to commit the
-    // new selectedIndex, so a burst of ↓ stalls at the session row. Re-pressing
-    // is safe (↓ clamps at the bottom), and selecting the sub-agent scrolls its
-    // otherwise-folded row into view. `1 steps` is the header-only chip (the
-    // true discriminator — `taskDescription` also shows in the tree row).
+    ],
+    coldProjects: [],
+    totalCount: 1,
+    timestamp: new Date().toISOString(),
+    hiddenStats: { total: 0, active: 0 },
+  });
+  // The sub-agent's own stream: one tool call + one response.
+  const subAgentActivities = (): ActivityEntry[] => [
+    {
+      timestamp: new Date(2026, 0, 1, 9, 0, 0),
+      type: "tool",
+      icon: "○",
+      label: "Read",
+      detail: "x.ts",
+    },
+    {
+      timestamp: new Date(2026, 0, 1, 9, 0, 2),
+      type: "response",
+      icon: "✦",
+      label: "Response",
+      detail: "RESULT_TEXT",
+    },
+  ];
+  // Press ↓ until the header-only `1 steps` chip appears (↓ clamps at the
+  // bottom row; selecting the sub-agent scrolls its folded row into view).
+  const selectSubAgent = async (
+    stdin: { write: (s: string) => void },
+    lastFrame: () => string | undefined,
+  ) => {
     for (let i = 0; i < 60; i++) {
       if ((lastFrame() ?? "").includes("1 steps")) break;
       stdin.write(DOWN);
@@ -1631,6 +1624,52 @@ describe("App — sub-agent viewer summary header", () => {
       timeout: 5000,
       interval: 25,
     });
+  };
+
+  it("shows the intent header when a sub-agent row is selected", async () => {
+    mockTree = subAgentTree();
+    mockActivities = subAgentActivities();
+
+    const { stdin, lastFrame } = render(<App mode="watch" />);
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("↵: expand"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    await selectSubAgent(stdin, lastFrame);
     expect(lastFrame() ?? "").toContain("DO_THE_THING"); // intent in header
+  });
+
+  it("summary uses the sub-agent's own stream, not the filtered viewer merge", async () => {
+    mockTree = subAgentTree();
+    mockActivities = subAgentActivities();
+
+    const { stdin, lastFrame } = render(<App mode="watch" />);
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("↵: expand"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    await selectSubAgent(stdin, lastFrame);
+
+    // Focus the viewer and cycle the type filter to "response" (filterPresets
+    // = [[], ["response"], ["commit"]]). That drops the tool from the viewer's
+    // *merged/filtered* stream — but the sub-agent summary must reflect the
+    // agent's OWN raw activity (1 tool), so the chip must stay `1 steps`, not
+    // collapse to `0 steps`.
+    stdin.write("\t"); // focus tree → viewer
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("↵: detail"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    stdin.write("f"); // filter → response (hides the tool row)
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("f: response"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    // Header still counts the raw tool call.
+    await vi.waitFor(() => expect(lastFrame() ?? "").toContain("1 steps"), {
+      timeout: 3000,
+      interval: 25,
+    });
+    expect(lastFrame() ?? "").not.toContain("0 steps");
   });
 });

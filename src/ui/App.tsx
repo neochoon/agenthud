@@ -1900,9 +1900,18 @@ export function App({
         ? selectedSession.projectName || selectedSession.id.slice(0, 8)
         : (selectedSession.agentId ?? selectedSession.id.slice(0, 8));
 
-  const subAgentSummary = selectedSession
-    ? buildSubAgentSummary(selectedSession, mergedActivities)
-    : null;
+  // Built from the sub-agent's OWN raw activity stream (`activities`), not the
+  // filtered/git-merged `mergedActivities` — otherwise a type filter or merged
+  // git commits would skew steps/duration. Memoized so it doesn't re-scan the
+  // history (and mint a new object identity that defeats downstream React.memo)
+  // on every ~100ms poll/spinner render.
+  const subAgentSummary = useMemo(
+    () =>
+      selectedSession
+        ? buildSubAgentSummary(selectedSession, activities)
+        : null,
+    [selectedSession, activities],
+  );
 
   const MIN_WIDTH = 80;
   const MIN_HEIGHT = 20;

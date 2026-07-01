@@ -3,6 +3,7 @@ import type { ActivityEntry, SessionNode } from "../../src/types/index.js";
 import {
   buildSubAgentSummary,
   formatDuration,
+  subAgentHeaderRowCount,
 } from "../../src/ui/subAgentSummary.js";
 
 const node = (over: Partial<SessionNode> = {}): SessionNode => ({
@@ -74,6 +75,25 @@ describe("buildSubAgentSummary", () => {
     expect(
       buildSubAgentSummary(node({ agentId: "a" }), [tool(10)]),
     ).toMatchObject({ steps: 1, durationMs: null });
+  });
+});
+
+describe("subAgentHeaderRowCount", () => {
+  it("is 0 with no summary", () => {
+    expect(subAgentHeaderRowCount(null)).toBe(0);
+    expect(subAgentHeaderRowCount(undefined)).toBe(0);
+  });
+  it("is 2 without a result (chip + divider)", () => {
+    const s = buildSubAgentSummary(node({ agentId: "a" }), [tool(0)]);
+    expect(s?.result).toBe("");
+    expect(subAgentHeaderRowCount(s)).toBe(2);
+  });
+  it("is 3 with a result (chip + result + divider)", () => {
+    const s = buildSubAgentSummary(node({ agentId: "a" }), [
+      tool(0),
+      response(1000, "done"),
+    ]);
+    expect(subAgentHeaderRowCount(s)).toBe(3);
   });
 });
 

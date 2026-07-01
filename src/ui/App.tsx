@@ -81,7 +81,10 @@ import { SearchInput } from "./search/SearchInput.js";
 import type { SearchState } from "./search/searchKey.js";
 import { applyDetailSearchKey } from "./search/searchKey.js";
 import { filterTreeBySearch, treeSearchHits } from "./search/treeSearch.js";
-import { buildSubAgentSummary } from "./subAgentSummary.js";
+import {
+  buildSubAgentSummary,
+  subAgentHeaderRowCount,
+} from "./subAgentSummary.js";
 import {
   adjustViewerCursorOnNewActivities,
   scrollOffsetForCursor,
@@ -1216,7 +1219,7 @@ export function App({
         const prev = Math.max(0, selectedIndex - 1);
         setSelectedId(allFlat[prev]?.id ?? selectedId);
       } else {
-        if (viewerCursorLine < viewerRows - 1) {
+        if (viewerCursorLine < viewerStreamRows - 1) {
           setViewerCursorLine((c) => c + 1);
         } else {
           // cursor at top of viewport — scroll viewport toward older.
@@ -1225,7 +1228,10 @@ export function App({
           // mergedActivities, not raw activities).
           setIsLive(false);
           setScrollOffset((o) =>
-            Math.min(o + 1, Math.max(0, mergedActivities.length - viewerRows)),
+            Math.min(
+              o + 1,
+              Math.max(0, mergedActivities.length - viewerStreamRows),
+            ),
           );
         }
       }
@@ -1265,8 +1271,8 @@ export function App({
         setIsLive(false);
         setScrollOffset((o) =>
           Math.min(
-            o + viewerRows,
-            Math.max(0, mergedActivities.length - viewerRows),
+            o + viewerStreamRows,
+            Math.max(0, mergedActivities.length - viewerStreamRows),
           ),
         );
       }
@@ -1279,7 +1285,7 @@ export function App({
       } else {
         setViewerCursorLine(0);
         setScrollOffset((o) => {
-          const newOffset = Math.max(0, o - viewerRows);
+          const newOffset = Math.max(0, o - viewerStreamRows);
           if (newOffset === 0) {
             setIsLive(true);
             setNewCount(0);
@@ -1298,8 +1304,8 @@ export function App({
         setIsLive(false);
         setScrollOffset((o) =>
           Math.min(
-            o + Math.floor(viewerRows / 2),
-            Math.max(0, mergedActivities.length - viewerRows),
+            o + Math.floor(viewerStreamRows / 2),
+            Math.max(0, mergedActivities.length - viewerStreamRows),
           ),
         );
       }
@@ -1315,7 +1321,7 @@ export function App({
       } else {
         setViewerCursorLine(0);
         setScrollOffset((o) => {
-          const newOffset = Math.max(0, o - Math.floor(viewerRows / 2));
+          const newOffset = Math.max(0, o - Math.floor(viewerStreamRows / 2));
           if (newOffset === 0) {
             setIsLive(true);
             setNewCount(0);
@@ -1328,9 +1334,9 @@ export function App({
       // g = top of viewport = oldest visible; cursor lands on the top row
       // (which is the oldest visible — `viewerRows - 1` entries back from
       // the newest in the slice).
-      setViewerCursorLine(Math.max(0, viewerRows - 1));
+      setViewerCursorLine(Math.max(0, viewerStreamRows - 1));
       setIsLive(false);
-      setScrollOffset(Math.max(0, mergedActivities.length - viewerRows));
+      setScrollOffset(Math.max(0, mergedActivities.length - viewerStreamRows));
     },
     onScrollBottom: () => {
       // G = bottom of viewport = newest = live; cursor on the live edge.
@@ -1369,7 +1375,7 @@ export function App({
           mergedActivities,
           isLive,
           scrollOffset,
-          viewerRows,
+          viewerStreamRows,
           viewerCursorLine,
         );
         if (act) openActivityDetail(act);
@@ -1911,6 +1917,15 @@ export function App({
         ? buildSubAgentSummary(selectedSession, activities)
         : null,
     [selectedSession, activities],
+  );
+  // The sub-agent header eats rows off the top of the viewer box, so the
+  // scrollable activity stream is shorter than `viewerRows`. All viewer
+  // scroll/cursor/paging/selection math must use THIS budget to stay in sync
+  // with what the panel actually renders (0 header rows for main sessions, so
+  // this equals viewerRows there — no behavior change off the sub-agent path).
+  const viewerStreamRows = Math.max(
+    1,
+    viewerRows - subAgentHeaderRowCount(subAgentSummary),
   );
 
   const MIN_WIDTH = 80;

@@ -42,6 +42,20 @@ export function buildSubAgentSummary(
   };
 }
 
+/**
+ * How many rows the viewer's sub-agent header occupies: a chip line + an
+ * optional Result line + the divider (0 when there is no summary). The panel
+ * renders exactly this many header rows, and App subtracts it from the viewer
+ * row budget so scroll/cursor/selection stay in sync with the shorter stream.
+ * Single source of truth for both sides.
+ */
+export function subAgentHeaderRowCount(
+  summary: SubAgentSummary | null | undefined,
+): number {
+  if (!summary) return 0;
+  return 2 + (summary.result ? 1 : 0); // chip + [result] + divider
+}
+
 export function formatDuration(ms: number): string {
   const secs = Math.max(0, Math.round(ms / 1000));
   const h = Math.floor(secs / 3600);

@@ -320,6 +320,23 @@ describe("ActivityViewerPanel — sub-agent summary header", () => {
     expect(out).toContain("Read"); // stream still present below
   });
 
+  it("puts the chip in the title border and intent on its own line", () => {
+    const { lastFrame } = render(
+      <ActivityViewerPanel
+        {...baseProps}
+        width={80}
+        activities={[makeActivity("Read", 0)]}
+        subAgentSummary={summary}
+      />,
+    );
+    const lines = (lastFrame() ?? "").split("\n").filter(Boolean);
+    const titleLine = lines.find((l) => l.includes("┌"));
+    expect(titleLine).toContain("3 steps"); // chip lives in the top border
+    const intentLine = lines.find((l) => l.includes("Research the thing"));
+    expect(intentLine).toContain("»"); // intent on its own line, prefixed
+    expect(intentLine).not.toContain("3 steps"); // chip is NOT on the intent line
+  });
+
   it("flattens newlines in every header row so the border stays aligned", () => {
     const W = 80;
     const { lastFrame } = render(

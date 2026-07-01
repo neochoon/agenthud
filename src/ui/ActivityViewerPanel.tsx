@@ -346,6 +346,10 @@ export function ActivityViewerPanel({
   // Sub-agent black-box header (P1): fixed rows above the stream, rendered the
   // same way in both the normal and the search/narrow-finder path. The stream's
   // row budget shrinks by the header height so the box stays `visibleRows` tall.
+  // Title-line label. For a sub-agent the status chip
+  // (status · steps · duration · model) rides in the TOP BORDER — free rows —
+  // so the content lines below carry just the intent, Result, and divider.
+  let titleLabel = sessionName;
   const headerLines: React.ReactElement[] = [];
   if (subAgentSummary) {
     const s = subAgentSummary;
@@ -369,12 +373,18 @@ export function ActivityViewerPanel({
     const model = s.model ? ` · ${s.model}` : "";
     const steps = `${s.steps} step${s.steps === 1 ? "" : "s"}`;
     const chip = `${s.status} · ${steps}${dur}${model}`;
-    headerLines.push(boxRow("sa-chip", `${chip}  ${s.intent}`));
+    titleLabel = `${sessionName} · ${chip}`;
+    headerLines.push(boxRow("sa-intent", `» ${s.intent}`));
     if (s.result) {
       headerLines.push(boxRow("sa-result", `Result: ${s.result}`));
     }
     headerLines.push(boxRow("sa-div", "─ activity (↵ drill in)"));
   }
+  // Keep the (name · chip) title from overflowing the border on narrow widths;
+  // main sessions pass their name through unchanged.
+  const titleName = subAgentSummary
+    ? truncateByWidth(titleLabel, Math.max(8, contentWidth - 16))
+    : sessionName;
 
   // Narrow-finder mode: only narrow once there's a query. An empty query
   // (search just opened, nothing typed) shows the full list — narrowing to
@@ -495,7 +505,7 @@ export function ActivityViewerPanel({
     return (
       <Box flexDirection="column" width={width}>
         <Text color="cyan">
-          {createTitleLine(sessionName, titleSuffix, width)}
+          {createTitleLine(titleName, titleSuffix, width)}
         </Text>
         {finalLines}
         <Text>{createBottomLine(width)}</Text>
@@ -593,7 +603,7 @@ export function ActivityViewerPanel({
   return (
     <Box flexDirection="column" width={width}>
       <Text color={isLive ? undefined : "yellow"}>
-        {createTitleLine(sessionName, titleSuffix, width)}
+        {createTitleLine(titleName, titleSuffix, width)}
       </Text>
       {finalLines}
       <Text>{createBottomLine(width)}</Text>

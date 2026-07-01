@@ -1051,6 +1051,33 @@ export function App({
   // statusBar(1) + margin(1) + tree(treeRows+2) + margin(1) + viewer(viewerRows+2) = height
   const viewerRows = Math.max(5, height - 7 - treeRows);
 
+  // Sub-agent black-box header: built from the sub-agent's OWN raw activity
+  // stream (`activities`), not the filtered/git-merged `mergedActivities` —
+  // otherwise a type filter or merged git commits would skew steps/duration.
+  // Memoized so it doesn't re-scan the history (and mint a new object identity
+  // that defeats downstream React.memo) on every ~100ms poll/spinner render.
+  // Declared HERE (not lower) so the cursor-anchor effect just below can budget
+  // against the header-reduced stream height. `rawSelected` (the flat-list hit)
+  // is enough — the project-sentinel massaging done later resolves to a
+  // top-level session, which has no agentId and yields a null summary anyway.
+  const rawSelectedForSummary = allFlat.find((s) => s.id === selectedId);
+  const subAgentSummary = useMemo(
+    () =>
+      rawSelectedForSummary
+        ? buildSubAgentSummary(rawSelectedForSummary, activities)
+        : null,
+    [rawSelectedForSummary, activities],
+  );
+  // The sub-agent header eats rows off the top of the viewer box, so the
+  // scrollable activity stream is shorter than `viewerRows`. All viewer
+  // scroll/cursor/paging/selection math must use THIS budget to stay in sync
+  // with what the panel actually renders (0 header rows for main sessions, so
+  // this equals viewerRows there — no behavior change off the sub-agent path).
+  const viewerStreamRows = Math.max(
+    1,
+    viewerRows - subAgentHeaderRowCount(subAgentSummary),
+  );
+
   // Keep the viewer cursor anchored to its activity when new entries
   // arrive in LIVE mode. Without this, the visible window auto-scrolls
   // to show new content but cursorLine stays at the same screen row —
@@ -1072,7 +1099,7 @@ export function App({
       prevActivityCount: prev,
       newActivityCount: mergedActivities.length,
       isLive,
-      viewerRows,
+      viewerRows: viewerStreamRows,
     });
     if (result.cursorLine !== viewerCursorLine) {
       setViewerCursorLine(result.cursorLine);
@@ -1082,7 +1109,7 @@ export function App({
       setScrollOffset((o) => o + result.scrollDelta);
       setNewCount((n) => n + result.scrollDelta);
     }
-  }, [mergedActivities.length, isLive, viewerRows, viewerCursorLine]);
+  }, [mergedActivities.length, isLive, viewerStreamRows, viewerCursorLine]);
 
   // While PAUSED, keep the view frozen on its current snapshot as new
   // entries arrive — bump `scrollOffset` and `newCount` by the delta
@@ -1916,27 +1943,8 @@ export function App({
         ? selectedSession.projectName || selectedSession.id.slice(0, 8)
         : (selectedSession.agentId ?? selectedSession.id.slice(0, 8));
 
-  // Built from the sub-agent's OWN raw activity stream (`activities`), not the
-  // filtered/git-merged `mergedActivities` — otherwise a type filter or merged
-  // git commits would skew steps/duration. Memoized so it doesn't re-scan the
-  // history (and mint a new object identity that defeats downstream React.memo)
-  // on every ~100ms poll/spinner render.
-  const subAgentSummary = useMemo(
-    () =>
-      selectedSession
-        ? buildSubAgentSummary(selectedSession, activities)
-        : null,
-    [selectedSession, activities],
-  );
-  // The sub-agent header eats rows off the top of the viewer box, so the
-  // scrollable activity stream is shorter than `viewerRows`. All viewer
-  // scroll/cursor/paging/selection math must use THIS budget to stay in sync
-  // with what the panel actually renders (0 header rows for main sessions, so
-  // this equals viewerRows there — no behavior change off the sub-agent path).
-  const viewerStreamRows = Math.max(
-    1,
-    viewerRows - subAgentHeaderRowCount(subAgentSummary),
-  );
+  // `subAgentSummary` and `viewerStreamRows` are computed once near the top of
+  // the component (above the cursor-anchor effect that needs the reduced budget).
 
   const MIN_WIDTH = 80;
   const MIN_HEIGHT = 20;

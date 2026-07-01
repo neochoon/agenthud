@@ -1,0 +1,29 @@
+# CodeRabbit configuration — governs review BEHAVIOR for this repo and takes
+# precedence over the CodeRabbit dashboard UI. It does NOT replace the GitHub
+# App installation: the CodeRabbit app must still be installed for repo access,
+# and this file is only read once the app can see the repo.
+# Schema: https://docs.coderabbit.ai/reference/configuration
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+language: en-US
+
+reviews:
+  # "assertive" = the profile already in use (surfaces more nitpicks/edge cases).
+  profile: assertive
+  # Post the review as GitHub "Request changes" until its comments are resolved.
+  request_changes_workflow: true
+  high_level_summary: true
+  poem: false
+  review_status: true
+  auto_review:
+    # Review automatically on push (the current behavior we want version-locked).
+    enabled: true
+    # Incremental re-review on each new push to an open PR.
+    auto_incremental_review: true
+    # Skip draft PRs — review once they're marked ready.
+    drafts: false
+    base_branches:
+      - main
+
+chat:
+  auto_reply: true

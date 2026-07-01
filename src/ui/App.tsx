@@ -82,6 +82,10 @@ import type { SearchState } from "./search/searchKey.js";
 import { applyDetailSearchKey } from "./search/searchKey.js";
 import { filterTreeBySearch, treeSearchHits } from "./search/treeSearch.js";
 import {
+  buildSubAgentSummary,
+  subAgentHeaderRowCount,
+} from "./subAgentSummary.js";
+import {
   adjustViewerCursorOnNewActivities,
   scrollOffsetForCursor,
 } from "./viewerCursor.js";
@@ -1047,6 +1051,33 @@ export function App({
   // statusBar(1) + margin(1) + tree(treeRows+2) + margin(1) + viewer(viewerRows+2) = height
   const viewerRows = Math.max(5, height - 7 - treeRows);
 
+  // Sub-agent black-box header: built from the sub-agent's OWN raw activity
+  // stream (`activities`), not the filtered/git-merged `mergedActivities` —
+  // otherwise a type filter or merged git commits would skew steps/duration.
+  // Memoized so it doesn't re-scan the history (and mint a new object identity
+  // that defeats downstream React.memo) on every ~100ms poll/spinner render.
+  // Declared HERE (not lower) so the cursor-anchor effect just below can budget
+  // against the header-reduced stream height. `rawSelected` (the flat-list hit)
+  // is enough — the project-sentinel massaging done later resolves to a
+  // top-level session, which has no agentId and yields a null summary anyway.
+  const rawSelectedForSummary = allFlat.find((s) => s.id === selectedId);
+  const subAgentSummary = useMemo(
+    () =>
+      rawSelectedForSummary
+        ? buildSubAgentSummary(rawSelectedForSummary, activities)
+        : null,
+    [rawSelectedForSummary, activities],
+  );
+  // The sub-agent header eats rows off the top of the viewer box, so the
+  // scrollable activity stream is shorter than `viewerRows`. All viewer
+  // scroll/cursor/paging/selection math must use THIS budget to stay in sync
+  // with what the panel actually renders (0 header rows for main sessions, so
+  // this equals viewerRows there — no behavior change off the sub-agent path).
+  const viewerStreamRows = Math.max(
+    1,
+    viewerRows - subAgentHeaderRowCount(subAgentSummary),
+  );
+
   // Keep the viewer cursor anchored to its activity when new entries
   // arrive in LIVE mode. Without this, the visible window auto-scrolls
   // to show new content but cursorLine stays at the same screen row —
@@ -1068,7 +1099,7 @@ export function App({
       prevActivityCount: prev,
       newActivityCount: mergedActivities.length,
       isLive,
-      viewerRows,
+      viewerRows: viewerStreamRows,
     });
     if (result.cursorLine !== viewerCursorLine) {
       setViewerCursorLine(result.cursorLine);
@@ -1078,7 +1109,7 @@ export function App({
       setScrollOffset((o) => o + result.scrollDelta);
       setNewCount((n) => n + result.scrollDelta);
     }
-  }, [mergedActivities.length, isLive, viewerRows, viewerCursorLine]);
+  }, [mergedActivities.length, isLive, viewerStreamRows, viewerCursorLine]);
 
   // While PAUSED, keep the view frozen on its current snapshot as new
   // entries arrive — bump `scrollOffset` and `newCount` by the delta
@@ -1215,7 +1246,7 @@ export function App({
         const prev = Math.max(0, selectedIndex - 1);
         setSelectedId(allFlat[prev]?.id ?? selectedId);
       } else {
-        if (viewerCursorLine < viewerRows - 1) {
+        if (viewerCursorLine < viewerStreamRows - 1) {
           setViewerCursorLine((c) => c + 1);
         } else {
           // cursor at top of viewport — scroll viewport toward older.
@@ -1224,7 +1255,10 @@ export function App({
           // mergedActivities, not raw activities).
           setIsLive(false);
           setScrollOffset((o) =>
-            Math.min(o + 1, Math.max(0, mergedActivities.length - viewerRows)),
+            Math.min(
+              o + 1,
+              Math.max(0, mergedActivities.length - viewerStreamRows),
+            ),
           );
         }
       }
@@ -1264,8 +1298,8 @@ export function App({
         setIsLive(false);
         setScrollOffset((o) =>
           Math.min(
-            o + viewerRows,
-            Math.max(0, mergedActivities.length - viewerRows),
+            o + viewerStreamRows,
+            Math.max(0, mergedActivities.length - viewerStreamRows),
           ),
         );
       }
@@ -1278,7 +1312,7 @@ export function App({
       } else {
         setViewerCursorLine(0);
         setScrollOffset((o) => {
-          const newOffset = Math.max(0, o - viewerRows);
+          const newOffset = Math.max(0, o - viewerStreamRows);
           if (newOffset === 0) {
             setIsLive(true);
             setNewCount(0);
@@ -1297,8 +1331,8 @@ export function App({
         setIsLive(false);
         setScrollOffset((o) =>
           Math.min(
-            o + Math.floor(viewerRows / 2),
-            Math.max(0, mergedActivities.length - viewerRows),
+            o + Math.floor(viewerStreamRows / 2),
+            Math.max(0, mergedActivities.length - viewerStreamRows),
           ),
         );
       }
@@ -1314,7 +1348,7 @@ export function App({
       } else {
         setViewerCursorLine(0);
         setScrollOffset((o) => {
-          const newOffset = Math.max(0, o - Math.floor(viewerRows / 2));
+          const newOffset = Math.max(0, o - Math.floor(viewerStreamRows / 2));
           if (newOffset === 0) {
             setIsLive(true);
             setNewCount(0);
@@ -1327,9 +1361,9 @@ export function App({
       // g = top of viewport = oldest visible; cursor lands on the top row
       // (which is the oldest visible — `viewerRows - 1` entries back from
       // the newest in the slice).
-      setViewerCursorLine(Math.max(0, viewerRows - 1));
+      setViewerCursorLine(Math.max(0, viewerStreamRows - 1));
       setIsLive(false);
-      setScrollOffset(Math.max(0, mergedActivities.length - viewerRows));
+      setScrollOffset(Math.max(0, mergedActivities.length - viewerStreamRows));
     },
     onScrollBottom: () => {
       // G = bottom of viewport = newest = live; cursor on the live edge.
@@ -1368,7 +1402,7 @@ export function App({
           mergedActivities,
           isLive,
           scrollOffset,
-          viewerRows,
+          viewerStreamRows,
           viewerCursorLine,
         );
         if (act) openActivityDetail(act);
@@ -1646,7 +1680,12 @@ export function App({
             s ? { ...s, index: newIndex, navigated: true } : s,
           );
           setViewerSearchWindowStart((prev) =>
-            edgeScrollWindowStart(prev, newIndex, viewerRows, hits.length),
+            edgeScrollWindowStart(
+              prev,
+              newIndex,
+              viewerStreamRows,
+              hits.length,
+            ),
           );
           return;
         }
@@ -1658,7 +1697,12 @@ export function App({
             s ? { ...s, index: newIndex, navigated: true } : s,
           );
           setViewerSearchWindowStart((prev) =>
-            edgeScrollWindowStart(prev, newIndex, viewerRows, hits.length),
+            edgeScrollWindowStart(
+              prev,
+              newIndex,
+              viewerStreamRows,
+              hits.length,
+            ),
           );
           return;
         }
@@ -1677,7 +1721,7 @@ export function App({
               const newScrollOffset = scrollOffsetForCursor(
                 mergedActivities.length,
                 hitIndex,
-                viewerRows,
+                viewerStreamRows,
               );
               setSavedViewerSearch({
                 search,
@@ -1899,6 +1943,9 @@ export function App({
         ? selectedSession.projectName || selectedSession.id.slice(0, 8)
         : (selectedSession.agentId ?? selectedSession.id.slice(0, 8));
 
+  // `subAgentSummary` and `viewerStreamRows` are computed once near the top of
+  // the component (above the cursor-anchor effect that needs the reduced budget).
+
   const MIN_WIDTH = 80;
   const MIN_HEIGHT = 20;
   if (isWatchMode && (width < MIN_WIDTH || height + 1 < MIN_HEIGHT)) {
@@ -2062,6 +2109,7 @@ export function App({
                     ? viewerSearchWindowStart
                     : undefined
                 }
+                subAgentSummary={subAgentSummary}
               />
             )}
           </Box>

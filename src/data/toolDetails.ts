@@ -138,6 +138,12 @@ function joinParts(...parts: Array<string | null | undefined>): string {
   return parts.filter((p): p is string => !!p).join(" ");
 }
 
+/**
+ * One-line detail string for an activity row (the part after the colon in
+ * `[HH:MM] ⚙ Edit: foo.ts L10-12 +3 -1`). Returns `""` when a tool has
+ * nothing short to show. `input`/`result` are untyped JSON parsed from the
+ * session file, so every field is read defensively.
+ */
 export function summarizeToolDetail(
   name: string,
   input: ToolInput | undefined,
@@ -151,8 +157,12 @@ export function summarizeToolDetail(
       return joinParts(file, patchSpan(hunks), countChanges(hunks));
     }
     if (name === "Write") {
+      // The on-disk tool schema isn't versioned — a malformed row can hold an
+      // object/array where a string is expected (e.g. a Write whose content
+      // was serialized as JSON). Guard before .split so one bad row degrades
+      // to the basename instead of crashing the whole parse.
       const content = result?.content ?? input?.content;
-      if (content) {
+      if (typeof content === "string" && content.length > 0) {
         const n = content.split("\n").length - (content.endsWith("\n") ? 1 : 0);
         return joinParts(file, rangeStr(1, n), `+${n}`);
       }
@@ -267,6 +277,11 @@ function formatAskBody(questions: AskQuestion[] | undefined): string | null {
   return blocks.join("\n\n");
 }
 
+/**
+ * Multi-line body for the TUI detail view, and (Task only) the text inlined
+ * into the markdown report. Returns null when a tool has no extra detail
+ * beyond its one-liner. `input`/`result` are untyped JSON, read defensively.
+ */
 export function buildToolDetailBody(
   name: string,
   input: ToolInput | undefined,
@@ -286,14 +301,18 @@ export function buildToolDetailBody(
   // than an all-additions diff); the row summary still uses patch stats.
   if (name === "Write") {
     const content = result?.content ?? input?.content;
-    if (content) return { text: content, kind: "code" };
+    if (typeof content === "string" && content.length > 0) {
+      return { text: content, kind: "code" };
+    }
   }
   // Task surfaces the subagent's returned text — without this, the LLM
   // summary pipeline sees only the task description and is blind to
   // whatever the subagent actually did or concluded.
   if (name === "Task") {
     const content = result?.content;
-    if (content) return { text: content, kind: "code" };
+    if (typeof content === "string" && content.length > 0) {
+      return { text: content, kind: "code" };
+    }
   }
   // Bash: stdout + stderr + interrupted marker. TUI-only — the body
   // never flows into the markdown report path (see reportGenerator's
@@ -311,7 +330,7 @@ export function buildToolDetailBody(
   }
   if (name === "Read") {
     const content = result?.file?.content;
-    if (content) {
+    if (typeof content === "string" && content.length > 0) {
       const start = result?.file?.startLine ?? input?.offset ?? 1;
       return {
         text: numberLines(content, start),

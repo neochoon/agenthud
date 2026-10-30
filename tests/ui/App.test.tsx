@@ -912,7 +912,7 @@ function sessionStub(id: string) {
 describe("tree search → Enter keeps search alive", () => {
   const tick = () => new Promise((r) => setTimeout(r, 50));
   const ESC = String.fromCharCode(27);
-  const DOWN = ESC + "[B";
+  const DOWN = `${ESC}[B`;
 
   const twoMatchingSessions = (): SessionTree => ({
     projects: [
@@ -1543,7 +1543,7 @@ describe("viewer search → Enter opens Detail View", () => {
 
 describe("App — sub-agent viewer summary header", () => {
   const tick = () => new Promise((r) => setTimeout(r, 50));
-  const DOWN = String.fromCharCode(27) + "[B"; // ESC prefix REQUIRED (see prior CI fixes)
+  const DOWN = `${String.fromCharCode(27)}[B`; // ESC prefix REQUIRED (see prior CI fixes)
 
   // Tree: proj → session s1 → running sub-agent a1 (intent DO_THE_THING).
   const subAgentTree = (): SessionTree => ({

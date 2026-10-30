@@ -1,7 +1,27 @@
 /**
- * Derive a sub-agent's "black-box" summary (intent → status/steps/duration →
- * result) from data already on the node and its parsed activity stream. Pure;
- * returns null for main sessions (which have no agentId and keep full detail).
+ * Pure derivation of a sub-agent's black-box summary (intent, status, steps,
+ * duration, result) from session node + activity stream, for the Activity
+ * Viewer panel header and detail view chip.
+ *
+ * Design decisions:
+ * - Backward scan for result: the last `response` activity carries the final
+ *   answer; stops on first match (most recent = most relevant). O(n) worst-case,
+ *   but response entries are rare in most agent runs.
+ * - Duration as span (last - first) not age: captures the agent's active window,
+ *   not wall-clock elapsed; null when <2 activities (no span). Meaningful even
+ *   when timestamps are stale.
+ * - Status fold: both "working" and "waiting" liveStates map to "running" so a
+ *   blocked-on-approval agent doesn't falsely appear done.
+ * - Null for main sessions: avoids summary overhead for non-agents (isSubAgent
+ *   ≡ `node.agentId` is set).
+ *
+ * Gotchas:
+ * - formatDuration intentionally differs from formatElapsed (SessionTreePanel):
+ *   duration is a span (e.g., "2m14s"), elapsed is age (e.g., "3d"). Separate
+ *   concerns, separate formats.
+ * - A sub-agent with zero activities returns a summary with steps=0,
+ *   durationMs=null, result=""; intentional (no activity to show yet, but still
+ *   a valid sub-agent).
  */
 import type { ActivityEntry, SessionNode } from "../types/index.js";
 

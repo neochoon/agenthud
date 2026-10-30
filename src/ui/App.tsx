@@ -1711,32 +1711,35 @@ export function App({
             // Filter-confirm: keep the narrowed search open; do NOT open a Detail.
             return;
           }
+          // Navigated but no matches: no-op, matching Tree behavior and spec
+          // edge case (navigated=true but zero matches → Enter is a no-op).
+          if (hits.length === 0) {
+            return;
+          }
           // Navigated to a specific match → open its Detail View.
           let seeded: SearchState | null = null;
-          if (hits.length > 0) {
-            const safeIndex =
-              ((search.index % hits.length) + hits.length) % hits.length;
-            const hitIndex = hits[safeIndex];
-            if (hitIndex !== undefined) {
-              const newScrollOffset = scrollOffsetForCursor(
-                mergedActivities.length,
-                hitIndex,
-                viewerStreamRows,
-              );
-              setSavedViewerSearch({
-                search,
-                windowStart: viewerSearchWindowStart,
-              });
-              setViewerCursorLine(0);
-              setIsLive(false);
-              setScrollOffset(newScrollOffset);
-              const act = mergedActivities[hitIndex];
-              if (act) {
-                openActivityDetail(act);
-                // Carry the query into the Detail so the user lands on the
-                // matched text (the row only shows the truncated head).
-                seeded = seededDetailSearch(act, search.query);
-              }
+          const safeIndex =
+            ((search.index % hits.length) + hits.length) % hits.length;
+          const hitIndex = hits[safeIndex];
+          if (hitIndex !== undefined) {
+            const newScrollOffset = scrollOffsetForCursor(
+              mergedActivities.length,
+              hitIndex,
+              viewerStreamRows,
+            );
+            setSavedViewerSearch({
+              search,
+              windowStart: viewerSearchWindowStart,
+            });
+            setViewerCursorLine(0);
+            setIsLive(false);
+            setScrollOffset(newScrollOffset);
+            const act = mergedActivities[hitIndex];
+            if (act) {
+              openActivityDetail(act);
+              // Carry the query into the Detail so the user lands on the
+              // matched text (the row only shows the truncated head).
+              seeded = seededDetailSearch(act, search.query);
             }
           }
           setSearch(seeded);

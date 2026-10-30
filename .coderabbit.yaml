@@ -10,16 +10,22 @@ language: en-US
 reviews:
   # "assertive" = the profile already in use (surfaces more nitpicks/edge cases).
   profile: assertive
-  # Post the review as GitHub "Request changes" until its comments are resolved.
-  request_changes_workflow: true
+  # Auto-approve once review issues are fixed (modern field; replaces deprecated
+  # request_changes_workflow which is not in the official schema).
+  auto_approvals:
+    enabled: true
   high_level_summary: true
   poem: false
   review_status: true
   auto_review:
     # Review automatically on push (the current behavior we want version-locked).
     enabled: true
-    # Incremental re-review on each new push to an open PR.
+    # Incremental re-review on each new push to an open PR. Guard against quota
+    # exhaustion by pausing after N consecutive reviewed commits.
     auto_incremental_review: true
+    # Pause reviews after 3 consecutive reviewed commits to avoid quota burn.
+    # On limited plans (~1 review/hour), this prevents exhaustion in hours.
+    auto_pause_after_reviewed_commits: 3
     # Skip draft PRs — review once they're marked ready.
     drafts: false
     base_branches:

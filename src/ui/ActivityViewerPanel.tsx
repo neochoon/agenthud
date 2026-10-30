@@ -317,7 +317,7 @@ function renderHighlighted(text: string, query: string): React.ReactElement {
   return <>{segments}</>;
 }
 
-export function ActivityViewerPanel({
+export const ActivityViewerPanel = memo(function ActivityViewerPanel({
   activities,
   sessionName,
   scrollOffset,
@@ -572,7 +572,7 @@ export function ActivityViewerPanel({
       const timestamp = `[${formatActivityTime(activity.timestamp, now)}] `;
       lines.push(
         <ActivityRow
-          key={`activity-${i}`}
+          key={`${activity.timestamp.getTime()}-${activity.type}-${activity.label}`}
           activity={activity}
           timestamp={timestamp}
           width={width}
@@ -609,4 +609,4 @@ export function ActivityViewerPanel({
       <Text>{createBottomLine(width)}</Text>
     </Box>
   );
-}
+});

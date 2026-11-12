@@ -31,19 +31,26 @@
 
 ### Added
 - **`agenthud web`** — a browser UI over the same tree and activity data,
-  **in Chinese**. It is organized around what you can act on: the
-  **工作区白名单** (one checkbox per project, with `全选` / `清空` / `仅活跃`)
-  sits at the top and drives the tree, the report and the summary; everything
-  read-only is collapsed by default (a project folds, non-active sessions hide
-  behind `展开 N 个冷会话`, tool bodies open on click, previous summaries live
-  under a `<details>`). Three tabs: 活动 / 报告 / 摘要, the last one generating a
-  digest through the same engine path as the CLI. One self-contained HTML file
+  **in Chinese**, built as a three-step flow. **① 勾选工作区**: one checkbox per
+  project (with `全选` / `清空` / `仅活跃`); at least one is required and the
+  session tree, report and summary show *only* the checked ones. **② 时间范围**:
+  `单日` / `最近 5 天` / `最近 7 天` / `自定义` date-to-date, with the day count and
+  the model-call cost shown inline. **③ 查看**: 活动 / 报告 / 摘要 tabs, the last
+  generating a day or range digest through the same engine path as the CLI.
+  Only read-only detail is folded away (projects collapse, non-active sessions
+  hide behind `展开 N 个冷会话`, tool bodies open on click, summary history sits
+  under a `<details>`). One self-contained HTML file
   (`src/server/web-ui.html`, no framework, no CDN, works offline) served by
   `node:http`, **loopback-only**, with a `Host`-header check (DNS-rebinding
   guard) and a per-run token that every `/api/*` call must present. Session-file
   paths in activity requests are validated against current discovery, so the
   endpoint can't be used to read arbitrary files. `--port`, `--open`, `--cwd`,
   repeated `--project`.
+- **Date ranges in the web UI** — `/api/report` accepts `?from=&to=` (inclusive,
+  capped at 62 days) and returns one document with a `## <date>` section per day;
+  `/api/summary` accepts the same pair and switches to the range runner (per-day
+  dailies, then one synthesis). An inverted or half-specified range is a 400 with
+  a readable message.
 - **Workspace-scoped report & summary** — `--cwd` (this directory's project)
   and a REPEATABLE `--project <path|name>` on `report` and `summary` restrict
   the run to a whitelist of workspaces (`--project a --project b`), so a

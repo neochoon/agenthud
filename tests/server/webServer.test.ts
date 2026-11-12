@@ -31,6 +31,7 @@ const {
   sessionPayload,
   shortSessionId,
   summaryBodyForFile,
+  joinDailyReports,
 } = await import("../../src/server/webServer.js");
 const { DEFAULT_GLOBAL_CONFIG } = await import(
   "../../src/config/globalConfig.js"
@@ -103,6 +104,12 @@ function sessionLog(
   return `${records.map((r) => JSON.stringify(r)).join("\n")}\n`;
 }
 
+let serverHandle: { close: () => Promise<void> } | null = null;
+let apiForRange: (path: string, init?: RequestInit) => Promise<Response> =
+  () => {
+    throw new Error("server not started");
+  };
+
 describe("web server", () => {
   let home: string;
   let handle: {
@@ -142,10 +149,19 @@ describe("web server", () => {
     process.env.OPENCODE_DB = join(home, "no-opencode.db");
 
     handle = await startWebServer({ config: config(), port: 0 });
+    serverHandle = handle;
+    // The range cases live in their own describe but talk to THIS server.
+    apiForRange = (path, init) =>
+      fetch(`http://127.0.0.1:${handle.port}${path}`, {
+        ...(init ?? {}),
+        headers: {
+          "x-agenthud-token": handle.token,
+          ...((init && init.headers) ?? {}),
+        },
+      });
   });
 
   afterAll(async () => {
-    await handle.close();
     delete process.env.DSH_HOME;
     delete process.env.CLAUDE_PROJECTS_DIR;
     delete process.env.CODEX_SESSIONS_DIR;
@@ -330,6 +346,67 @@ describe("web server", () => {
   });
 });
 
+describe("date ranges (report + summary validation)", () => {
+  it("serves a multi-day report with one section per day", async () => {
+    const res = await apiForRange(
+      `/api/report?from=2023-11-13&to=2023-11-15&scope=${encodeURIComponent(CWD)}`,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      from: string;
+      to: string;
+      days: string[];
+      content: string;
+    };
+    expect(body.from).toBe("2023-11-13");
+    expect(body.to).toBe("2023-11-15");
+    expect(body.days).toEqual(["2023-11-13", "2023-11-14", "2023-11-15"]);
+    // Day 14 has the fixture session; the others are empty but present.
+    expect(body.content).toContain("## 2023-11-14");
+    expect(body.content).toContain("## 2023-11-13");
+    expect(body.content).toContain("AgentHUD Report: 2023-11-13 → 2023-11-15");
+  });
+
+  it("rejects an inverted or half-specified range", async () => {
+    const inverted = await apiForRange(
+      "/api/report?from=2023-11-15&to=2023-11-13",
+    );
+    expect(inverted.status).toBe(400);
+    expect((await inverted.json()).error).toContain("晚于");
+
+    const half = await apiForRange("/api/report?from=2023-11-13");
+    expect(half.status).toBe(400);
+  });
+
+  it("rejects an absurdly long range", async () => {
+    const res = await apiForRange("/api/report?from=2020-01-01&to=2023-12-31");
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain("天");
+  });
+
+  it("400s a range summary POST with an unknown scope (never spawns)", async () => {
+    const res = await apiForRange("/api/summary", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        from: "2023-11-13",
+        to: "2023-11-14",
+        scopes: [join("X:", "nope")],
+      }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("400s a range summary POST with an inverted range", async () => {
+    const res = await apiForRange("/api/summary", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ from: "2023-11-15", to: "2023-11-13" }),
+    });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("payload builders", () => {
   const node = (over: Partial<Record<string, unknown>> = {}) =>
     ({
@@ -455,4 +532,34 @@ describe("payload builders", () => {
     expect(body).not.toContain("backlinks-start");
     expect(body).not.toContain("agenthud-engine");
   });
+});
+
+describe("joinDailyReports", () => {
+  it("drops the per-day H1 and adds a range header", () => {
+    const out = joinDailyReports([
+      {
+        date: "2023-11-13",
+        content: "# AgentHUD Report: 2023-11-13\n\n## demo\n[09:00] > User: hi",
+      },
+      { date: "2023-11-14", content: "No activity found for 2023-11-14." },
+    ]);
+    expect(out).toContain("AgentHUD Report: 2023-11-13 → 2023-11-14");
+    expect(out).toContain("## 2023-11-13");
+    expect(out).toContain("## 2023-11-14");
+    // The duplicate per-day H1 is gone.
+    expect(out).not.toContain("# AgentHUD Report: 2023-11-13\n");
+    expect(out).toContain("No activity found for 2023-11-14.");
+  });
+
+  it("passes a single day through unchanged", () => {
+    const one = {
+      date: "2023-11-13",
+      content: "# AgentHUD Report: 2023-11-13",
+    };
+    expect(joinDailyReports([one])).toBe(one.content);
+  });
+});
+
+afterAll(async () => {
+  if (serverHandle) await serverHandle.close();
 });

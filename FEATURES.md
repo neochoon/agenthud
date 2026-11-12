@@ -426,22 +426,29 @@ agenthud web --cwd          # start scoped to this directory's project
 | `--cwd` | off | Start scoped to the current directory's project |
 | `--project PATH\|NAME` | off | Repeatable. Start on that project whitelist |
 
-**Layout, and why** — the page is organized around what you can *act on*:
+**Layout, and why** — the page is a three-step flow, and only what you can
+act on is open by default:
 
-- **工作区白名单** (top, always open, the primary control): one checkbox
+- **① 勾选工作区** (top, always open, the primary control): one checkbox
   per discovered project with its session / active counts, plus
-  `全选` / `清空` / `仅活跃`. The selection drives the tree, the report
-  and the summary; **no selection = every workspace**. It persists in
-  `localStorage`, and the URL/`--project` whitelist seeds it on first load.
-- **会话 tree** (left): only projects in the whitelist; each project
-  collapses, and non-active (cool/cold) sessions are hidden behind
-  `展开 N 个冷会话` — the rows you can act on come first.
-- **活动 / 报告 / 摘要** (right, three tabs): the selected session's
-  activity with click-to-expand tool bodies (Bash output, Read with a
-  dimmed line-number gutter, Edit as a colored diff); the markdown report
-  for the chosen date + whitelist; and a summary pane whose
-  `生成摘要` button POSTs to the server and renders the result, with the
-  previous summaries collapsed under a `<details>` you open on demand.
+  `全选` / `清空` / `仅活跃`. **At least one workspace must be checked** —
+  the session tree, the report and the summary all show *only* the
+  checked ones. The selection persists in `localStorage`, and the
+  URL/`--project` whitelist seeds it on first load.
+- **② 时间范围** (directly under it): `单日` / `最近 5 天` / `最近 7 天` /
+  `自定义` (two date pickers). The current range and its day count are
+  shown inline; a range over 14 days warns that a range summary costs one
+  model call per day plus one to synthesize.
+- **③ 查看** (right, three tabs): the selected session's activity with
+  click-to-expand tool bodies (Bash output, Read with a dimmed
+  line-number gutter, Edit as a colored diff); the markdown report for
+  the chosen range + whitelist; and a summary pane whose
+  `生成当天摘要` / `生成区间摘要（N 天）` button POSTs to the server and
+  renders the result, with previous summaries collapsed under a
+  `<details>` you open on demand.
+- Only read-only detail is folded away: projects collapse, non-active
+  sessions hide behind `展开 N 个冷会话` (a), tool bodies open on click,
+  the summary history sits behind its `<details>`.
 
 **Behavior:**
 - **Loopback only.** Refuses to bind anything but `127.0.0.1`, and
@@ -452,12 +459,17 @@ agenthud web --cwd          # start scoped to this directory's project
   local process, or a stray tab, cannot drive the API without it.
 - The tree polls every 3s using the same discovery the TUI uses, so a
   session that appears in one appears in the other.
+- `/api/report` takes either `?date=` (one day) or `?from=&to=` (an
+  inclusive range, capped at 62 days); a range returns one document with
+  a `## <date>` section per day. `/api/summary` accepts the same pair and
+  switches to the range runner (per-day dailies, then one synthesis).
 - `GET /api/activity` resolves the file from the server's own discovery;
   a client-supplied `path` is only checked for consistency, so the
   endpoint can't be turned into an arbitrary file reader.
 - The summary button POSTs to `/api/summary` and returns the markdown
   from the cache file; the server calls the runner with `quiet: true`,
-  so nothing is sprayed into its own stdout. Expect 30–90s.
+  so nothing is sprayed into its own stdout. Expect 30–90s for a day,
+  longer for a range.
 
 **Available since:** v0.20.x.
 

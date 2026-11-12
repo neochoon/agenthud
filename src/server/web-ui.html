@@ -96,6 +96,40 @@
   .ws .meta { color: var(--dim); font-size: 11px; }
   .ws .meta b { color: var(--text); font-weight: 600; }
 
+  /* ---------- 时间范围（② ） ---------- */
+  #dateBar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 7px 14px; border-bottom: 1px solid var(--line); background: var(--panel);
+    flex: 0 0 auto;
+  }
+  #dateBar .step {
+    font-size: 12px; font-weight: 600; color: var(--text);
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  #dateBar .step .num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 16px; height: 16px; border-radius: 50%; background: var(--accent);
+    color: #06101f; font-size: 10px; font-weight: 700;
+  }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+  .seg button {
+    border: 0; border-radius: 0; background: var(--panel-2); color: var(--dim);
+    padding: 4px 11px; font-size: 12px;
+  }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button.on { background: #1f6feb; color: #fff; }
+  #dateBar input[type="date"] {
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px;
+    padding: 3px 8px; color: var(--text);
+  }
+  #dateBar[data-mode="day"] .range-only { display: none; }
+  #dateBar .range-hint { color: var(--dim); font-size: 12px; margin-left: auto; }
+  .warn { color: var(--yellow); }
+  .needs-scope {
+    padding: 18px 14px; color: var(--dim); font-size: 12px; line-height: 1.7;
+  }
+  .needs-scope b { color: var(--accent); }
+
   /* ---------- 主体 ---------- */
   main { flex: 1 1 auto; display: flex; min-height: 0; }
   #treePane {
@@ -242,22 +276,21 @@
 <header>
   <div class="brand">Agent<span>HUD</span></div>
   <span class="pill" title="每 3 秒自动刷新"><span class="dot" id="liveDot"></span><span id="liveText">连接中…</span></span>
-  <span class="pill mono" id="scopePill">全部工作区</span>
+  <span class="pill mono" id="scopePill">未选工作区</span>
   <div class="header-spacer"></div>
-  <label class="dim tiny" for="date">日期</label>
-  <input type="date" id="date" style="background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:3px 8px">
   <button id="refreshBtn" title="立即刷新（r）">刷新</button>
   <button id="helpBtn" title="快捷键（?）" aria-label="快捷键">?</button>
 </header>
 
 <div id="banner" role="alert"></div>
 
-<!-- 工作区白名单：唯一的主要操作区，默认展开且高亮 -->
+<!-- ① 工作区白名单：主操作区，默认展开 -->
 <section id="workspacePanel">
   <div class="panel-head" id="wsHead">
     <span class="caret" id="wsCaret">▾</span>
-    <h2>工作区白名单</h2>
-    <span class="summary" id="wsSummary">未选择 = 全部工作区</span>
+    <span class="step"><span class="num">1</span></span>
+    <h2>勾选工作区</h2>
+    <span class="summary" id="wsSummary">必须至少勾选一个</span>
     <span class="actions">
       <button id="wsActive" title="只选有活跃会话的工作区">仅活跃</button>
       <button id="wsAll">全选</button>
@@ -265,6 +298,22 @@
     </span>
   </div>
   <div id="workspaceBody"></div>
+</section>
+
+<!-- ② 时间范围：单日 / 最近 N 天 / 自定义区间 -->
+<section id="dateBar" data-mode="day">
+  <span class="step"><span class="num">2</span>时间范围</span>
+  <div class="seg" id="rangeSeg" role="group" aria-label="时间范围">
+    <button data-mode="day" class="on">单日</button>
+    <button data-mode="5d">最近 5 天</button>
+    <button data-mode="7d">最近 7 天</button>
+    <button data-mode="custom">自定义</button>
+  </div>
+  <input type="date" id="dateOne" aria-label="日期">
+  <span class="range-only"><input type="date" id="dateFrom" aria-label="起始日期">
+    <span class="dim">至</span>
+    <input type="date" id="dateTo" aria-label="结束日期"></span>
+  <span class="range-hint" id="rangeHint">—</span>
 </section>
 
 <main>
@@ -277,6 +326,7 @@
   </aside>
   <section id="contentPane">
     <div class="tabs" role="tablist">
+      <span class="dim tiny" style="align-self:center;margin-right:6px"><span style="color:var(--accent);font-weight:700">3</span> 查看</span>
       <button class="tab on" data-tab="activity" role="tab">活动<span class="k">1</span></button>
       <button class="tab" data-tab="report" role="tab">报告<span class="k">2</span></button>
       <button class="tab" data-tab="summary" role="tab">摘要<span class="k">3</span></button>
@@ -307,7 +357,7 @@
       <tr><td>Esc</td><td>关闭浮层</td></tr>
       <tr><td>?</td><td>显示/关闭本帮助</td></tr>
     </table>
-    <p class="note">工作区白名单在页面顶部：勾选后，会话树、报告和摘要都只统计这些工作区；清空表示全部。</p>
+    <p class="note">操作顺序：① 在顶部勾选工作区（可多选，必须至少一个）→ ② 选时间范围（单日 / 最近 5 天 / 最近 7 天 / 自定义区间）→ ③ 在右侧看活动、报告或生成摘要。会话树只显示已勾选的工作区。</p>
     <p class="note" style="text-align:right"><button id="helpClose">关闭</button></p>
   </div>
 </div>
@@ -319,6 +369,7 @@
   // ---------- 基础 ----------
   var TOKEN = new URLSearchParams(location.search).get("token") || "";
   var SCOPE_KEY = "agenthud.scopes";
+  var RANGE_KEY = "agenthud.range";
   var state = {
     tree: null,
     scopes: [],
@@ -330,7 +381,10 @@
     expanded: {},
     filter: "",
     tab: "activity",
+    rangeMode: "day",
     date: todayIso(),
+    from: todayIso(),
+    to: todayIso(),
     actSeq: 0,
     reportSeq: 0,
     summaryBusy: false,
@@ -347,7 +401,12 @@
     wsCaret: document.getElementById("wsCaret"),
     wsSummary: document.getElementById("wsSummary"),
     scopePill: document.getElementById("scopePill"),
-    date: document.getElementById("date"),
+    dateBar: document.getElementById("dateBar"),
+    dateOne: document.getElementById("dateOne"),
+    dateFrom: document.getElementById("dateFrom"),
+    dateTo: document.getElementById("dateTo"),
+    rangeSeg: document.getElementById("rangeSeg"),
+    rangeHint: document.getElementById("rangeHint"),
     liveDot: document.getElementById("liveDot"),
     liveText: document.getElementById("liveText"),
     paneActivity: document.getElementById("paneActivity"),
@@ -401,7 +460,81 @@
       "<h2>缺少访问令牌</h2><p>请打开 <code>agenthud web</code> 在终端里打印的完整地址（带 ?token=…）。</p></div>";
     return;
   }
-  els.date.value = state.date;
+
+  // ---------- 时间范围 ----------
+  function addDays(iso, delta) {
+    var parts = iso.split("-");
+    var d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    d.setDate(d.getDate() + delta);
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  }
+  function lastN(n) {
+    var end = todayIso();
+    return { from: addDays(end, -(n - 1)), to: end };
+  }
+  function effectiveRange() {
+    if (state.rangeMode === "5d") return lastN(5);
+    if (state.rangeMode === "7d") return lastN(7);
+    if (state.rangeMode === "custom") {
+      var from = state.from || todayIso();
+      var to = state.to || todayIso();
+      return from <= to ? { from: from, to: to } : { from: to, to: from };
+    }
+    return { from: state.date, to: state.date };
+  }
+  function isRange() {
+    var r = effectiveRange();
+    return r.from !== r.to;
+  }
+  function rangeDays() {
+    var r = effectiveRange();
+    var n = 1;
+    var cur = r.from;
+    while (cur < r.to && n < 400) { cur = addDays(cur, 1); n += 1; }
+    return n;
+  }
+  function updateRangeUi() {
+    els.dateBar.setAttribute("data-mode", state.rangeMode);
+    Array.prototype.forEach.call(els.rangeSeg.querySelectorAll("button"), function (b) {
+      b.classList.toggle("on", b.getAttribute("data-mode") === state.rangeMode);
+    });
+    els.dateOne.value = state.date;
+    els.dateFrom.value = state.from;
+    els.dateTo.value = state.to;
+    var r = effectiveRange();
+    var days = rangeDays();
+    els.rangeHint.className = "range-hint";
+    if (state.rangeMode === "day") {
+      els.rangeHint.textContent = "当前：" + r.from;
+    } else if (r.from > r.to) {
+      els.rangeHint.className = "range-hint warn";
+      els.rangeHint.textContent = "起始日期晚于结束日期，已互换";
+    } else {
+      els.rangeHint.textContent = "当前：" + r.from + " → " + r.to + "（" + days + " 天）";
+      if (state.rangeMode !== "day" && days > 14) {
+        els.rangeHint.className = "range-hint warn";
+        els.rangeHint.textContent += " · 区间摘要需要 " + (days + 1) + " 次模型调用";
+      }
+    }
+    try {
+      localStorage.setItem(RANGE_KEY, JSON.stringify({
+        mode: state.rangeMode, date: state.date, from: state.from, to: state.to
+      }));
+    } catch (e) {}
+  }
+  function loadRangeState() {
+    try {
+      var raw = localStorage.getItem(RANGE_KEY);
+      if (!raw) return;
+      var v = JSON.parse(raw);
+      if (v && typeof v.mode === "string") state.rangeMode = v.mode;
+      if (v && typeof v.date === "string") state.date = v.date;
+      if (v && typeof v.from === "string") state.from = v.from;
+      if (v && typeof v.to === "string") state.to = v.to;
+    } catch (e) {}
+  }
+  loadRangeState();
+  updateRangeUi();
 
   // ---------- 工作区（主操作） ----------
   function projects() { return (state.tree && state.tree.projects) || []; }
@@ -426,11 +559,12 @@
     return set;
   }
   function visibleProjects() {
+    // 严格白名单：没勾选就什么都不显示（顶部会提示去勾选）。
     var set = scopeSet();
-    var any = state.scopes.length > 0;
+    if (state.scopes.length === 0) return [];
     var pw = state.filter.trim().toLowerCase();
     return projects().filter(function (p) {
-      if (any && !set[p.path]) return false;
+      if (!set[p.path]) return false;
       if (!pw) return true;
       if ((p.name || "").toLowerCase().indexOf(pw) >= 0) return true;
       if ((p.path || "").toLowerCase().indexOf(pw) >= 0) return true;
@@ -467,16 +601,16 @@
     els.workspaceBody.replaceChildren(frag);
     els.wsSummary.textContent = state.scopes.length
       ? "已选 " + state.scopes.length + " / " + list.length + " 个工作区"
-      : "未选择 = 全部工作区（" + list.length + "）";
+      : "必须至少勾选一个（共 " + list.length + " 个）";
     els.scopePill.textContent = state.scopes.length
       ? "已选 " + state.scopes.length + " 个工作区"
-      : "全部工作区";
+      : "未选工作区";
     els.footerScope.textContent = state.scopes.length
-      ? state.scopes.map(function (p) {
+      ? "范围：" + state.scopes.map(function (p) {
           var hit = list.filter(function (x) { return x.path === p; })[0];
           return hit ? hit.name : p;
         }).join(" + ")
-      : "范围：全部工作区";
+      : "范围：未选工作区";
   }
 
   function toggleScope(path, on) {
@@ -503,10 +637,20 @@
   function renderTree() {
     var list = visibleProjects();
     var frag = document.createDocumentFragment();
+    if (state.scopes.length === 0) {
+      var hint = document.createElement("div");
+      hint.className = "needs-scope";
+      hint.innerHTML =
+        "<b>先在上方勾选工作区</b><br>" +
+        "会话树只显示白名单里的工作区。可以点「仅活跃」快速选中正在跑的项目，或「全选」。";
+      frag.appendChild(hint);
+      els.tree.replaceChildren(frag);
+      return;
+    }
     if (!list.length) {
       var none = document.createElement("div");
       none.className = "empty";
-      none.textContent = state.tree ? "没有匹配的会话" : "加载中…";
+      none.textContent = state.tree ? "没有匹配的会话（试试清掉过滤词）" : "加载中…";
       frag.appendChild(none);
     }
     list.forEach(function (project) {
@@ -703,12 +847,21 @@
   // ---------- 报告 ----------
   function loadReport() {
     var seq = ++state.reportSeq;
+    if (!state.scopes.length) {
+      els.paneReport.innerHTML =
+        '<div class="needs-scope"><b>请先勾选工作区</b><br>报告只统计白名单里的工作区。</div>';
+      return;
+    }
+    var range = effectiveRange();
     els.paneReport.innerHTML = '<div class="empty">生成报告…</div>';
     var params = new URLSearchParams();
-    params.set("date", state.date);
     params.set("format", "markdown");
+    if (range.from === range.to) params.set("date", range.from);
+    else {
+      params.set("from", range.from);
+      params.set("to", range.to);
+    }
     state.scopes.forEach(function (p) { params.append("scope", p); });
-    if (!state.scopes.length) params.append("scope", "");
     api("/api/report?" + params.toString())
       .then(function (data) {
         if (seq !== state.reportSeq) return;
@@ -726,6 +879,8 @@
   // ---------- 摘要 ----------
   function renderSummaryPane() {
     var frag = document.createDocumentFragment();
+    var range = effectiveRange();
+    var days = rangeDays();
     var bar = document.createElement("div");
     bar.className = "toolbar";
     bar.innerHTML =
@@ -733,19 +888,24 @@
       '<select id="engine">' +
       '<option value="auto">自动</option><option value="codex">codex</option>' +
       '<option value="claude">claude</option><option value="kiro">kiro</option></select>' +
-      "<button class=\"primary\" id=\"genBtn\">生成摘要</button>" +
+      '<button class="primary" id="genBtn"></button>' +
       '<span class="dim tiny" id="genState"></span>';
     frag.appendChild(bar);
     var note = document.createElement("div");
     note.className = "note";
+    note.id = "sumNote";
     note.textContent = state.scopes.length
-      ? "范围：" + state.scopes.length + " 个工作区 · 日期 " + state.date
-      : "范围：全部工作区 · 日期 " + state.date;
+      ? "范围：" + state.scopes.length + " 个工作区 · " +
+        (range.from === range.to ? range.from : range.from + " → " + range.to + "（" + days + " 天）") +
+        (range.from === range.to ? "" : " · 共 " + (days + 1) + " 次模型调用")
+      : "请先在上方勾选工作区";
     frag.appendChild(note);
     var out = document.createElement("div");
     out.className = "md";
     out.id = "summaryOut";
-    out.innerHTML = '<div class="empty">还没有摘要。点「生成摘要」按当前工作区白名单和日期调用一次模型（可能 30–90 秒）。</div>';
+    out.innerHTML = state.scopes.length
+      ? '<div class="empty">点上面的按钮，按「已选工作区 + 当前时间范围」生成摘要（单日约 30–90 秒）。</div>'
+      : '<div class="needs-scope"><b>请先勾选工作区</b><br>摘要只统计白名单里的工作区。</div>';
     frag.appendChild(out);
 
     var hist = document.createElement("details");
@@ -754,7 +914,12 @@
     frag.appendChild(hist);
     els.paneSummary.replaceChildren(frag);
 
-    bar.querySelector("#genBtn").addEventListener("click", generateSummary);
+    var btn = bar.querySelector("#genBtn");
+    btn.textContent = range.from === range.to
+      ? "生成当天摘要"
+      : "生成区间摘要（" + days + " 天）";
+    btn.disabled = state.scopes.length === 0;
+    btn.addEventListener("click", generateSummary);
     hist.addEventListener("toggle", function () {
       if (hist.open) loadHistory();
     });
@@ -762,10 +927,15 @@
 
   function generateSummary() {
     if (state.summaryBusy) return;
+    if (!state.scopes.length) {
+      showBanner("请先在上方勾选至少一个工作区");
+      return;
+    }
     var engineEl = els.paneSummary.querySelector("#engine");
     var btn = els.paneSummary.querySelector("#genBtn");
     var stateEl = els.paneSummary.querySelector("#genState");
     var out = els.paneSummary.querySelector("#summaryOut");
+    var range = effectiveRange();
     state.summaryBusy = true;
     btn.disabled = true;
     var started = Date.now();
@@ -775,14 +945,17 @@
         Math.floor((Date.now() - started) / 1000) + "s";
     }, 1000);
 
+    var payload = {
+      scopes: state.scopes,
+      engine: engineEl ? engineEl.value : "auto"
+    };
+    if (range.from === range.to) payload.date = range.from;
+    else { payload.from = range.from; payload.to = range.to; }
+
     api("/api/summary", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        date: state.date,
-        scopes: state.scopes,
-        engine: engineEl ? engineEl.value : "auto"
-      })
+      body: JSON.stringify(payload)
     })
       .then(function (data) {
         stateEl.textContent = data.empty
@@ -930,7 +1103,29 @@
   function refreshTab() {
     if (state.tab === "report") loadReport();
     else if (state.tab === "summary") {
-      if (!els.paneSummary.querySelector("#genBtn")) renderSummaryPane();
+      // 已经渲染过就只更新按钮/说明，避免把正在看的结果刷掉
+      if (els.paneSummary.querySelector("#genBtn")) updateSummaryMeta();
+      else renderSummaryPane();
+    }
+  }
+
+  /** 让摘要面板的按钮文案与提示跟随「工作区 + 时间范围」。 */
+  function updateSummaryMeta() {
+    var btn = els.paneSummary.querySelector("#genBtn");
+    var note = els.paneSummary.querySelector("#sumNote");
+    if (!btn) return;
+    var range = effectiveRange();
+    var days = rangeDays();
+    btn.textContent = range.from === range.to
+      ? "生成当天摘要"
+      : "生成区间摘要（" + days + " 天）";
+    btn.disabled = state.scopes.length === 0;
+    if (note) {
+      note.textContent = state.scopes.length
+        ? "范围：" + state.scopes.length + " 个工作区 · " +
+          (range.from === range.to ? range.from : range.from + " → " + range.to + "（" + days + " 天）") +
+          (range.from === range.to ? "" : " · 共 " + (days + 1) + " 次模型调用")
+        : "请先在上方勾选工作区";
     }
   }
 
@@ -988,8 +1183,32 @@
   document.getElementById("refreshBtn").addEventListener("click", function () {
     loadTree().then(function () { if (state.tab !== "activity") refreshTab(); });
   });
-  els.date.addEventListener("change", function () {
-    state.date = els.date.value || todayIso();
+  // 时间范围：单日 / 最近 5 天 / 最近 7 天 / 自定义区间
+  Array.prototype.forEach.call(els.rangeSeg.querySelectorAll("button"), function (b) {
+    b.addEventListener("click", function () {
+      state.rangeMode = b.getAttribute("data-mode");
+      if (state.rangeMode === "custom" && (!state.from || !state.to)) {
+        var week = lastN(7);
+        state.from = week.from;
+        state.to = week.to;
+      }
+      updateRangeUi();
+      refreshTab();
+    });
+  });
+  els.dateOne.addEventListener("change", function () {
+    state.date = els.dateOne.value || todayIso();
+    updateRangeUi();
+    refreshTab();
+  });
+  els.dateFrom.addEventListener("change", function () {
+    state.from = els.dateFrom.value || todayIso();
+    updateRangeUi();
+    refreshTab();
+  });
+  els.dateTo.addEventListener("change", function () {
+    state.to = els.dateTo.value || todayIso();
+    updateRangeUi();
     refreshTab();
   });
   els.filter.addEventListener("input", function () {

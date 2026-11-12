@@ -50,7 +50,12 @@ import {
   listSummaries,
   stripExistingHeaderBlock,
 } from "../data/summariesIndex.js";
-import { dailySummaryPath, runSummary } from "../data/summaryRunner.js";
+import {
+  dailySummaryPath,
+  rangeSummaryPath,
+  runRangeSummary,
+  runSummary,
+} from "../data/summaryRunner.js";
 import type {
   ActivityEntry,
   GlobalConfig,
@@ -306,6 +311,57 @@ function parseDate(value: string | null): Date {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
+function isoDate(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+/** Hard cap on a requested range: beyond this the payload (and, for a
+ * summary, the number of engine calls) stops being a reasonable ask. */
+const MAX_RANGE_DAYS = 62;
+
+/** Inclusive day list for a `from`/`to` pair, or an error message. */
+function enumerateDays(
+  fromRaw: string | null,
+  toRaw: string | null,
+): { ok: true; days: Date[] } | { ok: false; error: string } {
+  if (!fromRaw || !toRaw) {
+    return { ok: false, error: "from 和 to 必须同时给出（格式 YYYY-MM-DD）" };
+  }
+  const from = parseDate(fromRaw);
+  const to = parseDate(toRaw);
+  if (isoDate(from) !== fromRaw || isoDate(to) !== toRaw) {
+    return { ok: false, error: "日期格式必须是 YYYY-MM-DD" };
+  }
+  if (from.getTime() > to.getTime()) {
+    return { ok: false, error: "起始日期不能晚于结束日期" };
+  }
+  const days: Date[] = [];
+  const cursor = new Date(from);
+  while (cursor.getTime() <= to.getTime()) {
+    days.push(new Date(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+    if (days.length > MAX_RANGE_DAYS) {
+      return { ok: false, error: `范围超过 ${MAX_RANGE_DAYS} 天，请缩小范围` };
+    }
+  }
+  return { ok: true, days };
+}
+
+/** One markdown document for a multi-day range: each day's report body
+ * under a `## <date>` heading (the per-day H1 would otherwise repeat). */
+export function joinDailyReports(
+  days: Array<{ date: string; content: string }>,
+): string {
+  if (days.length === 0) return "（无活动）";
+  if (days.length === 1) return days[0].content;
+  const header = `# AgentHUD Report: ${days[0].date} → ${days[days.length - 1].date}`;
+  const parts = days.map((d) => {
+    const body = d.content.replace(/^# AgentHUD Report: .*\n+/, "").trim();
+    return `## ${d.date}\n\n${body || "（无活动）"}`;
+  });
+  return `${header}\n\n${parts.join("\n\n")}`;
+}
+
 export async function startWebServer(
   opts: WebServerOptions,
 ): Promise<WebServerHandle> {
@@ -414,11 +470,10 @@ export async function startWebServer(
     }
 
     if (req.method === "GET" && url.pathname === "/api/report") {
-      const date = parseDate(url.searchParams.get("date"));
       // `?scope=` ABSENT → the server's initial whitelist
       // (`agenthud web --cwd`); present-but-empty (`?scope=`) → every
-      // project, which is what the UI's "全部工作区" sends. Conflating the
-      // two would make the picker unable to widen back out.
+      // project. Conflating the two would make the picker unable to widen
+      // back out.
       const scopeParams = url.searchParams.getAll("scope");
       const resolvedParams = scopeParams
         .flatMap((s) => s.split(","))
@@ -437,13 +492,41 @@ export async function startWebServer(
         ...tree.projects.flatMap((p) => p.sessions),
         ...tree.coldProjects.flatMap((p) => p.sessions),
       ];
-      const content = generateReport(flat, {
-        date,
-        include: config.summary.include ?? config.report.include,
-        format,
-        detailLimit: config.summary.detailLimit ?? config.report.detailLimit,
-        withGit: config.summary.withGit ?? config.report.withGit,
-      });
+      const reportFor = (d: Date) =>
+        generateReport(flat, {
+          date: d,
+          include: config.summary.include ?? config.report.include,
+          format,
+          detailLimit: config.summary.detailLimit ?? config.report.detailLimit,
+          withGit: config.summary.withGit ?? config.report.withGit,
+        });
+
+      // Range request (`from` + `to`) → one document, one section per day.
+      const fromRaw = url.searchParams.get("from");
+      const toRaw = url.searchParams.get("to");
+      if (fromRaw !== null || toRaw !== null) {
+        const range = enumerateDays(fromRaw, toRaw);
+        if (!range.ok) {
+          sendJson(res, 400, { ok: false, error: range.error });
+          return;
+        }
+        const days = range.days.map((d) => ({
+          date: isoDate(d),
+          content: reportFor(d),
+        }));
+        sendJson(res, 200, {
+          from: days[0].date,
+          to: days[days.length - 1].date,
+          scopes: scopeList,
+          format,
+          days: days.map((d) => d.date),
+          content: joinDailyReports(days),
+        });
+        return;
+      }
+
+      const date = parseDate(url.searchParams.get("date"));
+      const content = reportFor(date);
       sendJson(res, 200, {
         date: url.searchParams.get("date") ?? "",
         scopes: scopeList,
@@ -494,6 +577,9 @@ export async function startWebServer(
     if (req.method === "POST" && url.pathname === "/api/summary") {
       let body: {
         date?: string;
+        /** Range mode: inclusive `from`/`to` (YYYY-MM-DD). */
+        from?: string;
+        to?: string;
         /** Whitelist of project paths (the workspace picker). */
         scopes?: string[];
         engine?: string;
@@ -507,7 +593,6 @@ export async function startWebServer(
         return;
       }
 
-      const date = parseDate(body.date ?? null);
       const wanted = Array.isArray(body.scopes)
         ? body.scopes.filter((s) => typeof s === "string" && s.trim())
         : [];
@@ -525,13 +610,78 @@ export async function startWebServer(
         }
         scopeList = resolved.projectPaths;
       }
+      const scopeArg = scopeList.length ? scopeList : undefined;
 
+      // ---- range mode: per-day dailies + one synthesis ----------------
+      if (body.from !== undefined || body.to !== undefined) {
+        const range = enumerateDays(body.from ?? null, body.to ?? null);
+        if (!range.ok) {
+          sendJson(res, 400, { ok: false, error: range.error });
+          return;
+        }
+        const from = range.days[0];
+        const to = range.days[range.days.length - 1];
+        const cachePath = rangeSummaryPath(from, to, scopeArg);
+        const mtimeBefore = existsSync(cachePath)
+          ? statSync(cachePath).mtimeMs
+          : 0;
+        const code = await runRangeSummary({
+          from,
+          to,
+          today: new Date(),
+          force: body.force === true,
+          // The user pressed the button — no second prompt behind a
+          // browser call that has nothing to answer it.
+          assumeYes: true,
+          engine: config.summary.engine,
+          engineFlag:
+            body.engine && body.engine !== "auto" ? body.engine : undefined,
+          model: body.model || config.summary.model,
+          include: config.summary.include ??
+            config.report.include ?? [...DEFAULT_INCLUDE_TYPES],
+          detailLimit:
+            config.summary.detailLimit ?? config.report.detailLimit ?? 120,
+          withGit: config.summary.withGit ?? config.report.withGit ?? false,
+          scopeToProjects: scopeArg,
+          open: false,
+          openIndex: false,
+          quiet: true,
+        });
+        if (code !== 0) {
+          sendJson(res, 502, {
+            ok: false,
+            error: "区间摘要生成失败，请查看服务端日志",
+          });
+          return;
+        }
+        if (!existsSync(cachePath)) {
+          sendJson(res, 200, {
+            ok: true,
+            cachePath: "",
+            markdown: "",
+            fromCache: false,
+            empty: true,
+            days: range.days.length,
+          });
+          return;
+        }
+        const content = readFileSync(cachePath, "utf-8");
+        sendJson(res, 200, {
+          ok: true,
+          range: true,
+          cachePath,
+          markdown: summaryBodyForFile(content),
+          fromCache: statSync(cachePath).mtimeMs === mtimeBefore,
+          days: range.days.length,
+          usage: null,
+        });
+        return;
+      }
+
+      const date = parseDate(body.date ?? null);
       // Cache provenance: a past day with an unchanged cache file means
       // the runner served the cached text instead of calling the engine.
-      const cachePath = dailySummaryPath(
-        date,
-        scopeList.length ? scopeList : undefined,
-      );
+      const cachePath = dailySummaryPath(date, scopeArg);
       const mtimeBefore = existsSync(cachePath)
         ? statSync(cachePath).mtimeMs
         : 0;

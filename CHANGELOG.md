@@ -4,6 +4,14 @@
 
 ### Fixed
 
+- **Codex summary calls no longer pollute agenthud's own session tree.** Every
+  `agenthud summary --engine codex` run wrote a rollout under
+  `~/.codex/sessions/` whose `cwd` was agenthud's home, so the generated
+  sessions reappeared as a `.agenthud` project in agenthud's own tree (one per
+  run). The codex engine now passes `codex exec --ephemeral` ("run without
+  persisting session files to disk") — the same self-pollution the claude engine
+  already avoided with `-p --no-session-persistence` (v0.9.3). Verified: a run
+  still writes its `-o` output and exits 0, with zero new rollout files.
 - **`agenthud summary` failed on Windows with a bogus "not found" error.** The
   summary engines are npm-installed CLIs, i.e. `codex.cmd` shims, and Node can
   neither spawn the bare name (`ENOENT` — `CreateProcess` only resolves `.exe`)

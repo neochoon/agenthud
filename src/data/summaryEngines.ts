@@ -310,7 +310,17 @@ export const codexEngine: SummaryEngine = {
   inputMode: "stdin",
   installHint: "npm i -g @openai/codex",
   buildArgs: ({ model, outFile }) => {
-    const args = ["exec", "--skip-git-repo-check"];
+    const args = [
+      "exec",
+      // `--ephemeral` = "run without persisting session files to disk".
+      // Without it every summary call writes a rollout under
+      // `~/.codex/sessions/` whose cwd is agenthud's own home, so the
+      // generated sessions show up in agenthud's OWN tree as a
+      // `.agenthud` project — the same self-pollution `claude -p
+      // --no-session-persistence` prevents (v0.9.3).
+      "--ephemeral",
+      "--skip-git-repo-check",
+    ];
     if (outFile) args.push("-o", outFile);
     if (model) args.push("-m", model);
     return args;

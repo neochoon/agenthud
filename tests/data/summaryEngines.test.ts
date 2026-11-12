@@ -71,6 +71,9 @@ describe("engine arg building", () => {
     const args = codexEngine.buildArgs({ prompt: "P", outFile: "/tmp/out" });
     expect(args[0]).toBe("exec");
     expect(args).toContain("--skip-git-repo-check");
+    // Without --ephemeral every summary call persists a rollout whose cwd
+    // is agenthud's home, which then shows up in agenthud's own tree.
+    expect(args).toContain("--ephemeral");
     expect(args).toContain("-o");
     expect(args).toContain("/tmp/out");
     // `codex exec` reads its instructions from stdin when no positional

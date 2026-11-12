@@ -260,13 +260,20 @@ function SessionRow({
   // (`ses_<descending-timestamp><random>`), so close-in-time sessions share
   // a long prefix. The distinguishing entropy is the random TAIL — show
   // that instead (the title alongside is the primary identity).
+  //
+  // DSH ids are UUIDs, most of them carrying a redundant `session-` prefix
+  // (`session-9760ce18-…`), which would render as the same `sess` on every
+  // row. Strip the prefix first, then take the leading bits as usual.
   const isOpencode = session.provider === "opencode";
+  const isDsh = session.provider === "dsh";
+  const stripDshPrefix = (id: string) =>
+    isDsh ? id.replace(/^session-/, "") : id;
   const parentShort = isOpencode
     ? session.id.slice(-4)
-    : session.id.slice(0, 4);
+    : stripDshPrefix(session.id).slice(0, 4);
   const subShort = isOpencode
     ? (session.agentId ?? session.id).slice(-6)
-    : (session.agentId ?? session.id).slice(0, 6);
+    : stripDshPrefix(session.agentId ?? session.id).slice(0, 6);
   const rawName = isParent
     ? isNonInteractive
       ? `(#${parentShort})`
@@ -284,14 +291,17 @@ function SessionRow({
   const providerTag = isParent && session.provider ? session.provider : "";
   // Provider tint: Claude gold, both Kiro surfaces magenta (the
   // label text `kiro` vs `kiro-ide` carries the distinction), Codex
-  // cyan. The colored label is dim, so it reads as quiet metadata.
+  // cyan, DSH green. The colored label is dim, so it reads as quiet
+  // metadata.
   const providerColor = session.provider?.startsWith("kiro")
     ? "magenta"
     : session.provider === "claude"
       ? "yellow"
       : session.provider === "codex"
         ? "cyan"
-        : undefined;
+        : session.provider === "dsh"
+          ? "green"
+          : undefined;
 
   // Context-window usage gauge. Shown on BOTH top-level sessions and
   // sub-agents (they have independent contexts). Color encodes

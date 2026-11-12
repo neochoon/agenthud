@@ -33,7 +33,8 @@ export type ProviderName =
   | "kiro"
   | "kiro-ide"
   | "codex"
-  | "opencode";
+  | "opencode"
+  | "dsh";
 
 export interface DiscoverOptions {
   // When set, drop every project whose decoded path is not exactly this
@@ -82,6 +83,13 @@ export interface SessionProvider {
    * `context` carries out-of-band info (e.g. file mtime) for
    * formats that lack it inline; providers may ignore it. */
   parseActivities(lines: string[], context?: ParseContext): ParseResult;
+  /** Non-line-delimited providers only: read the session's records
+   * without assuming the file is plain UTF-8 JSONL (e.g. DSH stores
+   * zstd-compressed frames). When present the history reader calls
+   * this instead of `readFileSync` + split, and `lineDelimited` must
+   * be false — byte-offset tail parsing cannot apply to a compressed
+   * container. No-op for every other provider. */
+  readRecords?(filePath: string): string[];
   /** Line-delimited providers only: true when `line` STARTS a new
    * turn (a user prompt). The history cache splits its frozen
    * prefix from the re-parsed tail ONLY at such lines, so a

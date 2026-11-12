@@ -516,6 +516,8 @@ the `?` overlay renders in-app.
 | `~/.codex/sessions/` | Codex CLI rollout JSONL files (read-only) |
 | `…/Kiro/User/globalStorage/kiro.kiroagent/` | Kiro IDE session + execution files (read-only) |
 | `~/.kiro/sessions/cli/` | Kiro CLI session files (read-only) |
+| `~/.dsh/sessions/` | DSH session logs (`session.v4.jsonl.zstd`, zstd frames — read-only) |
+| `~/.dsh/storages/session_projcache/` | DSH projection cache: titles, model, context gauge, open step (read-only) |
 
 Per-provider on-disk schemas (with `jq` verification commands) are
 documented under [`docs/schemas/`](./docs/schemas/).
@@ -528,6 +530,8 @@ documented under [`docs/schemas/`](./docs/schemas/).
 | `CODEX_SESSIONS_DIR` | Override the Codex sessions directory (default: `~/.codex/sessions`). |
 | `KIRO_SESSIONS_DIR` | Override the Kiro CLI sessions directory (default: `~/.kiro/sessions/cli`). |
 | `KIRO_IDE_SESSIONS_DIR` | Override the Kiro IDE `workspace-sessions` directory. |
+| `DSH_HOME` | Override the DSH data root (default: `~/.dsh`). Sessions and the projection cache are resolved from it. |
+| `DSH_SESSIONS_DIR` | Override the DSH sessions root outright (default: `<DSH_HOME>/sessions`). |
 | `AGENTHUD_HOME` | Override the app data directory (default: `~/.agenthud`). |
 | `WSL_DISTRO_NAME`, `/proc/version` markers | WSL detection (cached for the process; v0.12.4). Affects `--open` opener preference (`wslview` over `xdg-open`) and the cwd-home protection in legacy-config migration. |
 | `NODE_ENV` | Set to `production` by default in the bundled binary to disable React dev-mode profiler accumulation (~12× memory-leak reduction; v0.9.0). |

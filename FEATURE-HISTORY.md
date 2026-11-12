@@ -8,6 +8,11 @@ see [FEATURES.md](./FEATURES.md).
 
 ## Unreleased (post-0.19.0)
 
+- **DSH (DeepSeek Harness) provider**: a sixth session source joins the tree —
+  built-in zstd multi-frame decoding, sub-agent nesting via `parentSession`,
+  and titles/model/context-gauge/live-state taken from DSH's own projection
+  cache. The provider plug-in layer (`src/data/providers/`) needed one new
+  optional hook (`readRecords`) for container formats that aren't plain JSONL.
 - **agenthud follow**: live merged event stream (activity + state + lifecycle)
   across all sessions and sub-agents, as human-readable lines or NDJSON
   (`--json`); `--since`, `--include`, and `--once` for backfill control — the

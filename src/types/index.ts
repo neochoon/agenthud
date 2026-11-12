@@ -35,7 +35,7 @@ export interface SessionNode {
   firstUserPrompt: string | null; // Display description: latest substantial (≥10 chars, non-slash) user message, falling back to the first natural-language one. Name kept for backwards compat.
   liveState: LiveState | null; // working/waiting from JSONL tail; null = fall back to time-based status
   hidden?: boolean; // true when matched by hiddenSessions/hiddenSubAgents, or descendant of a hidden project
-  provider?: "claude" | "kiro" | "kiro-ide" | "codex" | "opencode"; // origin source of this node. Renderer uses it for a small per-row label so users can tell at a glance which CLI created the session.
+  provider?: "claude" | "kiro" | "kiro-ide" | "codex" | "opencode" | "dsh"; // origin source of this node. Renderer uses it for a small per-row label so users can tell at a glance which CLI created the session.
   /**
    * Origin CLI/schema version of this session, captured per provider:
    * claude per-line `version` (`2.1.148`), codex `session_meta.cli_version`

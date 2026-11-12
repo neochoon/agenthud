@@ -13,3 +13,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 process.env.AGENTHUD_HOME = mkdtempSync(join(tmpdir(), "agenthud-test-"));
+// Same isolation for the DSH provider: its sessions root lives under
+// DSH_HOME, so pointing it at a non-existent temp dir keeps a test run
+// from reading (and asserting on) the developer's real ~/.dsh corpus.
+// The parent exists, the home itself does not — `isAvailable()` then
+// reports false until a test opts in with its own DSH_HOME.
+process.env.DSH_HOME = join(
+  mkdtempSync(join(tmpdir(), "agenthud-dsh-test-")),
+  "no-dsh-home",
+);

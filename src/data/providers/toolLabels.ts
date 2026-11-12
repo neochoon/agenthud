@@ -24,6 +24,11 @@
  *   provider): `webfetch`/`websearch` (one word, vs Kiro's
  *   `web_fetch`/`web_search`), `list` → `Glob` (directory enumeration
  *   sits in the read/glob bucket), `patch` → `Edit` (a diff is an edit).
+ * - DSH's vocabulary is snake_case and PowerShell-first: `pwsh` (its
+ *   shell tool), `read_image` (a read that returns an image),
+ *   `todo_write`, `ask_user_question`, `str_replace_editor` (an edit),
+ *   `run_code` (arbitrary code execution — same bucket as a shell),
+ *   and `skill` (an invoked skill, matching ICONS.Skill).
  */
 
 import { ICONS } from "../../types/index.js";
@@ -33,12 +38,18 @@ const RAW_TOOL_TO_CANONICAL: Map<string, string> = new Map([
   ["introspect", "Read"],
   ["shell", "Bash"],
   ["bash", "Bash"],
+  ["pwsh", "Bash"],
+  ["powershell", "Bash"],
+  ["exec_command", "Bash"],
+  ["run_code", "Bash"],
   ["write", "Write"],
   ["edit", "Edit"],
   ["patch", "Edit"],
+  ["str_replace_editor", "Edit"],
   ["grep", "Grep"],
   ["glob", "Glob"],
   ["list", "Glob"],
+  ["read_image", "Read"],
   ["web_fetch", "WebFetch"],
   ["webfetch", "WebFetch"],
   ["fetch", "WebFetch"],
@@ -47,10 +58,14 @@ const RAW_TOOL_TO_CANONICAL: Map<string, string> = new Map([
   ["search", "WebSearch"],
   ["task", "Task"],
   ["subagent", "Task"],
+  ["workflow", "Task"],
   ["todo", "TodoWrite"],
   ["todowrite", "TodoWrite"],
+  ["todo_write", "TodoWrite"],
   ["ask", "AskUserQuestion"],
   ["askuserquestion", "AskUserQuestion"],
+  ["ask_user_question", "AskUserQuestion"],
+  ["skill", "Skill"],
 ]);
 
 /** Translate a provider's raw tool name to the canonical label.

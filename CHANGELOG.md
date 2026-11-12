@@ -18,6 +18,21 @@
   (#201, #204, #205).
 
 ### Added
+- **DSH (DeepSeek Harness) provider** — agenthud now discovers sessions
+  written by DeepSeek Harness, alongside Claude Code, Codex, Kiro and
+  opencode. DSH stores each session as `<DSH_HOME>/sessions/<encoded-cwd>/
+  <sessionId>/session.v4.jsonl.zstd`: JSONL compressed as **one concatenated
+  zstd frame per append**, a container `node:zlib` will only decode the first
+  frame of, so the provider walks the frame structure itself (RFC 8878) and
+  decodes frame by frame — no new dependency. Discovery reads just the first
+  frame (the session header: id / cwd / parent / delegation depth) plus DSH's
+  own per-session projection cache, so a 171-session corpus refreshes in ~20 ms
+  warm. Sub-agents nest via `parentSession`; titles, model, context gauge and
+  `working`/`waiting` come from the projection cache. User rows are filtered to
+  real human input (`source.kind`), and DSH's snake_case tools are canonicalized
+  (`pwsh` → `Bash`, `read_image` → `Read`, …). Requires Node 22.15+ (built-in
+  zstd); on Node 20 the provider is skipped like opencode under 22. Schema and
+  verification commands: [docs/schemas/dsh-session.md](./docs/schemas/dsh-session.md).
 - **In-pane search (`/`)** — text search scoped to the focused pane, distinct
   from the `f` type-filter. **Search persists**: typing narrows to matches;
   `↵` with no `↑`/`↓` navigation *filter-confirms* (keeps the narrowed view

@@ -4,7 +4,7 @@
 [![CI](https://github.com/neochoon/agenthud/actions/workflows/ci.yml/badge.svg)](https://github.com/neochoon/agenthud/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/neochoon/agenthud/branch/main/graph/badge.svg)](https://codecov.io/gh/neochoon/agenthud)
 
-A **heads-up display** for your AI coding agents — **Claude Code**, **OpenAI Codex**, **AWS Kiro**, and **opencode**. AgentHUD reads each agent's on-disk sessions (JSONL files, or opencode's SQLite store) and merges them into one tree, so a project you've touched from several agents shows as a single row with combined sessions and sub-agents.
+A **heads-up display** for your AI coding agents — **Claude Code**, **OpenAI Codex**, **AWS Kiro**, **opencode**, and **DeepSeek Harness (DSH)**. AgentHUD reads each agent's on-disk sessions (JSONL files, opencode's SQLite store, or DSH's zstd-compressed event logs) and merges them into one tree, so a project you've touched from several agents shows as a single row with combined sessions and sub-agents.
 
 ![demo](./demo/live.gif)
 
@@ -15,9 +15,9 @@ It's organized as **three layers, by who's reading** — a human at a glance, a 
 - **`agenthud report`** — **the machine layer.** Structured Markdown / JSON. `summary` is literally `report` piped into an agent CLI, so the daily digest isn't a black box — and you can pipe `report` into anything else, too.
 - **`agenthud follow`** — **the live machine feed.** A chronologically-merged stream of every event (activity + state + lifecycle) across all sessions and sub-agents, as human lines or `--json` NDJSON — the read-only substrate a higher-level supervisor can consume. See [FEATURES.md](./FEATURES.md#follow).
 
-→ **See [FEATURES.md](./FEATURES.md) for the full surface** — every flag, keybinding, config key, file path, and env var. Per-agent session schemas: [Claude Code](./docs/schemas/claude-session.md) · [Codex CLI](./docs/schemas/codex-session.md) · [Kiro IDE](./docs/schemas/kiro-ide-session.md) · [Kiro CLI](./docs/schemas/kiro-session.md) · [opencode](./docs/schemas/opencode-session.md) (or browse [docs/schemas/](./docs/schemas/)).
+→ **See [FEATURES.md](./FEATURES.md) for the full surface** — every flag, keybinding, config key, file path, and env var. Per-agent session schemas: [Claude Code](./docs/schemas/claude-session.md) · [Codex CLI](./docs/schemas/codex-session.md) · [Kiro IDE](./docs/schemas/kiro-ide-session.md) · [Kiro CLI](./docs/schemas/kiro-session.md) · [opencode](./docs/schemas/opencode-session.md) · [DSH](./docs/schemas/dsh-session.md) (or browse [docs/schemas/](./docs/schemas/)).
 
-Requires Node.js 20+ (opencode sessions need Node 22+ — they're read via the built-in `node:sqlite`; on older Node, opencode is simply skipped and everything else works). Open agenthud in a separate terminal while you work; press `?` inside the TUI for in-app help.
+Requires Node.js 20+ (opencode needs Node 22+ for the built-in `node:sqlite`, and DSH needs Node 22.15+ for built-in zstd; on older Node those two providers are simply skipped and everything else works). Open agenthud in a separate terminal while you work; press `?` inside the TUI for in-app help.
 
 ## Try without installing
 

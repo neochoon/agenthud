@@ -22,6 +22,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { parseActivitiesFromLines } from "../../src/data/providers/claude-activity.js";
 import { parseCodexActivities } from "../../src/data/providers/codex.js";
+import { parseDshActivities } from "../../src/data/providers/dsh.js";
 import { parseKiroActivitiesFromLines } from "../../src/data/providers/kiro-activity.js";
 import { parseActivities as parseOpencode } from "../../src/data/providers/opencode.js";
 
@@ -82,6 +83,27 @@ describe("parser corpus: kiro v1", () => {
         "Read:/src/db/pool.ts",
         "Edit:/src/db/pool.ts",
         "Response:The connection pool has been refactored with retry logic.",
+      ]
+    `);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DSH v4 event log
+// ---------------------------------------------------------------------------
+describe("parser corpus: dsh v4", () => {
+  it("parses the known shapes into stable activity labels/details", () => {
+    const { activities } = parseDshActivities(lines("dsh/v4.jsonl"));
+    expect(activities.length).toBeGreaterThan(0);
+    const summary = activities.map((a) => `${a.label}:${a.detail}`);
+    expect(summary).toMatchInlineSnapshot(`
+      [
+        "User:The approval policy changed. Nothing else to do.",
+        "User:Fix the failing tests in the auth module",
+        "Thinking:I should run the suite first and read the auth module.",
+        "Read:auth.ts",
+        "Bash:npm test -- auth",
+        "Response:I've fixed the failing assertion in the auth module.",
       ]
     `);
   });

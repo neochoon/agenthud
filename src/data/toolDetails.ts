@@ -301,9 +301,13 @@ export function buildToolDetailBody(
   // Bash output is high-volume and noisy; the row's one-line command
   // label is enough for the LLM summary, and the full output is one
   // `↵` keystroke away in the TUI for the user.
+  //
+  // `content` is the fallback for providers whose shell tool returns a
+  // single text blob instead of Claude's stdout/stderr pair (DSH's
+  // `pwsh`): for a shell tool, the returned text IS the output.
   if (name === "Bash") {
     const text = formatBashBody(
-      result?.stdout,
+      result?.stdout ?? result?.content,
       result?.stderr,
       result?.interrupted,
     );

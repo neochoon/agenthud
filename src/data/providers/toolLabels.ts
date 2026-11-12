@@ -65,6 +65,10 @@ const RAW_TOOL_TO_CANONICAL: Map<string, string> = new Map([
   ["ask", "AskUserQuestion"],
   ["askuserquestion", "AskUserQuestion"],
   ["ask_user_question", "AskUserQuestion"],
+  // Codex 0.163+ reaches the user through these two.
+  ["request_user_input", "AskUserQuestion"],
+  ["request_user_input_async", "AskUserQuestion"],
+  ["apply_patch", "Edit"],
   ["skill", "Skill"],
 ]);
 

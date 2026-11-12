@@ -4,6 +4,22 @@
 
 ### Fixed
 
+- **Codex sessions produced zero activities — they were invisible in reports,
+  summaries and the activity viewer.** Codex CLI 0.163 moved the transcript from
+  `event_msg/user_message` / `agent_message` to role-tagged
+  `response_item/message` items, and replaced named `exec_command` calls with a
+  single `exec` orchestrator whose `input` is JavaScript. Every rollout in a
+  33-session corpus (0.163 → 0.167.0-alpha) uses the new shape, so the parser
+  matched nothing while still *listing* the session — the tree looked fine and
+  the digests silently contained only the other agents. The parser now reads
+  `response_item/message` (user/assistant; `developer` skipped), the plaintext
+  `reasoning` summaries, and both `function_call` and `custom_tool_call`
+  (unwrapping `tools.exec_command({cmd})` / `tools.apply_patch` to a readable
+  row + the matching `*_output` as its expandable body). `request_user_input*`
+  maps to `AskUserQuestion`, `apply_patch` to `Edit`. Titles and the context
+  gauge were broken by the same change and are fixed with it. The
+  `event_msg/item_completed` mirror is deliberately NOT parsed (it would double
+  every row). Schema doc updated: [docs/schemas/codex-session.md](./docs/schemas/codex-session.md).
 - **Codex summary calls no longer pollute agenthud's own session tree.** Every
   `agenthud summary --engine codex` run wrote a rollout under
   `~/.codex/sessions/` whose `cwd` was agenthud's home, so the generated

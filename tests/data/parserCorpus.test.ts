@@ -21,7 +21,10 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { parseActivitiesFromLines } from "../../src/data/providers/claude-activity.js";
-import { parseCodexActivities } from "../../src/data/providers/codex.js";
+import {
+  execInputDetail,
+  parseCodexActivities,
+} from "../../src/data/providers/codex.js";
 import { parseDshActivities } from "../../src/data/providers/dsh.js";
 import { parseKiroActivitiesFromLines } from "../../src/data/providers/kiro-activity.js";
 import { parseActivities as parseOpencode } from "../../src/data/providers/opencode.js";
@@ -125,5 +128,104 @@ describe("parser corpus: opencode parts", () => {
         "Response:I've added error handling to the API client.",
       ]
     `);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Codex v0.167 (0.163+ role-tagged transcript)
+//
+// The format this provider originally parsed (`event_msg/user_message`,
+// `agent_message`, named `exec_command` function calls) is GONE from
+// every rollout on disk since CLI 0.163 — which silently produced zero
+// activities, so codex sessions were invisible in reports and summaries.
+// These cases lock the new shapes in.
+// ---------------------------------------------------------------------------
+describe("codex v0.167 format", () => {
+  const fx = () => lines("codex/v0.167.jsonl");
+
+  it("parses the role-tagged transcript into stable rows", () => {
+    const { activities } = parseCodexActivities(fx());
+    const summary = activities.map((a) => `${a.label}:${a.detail}`);
+    expect(summary).toMatchInlineSnapshot(`
+      [
+        "User:读下这个文档",
+        "Thinking:**Checking the fixture**",
+        "Bash:Get-Content -LiteralPath 'AGENT.md' -Encoding UTF8",
+        "Response:已读完 AGENT.md，文档介绍的是四旋翼联合实验系统。",
+        "AskUserQuestion:是否允许沿用原差分账号？",
+      ]
+    `);
+  });
+
+  it("skips the developer/system prompt as a user turn", () => {
+    const { activities } = parseCodexActivities(fx());
+    const users = activities.filter((a) => a.type === "user");
+    expect(users).toHaveLength(1);
+    expect(users[0].detail).toBe("读下这个文档");
+    expect(
+      users.some((u) => (u.detailBody ?? "").includes("agent based on GPT-6")),
+    ).toBe(false);
+  });
+
+  it("reads the plaintext reasoning summary, not the encrypted blob", () => {
+    const { activities } = parseCodexActivities(fx());
+    const thinking = activities.filter((a) => a.type === "thinking");
+    expect(thinking).toHaveLength(1);
+    expect(thinking[0].detail).toContain("Checking the fixture");
+  });
+
+  it("unwraps the exec orchestrator to the inner shell command", () => {
+    const { activities } = parseCodexActivities(fx());
+    const bash = activities.filter((a) => a.label === "Bash");
+    expect(bash).toHaveLength(1);
+    expect(bash[0].detail).toBe(
+      "Get-Content -LiteralPath 'AGENT.md' -Encoding UTF8",
+    );
+    // The matching custom_tool_call_output becomes the expandable body.
+    expect(bash[0].detailBody).toContain("# PX4 开发环境");
+  });
+
+  it("does not double-count the item_completed mirror", () => {
+    const { activities } = parseCodexActivities(fx());
+    // One exec call → exactly one Bash row, even though the log also
+    // carries an item_completed/CommandExecution for the same command.
+    expect(activities.filter((a) => a.label === "Bash")).toHaveLength(1);
+    expect(activities.filter((a) => a.type === "response")).toHaveLength(1);
+  });
+
+  it("maps the human-in-the-loop tool to AskUserQuestion", () => {
+    const { activities } = parseCodexActivities(fx());
+    expect(activities.some((a) => a.label === "AskUserQuestion")).toBe(true);
+  });
+
+  it("still reports the model and the context gauge", () => {
+    const { modelName } = parseCodexActivities(fx());
+    expect(modelName).toBe("gpt-6.1-sol");
+  });
+});
+
+describe("execInputDetail", () => {
+  it("extracts the tool and its cmd from the exec source", () => {
+    expect(
+      execInputDetail('text(await tools.exec_command({cmd:"git status"}));'),
+    ).toEqual({ tool: "exec_command", detail: "git status" });
+  });
+
+  it("falls back to another string field when there is no cmd", () => {
+    expect(
+      execInputDetail('await tools.read_file({path:"src/a.ts"});'),
+    ).toEqual({ tool: "read_file", detail: "src/a.ts" });
+  });
+
+  it("returns the bare tool name when nothing is recognizable", () => {
+    expect(execInputDetail("await tools.wait({})").tool).toBe("wait");
+    expect(execInputDetail(undefined)).toEqual({ tool: "exec", detail: "" });
+  });
+
+  it("unescapes quotes inside the command", () => {
+    const parsed = execInputDetail(
+      'text(await tools.exec_command({cmd:"echo \\"hi\\""}));',
+    );
+    expect(parsed.detail).toBe('echo "hi"');
   });
 });

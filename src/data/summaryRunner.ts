@@ -65,7 +65,7 @@ import { agenthudHome } from "../utils/agenthudHome.js";
 import { openInDefaultApp } from "../utils/openInDefaultApp.js";
 import { startStderrTicker } from "../utils/stderrTicker.js";
 import { generateReport } from "./reportGenerator.js";
-import { scopeSlugFor } from "./scope.js";
+import { scopeSuffixFor } from "./scope.js";
 import { discoverSessions } from "./sessions.js";
 import { regenerateIndex } from "./summariesIndex.js";
 import type { SummaryEngine } from "./summaryEngines.js";
@@ -98,11 +98,10 @@ export interface SummaryOptions {
   open?: boolean;
   /** Launch ~/.agenthud/summaries/index.md in the OS default app. */
   openIndex?: boolean;
-  /** Scope the digest to ONE workspace (an absolute project path, see
-   * scope.ts). Undefined = every project of the day. The scope is part
-   * of the cache filename, so a scoped digest never replaces the
-   * whole-day one. */
-  scopeToProject?: string;
+  /** Whitelist of absolute project paths (see scope.ts). Undefined or
+   * empty = every project of the day. The scope set is part of the cache
+   * filename, so a scoped digest never replaces the whole-day one. */
+  scopeToProjects?: string[];
   /** Non-interactive caller (the web server): suppress the markdown
    * stream on stdout and the progress lines on stderr, so the caller can
    * read the result back from the cache file instead of having it mixed
@@ -129,9 +128,9 @@ export interface RangeSummaryOptions {
   open?: boolean;
   /** Launch ~/.agenthud/summaries/index.md in the OS default app. */
   openIndex?: boolean;
-  /** Scope every day of the range to ONE workspace (absolute project
-   * path). Undefined = every project. */
-  scopeToProject?: string;
+  /** Whitelist of absolute project paths applied to every day of the
+   * range. Undefined or empty = every project. */
+  scopeToProjects?: string[];
   /** Non-interactive caller: no stdout stream, no progress lines. */
   quiet?: boolean;
 }
@@ -193,17 +192,17 @@ function dateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function dailySummaryPath(date: Date, scopeToProject?: string): string {
-  const suffix = scopeToProject ? `--${scopeSlugFor(scopeToProject)}` : "";
+export function dailySummaryPath(date: Date, scopes?: string[]): string {
+  const suffix = scopeSuffixFor(scopes);
   return join(summariesDir(), `${dateKey(date)}${suffix}.md`);
 }
 
 export function rangeSummaryPath(
   from: Date,
   to: Date,
-  scopeToProject?: string,
+  scopes?: string[],
 ): string {
-  const suffix = scopeToProject ? `--${scopeSlugFor(scopeToProject)}` : "";
+  const suffix = scopeSuffixFor(scopes);
   return join(
     summariesDir(),
     `range-${dateKey(from)}_${dateKey(to)}${suffix}.md`,
@@ -550,8 +549,8 @@ interface DailyGenOpts {
   detailLimit: number;
   /** Whether to merge git commits into the LLM payload. */
   withGit: boolean;
-  /** Absolute project path limiting discovery to one workspace. */
-  scopeToProject?: string;
+  /** Absolute project paths limiting discovery (whitelist). */
+  scopeToProjects?: string[];
 }
 
 /**
@@ -575,7 +574,7 @@ async function generateDailySummary(
   opts: DailyGenOpts,
 ): Promise<DailyGenResult> {
   const isToday = isSameLocalDay(opts.date, opts.today);
-  const cached = dailySummaryPath(opts.date, opts.scopeToProject);
+  const cached = dailySummaryPath(opts.date, opts.scopeToProjects);
   const dateLabel = dateKey(opts.date);
 
   if (!isToday && !opts.force && existsSync(cached)) {
@@ -628,7 +627,9 @@ async function generateDailySummary(
   // the empty-day / git-commit logic looking at the wrong set.
   const tree = discoverSessions(
     config,
-    opts.scopeToProject ? { scopeToProject: opts.scopeToProject } : undefined,
+    opts.scopeToProjects?.length
+      ? { scopeToProjects: opts.scopeToProjects }
+      : undefined,
   );
   const flatSessions = [
     ...tree.projects.flatMap((p) => p.sessions),
@@ -789,7 +790,7 @@ export async function runSummary(options: SummaryOptions): Promise<number> {
     include: options.include,
     detailLimit: options.detailLimit,
     withGit: options.withGit,
-    scopeToProject: options.scopeToProject,
+    scopeToProjects: options.scopeToProjects,
   });
   // Regenerate the index when something *changed* on disk (a new
   // daily got written), OR when the user explicitly asked for the
@@ -808,7 +809,7 @@ export async function runSummary(options: SummaryOptions): Promise<number> {
   // skipped because the day was empty.
   if (options.open && res.code === 0 && !res.skipped) {
     await openInDefaultApp(
-      dailySummaryPath(options.date, options.scopeToProject),
+      dailySummaryPath(options.date, options.scopeToProjects),
     );
   }
   // `--open-index` is about *navigating the corpus* — fire it even
@@ -839,7 +840,7 @@ export async function runRangeSummary(
   const rangeCache = rangeSummaryPath(
     options.from,
     options.to,
-    options.scopeToProject,
+    options.scopeToProjects,
   );
 
   if (
@@ -897,7 +898,7 @@ export async function runRangeSummary(
     if (
       !options.force &&
       !isToday &&
-      existsSync(dailySummaryPath(d, options.scopeToProject))
+      existsSync(dailySummaryPath(d, options.scopeToProjects))
     )
       cachedCount++;
     else missingCount++;
@@ -920,7 +921,7 @@ export async function runRangeSummary(
       !options.assumeYes &&
       (isToday ||
         options.force ||
-        !existsSync(dailySummaryPath(d, options.scopeToProject)));
+        !existsSync(dailySummaryPath(d, options.scopeToProjects)));
     const confirmer = willPrompt
       ? async () => {
           const hint = isToday ? " (today — regenerated every time)" : "";
@@ -944,7 +945,7 @@ export async function runRangeSummary(
       include: options.include,
       detailLimit: options.detailLimit,
       withGit: options.withGit,
-      scopeToProject: options.scopeToProject,
+      scopeToProjects: options.scopeToProjects,
     });
 
     if (res.skipped) {

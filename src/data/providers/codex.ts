@@ -54,7 +54,12 @@ import type {
 import { ICONS } from "../../types/index.js";
 import { ONE_HOUR_MS, THIRTY_MINUTES_MS } from "../../utils/timeConstants.js";
 import { pickLatestUserTitle } from "./sessionTitle.js";
-import type { ParseResult, SessionProvider } from "./types.js";
+import {
+  type DiscoverOptions,
+  type ParseResult,
+  projectInScope,
+  type SessionProvider,
+} from "./types.js";
 
 export function getCodexSessionsDir(): string {
   return (
@@ -272,7 +277,10 @@ function makeNode(
   return node;
 }
 
-function discoverCodexSessions(config: GlobalConfig): SessionTree {
+function discoverCodexSessions(
+  config: GlobalConfig,
+  options?: DiscoverOptions,
+): SessionTree {
   const root = getCodexSessionsDir();
   const empty: SessionTree = {
     projects: [],
@@ -332,6 +340,7 @@ function discoverCodexSessions(config: GlobalConfig): SessionTree {
       `${projectName}/${meta.id}`,
     );
     const hidden = projectHidden || sessionHidden;
+    if (!projectInScope(meta.cwd, options)) continue;
     const node = makeNode(meta, filePath, mtimeMs, hidden);
     nodesById.set(meta.id, node);
     if (hidden) {

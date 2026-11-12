@@ -74,16 +74,16 @@ export interface CliOptions {
   summaryOpenIndex?: boolean;
   summaryError?: string;
   scopeToCwd?: boolean;
-  /** `--project <path|name>`: scope report/summary to ONE workspace
-   * (resolved against discovered projects in main.ts). */
-  scopeProject?: string;
+  /** `--project <path|name>` (repeatable): whitelist of workspaces for
+   * report/summary (resolved against discovered projects in main.ts). */
+  scopeProjects?: string[];
 
   // web
   webPort?: number;
   webOpen?: boolean;
   webError?: string;
   webScopeToCwd?: boolean;
-  webScopeProject?: string;
+  webScopeProjects?: string[];
 
   // follow
   followSince?: string; // raw --since spec
@@ -368,6 +368,20 @@ function todayLocalMidnight(): Date {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
+/** Every value given for a repeatable `--flag value` option, in order. */
+function collectFlagValues(rest: string[], flag: string): string[] {
+  const values: string[] = [];
+  for (let i = 0; i < rest.length; i++) {
+    if (rest[i] !== flag) continue;
+    const val = rest[i + 1];
+    if (val && !val.startsWith("-")) {
+      values.push(val);
+      i++;
+    }
+  }
+  return values;
+}
+
 export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
   // `watch` is the explicit form of the default mode — strip it so the
   // rest of parsing sees the same shape it always has.
@@ -482,16 +496,15 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
     const reportWithGit =
       rest.includes("--with-git") || (config?.report.withGit ?? false);
 
-    // Workspace scope: `--cwd` (this directory's project) or
-    // `--project <path|name>`. Resolved against the discovered projects
-    // in main.ts, where the tree is available.
-    const projectIdx = rest.indexOf("--project");
-    const scopeProject = projectIdx === -1 ? undefined : rest[projectIdx + 1];
-    if (projectIdx !== -1 && !scopeProject) {
+    // Workspace scope: `--cwd` (this directory's project) or a
+    // repeatable `--project <path|name>` whitelist. Resolved against the
+    // discovered projects in main.ts, where the tree is available.
+    const scopeProjects = collectFlagValues(rest, "--project");
+    if (rest.includes("--project") && scopeProjects.length === 0) {
       reportError = reportError ?? "Invalid --project: missing value.";
     }
     const scopeCwd = rest.includes("--cwd") || undefined;
-    if (scopeCwd && scopeProject) {
+    if (scopeCwd && scopeProjects.length > 0) {
       reportError =
         reportError ?? "--cwd and --project are mutually exclusive.";
     }
@@ -505,7 +518,7 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
       reportWithGit,
       reportError,
       scopeToCwd: scopeCwd,
-      scopeProject,
+      scopeProjects,
     };
   }
 
@@ -738,16 +751,14 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
       summaryModel = config.summary.model;
     }
 
-    // Workspace scope: `--cwd` or `--project <path|name>`. Resolved in
-    // main.ts against the discovered projects.
-    const summaryProjectIdx = rest.indexOf("--project");
-    const scopeProject =
-      summaryProjectIdx === -1 ? undefined : rest[summaryProjectIdx + 1];
-    if (summaryProjectIdx !== -1 && !scopeProject) {
+    // Workspace scope: `--cwd` or a repeatable `--project` whitelist.
+    // Resolved in main.ts against the discovered projects.
+    const scopeProjects = collectFlagValues(rest, "--project");
+    if (rest.includes("--project") && scopeProjects.length === 0) {
       summaryError = summaryError ?? "Invalid --project: missing value.";
     }
     const scopeCwd = rest.includes("--cwd") || undefined;
-    if (scopeCwd && scopeProject) {
+    if (scopeCwd && scopeProjects.length > 0) {
       summaryError =
         summaryError ?? "--cwd and --project are mutually exclusive.";
     }
@@ -771,7 +782,7 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
       summaryOpenIndex,
       summaryError,
       scopeToCwd: scopeCwd,
-      scopeProject,
+      scopeProjects,
     };
   }
 
@@ -780,7 +791,7 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
     let webPort: number | undefined;
     let webOpen: boolean | undefined;
     let webScopeToCwd: boolean | undefined;
-    let webScopeProject: string | undefined;
+    let webScopeProjects: string[] | undefined;
     let webError: string | undefined;
 
     const FLAGS_WITH_VALUE = new Set(["--port", "-p", "--project"]);
@@ -816,18 +827,14 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
       }
     }
 
-    const projectIdx = rest.indexOf("--project");
-    if (projectIdx !== -1) {
-      const val = rest[projectIdx + 1];
-      if (!val) {
-        webError = webError ?? "Invalid --project: missing value.";
-      } else {
-        webScopeProject = val;
-      }
+    const webProjects = collectFlagValues(rest, "--project");
+    if (rest.includes("--project") && webProjects.length === 0) {
+      webError = webError ?? "Invalid --project: missing value.";
     }
+    if (webProjects.length > 0) webScopeProjects = webProjects;
 
     if (rest.includes("--cwd")) webScopeToCwd = true;
-    if (webScopeToCwd && webScopeProject) {
+    if (webScopeToCwd && webScopeProjects) {
       webError = webError ?? "--cwd and --project are mutually exclusive.";
     }
     if (rest.includes("--open") || rest.includes("-o")) webOpen = true;
@@ -837,7 +844,7 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
       webPort,
       webOpen,
       webScopeToCwd,
-      webScopeProject,
+      webScopeProjects,
       webError,
     };
   }

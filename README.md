@@ -77,9 +77,10 @@ agenthud report --format json             # script-readable
 agenthud report --with-git                # merge git commits into the timeline
 
 # 4 · The browser
-agenthud web                              # local UI on 127.0.0.1:7787
+agenthud web                              # 中文界面 · 127.0.0.1:7787
 agenthud web -o                           # …and open it
 agenthud report --cwd                     # one workspace only
+agenthud summary --project a --project b  # several workspaces at once
 agenthud summary --cwd                    # …a digest for just that workspace
 ```
 

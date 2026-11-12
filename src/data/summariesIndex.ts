@@ -68,11 +68,16 @@ const BACKLINK_END_MARKER = "<!-- agenthud-backlinks-end -->";
 
 // A workspace-scoped summary carries a `--<slug>` suffix before `.md`
 // (`2026-11-11--agenthud-3f2a1b.md`): same day, different scope, so the
-// two must never overwrite each other. Files written before scoping
+// two must never overwrite each other. A MULTI-workspace scope joins the
+// slugs with `+` (`--a-1b2c3d+b-4e5f6a`). Files written before scoping
 // existed have no suffix and keep parsing as whole-day digests.
-const DAILY_RE = /^(\d{4})-(\d{2})-(\d{2})(?:--([a-z0-9][a-z0-9-]*))?\.md$/;
-const RANGE_RE =
-  /^range-(\d{4})-(\d{2})-(\d{2})_(\d{4})-(\d{2})-(\d{2})(?:--([a-z0-9][a-z0-9-]*))?\.md$/;
+const SCOPE_SET = "[a-z0-9][a-z0-9-]*(?:\\+[a-z0-9][a-z0-9-]*)*";
+const DAILY_RE = new RegExp(
+  `^(\\d{4})-(\\d{2})-(\\d{2})(?:--(${SCOPE_SET}))?\\.md$`,
+);
+const RANGE_RE = new RegExp(
+  `^range-(\\d{4})-(\\d{2})-(\\d{2})_(\\d{4})-(\\d{2})-(\\d{2})(?:--(${SCOPE_SET}))?\\.md$`,
+);
 
 function makeLocalDate(y: number, m: number, d: number): Date | null {
   // Validate by round-tripping through the Date constructor — out-of-range
@@ -125,10 +130,14 @@ export function parseSummaryFilename(name: string): SummaryEntry | null {
 }
 
 /** Human label for a scope slug: `agenthud-3f2a1b` → `agenthud`. The
- * hash is only there to keep two same-named projects apart. */
+ * hash is only there to keep two same-named projects apart. A joined
+ * multi-scope slug (`a-1b2c3d+b-4e5f6a`) becomes `a + b`. */
 export function scopeLabelFromSlug(slug: string): string {
-  const withoutHash = slug.replace(/-[0-9a-f]{6}$/, "");
-  return withoutHash || slug;
+  return slug
+    .split("+")
+    .map((part) => part.replace(/-[0-9a-f]{6}$/, "") || part)
+    .filter(Boolean)
+    .join(" + ");
 }
 
 // ─── listSummaries ───────────────────────────────────────────────────────────

@@ -243,6 +243,35 @@ describe("web server", () => {
     expect(payload.activities[0].time).toMatch(/^\d{2}:\d{2}:\d{2}$/);
   });
 
+  it("accepts a workspace whitelist (repeated ?scope= or comma form)", async () => {
+    const enc = encodeURIComponent;
+    const both = await api(
+      `/api/report?date=${DAY}&scope=${enc(CWD)}&scope=${enc(OTHER_CWD)}`,
+    );
+    const bothText = ((await both.json()) as { content: string }).content;
+    expect(bothText).toContain("## demo");
+    expect(bothText).toContain("## other");
+
+    const comma = await api(
+      `/api/report?date=${DAY}&scope=${enc(CWD)},${enc(OTHER_CWD)}`,
+    );
+    const commaBody = (await comma.json()) as {
+      content: string;
+      scopes: string[];
+    };
+    expect(commaBody.scopes).toHaveLength(2);
+    expect(commaBody.content).toContain("## other");
+  });
+
+  it("returns only the whitelisted project for a single-scope request", async () => {
+    const one = await api(
+      `/api/report?date=${DAY}&scope=${encodeURIComponent(OTHER_CWD)}`,
+    );
+    const text = ((await one.json()) as { content: string }).content;
+    expect(text).toContain("## other");
+    expect(text).not.toContain("## demo");
+  });
+
   it("serves activities by id alone (the path is the server's own)", async () => {
     const res = await api(`/api/activity?id=${encodeURIComponent(SESSION_ID)}`);
     expect(res.status).toBe(200);
@@ -281,7 +310,10 @@ describe("web server", () => {
     const res = await api("/api/summary", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ date: "2023-11-14", scope: join("X:", "nope") }),
+      body: JSON.stringify({
+        date: "2023-11-14",
+        scopes: [join("X:", "nope")],
+      }),
     });
     expect(res.status).toBe(400);
     expect((await res.json()).error).toContain("no project");

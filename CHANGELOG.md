@@ -30,19 +30,25 @@
   (#201, #204, #205).
 
 ### Added
-- **`agenthud web`** — a browser UI over the same tree and activity data:
-  project → session → sub-agent tree with live/status badges and context %,
-  per-session activity with expandable tool output, a Report tab, and a
-  Summary tab that generates a digest through the same engine path as the CLI.
-  It is one self-contained HTML file (`src/server/web-ui.html`, no framework,
-  no CDN, works offline) served by `node:http`, **loopback-only**, with a
-  `Host`-header check (DNS-rebinding guard) and a per-run token that every
-  `/api/*` call must present. Session-file paths in activity requests are
-  validated against current discovery, so the endpoint can't be used to read
-  arbitrary files. `--port`, `--open`, `--cwd`, `--project`.
+- **`agenthud web`** — a browser UI over the same tree and activity data,
+  **in Chinese**. It is organized around what you can act on: the
+  **工作区白名单** (one checkbox per project, with `全选` / `清空` / `仅活跃`)
+  sits at the top and drives the tree, the report and the summary; everything
+  read-only is collapsed by default (a project folds, non-active sessions hide
+  behind `展开 N 个冷会话`, tool bodies open on click, previous summaries live
+  under a `<details>`). Three tabs: 活动 / 报告 / 摘要, the last one generating a
+  digest through the same engine path as the CLI. One self-contained HTML file
+  (`src/server/web-ui.html`, no framework, no CDN, works offline) served by
+  `node:http`, **loopback-only**, with a `Host`-header check (DNS-rebinding
+  guard) and a per-run token that every `/api/*` call must present. Session-file
+  paths in activity requests are validated against current discovery, so the
+  endpoint can't be used to read arbitrary files. `--port`, `--open`, `--cwd`,
+  repeated `--project`.
 - **Workspace-scoped report & summary** — `--cwd` (this directory's project)
-  and `--project <path|name>` on `report` and `summary` restrict the run to one
-  workspace, so a multi-project day no longer drowns one project's digest.
+  and a REPEATABLE `--project <path|name>` on `report` and `summary` restrict
+  the run to a whitelist of workspaces (`--project a --project b`), so a
+  multi-project day no longer drowns one project's digest and related projects
+  can be summarized together.
   Resolution is provider-neutral (it walks the *discovered* projects, so Kiro
   and DSH workspaces work), `--cwd` picks the deepest containing project, and
   an ambiguous `--project web` errors with the candidate paths instead of

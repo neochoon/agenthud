@@ -90,7 +90,12 @@ import {
   type ToolUseResult,
 } from "../toolDetails.js";
 import { canonicalToolLabel, iconForCanonicalLabel } from "./toolLabels.js";
-import type { DiscoverOptions, ParseResult, SessionProvider } from "./types.js";
+import {
+  type DiscoverOptions,
+  type ParseResult,
+  projectInScope,
+  type SessionProvider,
+} from "./types.js";
 
 // --- paths -----------------------------------------------------------------
 
@@ -675,8 +680,7 @@ function discoverDshSessions(
     const head = readDshSessionHead(file.filePath, file.size);
     if (!head) continue;
     if (!head.cwd) continue; // no directory to group under
-    if (options?.scopeToProject && head.cwd !== options.scopeToProject)
-      continue;
+    if (!projectInScope(head.cwd, options)) continue;
     parsed.push({
       head,
       filePath: file.filePath,

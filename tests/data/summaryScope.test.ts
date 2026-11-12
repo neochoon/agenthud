@@ -31,21 +31,21 @@ describe("scoped cache filenames", () => {
   });
 
   it("adds the scope slug for a scoped digest", () => {
-    const scoped = dailySummaryPath(DAY, PROJECT);
+    const scoped = dailySummaryPath(DAY, [PROJECT]);
     expect(scoped).toContain(`2026-11-12--${scopeSlugFor(PROJECT)}.md`);
     expect(scoped).not.toBe(dailySummaryPath(DAY));
   });
 
   it("scopes range digests the same way", () => {
-    const scoped = rangeSummaryPath(DAY, DAY, PROJECT);
+    const scoped = rangeSummaryPath(DAY, DAY, [PROJECT]);
     expect(scoped).toContain(
       `range-2026-11-12_2026-11-12--${scopeSlugFor(PROJECT)}.md`,
     );
   });
 
   it("gives two same-named projects different files", () => {
-    const a = dailySummaryPath(DAY, join("C:", "one", "web"));
-    const b = dailySummaryPath(DAY, join("C:", "two", "web"));
+    const a = dailySummaryPath(DAY, [join("C:", "one", "web")]);
+    const b = dailySummaryPath(DAY, [join("C:", "two", "web")]);
     expect(a).not.toBe(b);
   });
 });
@@ -116,5 +116,43 @@ describe("scoped titles and index rows", () => {
     expect(md.indexOf("2026-11-12.md")).toBeLessThan(
       md.indexOf("2026-11-12--agenthud-3f2a1b.md"),
     );
+  });
+});
+
+describe("multi-workspace scope sets", () => {
+  const OTHER = join("C:", "file", "desktop_pet");
+
+  it("joins slugs with + and is order-independent", () => {
+    const a = dailySummaryPath(DAY, [PROJECT, OTHER]);
+    const b = dailySummaryPath(DAY, [OTHER, PROJECT]);
+    expect(a).toBe(b);
+    expect(a).toContain(`--${scopeSlugFor(PROJECT)}+${scopeSlugFor(OTHER)}.md`);
+  });
+
+  it("dedupes repeated paths", () => {
+    expect(dailySummaryPath(DAY, [PROJECT, PROJECT])).toBe(
+      dailySummaryPath(DAY, [PROJECT]),
+    );
+  });
+
+  it("parses a joined scope and labels it", () => {
+    const entry = parseSummaryFilename(
+      `2026-11-12--${scopeSlugFor(PROJECT)}+${scopeSlugFor(OTHER)}.md`,
+    );
+    expect(entry?.scope).toContain("+");
+    if (!entry) throw new Error("fixture");
+    expect(scopeLabelFromSlug(entry.scope as string)).toBe(
+      "agenthud + desktop-pet",
+    );
+  });
+
+  it("puts the label in the title and index row", () => {
+    const entry = parseSummaryFilename(
+      `2026-11-12--${scopeSlugFor(PROJECT)}+${scopeSlugFor(OTHER)}.md`,
+    );
+    if (!entry) throw new Error("fixture");
+    expect(buildTitleLine(entry)).toContain("· agenthud + desktop-pet");
+    const md = buildIndexMarkdown([entry]);
+    expect(md).toContain("· agenthud + desktop-pet");
   });
 });

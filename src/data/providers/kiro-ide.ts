@@ -63,7 +63,13 @@ import type {
 import { ICONS } from "../../types/index.js";
 import { ONE_HOUR_MS, THIRTY_MINUTES_MS } from "../../utils/timeConstants.js";
 import { pickLatestUserTitle } from "./sessionTitle.js";
-import type { ParseContext, ParseResult, SessionProvider } from "./types.js";
+import {
+  type DiscoverOptions,
+  type ParseContext,
+  type ParseResult,
+  projectInScope,
+  type SessionProvider,
+} from "./types.js";
 
 export function getKiroIdeSessionsDir(): string {
   if (process.env.KIRO_IDE_SESSIONS_DIR) {
@@ -383,7 +389,10 @@ function buildSubAgentsBySession(
   return out;
 }
 
-function discoverKiroIdeSessions(config: GlobalConfig): SessionTree {
+function discoverKiroIdeSessions(
+  config: GlobalConfig,
+  options?: DiscoverOptions,
+): SessionTree {
   const root = getKiroIdeSessionsDir();
   const empty: SessionTree = {
     projects: [],
@@ -436,6 +445,7 @@ function discoverKiroIdeSessions(config: GlobalConfig): SessionTree {
       const file = readSessionFile(jsonPath);
       const workspace = meta.workspaceDirectory ?? file?.workspaceDirectory;
       if (!workspace) continue;
+      if (!projectInScope(workspace, options)) continue;
       const projectName = basename(workspace);
       const projectHidden = config.hiddenProjects.includes(projectName);
       const sessionHidden = config.hiddenSessions.includes(

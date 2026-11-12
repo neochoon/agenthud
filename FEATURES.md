@@ -133,16 +133,17 @@ humans, JSON for scripts.
 | `--detail-limit N` | `120` | Max chars per activity detail; `0` = unlimited |
 | `--with-git` | off | Merge git commits from each session's project path into the timeline |
 | `--cwd` | off | Only the project containing the current directory |
-| `--project PATH\|NAME` | off | Only that project (an absolute path, or a project name unique among discovered projects) |
+| `--project PATH\|NAME` | off | Repeatable. Whitelist of workspaces (absolute paths, or project names unique among discovered projects) |
 
-**Workspace scope:** `--cwd` / `--project` restrict the report to one
-project. Resolution walks the *discovered* projects (any provider), not
-`~/.claude/projects/` directory names, so a Kiro or DSH workspace scopes
-correctly; `--cwd` picks the deepest project containing the working
-directory. An unknown value exits 1 with the list of known projects, and
-an ambiguous `--project web` (two projects with that name) refuses to
-guess and asks for a path. The resolved scope is echoed as
-`scope = <path>` on stderr.
+**Workspace scope:** `--cwd` / `--project` restrict the report to a
+whitelist of projects — pass `--project` more than once to work across
+several at once (`--project agenthud --project desktop_pet`). Resolution
+walks the *discovered* projects (any provider), not `~/.claude/projects/`
+directory names, so a Kiro or DSH workspace scopes correctly; `--cwd`
+picks the deepest project containing the working directory. An unknown
+value exits 1 with the list of known projects, and an ambiguous
+`--project web` (two projects with that name) refuses to guess and asks
+for a path. The resolved whitelist is echoed as `scope = a, b` on stderr.
 
 **Include types:** `user`, `response`, `bash`, `edit`, `thinking`,
 `task`, `read`, `glob`, `commit`. Unknown values error (v0.9.4
@@ -191,16 +192,19 @@ engine**: Claude / Codex / Kiro — see `--engine` below).
 | `-o, --open` | off | Open the produced summary in OS default app |
 | `-I, --open-index` | off | Open `~/.agenthud/summaries/index.md` |
 | `--cwd` | off | Summarize only the project containing the current directory |
-| `--project PATH\|NAME` | off | Summarize only that project (see [Report](#report) for resolution rules) |
+| `--project PATH\|NAME` | off | Repeatable. Whitelist of workspaces (see [Report](#report)) |
 
-**Workspace scope:** a scoped summary covers one project and is cached
-SEPARATELY — `~/.agenthud/summaries/YYYY-MM-DD--<project>-<hash>.md` —
-so it never overwrites the whole-day digest for the same date, and the
+**Workspace scope:** a scoped summary covers the whitelisted projects
+and is cached SEPARATELY —
+`~/.agenthud/summaries/YYYY-MM-DD--<project>-<hash>[+<project>-<hash>].md`
+— so it never overwrites the whole-day digest for the same date, and the
 index lists both (`2026-11-12 (Thu)` and
-`2026-11-12 (Thu) · agenthud`). The backlink prev/next chain stays
-within one scope, so paging through days never jumps between projects.
-`scopeToProject` is applied at discovery, which means the payload, the
-empty-day check and `--with-git` all see only that workspace.
+`2026-11-12 (Thu) · agenthud + desktop-pet`). The suffix is sorted, so
+the same project set in any order shares one cache file. The backlink
+prev/next chain stays within one scope set, so paging through days never
+jumps between scopes. `scopeToProjects` is applied at discovery, which
+means the payload, the empty-day check and `--with-git` all see only
+those workspaces.
 
 **Behavior:**
 - Builds the markdown payload via `generateReport`. If the day has
@@ -404,13 +408,14 @@ interval (default 2s, `refreshIntervalMs` in config). Broken pipe
 
 The same tree and activity viewer as the TUI, in a browser, plus the
 report and summary controls — for people who would rather click than
-memorize keys.
+memorize keys. **The interface is in Chinese.**
 
 **Invocation:** `agenthud web [--port N] [--open] [--cwd | --project …]`
 
 ```bash
 agenthud web                # http://127.0.0.1:7787/?token=…
 agenthud web --port 9000 -o # different port, open the browser
+agenthud web --project a --project b   # start on a workspace whitelist
 agenthud web --cwd          # start scoped to this directory's project
 ```
 
@@ -419,15 +424,24 @@ agenthud web --cwd          # start scoped to this directory's project
 | `--port N`, `-p N` | `7787` | Port to listen on; `0` picks a free one |
 | `-o, --open` | off | Open the URL in the default browser |
 | `--cwd` | off | Start scoped to the current directory's project |
-| `--project PATH\|NAME` | off | Start scoped to that project |
+| `--project PATH\|NAME` | off | Repeatable. Start on that project whitelist |
 
-**What it shows:** project → session → sub-agent tree with live/status
-badges, context-window %, provider tag and model; the selected session's
-full activity list with expandable tool bodies (Bash output, Read with a
-dimmed line-number gutter, Edit as a colored diff); a Report tab
-(markdown for the chosen date and scope); and a Summary tab that
-generates a digest through the same engine path as the CLI and lists
-previous summaries.
+**Layout, and why** — the page is organized around what you can *act on*:
+
+- **工作区白名单** (top, always open, the primary control): one checkbox
+  per discovered project with its session / active counts, plus
+  `全选` / `清空` / `仅活跃`. The selection drives the tree, the report
+  and the summary; **no selection = every workspace**. It persists in
+  `localStorage`, and the URL/`--project` whitelist seeds it on first load.
+- **会话 tree** (left): only projects in the whitelist; each project
+  collapses, and non-active (cool/cold) sessions are hidden behind
+  `展开 N 个冷会话` — the rows you can act on come first.
+- **活动 / 报告 / 摘要** (right, three tabs): the selected session's
+  activity with click-to-expand tool bodies (Bash output, Read with a
+  dimmed line-number gutter, Edit as a colored diff); the markdown report
+  for the chosen date + whitelist; and a summary pane whose
+  `生成摘要` button POSTs to the server and renders the result, with the
+  previous summaries collapsed under a `<details>` you open on demand.
 
 **Behavior:**
 - **Loopback only.** Refuses to bind anything but `127.0.0.1`, and
@@ -438,9 +452,9 @@ previous summaries.
   local process, or a stray tab, cannot drive the API without it.
 - The tree polls every 3s using the same discovery the TUI uses, so a
   session that appears in one appears in the other.
-- `GET /api/activity?path=` is validated against the *currently
-  discovered* session files, so the endpoint can't be turned into an
-  arbitrary file reader.
+- `GET /api/activity` resolves the file from the server's own discovery;
+  a client-supplied `path` is only checked for consistency, so the
+  endpoint can't be turned into an arbitrary file reader.
 - The summary button POSTs to `/api/summary` and returns the markdown
   from the cache file; the server calls the runner with `quiet: true`,
   so nothing is sprayed into its own stdout. Expect 30–90s.

@@ -27,6 +27,7 @@ import type {
   GlobalConfig,
   SessionTree,
 } from "../../types/index.js";
+import { normalizeProjectPath } from "../scope.js";
 
 export type ProviderName =
   | "claude"
@@ -37,10 +38,26 @@ export type ProviderName =
   | "dsh";
 
 export interface DiscoverOptions {
-  // When set, drop every project whose decoded path is not exactly this
-  // string. Caller is responsible for resolving symlinks and choosing
-  // the matching project (see findContainingProject).
-  scopeToProject?: string;
+  // Whitelist of absolute project paths. When set and non-empty, every
+  // project whose decoded path is NOT in the list is dropped. The caller
+  // resolves names/paths to concrete project paths first (see
+  // data/scope.ts) — providers never see user input.
+  scopeToProjects?: string[];
+}
+
+/** True when `candidate` survives the scope whitelist. Shared so every
+ * provider applies the same separator/case rules instead of each
+ * re-implementing a string comparison (Windows and macOS compare
+ * case-insensitively, matching their filesystems). */
+export function projectInScope(
+  candidate: string,
+  options?: DiscoverOptions,
+): boolean {
+  const list = options?.scopeToProjects;
+  if (!list || list.length === 0) return true;
+  return list.some(
+    (p) => normalizeProjectPath(p) === normalizeProjectPath(candidate),
+  );
 }
 
 export interface ParseResult {

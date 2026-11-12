@@ -43,7 +43,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_INCLUDE_TYPES } from "../config/globalConfig.js";
 import { generateReport } from "../data/reportGenerator.js";
-import { projectRefsFromTree, resolveScope } from "../data/scope.js";
+import { projectRefsFromTree, resolveScopes } from "../data/scope.js";
 import { parseSessionHistory } from "../data/sessionHistory.js";
 import { discoverSessions } from "../data/sessions.js";
 import {
@@ -95,7 +95,7 @@ export interface TreePayload {
   hidden: { total: number; active: number };
   /** Set when the server was started with a scope (`agenthud web --cwd`),
    * so the UI can preselect it in its project selector. */
-  initialScope?: string;
+  initialScopes?: string[];
   projects: ProjectPayload[];
 }
 
@@ -145,7 +145,7 @@ export function sessionPayload(node: SessionNode): SessionPayload {
 export function buildTreePayload(
   tree: SessionTree,
   now = Date.now(),
-  initialScope?: string,
+  initialScopes?: string[],
 ): TreePayload {
   const project = (p: SessionTree["projects"][number]): ProjectPayload => ({
     name: p.name,
@@ -158,7 +158,7 @@ export function buildTreePayload(
     generatedAt: now,
     totalCount: tree.totalCount,
     hidden: { total: tree.hiddenStats.total, active: tree.hiddenStats.active },
-    ...(initialScope ? { initialScope } : {}),
+    ...(initialScopes?.length ? { initialScopes } : {}),
     projects: [...tree.projects, ...tree.coldProjects].map(project),
   };
 }
@@ -227,7 +227,7 @@ export interface WebServerOptions {
   host?: string; // default 127.0.0.1 (loopback only)
   openBrowser?: boolean;
   /** Initial scope, so `agenthud web --cwd` opens on that project. */
-  scopeToProject?: string;
+  scopeToProjects?: string[];
 }
 
 export interface WebServerHandle {
@@ -387,7 +387,7 @@ export async function startWebServer(
       sendJson(
         res,
         200,
-        buildTreePayload(discover(), Date.now(), opts.scopeToProject),
+        buildTreePayload(discover(), Date.now(), opts.scopeToProjects),
       );
       return;
     }
@@ -415,17 +415,23 @@ export async function startWebServer(
 
     if (req.method === "GET" && url.pathname === "/api/report") {
       const date = parseDate(url.searchParams.get("date"));
-      // `?scope=` ABSENT → the server's initial scope (`agenthud web --cwd`);
-      // present-but-empty → every project, which is what the UI's
-      // "All projects" option sends. Conflating the two would make the
-      // selector unable to widen back out.
-      const scopeParam = url.searchParams.get("scope");
-      const scope =
-        scopeParam === null ? (opts.scopeToProject ?? "") : scopeParam;
+      // `?scope=` ABSENT → the server's initial whitelist
+      // (`agenthud web --cwd`); present-but-empty (`?scope=`) → every
+      // project, which is what the UI's "全部工作区" sends. Conflating the
+      // two would make the picker unable to widen back out.
+      const scopeParams = url.searchParams.getAll("scope");
+      const resolvedParams = scopeParams
+        .flatMap((s) => s.split(","))
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const scopeList =
+        scopeParams.length === 0
+          ? (opts.scopeToProjects ?? [])
+          : resolvedParams;
       const format =
         url.searchParams.get("format") === "json" ? "json" : "markdown";
-      const tree = scope
-        ? discoverSessions(config, { scopeToProject: scope })
+      const tree = scopeList.length
+        ? discoverSessions(config, { scopeToProjects: scopeList })
         : discover();
       const flat = [
         ...tree.projects.flatMap((p) => p.sessions),
@@ -440,7 +446,7 @@ export async function startWebServer(
       });
       sendJson(res, 200, {
         date: url.searchParams.get("date") ?? "",
-        scope,
+        scopes: scopeList,
         format,
         content,
       });
@@ -488,7 +494,8 @@ export async function startWebServer(
     if (req.method === "POST" && url.pathname === "/api/summary") {
       let body: {
         date?: string;
-        scope?: string;
+        /** Whitelist of project paths (the workspace picker). */
+        scopes?: string[];
         engine?: string;
         model?: string;
         force?: boolean;
@@ -501,21 +508,30 @@ export async function startWebServer(
       }
 
       const date = parseDate(body.date ?? null);
-      const scope = (body.scope ?? "").trim();
-      if (scope) {
-        const resolved = resolveScope(
-          { kind: "ref", value: scope },
+      const wanted = Array.isArray(body.scopes)
+        ? body.scopes.filter((s) => typeof s === "string" && s.trim())
+        : [];
+      // Validate the whitelist against what actually exists, and use the
+      // canonical paths (not the client's strings) from here on.
+      let scopeList: string[] = [];
+      if (wanted.length > 0) {
+        const resolved = resolveScopes(
+          wanted.map((value) => ({ kind: "ref" as const, value })),
           projectRefsFromTree(discover()),
         );
         if (!resolved.ok) {
           sendJson(res, 400, { ok: false, error: resolved.error });
           return;
         }
+        scopeList = resolved.projectPaths;
       }
 
       // Cache provenance: a past day with an unchanged cache file means
       // the runner served the cached text instead of calling the engine.
-      const cachePath = dailySummaryPath(date, scope || undefined);
+      const cachePath = dailySummaryPath(
+        date,
+        scopeList.length ? scopeList : undefined,
+      );
       const mtimeBefore = existsSync(cachePath)
         ? statSync(cachePath).mtimeMs
         : 0;
@@ -533,7 +549,7 @@ export async function startWebServer(
         detailLimit:
           config.summary.detailLimit ?? config.report.detailLimit ?? 120,
         withGit: config.summary.withGit ?? config.report.withGit ?? false,
-        scopeToProject: scope || undefined,
+        scopeToProjects: scopeList.length ? scopeList : undefined,
         open: false,
         openIndex: false,
         quiet: true,

@@ -733,7 +733,7 @@ describe("dshProvider.discoverSessions", () => {
     writeSession("b", "s-b", jsonl([sessionHead({ id: "s-b", cwd: drop })]));
 
     const tree = dshProvider.discoverSessions(mockConfig, {
-      scopeToProject: keep,
+      scopeToProjects: [keep],
     });
     expect(tree.projects).toHaveLength(1);
     expect(tree.projects[0].projectPath).toBe(keep);

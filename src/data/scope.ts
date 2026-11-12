@@ -92,6 +92,19 @@ export function scopeSlugFor(projectPath: string): string {
   return `${safeName}-${hash}`;
 }
 
+/**
+ * Cache-filename suffix for a scope SET: `--a-1b2c3d+b-4e5f6a`.
+ *
+ * Sorted, so `--project a --project b` and `--project b --project a`
+ * share one cache file — the digest covers the same projects either
+ * way. Empty for an unscoped run (the whole-day digest).
+ */
+export function scopeSuffixFor(projectPaths?: string[]): string {
+  if (!projectPaths || projectPaths.length === 0) return "";
+  const slugs = [...new Set(projectPaths.map(scopeSlugFor))].sort();
+  return `--${slugs.join("+")}`;
+}
+
 function candidates(projects: ProjectRef[]): string {
   const list = projects
     .map((p) => `  ${p.name}  ${p.projectPath}`)
@@ -108,6 +121,43 @@ function candidates(projects: ProjectRef[]): string {
  * no sessions yet.
  */
 export function resolveScope(
+  request: ScopeRequest,
+  projects: ProjectRef[],
+): ScopeResult {
+  return resolveOne(request, projects);
+}
+
+/**
+ * Resolve several scope requests into one deduped whitelist. Errors from
+ * any single entry abort the whole set (a silently-dropped project would
+ * make a digest look complete when it isn't).
+ */
+export function resolveScopes(
+  requests: ScopeRequest[],
+  projects: ProjectRef[],
+):
+  | { ok: true; projectPaths: string[]; names: string[] }
+  | { ok: false; error: string } {
+  const paths: string[] = [];
+  const names: string[] = [];
+  for (const request of requests) {
+    const result = resolveOne(request, projects);
+    if (!result.ok) return result;
+    if (
+      paths.some(
+        (p) =>
+          normalizeProjectPath(p) === normalizeProjectPath(result.projectPath),
+      )
+    ) {
+      continue;
+    }
+    paths.push(result.projectPath);
+    names.push(result.projectName);
+  }
+  return { ok: true, projectPaths: paths, names };
+}
+
+function resolveOne(
   request: ScopeRequest,
   projects: ProjectRef[],
 ): ScopeResult {

@@ -38,7 +38,7 @@ import {
 } from "./cli.js";
 import { loadGlobalConfig } from "./config/globalConfig.js";
 import { generateReport } from "./data/reportGenerator.js";
-import { projectRefsFromTree, resolveScope } from "./data/scope.js";
+import { projectRefsFromTree, resolveScopes } from "./data/scope.js";
 import {
   decodeProjectPath,
   discoverSessions,
@@ -93,29 +93,28 @@ function flushStdout(): Promise<void> {
 }
 
 /**
- * Turn `--cwd` / `--project` into a concrete project path, or exit with
- * the resolver's (actionable) error. Resolving against the DISCOVERED
- * projects keeps this provider-neutral: a DSH or Kiro project has no
- * encoded Claude directory to walk.
+ * Turn `--cwd` / repeated `--project` values into a concrete whitelist of
+ * project paths, or exit with the resolver's (actionable) error.
+ * Resolving against the DISCOVERED projects keeps this provider-neutral:
+ * a DSH or Kiro project has no encoded Claude directory to walk.
  */
 function resolveScopeOrExit(opts: {
   cwd?: boolean;
-  project?: string;
-}): string | undefined {
-  if (!opts.cwd && !opts.project) return undefined;
+  projects?: string[];
+}): string[] | undefined {
+  const wanted = opts.projects ?? [];
+  if (!opts.cwd && wanted.length === 0) return undefined;
   const refs = projectRefsFromTree(discoverSessions(globalConfig));
-  const result = resolveScope(
-    opts.project
-      ? { kind: "ref", value: opts.project }
-      : { kind: "cwd", cwd: process.cwd() },
-    refs,
-  );
+  const requests = opts.cwd
+    ? [{ kind: "cwd" as const, cwd: process.cwd() }]
+    : wanted.map((value) => ({ kind: "ref" as const, value }));
+  const result = resolveScopes(requests, refs);
   if (!result.ok) {
     process.stderr.write(`agenthud: ${result.error}\n`);
     process.exit(1);
   }
-  process.stderr.write(`scope = ${result.projectPath}\n`);
-  return result.projectPath;
+  process.stderr.write(`scope = ${result.projectPaths.join(", ")}\n`);
+  return result.projectPaths;
 }
 
 if (options.error) {
@@ -173,11 +172,11 @@ if (options.mode === "report") {
   );
   const scope = resolveScopeOrExit({
     cwd: options.scopeToCwd,
-    project: options.scopeProject,
+    projects: options.scopeProjects,
   });
   const tree = discoverSessions(
     globalConfig,
-    scope ? { scopeToProject: scope } : undefined,
+    scope ? { scopeToProjects: scope } : undefined,
   );
   const flatSessions = [
     ...tree.projects.flatMap((p) => p.sessions),
@@ -219,7 +218,7 @@ if (options.mode === "summary") {
   const today = new Date();
   const scope = resolveScopeOrExit({
     cwd: options.scopeToCwd,
-    project: options.scopeProject,
+    projects: options.scopeProjects,
   });
   if (options.summaryFrom && options.summaryTo) {
     const exitCode = await runRangeSummary({
@@ -236,7 +235,7 @@ if (options.mode === "summary") {
       withGit: options.summaryWithGit!,
       open: options.summaryOpen,
       openIndex: options.summaryOpenIndex,
-      scopeToProject: scope,
+      scopeToProjects: scope,
     });
     await flushStdout();
     process.exit(exitCode);
@@ -254,7 +253,7 @@ if (options.mode === "summary") {
     withGit: options.summaryWithGit!,
     open: options.summaryOpen,
     openIndex: options.summaryOpenIndex,
-    scopeToProject: scope,
+    scopeToProjects: scope,
   });
   await flushStdout();
   process.exit(exitCode);
@@ -267,7 +266,7 @@ if (options.mode === "web") {
   }
   const scope = resolveScopeOrExit({
     cwd: options.webScopeToCwd,
-    project: options.webScopeProject,
+    projects: options.webScopeProjects,
   });
   const { startWebServer } = await import("./server/webServer.js");
   let handle: Awaited<ReturnType<typeof startWebServer>>;
@@ -276,7 +275,7 @@ if (options.mode === "web") {
       config: globalConfig,
       port: options.webPort,
       openBrowser: options.webOpen,
-      scopeToProject: scope,
+      scopeToProjects: scope,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

@@ -732,14 +732,25 @@ describe("workspace scope flags (report / summary)", () => {
     const opts = parseArgs(["report", "--cwd"]);
     expect(opts.mode).toBe("report");
     expect(opts.scopeToCwd).toBe(true);
-    expect(opts.scopeProject).toBeUndefined();
+    expect(opts.scopeProjects).toEqual([]);
   });
 
   it("report --project carries the value through", () => {
     const opts = parseArgs(["report", "--project", "agenthud"]);
     expect(opts.mode).toBe("report");
-    expect(opts.scopeProject).toBe("agenthud");
+    expect(opts.scopeProjects).toEqual(["agenthud"]);
     expect(opts.scopeToCwd).toBeUndefined();
+  });
+
+  it("--project is repeatable (a whitelist of workspaces)", () => {
+    const opts = parseArgs([
+      "report",
+      "--project",
+      "agenthud",
+      "--project",
+      "desktop_pet",
+    ]);
+    expect(opts.scopeProjects).toEqual(["agenthud", "desktop_pet"]);
   });
 
   it("report rejects --project without a value", () => {
@@ -756,9 +767,14 @@ describe("workspace scope flags (report / summary)", () => {
   it("summary --cwd and --project parse like report", () => {
     expect(parseArgs(["summary", "--cwd"]).scopeToCwd).toBe(true);
     expect(
-      parseArgs(["summary", "--project", "C:\\file\\sometime\\agenthud"])
-        .scopeProject,
-    ).toBe("C:\\file\\sometime\\agenthud");
+      parseArgs([
+        "summary",
+        "--project",
+        "C:\\file\\sometime\\agenthud",
+        "--project",
+        "web",
+      ]).scopeProjects,
+    ).toEqual(["C:\\file\\sometime\\agenthud", "web"]);
   });
 
   it("summary still rejects unknown flags", () => {
@@ -787,9 +803,10 @@ describe("web subcommand", () => {
   it("parses --open and the scope flags", () => {
     expect(parseArgs(["web", "--open"]).webOpen).toBe(true);
     expect(parseArgs(["web", "--cwd"]).webScopeToCwd).toBe(true);
-    expect(parseArgs(["web", "--project", "agenthud"]).webScopeProject).toBe(
-      "agenthud",
-    );
+    expect(
+      parseArgs(["web", "--project", "agenthud", "--project", "web"])
+        .webScopeProjects,
+    ).toEqual(["agenthud", "web"]);
   });
 
   it("rejects --cwd with --project", () => {

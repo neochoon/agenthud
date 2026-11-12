@@ -1467,7 +1467,7 @@ describe("findContainingProject", () => {
   });
 });
 
-describe("discoverSessions with scopeToProject", () => {
+describe("discoverSessions with scopeToProjects", () => {
   const projectsDir = join(
     process.env.HOME ?? "/home/user",
     ".claude",
@@ -1517,24 +1517,24 @@ describe("discoverSessions with scopeToProject", () => {
   it("returns only the scoped project, dropping the others", () => {
     wireMocksForTwoProjects();
     const tree = discoverSessions(mockConfig, {
-      scopeToProject: "/Users/me/target",
+      scopeToProjects: ["/Users/me/target"],
     });
     const all = [...tree.projects, ...tree.coldProjects];
     expect(all).toHaveLength(1);
     expect(all[0].projectPath).toBe("/Users/me/target");
   });
 
-  it("returns an empty tree when scopeToProject matches no registered project", () => {
+  it("returns an empty tree when the scope whitelist matches no registered project", () => {
     wireMocksForTwoProjects();
     const tree = discoverSessions(mockConfig, {
-      scopeToProject: "/Users/me/nothing-here",
+      scopeToProjects: ["/Users/me/nothing-here"],
     });
     expect(tree.projects).toHaveLength(0);
     expect(tree.coldProjects).toHaveLength(0);
     expect(tree.totalCount).toBe(0);
   });
 
-  it("keeps the unfiltered behaviour when scopeToProject is omitted", () => {
+  it("keeps the unfiltered behaviour when the scope whitelist is omitted", () => {
     wireMocksForTwoProjects();
     const tree = discoverSessions(mockConfig);
     const all = [...tree.projects, ...tree.coldProjects];

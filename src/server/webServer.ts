@@ -56,6 +56,7 @@ import {
   runRangeSummary,
   runSummary,
 } from "../data/summaryRunner.js";
+import { resolveStyleReference } from "../data/summaryStyle.js";
 import type {
   ActivityEntry,
   GlobalConfig,
@@ -536,6 +537,26 @@ export async function startWebServer(
       return;
     }
 
+    // Which style reference the next summary run would use. Read-only and
+    // cheap: the UI shows it beside the toggle, so "my style file is
+    // actually being picked up" is verifiable without generating anything.
+    if (req.method === "GET" && url.pathname === "/api/style") {
+      const style = resolveStyleReference({
+        path:
+          typeof config.summary.style === "string"
+            ? config.summary.style
+            : undefined,
+        disabled: config.summary.style === false,
+      });
+      sendJson(res, 200, {
+        path: style.path,
+        chars: style.text ? style.text.length : 0,
+        truncated: style.truncated,
+        error: style.error ?? "",
+      });
+      return;
+    }
+
     if (req.method === "GET" && url.pathname === "/api/summaries") {
       const dir = join(agenthudHome(), "summaries");
       const entries = listSummaries(dir).map((e) => ({
@@ -585,6 +606,9 @@ export async function startWebServer(
         engine?: string;
         model?: string;
         force?: boolean;
+        /** Style reference: `false` = drop it (the UI checkbox), a string
+         * = an explicit file. Omitted = config / the default file. */
+        style?: boolean | string;
       };
       try {
         body = JSON.parse(await readBody(req)) as typeof body;
@@ -611,6 +635,15 @@ export async function startWebServer(
         scopeList = resolved.projectPaths;
       }
       const scopeArg = scopeList.length ? scopeList : undefined;
+
+      // Style reference from the UI: a boolean toggle (false = off) or an
+      // explicit path. `undefined` leaves the config/default in charge.
+      const styleOpts: { stylePath?: string; noStyle?: boolean } =
+        body.style === false
+          ? { noStyle: true }
+          : typeof body.style === "string" && body.style.trim()
+            ? { stylePath: body.style.trim() }
+            : {};
 
       // ---- range mode: per-day dailies + one synthesis ----------------
       if (body.from !== undefined || body.to !== undefined) {
@@ -646,6 +679,7 @@ export async function startWebServer(
           open: false,
           openIndex: false,
           quiet: true,
+          ...styleOpts,
         });
         if (code !== 0) {
           sendJson(res, 502, {
@@ -703,6 +737,7 @@ export async function startWebServer(
         open: false,
         openIndex: false,
         quiet: true,
+        ...styleOpts,
       });
       if (code !== 0) {
         sendJson(res, 502, {

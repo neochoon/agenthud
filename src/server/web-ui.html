@@ -44,6 +44,15 @@
   .mono { font-family: var(--mono); }
   .dim { color: var(--dim); }
   .tiny { font-size: 11px; }
+  /* Inline checkbox inside a toolbar: keeps the label on one row with the
+     selects instead of wrapping like the workspace cards do. */
+  .chk {
+    display: inline-flex; align-items: center; gap: 5px;
+    color: var(--dim); font-size: 12px; cursor: pointer;
+    user-select: none; white-space: nowrap;
+  }
+  .chk input { margin: 0; cursor: pointer; }
+  .chk.off { opacity: .55; }
 
   /* ---------- 顶部 ---------- */
   header {
@@ -888,6 +897,8 @@
       '<select id="engine">' +
       '<option value="auto">自动</option><option value="codex">codex</option>' +
       '<option value="claude">claude</option><option value="kiro">kiro</option></select>' +
+      '<label class="chk" for="useStyle" title="让摘要模仿 ~/.agenthud/summary-style.md 里的写法">' +
+      '<input type="checkbox" id="useStyle" checked> 参考我的表达风格</label>' +
       '<button class="primary" id="genBtn"></button>' +
       '<span class="dim tiny" id="genState"></span>';
     frag.appendChild(bar);
@@ -923,6 +934,30 @@
     hist.addEventListener("toggle", function () {
       if (hist.open) loadHistory();
     });
+
+    // Report which style file the run will actually use, so "已启用" is
+    // verifiable instead of assumed. No style file → dim the toggle.
+    var styleCb = bar.querySelector("#useStyle");
+    api("/api/style")
+      .then(function (s) {
+        var ok = s.path && s.chars > 0;
+        styleCb.checked = !!ok;
+        styleCb.closest(".chk").classList.toggle("off", !ok);
+        if (ok) {
+          var shown = s.path.replace(/\\/g, "/");
+          note.textContent +=
+            " · 风格参考 " + shown.split("/").pop() + "（" + s.chars + " 字" +
+            (s.truncated ? "，已截断" : "") + "）";
+          note.title = shown;
+        } else {
+          styleCb.disabled = true;
+          note.textContent += " · 未找到 summary-style.md，风格参考不可用";
+        }
+      })
+      .catch(function () {
+        // Style is an enhancement — a failed probe must not break the pane.
+        styleCb.checked = false;
+      });
   }
 
   function generateSummary() {
@@ -949,6 +984,11 @@
       scopes: state.scopes,
       engine: engineEl ? engineEl.value : "auto"
     };
+    // Only send the negative: omitting `style` lets config.yaml and the
+    // default ~/.agenthud/summary-style.md decide, which is what "checked"
+    // means. Unchecked is an explicit override.
+    var styleCb = els.paneSummary.querySelector("#useStyle");
+    if (styleCb && !styleCb.checked) payload.style = false;
     if (range.from === range.to) payload.date = range.from;
     else { payload.from = range.from; payload.to = range.to; }
 

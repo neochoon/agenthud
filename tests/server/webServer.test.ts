@@ -156,7 +156,7 @@ describe("web server", () => {
         ...(init ?? {}),
         headers: {
           "x-agenthud-token": handle.token,
-          ...((init && init.headers) ?? {}),
+          ...(init?.headers ?? {}),
         },
       });
   });
@@ -209,6 +209,35 @@ describe("web server", () => {
       req.end();
     });
     expect(status).toBe(403);
+  });
+
+  it("requires the token on /api/style too", async () => {
+    const res = await fetch(`http://127.0.0.1:${handle.port}/api/style`);
+    expect(res.status).toBe(401);
+  });
+
+  it("reports no style reference when the default file is absent", async () => {
+    const res = await api("/api/style");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      path: "",
+      chars: 0,
+      truncated: false,
+      error: "",
+    });
+  });
+
+  it("reports the default style file once it exists", async () => {
+    const stylePath = join(process.env.AGENTHUD_HOME!, "summary-style.md");
+    writeFileSync(stylePath, "省略主语，直接以动词开头。\n", "utf-8");
+    try {
+      const res = await api("/api/style");
+      const body = (await res.json()) as { path: string; chars: number };
+      expect(body.path).toBe(stylePath);
+      expect(body.chars).toBeGreaterThan(0);
+    } finally {
+      rmSync(stylePath, { force: true });
+    }
   });
 
   it("returns the tree with the discovered DSH project", async () => {

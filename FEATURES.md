@@ -186,6 +186,8 @@ engine**: Claude / Codex / Kiro — see `--engine` below).
 | `--date YYYY-MM-DD \| today \| yesterday \| -Nd` | `today` | Date to summarize |
 | `--engine NAME` | `auto` | Which agent CLI synthesizes the summary: `auto` (first installed of claude → codex → kiro), `claude`, `codex`, `kiro`. Also set via `summary.engine` in config. |
 | `--prompt TEXT` | (template file) | Override prompt inline (daily only) |
+| `--style PATH` | `~/.agenthud/summary-style.md` | Style-reference file to imitate. Also set via `summary.style` (a path, or `false` to disable) |
+| `--no-style` | off | Ignore the style reference for this run |
 | `--force` | off | Regenerate even if cached |
 | `--model NAME` | engine default | Forward to the engine's model flag (e.g. `sonnet`, `gpt-5`, full id) |
 | `-y, --yes` | off | Skip confirmation prompt |
@@ -218,13 +220,26 @@ those workspaces.
   (auto-created on first run from
   `src/templates/summary-prompt.md`); `--prompt` overrides for
   one run. The shipped template asks for **Simplified Chinese output**
-  with Chinese section headings (`背景` / `主要成果` / `技术洞察` /
-  `重要代码变更` / `待办`); edit the file to change the language or tone.
+  in a **weekly-report shape** — `### 工作内容`, project groups numbered
+  `1、` `2、`, items `（1）` `（2）` — and spells out the register rules
+  (omit the subject, 了-suffixed verbs, semicolon-chained parallel
+  actions, close on a state or judgement, state problems plainly).
+  Edit the file to change the language or shape.
+- A **style reference** is prepended to that prompt when the file
+  exists: `~/.agenthud/summary-style.md` by default, `--style <path>` for
+  a one-off, `--no-style` to drop it, `summary.style` in config to point
+  elsewhere or `false` to disable. A missing default file means "off" (no
+  error); an unreadable EXPLICIT path is an error. Capped at 8,000
+  characters, cut at a paragraph break. Feed it a distilled *profile* of
+  your writing, not an archive — tens of KB of real reports costs ~10K
+  input tokens per run and makes the model lift project names and
+  conclusions out of the samples.
 - The prompt is part of the cache key: the provenance marker records a
-  `prompt: <fingerprint>`, so editing the template regenerates instead of
-  serving text written under the old instructions. Files written before
-  that field existed are still reused as-is — add `--force` once to
-  re-render them.
+  `prompt: <fingerprint>`, so editing the template — or the style
+  reference, which is composed into it — regenerates instead of serving
+  text written under the old instructions. Files written before that
+  field existed are still reused as-is — add `--force` once to re-render
+  them.
 - Token usage line printed at the end (`N in / M out · cache: A
   read, B written · $X.XXXX`) — Claude engine only; Codex/Kiro
   omit it.
@@ -515,6 +530,9 @@ report:
   format: markdown
 
 # Defaults for `agenthud summary` (inherits from report.* when omitted)
+# engine: auto            # auto | claude | codex | kiro
+# model: sonnet           # forwarded to the engine's model flag
+# style: ~/.agenthud/summary-style.md   # or false to disable
 summary: {}
 ```
 
@@ -635,6 +653,7 @@ picked up, run `agenthud --once` (per-row provider tag) or
 | `~/.agenthud/state.yaml` | Hidden items (app-managed) |
 | `~/.agenthud/summary-prompt.md` | Daily summary prompt template (auto-copied on first run) |
 | `~/.agenthud/summary-range-prompt.md` | Range summary prompt template |
+| `~/.agenthud/summary-style.md` | Style reference the summary imitates (optional; absent = off) |
 | `~/.agenthud/summaries/` | Cached daily and range summaries (scoped ones: `DATE--<project>-<hash>.md`) |
 | `~/.agenthud/summaries/index.md` | Auto-generated navigable index |
 | `~/.claude/projects/` | Claude Code session JSONL files (read-only) |

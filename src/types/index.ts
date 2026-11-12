@@ -139,6 +139,10 @@ export interface SummaryConfig {
   /** Which agent CLI synthesizes the summary: claude / codex / kiro,
    * or "auto" (first on PATH, claude→codex→kiro). */
   engine?: string;
+  /** Style-reference file the summary prompt imitates. Defaults to
+   * `~/.agenthud/summary-style.md` when unset; `false` turns the
+   * feature off. See data/summaryStyle.ts. */
+  style?: string | false;
 }
 
 /** Token usage reported by a summary engine (only claude provides

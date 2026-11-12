@@ -61,6 +61,10 @@ export interface CliOptions {
   summaryModel?: string;
   summaryEngine?: string; // from config (summary.engine)
   summaryEngineFlag?: string; // from --engine
+  /** `--style <path>`: style-reference file for this run. */
+  summaryStylePath?: string;
+  /** `--no-style`: drop the style reference for this run. */
+  summaryNoStyle?: boolean;
 
   // Report-shaped options on summary. Resolved as
   // CLI flag → config.summary.X → config.report.X → built-in default.
@@ -121,6 +125,8 @@ const KNOWN_SUMMARY_FLAGS = new Set([
   "--force",
   "--model",
   "--engine",
+  "--style",
+  "--no-style",
   "-y",
   "--yes",
   "--include",
@@ -222,6 +228,11 @@ Commands:
                                 (e.g. "sonnet", "gpt-5", or a full id)
     --engine NAME               Which agent CLI synthesizes the summary:
                                 auto (default) | claude | codex | kiro
+    --style PATH                Imitate this file's writing style. Defaults
+                                to ~/.agenthud/summary-style.md when that
+                                file exists; editing it invalidates the
+                                cached summary.
+    --no-style                  Ignore the style reference for this run.
     -y, --yes                   Skip confirmation prompts for new daily
                                 summaries
     -o, --open                  Launch the resulting summary in your OS
@@ -542,6 +553,7 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
       "--prompt",
       "--model",
       "--engine",
+      "--style",
       "--include",
       "--format",
       "--detail-limit",
@@ -674,6 +686,36 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
       }
     }
 
+    // Style reference: `--style PATH` attaches one, `--no-style` drops it,
+    // and with neither flag `summary.style` config decides (unset = use
+    // ~/.agenthud/summary-style.md when it exists).
+    let summaryStylePath: string | undefined;
+    let summaryNoStyle: boolean | undefined;
+    const styleIdx = rest.indexOf("--style");
+    if (styleIdx !== -1) {
+      const val = rest[styleIdx + 1];
+      if (!val) {
+        summaryError =
+          summaryError ??
+          "Invalid --style: missing value (path to a style reference file).";
+      } else {
+        summaryStylePath = val;
+      }
+    }
+    if (rest.includes("--no-style")) {
+      if (summaryStylePath !== undefined) {
+        summaryError =
+          summaryError ?? "--style and --no-style are mutually exclusive.";
+      }
+      summaryNoStyle = true;
+    }
+    if (summaryStylePath === undefined && !summaryNoStyle) {
+      if (config?.summary.style === false) summaryNoStyle = true;
+      else if (typeof config?.summary.style === "string") {
+        summaryStylePath = config.summary.style;
+      }
+    }
+
     if (rest.includes("--force")) summaryForce = true;
     if (rest.includes("-y") || rest.includes("--yes")) summaryAssumeYes = true;
     const summaryOpen =
@@ -774,6 +816,8 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
       summaryModel,
       summaryEngine: config?.summary.engine,
       summaryEngineFlag,
+      summaryStylePath,
+      summaryNoStyle,
       summaryInclude,
       summaryFormat,
       summaryDetailLimit,

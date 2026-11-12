@@ -77,6 +77,11 @@ import {
   resolveCommandPath,
   resolveSummaryEngine,
 } from "./summaryEngines.js";
+import {
+  composePromptWithStyle,
+  resolveStyleReference,
+  type StyleReference,
+} from "./summaryStyle.js";
 
 export interface SummaryOptions {
   date: Date;
@@ -108,6 +113,10 @@ export interface SummaryOptions {
    * read the result back from the cache file instead of having it mixed
    * into its own output. */
   quiet?: boolean;
+  /** Explicit style-reference file (`--style` / `summary.style`). */
+  stylePath?: string;
+  /** Drop the style reference for this run (`--no-style`). */
+  noStyle?: boolean;
 }
 
 export interface RangeSummaryOptions {
@@ -134,6 +143,10 @@ export interface RangeSummaryOptions {
   scopeToProjects?: string[];
   /** Non-interactive caller: no stdout stream, no progress lines. */
   quiet?: boolean;
+  /** Explicit style-reference file (`--style` / `summary.style`). */
+  stylePath?: string;
+  /** Drop the style reference for this run (`--no-style`). */
+  noStyle?: boolean;
 }
 
 type PromptKind = "daily" | "range";
@@ -187,6 +200,45 @@ export function formatPromptSource(
 function templatePath(kind: PromptKind): string {
   const here = dirname(fileURLToPath(import.meta.url));
   return join(here, "templates", promptFilename(kind));
+}
+
+/** One-line stderr description of the style reference in effect, or ""
+ * when there is none. Home-relative and forward-slashed so the path reads
+ * the same on Windows as on POSIX. */
+export function formatStyleSource(style: StyleReference): string {
+  if (!style.text || !style.path) return "";
+  const home = homedir();
+  const shown = (
+    style.path.startsWith(home)
+      ? `~${style.path.slice(home.length)}`
+      : style.path
+  ).replace(/\\/g, "/");
+  const chars = style.text.length.toLocaleString("en-US");
+  return `${shown} (${chars} chars${style.truncated ? ", truncated" : ""})`;
+}
+
+/**
+ * Resolve the style reference once per run and report a broken explicit
+ * path. Returns null when the run must abort (only for `--style` pointing
+ * at something unreadable — a missing default file is simply "off").
+ */
+function resolveStyleForRun(
+  opts: { stylePath?: string; noStyle?: boolean },
+  announce: boolean,
+): StyleReference | null {
+  const style = resolveStyleReference({
+    path: opts.stylePath,
+    disabled: opts.noStyle,
+  });
+  if (style.error) {
+    process.stderr.write(`agenthud: ${style.error}\n`);
+    return null;
+  }
+  if (announce) {
+    const label = formatStyleSource(style);
+    if (label) process.stderr.write(`style reference: ${label}\n`);
+  }
+  return style;
 }
 
 function dateKey(d: Date): string {
@@ -555,6 +607,10 @@ interface DailyGenOpts {
   withGit: boolean;
   /** Absolute project paths limiting discovery (whitelist). */
   scopeToProjects?: string[];
+  /** Style-reference text resolved once by the caller, or null for none.
+   * Folded into the prompt BEFORE it is fingerprinted, so editing the
+   * style file invalidates the cache exactly like editing the prompt. */
+  style: string | null;
 }
 
 /**
@@ -585,7 +641,10 @@ async function generateDailySummary(
   // the output language) must regenerate rather than serve text written
   // under the old instructions. Reading is side-effect free — the user
   // file is only materialized further down, on the generate path.
-  const prompt = resolvePrompt("daily", opts.promptOverride);
+  const prompt = composePromptWithStyle(
+    resolvePrompt("daily", opts.promptOverride),
+    opts.style,
+  );
   const promptHash = promptFingerprint(prompt);
 
   if (!isToday && !opts.force && existsSync(cached)) {
@@ -791,6 +850,13 @@ export async function runSummary(options: SummaryOptions): Promise<number> {
   // With --open the user is going to read the rendered file in their
   // default app anyway, so streaming the same markdown to the terminal
   // is duplicate noise (and breaks downstream piping). Suppress.
+  // Style is resolved BEFORE the cache check inside generateDailySummary:
+  // it is part of the prompt, hence part of the cache fingerprint.
+  const style = resolveStyleForRun(
+    { stylePath: options.stylePath, noStyle: options.noStyle },
+    !options.quiet,
+  );
+  if (!style) return 1;
   const res = await generateDailySummary({
     date: options.date,
     today: options.today,
@@ -804,6 +870,7 @@ export async function runSummary(options: SummaryOptions): Promise<number> {
     detailLimit: options.detailLimit,
     withGit: options.withGit,
     scopeToProjects: options.scopeToProjects,
+    style: style.text,
   });
   // Regenerate the index when something *changed* on disk (a new
   // daily got written), OR when the user explicitly asked for the
@@ -857,8 +924,14 @@ export async function runRangeSummary(
   );
 
   // Resolve the range prompt up front for the same reason as the daily
-  // path: its fingerprint is part of cache provenance.
-  const metaPrompt = resolvePrompt("range");
+  // path: its fingerprint is part of cache provenance. Style is composed
+  // in first, so editing either file invalidates the range cache.
+  const style = resolveStyleForRun(
+    { stylePath: options.stylePath, noStyle: options.noStyle },
+    !options.quiet,
+  );
+  if (!style) return 1;
+  const metaPrompt = composePromptWithStyle(resolvePrompt("range"), style.text);
   const metaPromptHash = promptFingerprint(metaPrompt);
 
   if (
@@ -966,6 +1039,7 @@ export async function runRangeSummary(
       detailLimit: options.detailLimit,
       withGit: options.withGit,
       scopeToProjects: options.scopeToProjects,
+      style: style.text,
     });
 
     if (res.skipped) {

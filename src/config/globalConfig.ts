@@ -135,11 +135,16 @@ report:
 # \`engine\` selects which agent CLI synthesizes the summary:
 #   auto (default) → first installed of claude, codex, kiro
 #   claude | codex | kiro → force that one
+# \`style\` is a sample of your own writing the summary imitates.
+#   unset  → ~/.agenthud/summary-style.md when that file exists
+#   PATH   → use that file instead
+#   false  → never attach a style reference
 summary:
   withGit: true
   detailLimit: 0
   # engine: auto
   # model: sonnet
+  # style: ~/.agenthud/summary-style.md
 `;
   try {
     writeFileSync(CONFIG_PATH(), defaultYaml, "utf-8");
@@ -276,6 +281,17 @@ export function loadGlobalConfig(): GlobalConfig {
     }
     if (typeof s.engine === "string" && s.engine.trim().length > 0) {
       config.summary.engine = s.engine.trim().toLowerCase();
+    }
+    // `style: false` (or the string "off"/"none"/"false") disables the
+    // style reference; any other string is a path. Deliberately explicit
+    // so a typo'd path doesn't silently behave like "off" — resolveStyle
+    // reports an unreadable EXPLICIT path at run time.
+    if (s.style === false) {
+      config.summary.style = false;
+    } else if (typeof s.style === "string") {
+      const v = s.style.trim();
+      if (/^(off|none|false)$/i.test(v)) config.summary.style = false;
+      else if (v.length > 0) config.summary.style = v;
     }
   }
 

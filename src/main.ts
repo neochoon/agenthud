@@ -236,6 +236,8 @@ if (options.mode === "summary") {
       open: options.summaryOpen,
       openIndex: options.summaryOpenIndex,
       scopeToProjects: scope,
+      stylePath: options.summaryStylePath,
+      noStyle: options.summaryNoStyle,
     });
     await flushStdout();
     process.exit(exitCode);
@@ -254,6 +256,8 @@ if (options.mode === "summary") {
     open: options.summaryOpen,
     openIndex: options.summaryOpenIndex,
     scopeToProjects: scope,
+    stylePath: options.summaryStylePath,
+    noStyle: options.summaryNoStyle,
   });
   await flushStdout();
   process.exit(exitCode);

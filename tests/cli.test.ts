@@ -819,3 +819,76 @@ describe("web subcommand", () => {
     expect(parseArgs(["web", "--serve"]).webError).toContain("Unknown option");
   });
 });
+
+describe("style reference flags (summary)", () => {
+  it("defaults to neither flag, leaving config/default in charge", () => {
+    const opts = parseArgs(["summary"]);
+    expect(opts.summaryStylePath).toBeUndefined();
+    expect(opts.summaryNoStyle).toBeUndefined();
+    expect(opts.summaryError).toBeUndefined();
+  });
+
+  it("--style carries the path through", () => {
+    const opts = parseArgs(["summary", "--style", "./my-style.md"]);
+    expect(opts.summaryStylePath).toBe("./my-style.md");
+    expect(opts.summaryNoStyle).toBeUndefined();
+  });
+
+  it("--no-style sets the kill switch", () => {
+    const opts = parseArgs(["summary", "--no-style"]);
+    expect(opts.summaryNoStyle).toBe(true);
+    expect(opts.summaryStylePath).toBeUndefined();
+  });
+
+  it("rejects --style without a value", () => {
+    expect(parseArgs(["summary", "--style"]).summaryError).toContain("--style");
+  });
+
+  it("rejects --style together with --no-style", () => {
+    expect(
+      parseArgs(["summary", "--style", "a.md", "--no-style"]).summaryError,
+    ).toContain("mutually exclusive");
+  });
+
+  it("takes the path from summary.style when no flag is given", () => {
+    const opts = parseArgs(
+      ["summary"],
+      makeConfig({ summary: { style: "~/notes/style.md" } }),
+    );
+    expect(opts.summaryStylePath).toBe("~/notes/style.md");
+  });
+
+  it("turns summary.style: false into --no-style", () => {
+    const opts = parseArgs(
+      ["summary"],
+      makeConfig({ summary: { style: false } }),
+    );
+    expect(opts.summaryNoStyle).toBe(true);
+    expect(opts.summaryStylePath).toBeUndefined();
+  });
+
+  it("lets --style override a configured path", () => {
+    const opts = parseArgs(
+      ["summary", "--style", "./flag.md"],
+      makeConfig({ summary: { style: "~/config.md" } }),
+    );
+    expect(opts.summaryStylePath).toBe("./flag.md");
+  });
+
+  it("lets --no-style override a configured path", () => {
+    const opts = parseArgs(
+      ["summary", "--no-style"],
+      makeConfig({ summary: { style: "~/config.md" } }),
+    );
+    expect(opts.summaryNoStyle).toBe(true);
+    expect(opts.summaryStylePath).toBeUndefined();
+  });
+
+  it("does not swallow the next flag as the --style value", () => {
+    // --style is in FLAGS_WITH_VALUE, so the value skip must not make the
+    // parser miss a later --force.
+    const opts = parseArgs(["summary", "--style", "x.md", "--force"]);
+    expect(opts.summaryStylePath).toBe("x.md");
+    expect(opts.summaryForce).toBe(true);
+  });
+});

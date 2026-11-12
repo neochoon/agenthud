@@ -8,6 +8,14 @@ see [FEATURES.md](./FEATURES.md).
 
 ## Unreleased (post-0.19.0)
 
+- **Style reference — the digest writes in your voice**: a profile of your own
+  prose at `~/.agenthud/summary-style.md` is prepended to both summary prompts,
+  so the output imitates your register instead of a generic report. The
+  templates themselves were reshaped to a weekly-report layout (project groups
+  numbered `1、`, items `（1）`, subject dropped). `--style` / `--no-style` /
+  `summary.style`, a web-UI checkbox, and an 8,000-char cap; the composed
+  prompt is what gets fingerprinted, so editing the style file invalidates the
+  cache like editing the prompt.
 - **`agenthud web`**: the TUI's two panes — plus report/summary controls — in a
   Chinese, action-first browser page (workspace whitelist on top, read-only
   detail collapsed). One self-contained HTML file, loopback-only, token-guarded.

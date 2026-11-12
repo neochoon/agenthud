@@ -54,22 +54,41 @@
   (#201, #204, #205).
 
 ### Changed
-- **Summary prompts now ask for Simplified Chinese output.** Both templates
-  (`summary-prompt.md`, `summary-range-prompt.md`) instruct the model to write
-  in 简体中文 and the section headings are Chinese (`背景` / `主要成果` /
-  `技术洞察` / `重要代码变更` / `待办`; range: `区间概览` / `主要成果` /
-  `工作主线` / `反复出现的模式` / `遗留 / 未完成`). Code identifiers, paths,
-  commands, commit hashes and model names stay untranslated. The daily template
-  also no longer says "Claude Code sessions" — it covers all six sources.
+- **Summary prompts now ask for Simplified Chinese output in a weekly-report
+  shape.** Both templates (`summary-prompt.md`, `summary-range-prompt.md`)
+  instruct the model to write in 简体中文 and drop the old five-section skeleton
+  (`背景` / `主要成果` / `技术洞察` / …) for the shape an engineer's own weekly
+  report uses: `### 工作内容`, then project groups numbered `1、` `2、` with
+  `（1）` `（2）` items inside. The register rules are spelled out — omit the
+  subject (never "我"), 了-suffixed verbs, semicolon-chained parallel actions,
+  close on a state or judgement, state problems plainly, quantify when the log
+  gives numbers, no emoji / `-` bullets / bold-as-heading. Code identifiers,
+  paths, commands, commit hashes and model names stay untranslated. The daily
+  template also no longer says "Claude Code sessions" — it covers all six
+  sources.
 - **The prompt is now part of cache provenance.** The provenance marker gained
-  a `prompt: <fingerprint>` field, so editing the prompt (e.g. changing the
-  output language) regenerates instead of serving text written under the old
-  instructions. A marker WITHOUT the field (written before this change) is
-  still matched on engine + model only — upgrading must not silently re-bill
-  every existing summary — so pass `--force` once to re-render old files in the
-  new language.
+  a `prompt: <fingerprint>` field, so editing the prompt (or the style
+  reference, which is composed into it) regenerates instead of serving text
+  written under the old instructions. A marker WITHOUT the field (written
+  before this change) is still matched on engine + model only — upgrading must
+  not silently re-bill every existing summary — so pass `--force` once to
+  re-render old files in the new language and shape.
 
 ### Added
+- **Style reference — write the summary in your own voice.** Put a sample of
+  your own prose in `~/.agenthud/summary-style.md` and it is prepended to both
+  the daily and the range prompt, so the digest imitates how you actually
+  write. `--style <path>` for a one-off file, `--no-style` to drop it,
+  `summary.style: false` (or a path) in `config.yaml`, and a checkbox in the
+  web UI beside the engine picker. A missing default file simply means "off";
+  only an unreadable EXPLICIT path is an error. Capped at 8,000 characters,
+  cut at a paragraph break, so a runaway file can't eat the context window.
+  Deliberately a *profile*, not a corpus: tens of KB of real reports costs
+  ~10K input tokens per run and teaches the model to lift project names and
+  conclusions out of the samples into unrelated summaries.
+  `GET /api/style` reports which file a run would use, so "my style is being
+  picked up" is verifiable without generating anything.
+
 - **`agenthud web`** — a browser UI over the same tree and activity data,
   **in Chinese**, built as a three-step flow. **① 勾选工作区**: one checkbox per
   project (with `全选` / `清空` / `仅活跃`); at least one is required and the

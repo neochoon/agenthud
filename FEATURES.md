@@ -35,6 +35,7 @@ For getting started, see [README.md](./README.md).
 Cross-cutting reference:
 
 - [Keybindings](#keybindings) — full key map (mirrors what `?` shows in-app)
+- [Runtime requirements](#runtime-requirements) — which Node version each source needs
 - [Files & directories](#files--directories) — what lives in `~/.agenthud/`
 - [Environment variables](#environment-variables)
 
@@ -43,7 +44,8 @@ Cross-cutting reference:
 ## Watch
 
 The default mode. Real-time TUI: project tree on top, activity viewer
-on the bottom, both polling `~/.claude/projects/` every ~2 s.
+on the bottom, both polling every agent's session store (see
+[Runtime requirements](#runtime-requirements)) every ~2 s.
 
 **Invocation:** `agenthud` or `agenthud watch` (also `-w`,
 `--watch`).
@@ -496,11 +498,29 @@ the `?` overlay renders in-app.
 | `[warm]` | Updated in the last hour | yellow |
 | `[cool]` | Updated earlier today | cyan |
 | `[cold]` | Last updated yesterday or earlier (collapsed by default) | gray |
-| `[working]` | Claude is mid-turn (tool running or about to respond) | green |
-| `[waiting]` | Claude yielded; ball is in your court (incl. `AskUserQuestion`) | magenta |
+| `[working]` | The agent is mid-turn (tool running or about to respond) | green |
+| `[waiting]` | The agent yielded; ball is in your court (incl. `AskUserQuestion`) | magenta |
 
 `[working]` / `[waiting]` replace `[hot]` within the 30-minute window
 (v0.10.0); `warm/cool/cold` stay time-based.
+
+## Runtime requirements
+
+`agenthud` requires **Node.js 20+**. Two session sources depend on a
+built-in Node module that only ships in newer releases; when it is
+absent the provider reports itself unavailable (`isAvailable()` false)
+and is skipped — no error, no crash, the other sources keep working.
+
+| Source | Built-in module used | Minimum Node |
+|---|---|---|
+| Claude Code, Codex CLI, Kiro CLI, Kiro IDE | `node:fs` only | 20 |
+| opencode | `node:sqlite` | 22 |
+| DeepSeek Harness (DSH) | `node:zlib` (zstd) | 22.15 |
+
+`engines` in `package.json` stays at `>=20` on purpose: the binary is
+still useful on Node 20 for four of the five sources. To see what was
+picked up, run `agenthud --once` (per-row provider tag) or
+`agenthud report --format json` (a `provider` field per session).
 
 ## Files & directories
 

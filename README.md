@@ -17,7 +17,30 @@ It's organized as **three layers, by who's reading** — a human at a glance, a 
 
 → **See [FEATURES.md](./FEATURES.md) for the full surface** — every flag, keybinding, config key, file path, and env var. Per-agent session schemas: [Claude Code](./docs/schemas/claude-session.md) · [Codex CLI](./docs/schemas/codex-session.md) · [Kiro IDE](./docs/schemas/kiro-ide-session.md) · [Kiro CLI](./docs/schemas/kiro-session.md) · [opencode](./docs/schemas/opencode-session.md) · [DSH](./docs/schemas/dsh-session.md) (or browse [docs/schemas/](./docs/schemas/)).
 
-Requires Node.js 20+ (opencode needs Node 22+ for the built-in `node:sqlite`, and DSH needs Node 22.15+ for built-in zstd; on older Node those two providers are simply skipped and everything else works). Open agenthud in a separate terminal while you work; press `?` inside the TUI for in-app help.
+### Node & agent support
+
+`agenthud` itself needs **Node.js 20+**. Two session sources lean on a
+built-in Node module that only exists in newer releases, so on an older
+Node they report "not detected" instead of failing — everything else
+(including the other agents' projects, `report`, `summary`, `follow`)
+keeps working.
+
+| Agent | Session source | Needs |
+|---|---|---|
+| Claude Code | `~/.claude/projects/*.jsonl` | Node 20+ |
+| Codex CLI | `~/.codex/sessions/**/rollout-*.jsonl` | Node 20+ |
+| Kiro CLI / Kiro IDE | `~/.kiro/sessions/cli/`, `…/kiro.kiroagent/` | Node 20+ |
+| opencode | `opencode.db` — SQLite via `node:sqlite` | **Node 22+** |
+| DeepSeek Harness (DSH) | `<DSH_HOME>/sessions/**/session.v4.jsonl.zstd` — zstd frames via `node:zlib` | **Node 22.15+** |
+
+`package.json` therefore keeps `engines: node >= 20` — bumping it would
+refuse to install on a Node that runs 4 of the 5 sources fine. Check
+which sources were actually picked up with `agenthud --once` (the tree
+shows a per-row provider tag) or `agenthud report --format json` (each
+session carries its `provider`).
+
+Open agenthud in a separate terminal while you work; press `?` inside
+the TUI for in-app help.
 
 ## Try without installing
 

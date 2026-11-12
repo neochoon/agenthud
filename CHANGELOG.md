@@ -73,6 +73,12 @@
   before this change) is still matched on engine + model only — upgrading must
   not silently re-bill every existing summary — so pass `--force` once to
   re-render old files in the new language and shape.
+- **Index previews follow the new shape.** `extractContextSnippet` used to take
+  the first non-heading line, which under the weekly-report layout was the
+  project-group header — so every index entry read `agenthud — 1、agenthud：`,
+  repeating the scope label. Group headers are now skipped and item markers
+  (`（1）` / `(1)` / `1）` / `①`) stripped, so the preview is the first item's
+  content. Old five-section summaries preview unchanged.
 
 ### Added
 - **Style reference — write the summary in your own voice.** Put a sample of

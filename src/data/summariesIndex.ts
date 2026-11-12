@@ -382,11 +382,23 @@ export function prependHeaderBlock(content: string, block: string): string {
 
 // ─── extractContextSnippet ───────────────────────────────────────────────────
 
+// Structural lines from the weekly-report shape carry no information as a
+// preview: a project-group header ("1、agenthud：") only repeats the scope
+// label the index already prints, and an item marker ("（1）") is noise at
+// the start of a teaser. Skip the former, strip the latter.
+const GROUP_HEADER_RE = /^\d+、.*[：:]\s*$/;
+const ITEM_MARKER_RE = /^(?:（\d+）|\(\d+\)|\d+）|[①②③④⑤⑥⑦⑧⑨⑩])\s*/;
+
 /**
  * One-line preview pulled from a summary file: the first non-empty,
  * non-heading, non-comment line in the body (after stripping any
  * leading backlink footer). Truncates to `maxChars` with an ellipsis.
  * Returns `null` for empty files or files with no prose.
+ *
+ * Group headers are skipped and item markers stripped, so a summary in
+ * the weekly-report shape previews as its first item's content
+ * ("会话来源接入：增加了DSH session provider…") rather than as the
+ * redundant "1、agenthud：".
  */
 export function extractContextSnippet(
   content: string,
@@ -398,8 +410,11 @@ export function extractContextSnippet(
     if (!line) continue;
     if (line.startsWith("#")) continue;
     if (line.startsWith("<!--")) continue;
-    if (line.length <= maxChars) return line;
-    return `${line.slice(0, maxChars - 1).trimEnd()}…`;
+    if (GROUP_HEADER_RE.test(line)) continue;
+    const text = line.replace(ITEM_MARKER_RE, "").trim();
+    if (!text) continue;
+    if (text.length <= maxChars) return text;
+    return `${text.slice(0, maxChars - 1).trimEnd()}…`;
   }
   return null;
 }

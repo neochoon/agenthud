@@ -8,6 +8,10 @@ see [FEATURES.md](./FEATURES.md).
 
 ## Unreleased (post-0.19.0)
 
+- **`agenthud web`**: the TUI's two panes — plus report/summary controls — in a
+  local browser page. One self-contained HTML file, loopback-only, token-guarded.
+- **Workspace-scoped `report` / `summary`** (`--cwd` / `--project`): one
+  project's digest, cached per scope so it never replaces the whole-day one.
 - **DSH (DeepSeek Harness) provider**: a sixth session source joins the tree —
   built-in zstd multi-frame decoding, sub-agent nesting via `parentSession`,
   and titles/model/context-gauge/live-state taken from DSH's own projection

@@ -29,6 +29,8 @@ For getting started, see [README.md](./README.md).
 | Summaries index hub | `agenthud summary --open-index` / `-I` | v0.12.0 | [Summaries index](#summaries-index) |
 | Subagent visibility in reports | `task` include type | v0.13.0 | [Subagent reporting](#subagent-reporting) |
 | Live event stream | `agenthud follow` | v0.19.x | [Follow](#follow) |
+| Browser UI | `agenthud web` | v0.20.x | [Web UI](#web-ui) |
+| Workspace-scoped report / summary | `--cwd` / `--project` | v0.20.x | [Report](#report) |
 | Global config | `~/.agenthud/config.yaml` | v0.9.0 | [Config](#config) |
 | Effective-options stderr line | (automatic) | v0.12.0 | [Effective options](#effective-options) |
 
@@ -130,6 +132,17 @@ humans, JSON for scripts.
 | `--format markdown \| json` | `markdown` | Output format |
 | `--detail-limit N` | `120` | Max chars per activity detail; `0` = unlimited |
 | `--with-git` | off | Merge git commits from each session's project path into the timeline |
+| `--cwd` | off | Only the project containing the current directory |
+| `--project PATH\|NAME` | off | Only that project (an absolute path, or a project name unique among discovered projects) |
+
+**Workspace scope:** `--cwd` / `--project` restrict the report to one
+project. Resolution walks the *discovered* projects (any provider), not
+`~/.claude/projects/` directory names, so a Kiro or DSH workspace scopes
+correctly; `--cwd` picks the deepest project containing the working
+directory. An unknown value exits 1 with the list of known projects, and
+an ambiguous `--project web` (two projects with that name) refuses to
+guess and asks for a path. The resolved scope is echoed as
+`scope = <path>` on stderr.
 
 **Include types:** `user`, `response`, `bash`, `edit`, `thinking`,
 `task`, `read`, `glob`, `commit`. Unknown values error (v0.9.4
@@ -177,6 +190,17 @@ engine**: Claude / Codex / Kiro — see `--engine` below).
 | `-y, --yes` | off | Skip confirmation prompt |
 | `-o, --open` | off | Open the produced summary in OS default app |
 | `-I, --open-index` | off | Open `~/.agenthud/summaries/index.md` |
+| `--cwd` | off | Summarize only the project containing the current directory |
+| `--project PATH\|NAME` | off | Summarize only that project (see [Report](#report) for resolution rules) |
+
+**Workspace scope:** a scoped summary covers one project and is cached
+SEPARATELY — `~/.agenthud/summaries/YYYY-MM-DD--<project>-<hash>.md` —
+so it never overwrites the whole-day digest for the same date, and the
+index lists both (`2026-11-12 (Thu)` and
+`2026-11-12 (Thu) · agenthud`). The backlink prev/next chain stays
+within one scope, so paging through days never jumps between projects.
+`scopeToProject` is applied at discovery, which means the payload, the
+empty-day check and `--with-git` all see only that workspace.
 
 **Behavior:**
 - Builds the markdown payload via `generateReport`. If the day has
@@ -184,7 +208,8 @@ engine**: Claude / Codex / Kiro — see `--engine` below).
   exit 0 without spawning the engine or writing a file (v0.12.2 /
   v0.12.3).
 - Past days are cached at `~/.agenthud/summaries/YYYY-MM-DD.md`
-  and reused on subsequent runs. Today is always regenerated.
+  (scoped: `YYYY-MM-DD--<project>-<hash>.md`) and reused on subsequent
+  runs. Today is always regenerated.
 - Prompt template comes from `~/.agenthud/summary-prompt.md`
   (auto-created on first run from
   `src/templates/summary-prompt.md`); `--prompt` overrides for
@@ -375,6 +400,53 @@ interval (default 2s, `refreshIntervalMs` in config). Broken pipe
 
 **Available since:** v0.19.x.
 
+## Web UI
+
+The same tree and activity viewer as the TUI, in a browser, plus the
+report and summary controls — for people who would rather click than
+memorize keys.
+
+**Invocation:** `agenthud web [--port N] [--open] [--cwd | --project …]`
+
+```bash
+agenthud web                # http://127.0.0.1:7787/?token=…
+agenthud web --port 9000 -o # different port, open the browser
+agenthud web --cwd          # start scoped to this directory's project
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--port N`, `-p N` | `7787` | Port to listen on; `0` picks a free one |
+| `-o, --open` | off | Open the URL in the default browser |
+| `--cwd` | off | Start scoped to the current directory's project |
+| `--project PATH\|NAME` | off | Start scoped to that project |
+
+**What it shows:** project → session → sub-agent tree with live/status
+badges, context-window %, provider tag and model; the selected session's
+full activity list with expandable tool bodies (Bash output, Read with a
+dimmed line-number gutter, Edit as a colored diff); a Report tab
+(markdown for the chosen date and scope); and a Summary tab that
+generates a digest through the same engine path as the CLI and lists
+previous summaries.
+
+**Behavior:**
+- **Loopback only.** Refuses to bind anything but `127.0.0.1`, and
+  rejects a request whose `Host` header isn't `127.0.0.1:<port>` /
+  `localhost:<port>` — the DNS-rebinding guard.
+- **Token-guarded.** Each run mints a random token, printed as part of
+  the URL; every `/api/*` call needs it (`X-Agenthud-Token`). Another
+  local process, or a stray tab, cannot drive the API without it.
+- The tree polls every 3s using the same discovery the TUI uses, so a
+  session that appears in one appears in the other.
+- `GET /api/activity?path=` is validated against the *currently
+  discovered* session files, so the endpoint can't be turned into an
+  arbitrary file reader.
+- The summary button POSTs to `/api/summary` and returns the markdown
+  from the cache file; the server calls the runner with `quiet: true`,
+  so nothing is sprayed into its own stdout. Expect 30–90s.
+
+**Available since:** v0.20.x.
+
 ## Config
 
 Global config at `~/.agenthud/config.yaml`. Auto-created on first
@@ -530,7 +602,7 @@ picked up, run `agenthud --once` (per-row provider tag) or
 | `~/.agenthud/state.yaml` | Hidden items (app-managed) |
 | `~/.agenthud/summary-prompt.md` | Daily summary prompt template (auto-copied on first run) |
 | `~/.agenthud/summary-range-prompt.md` | Range summary prompt template |
-| `~/.agenthud/summaries/` | Cached daily and range summaries |
+| `~/.agenthud/summaries/` | Cached daily and range summaries (scoped ones: `DATE--<project>-<hash>.md`) |
 | `~/.agenthud/summaries/index.md` | Auto-generated navigable index |
 | `~/.claude/projects/` | Claude Code session JSONL files (read-only) |
 | `~/.codex/sessions/` | Codex CLI rollout JSONL files (read-only) |

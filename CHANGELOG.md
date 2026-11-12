@@ -30,6 +30,25 @@
   (#201, #204, #205).
 
 ### Added
+- **`agenthud web`** — a browser UI over the same tree and activity data:
+  project → session → sub-agent tree with live/status badges and context %,
+  per-session activity with expandable tool output, a Report tab, and a
+  Summary tab that generates a digest through the same engine path as the CLI.
+  It is one self-contained HTML file (`src/server/web-ui.html`, no framework,
+  no CDN, works offline) served by `node:http`, **loopback-only**, with a
+  `Host`-header check (DNS-rebinding guard) and a per-run token that every
+  `/api/*` call must present. Session-file paths in activity requests are
+  validated against current discovery, so the endpoint can't be used to read
+  arbitrary files. `--port`, `--open`, `--cwd`, `--project`.
+- **Workspace-scoped report & summary** — `--cwd` (this directory's project)
+  and `--project <path|name>` on `report` and `summary` restrict the run to one
+  workspace, so a multi-project day no longer drowns one project's digest.
+  Resolution is provider-neutral (it walks the *discovered* projects, so Kiro
+  and DSH workspaces work), `--cwd` picks the deepest containing project, and
+  an ambiguous `--project web` errors with the candidate paths instead of
+  guessing. A scoped digest is cached separately
+  (`YYYY-MM-DD--<project>-<hash>.md`) so it never overwrites the whole-day
+  digest; the index labels both and the backlink chain stays within one scope.
 - **DSH (DeepSeek Harness) provider** — agenthud now discovers sessions
   written by DeepSeek Harness, alongside Claude Code, Codex, Kiro and
   opencode. DSH stores each session as `<DSH_HOME>/sessions/<encoded-cwd>/

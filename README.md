@@ -14,6 +14,7 @@ It's organized as **three layers, by who's reading** — a human at a glance, a 
 - **`agenthud summary`** — **the daily digest.** Fold a day (or a week) into an LLM engineering summary — a standup-in-one-command habit, via whichever agent CLI you have installed (claude, codex, or kiro-cli, auto-detected).
 - **`agenthud report`** — **the machine layer.** Structured Markdown / JSON. `summary` is literally `report` piped into an agent CLI, so the daily digest isn't a black box — and you can pipe `report` into anything else, too.
 - **`agenthud follow`** — **the live machine feed.** A chronologically-merged stream of every event (activity + state + lifecycle) across all sessions and sub-agents, as human lines or `--json` NDJSON — the read-only substrate a higher-level supervisor can consume. See [FEATURES.md](./FEATURES.md#follow).
+- **`agenthud web`** — **the browser HUD.** The same project tree and activity viewer as a local web page — click a session, expand a tool's output, generate the day's digest — for when keybindings are in the way. Loopback-only and token-guarded. See [FEATURES.md](./FEATURES.md#web-ui).
 
 → **See [FEATURES.md](./FEATURES.md) for the full surface** — every flag, keybinding, config key, file path, and env var. Per-agent session schemas: [Claude Code](./docs/schemas/claude-session.md) · [Codex CLI](./docs/schemas/codex-session.md) · [Kiro IDE](./docs/schemas/kiro-ide-session.md) · [Kiro CLI](./docs/schemas/kiro-session.md) · [opencode](./docs/schemas/opencode-session.md) · [DSH](./docs/schemas/dsh-session.md) (or browse [docs/schemas/](./docs/schemas/)).
 
@@ -74,6 +75,12 @@ agenthud summary -oI                      # open the summary + the summaries ind
 agenthud report                           # today's activity as markdown
 agenthud report --format json             # script-readable
 agenthud report --with-git                # merge git commits into the timeline
+
+# 4 · The browser
+agenthud web                              # local UI on 127.0.0.1:7787
+agenthud web -o                           # …and open it
+agenthud report --cwd                     # one workspace only
+agenthud summary --cwd                    # …a digest for just that workspace
 ```
 
 ## The live HUD — `agenthud`

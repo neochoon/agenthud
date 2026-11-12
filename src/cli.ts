@@ -43,7 +43,7 @@ const ALL_TYPES = [
 ];
 
 export interface CliOptions {
-  mode: "watch" | "once" | "report" | "summary" | "follow";
+  mode: "watch" | "once" | "report" | "summary" | "follow" | "web";
   command?: "version" | "help";
   error?: string;
   reportDate?: Date;
@@ -74,6 +74,16 @@ export interface CliOptions {
   summaryOpenIndex?: boolean;
   summaryError?: string;
   scopeToCwd?: boolean;
+  /** `--project <path|name>`: scope report/summary to ONE workspace
+   * (resolved against discovered projects in main.ts). */
+  scopeProject?: string;
+
+  // web
+  webPort?: number;
+  webOpen?: boolean;
+  webError?: string;
+  webScopeToCwd?: boolean;
+  webScopeProject?: string;
 
   // follow
   followSince?: string; // raw --since spec
@@ -99,6 +109,8 @@ const KNOWN_REPORT_FLAGS = new Set([
   "--format",
   "--detail-limit",
   "--with-git",
+  "--cwd",
+  "--project",
 ]);
 const KNOWN_SUMMARY_FLAGS = new Set([
   "--date",
@@ -119,6 +131,8 @@ const KNOWN_SUMMARY_FLAGS = new Set([
   "--open",
   "-I",
   "--open-index",
+  "--cwd",
+  "--project",
 ]);
 const KNOWN_FOLLOW_FLAGS = new Set([
   "--since",
@@ -126,7 +140,23 @@ const KNOWN_FOLLOW_FLAGS = new Set([
   "--include",
   "--once",
 ]);
-const KNOWN_SUBCOMMANDS = new Set(["watch", "report", "summary", "follow"]);
+const KNOWN_WEB_FLAGS = new Set([
+  "--port",
+  "-p",
+  "--open",
+  "-o",
+  "--cwd",
+  "--project",
+  "-h",
+  "--help",
+]);
+const KNOWN_SUBCOMMANDS = new Set([
+  "watch",
+  "report",
+  "summary",
+  "follow",
+  "web",
+]);
 
 export function getHelp(): string {
   return `Usage: agenthud [command] [options]
@@ -165,6 +195,9 @@ Commands:
                                 0 = unlimited)
     --with-git                  Merge git commits from each session's
                                 project into the timeline
+    --cwd                       Only this directory's project
+    --project PATH|NAME         Only that project (path, or a unique
+                                project name)
 
   summary [--date DATE | --last Nd | --from DATE --to DATE]
           [--include TYPES] [--detail-limit N] [--with-git]
@@ -197,6 +230,22 @@ Commands:
     -I, --open-index            Launch ~/.agenthud/summaries/index.md
                                 in your OS default app. Combinable with
                                 -o (e.g. -oI opens both).
+    --cwd                       Summarize only this directory's project
+    --project PATH|NAME         Summarize only that project. A scoped
+                                summary is cached separately
+                                (DATE--<project>-<hash>.md), so it never
+                                replaces the whole-day digest.
+
+  web [--port N] [--open] [--cwd | --project PATH|NAME]
+                                Browser UI: the same tree and activity
+                                viewer as the TUI, plus report/summary
+                                controls. Serves on 127.0.0.1 only and
+                                prints a token-guarded URL.
+    --port N, -p N              Port to listen on (default 7787; 0 picks
+                                a free one)
+    -o, --open                  Open the URL in your default browser
+    --cwd                       Start scoped to this directory's project
+    --project PATH|NAME         Start scoped to that project
 
   follow [--since SPEC] [--json] [--include TYPES]
                                 Stream live agent events (activity +
@@ -357,6 +406,7 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
       "--include",
       "--format",
       "--detail-limit",
+      "--project",
     ]);
     for (let i = 0; i < rest.length; i++) {
       const arg = rest[i];
@@ -432,6 +482,20 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
     const reportWithGit =
       rest.includes("--with-git") || (config?.report.withGit ?? false);
 
+    // Workspace scope: `--cwd` (this directory's project) or
+    // `--project <path|name>`. Resolved against the discovered projects
+    // in main.ts, where the tree is available.
+    const projectIdx = rest.indexOf("--project");
+    const scopeProject = projectIdx === -1 ? undefined : rest[projectIdx + 1];
+    if (projectIdx !== -1 && !scopeProject) {
+      reportError = reportError ?? "Invalid --project: missing value.";
+    }
+    const scopeCwd = rest.includes("--cwd") || undefined;
+    if (scopeCwd && scopeProject) {
+      reportError =
+        reportError ?? "--cwd and --project are mutually exclusive.";
+    }
+
     return {
       mode: "report",
       reportDate,
@@ -440,6 +504,8 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
       reportDetailLimit,
       reportWithGit,
       reportError,
+      scopeToCwd: scopeCwd,
+      scopeProject,
     };
   }
 
@@ -466,6 +532,7 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
       "--include",
       "--format",
       "--detail-limit",
+      "--project",
     ]);
 
     for (let i = 0; i < rest.length; i++) {
@@ -671,6 +738,20 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
       summaryModel = config.summary.model;
     }
 
+    // Workspace scope: `--cwd` or `--project <path|name>`. Resolved in
+    // main.ts against the discovered projects.
+    const summaryProjectIdx = rest.indexOf("--project");
+    const scopeProject =
+      summaryProjectIdx === -1 ? undefined : rest[summaryProjectIdx + 1];
+    if (summaryProjectIdx !== -1 && !scopeProject) {
+      summaryError = summaryError ?? "Invalid --project: missing value.";
+    }
+    const scopeCwd = rest.includes("--cwd") || undefined;
+    if (scopeCwd && scopeProject) {
+      summaryError =
+        summaryError ?? "--cwd and --project are mutually exclusive.";
+    }
+
     return {
       mode: "summary",
       summaryDate,
@@ -689,6 +770,75 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
       summaryOpen,
       summaryOpenIndex,
       summaryError,
+      scopeToCwd: scopeCwd,
+      scopeProject,
+    };
+  }
+
+  if (args[0] === "web") {
+    const rest = args.slice(1);
+    let webPort: number | undefined;
+    let webOpen: boolean | undefined;
+    let webScopeToCwd: boolean | undefined;
+    let webScopeProject: string | undefined;
+    let webError: string | undefined;
+
+    const FLAGS_WITH_VALUE = new Set(["--port", "-p", "--project"]);
+    for (let i = 0; i < rest.length; i++) {
+      const arg = rest[i];
+      if (!arg.startsWith("-")) continue;
+      if (!KNOWN_WEB_FLAGS.has(arg)) {
+        webError = `Unknown option: "${arg}". Run agenthud --help for usage.`;
+        break;
+      }
+      if (FLAGS_WITH_VALUE.has(arg)) i++;
+    }
+
+    const portIdx =
+      rest.indexOf("--port") !== -1
+        ? rest.indexOf("--port")
+        : rest.indexOf("-p");
+    if (portIdx !== -1) {
+      const val = rest[portIdx + 1];
+      const n = Number(val);
+      if (
+        !val ||
+        Number.isNaN(n) ||
+        !Number.isInteger(n) ||
+        n < 1 ||
+        n > 65535
+      ) {
+        webError =
+          webError ??
+          `Invalid --port: "${val}". Must be an integer between 1 and 65535.`;
+      } else {
+        webPort = n;
+      }
+    }
+
+    const projectIdx = rest.indexOf("--project");
+    if (projectIdx !== -1) {
+      const val = rest[projectIdx + 1];
+      if (!val) {
+        webError = webError ?? "Invalid --project: missing value.";
+      } else {
+        webScopeProject = val;
+      }
+    }
+
+    if (rest.includes("--cwd")) webScopeToCwd = true;
+    if (webScopeToCwd && webScopeProject) {
+      webError = webError ?? "--cwd and --project are mutually exclusive.";
+    }
+    if (rest.includes("--open") || rest.includes("-o")) webOpen = true;
+
+    return {
+      mode: "web",
+      webPort,
+      webOpen,
+      webScopeToCwd,
+      webScopeProject,
+      webError,
     };
   }
 

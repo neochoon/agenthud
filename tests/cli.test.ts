@@ -726,3 +726,79 @@ describe("getHelp", () => {
     expect(getHelp()).toContain("follow");
   });
 });
+
+describe("workspace scope flags (report / summary)", () => {
+  it("report --cwd scopes to the current project", () => {
+    const opts = parseArgs(["report", "--cwd"]);
+    expect(opts.mode).toBe("report");
+    expect(opts.scopeToCwd).toBe(true);
+    expect(opts.scopeProject).toBeUndefined();
+  });
+
+  it("report --project carries the value through", () => {
+    const opts = parseArgs(["report", "--project", "agenthud"]);
+    expect(opts.mode).toBe("report");
+    expect(opts.scopeProject).toBe("agenthud");
+    expect(opts.scopeToCwd).toBeUndefined();
+  });
+
+  it("report rejects --project without a value", () => {
+    expect(parseArgs(["report", "--project"]).reportError).toContain(
+      "--project",
+    );
+  });
+
+  it("report rejects --cwd together with --project", () => {
+    const opts = parseArgs(["report", "--cwd", "--project", "x"]);
+    expect(opts.reportError).toContain("mutually exclusive");
+  });
+
+  it("summary --cwd and --project parse like report", () => {
+    expect(parseArgs(["summary", "--cwd"]).scopeToCwd).toBe(true);
+    expect(
+      parseArgs(["summary", "--project", "C:\\file\\sometime\\agenthud"])
+        .scopeProject,
+    ).toBe("C:\\file\\sometime\\agenthud");
+  });
+
+  it("summary still rejects unknown flags", () => {
+    expect(parseArgs(["summary", "--scope", "x"]).summaryError).toContain(
+      "Unknown option",
+    );
+  });
+});
+
+describe("web subcommand", () => {
+  it("defaults to the built-in port and no auto-open", () => {
+    expect(parseArgs(["web"])).toEqual({ mode: "web" });
+  });
+
+  it("parses --port (and the -p alias)", () => {
+    expect(parseArgs(["web", "--port", "9000"]).webPort).toBe(9000);
+    expect(parseArgs(["web", "-p", "9001"]).webPort).toBe(9001);
+  });
+
+  it("rejects an out-of-range or non-numeric port", () => {
+    expect(parseArgs(["web", "--port", "0"]).webError).toContain("--port");
+    expect(parseArgs(["web", "--port", "abc"]).webError).toContain("--port");
+    expect(parseArgs(["web", "--port"]).webError).toContain("--port");
+  });
+
+  it("parses --open and the scope flags", () => {
+    expect(parseArgs(["web", "--open"]).webOpen).toBe(true);
+    expect(parseArgs(["web", "--cwd"]).webScopeToCwd).toBe(true);
+    expect(parseArgs(["web", "--project", "agenthud"]).webScopeProject).toBe(
+      "agenthud",
+    );
+  });
+
+  it("rejects --cwd with --project", () => {
+    expect(parseArgs(["web", "--cwd", "--project", "x"]).webError).toContain(
+      "mutually exclusive",
+    );
+  });
+
+  it("rejects unknown flags", () => {
+    expect(parseArgs(["web", "--serve"]).webError).toContain("Unknown option");
+  });
+});

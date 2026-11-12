@@ -42,7 +42,10 @@ import { join } from "node:path";
 export interface DailyEntry {
   kind: "daily";
   date: Date; // local midnight of the summary day
-  filename: string; // e.g. "2026-06-07.md"
+  filename: string; // e.g. "2026-06-07.md", or "2026-06-07--web-3f2a1b.md"
+  /** Present for a workspace-scoped summary: the `--<slug>` suffix (see
+   * `scopeSlugFor` in scope.ts). Absent = the whole-day digest. */
+  scope?: string;
 }
 
 export interface RangeEntry {
@@ -50,6 +53,7 @@ export interface RangeEntry {
   from: Date;
   to: Date;
   filename: string; // e.g. "range-2026-06-01_2026-06-07.md"
+  scope?: string;
 }
 
 export type SummaryEntry = DailyEntry | RangeEntry;
@@ -62,8 +66,13 @@ const BACKLINK_END_MARKER = "<!-- agenthud-backlinks-end -->";
 
 // ─── Date helpers ────────────────────────────────────────────────────────────
 
-const DAILY_RE = /^(\d{4})-(\d{2})-(\d{2})\.md$/;
-const RANGE_RE = /^range-(\d{4})-(\d{2})-(\d{2})_(\d{4})-(\d{2})-(\d{2})\.md$/;
+// A workspace-scoped summary carries a `--<slug>` suffix before `.md`
+// (`2026-11-11--agenthud-3f2a1b.md`): same day, different scope, so the
+// two must never overwrite each other. Files written before scoping
+// existed have no suffix and keep parsing as whole-day digests.
+const DAILY_RE = /^(\d{4})-(\d{2})-(\d{2})(?:--([a-z0-9][a-z0-9-]*))?\.md$/;
+const RANGE_RE =
+  /^range-(\d{4})-(\d{2})-(\d{2})_(\d{4})-(\d{2})-(\d{2})(?:--([a-z0-9][a-z0-9-]*))?\.md$/;
 
 function makeLocalDate(y: number, m: number, d: number): Date | null {
   // Validate by round-tripping through the Date constructor — out-of-range
@@ -96,7 +105,9 @@ export function parseSummaryFilename(name: string): SummaryEntry | null {
       Number(range[6]),
     );
     if (!from || !to) return null;
-    return { kind: "range", from, to, filename: name };
+    const entry: RangeEntry = { kind: "range", from, to, filename: name };
+    if (range[7]) entry.scope = range[7];
+    return entry;
   }
   const daily = DAILY_RE.exec(name);
   if (daily) {
@@ -106,9 +117,18 @@ export function parseSummaryFilename(name: string): SummaryEntry | null {
       Number(daily[3]),
     );
     if (!date) return null;
-    return { kind: "daily", date, filename: name };
+    const entry: DailyEntry = { kind: "daily", date, filename: name };
+    if (daily[4]) entry.scope = daily[4];
+    return entry;
   }
   return null;
+}
+
+/** Human label for a scope slug: `agenthud-3f2a1b` → `agenthud`. The
+ * hash is only there to keep two same-named projects apart. */
+export function scopeLabelFromSlug(slug: string): string {
+  const withoutHash = slug.replace(/-[0-9a-f]{6}$/, "");
+  return withoutHash || slug;
 }
 
 // ─── listSummaries ───────────────────────────────────────────────────────────
@@ -149,7 +169,16 @@ export function listSummaries(dir: string): SummaryEntry[] {
     }
     // Same month: ranges win.
     if (a.kind !== b.kind) return a.kind === "range" ? -1 : 1;
-    return db.getTime() - da.getTime();
+    const timeDiff = db.getTime() - da.getTime();
+    if (timeDiff !== 0) return timeDiff;
+    // Same day: the whole-day digest first, then scoped ones by label,
+    // so the index order is stable across runs.
+    const sa = a.scope ?? "";
+    const sb = b.scope ?? "";
+    if (sa === sb) return a.filename.localeCompare(b.filename);
+    if (sa === "") return -1;
+    if (sb === "") return 1;
+    return sa.localeCompare(sb);
   });
   return entries;
 }
@@ -230,15 +259,20 @@ export function buildIndexMarkdown(
       for (const entry of bucket) {
         const snippet = snippets?.get(entry.filename);
         const trail = snippet ? ` — ${snippet}` : "";
+        // A scoped entry is labelled with its project so a day with a
+        // whole-day digest plus three project digests reads clearly.
+        const scope = entry.scope
+          ? ` · ${scopeLabelFromSlug(entry.scope)}`
+          : "";
         if (entry.kind === "range") {
           const fromIso = formatDateKey(entry.from);
           const toIso = formatDateKey(entry.to);
           lines.push(
-            `- [Range: ${fromIso} → ${toIso}](./${entry.filename}) · weekly${trail}`,
+            `- [Range: ${fromIso} → ${toIso}](./${entry.filename})${scope ? scope : " · weekly"}${trail}`,
           );
         } else {
           lines.push(
-            `- [${formatDateLabel(entry.date)}](./${entry.filename})${trail}`,
+            `- [${formatDateLabel(entry.date)}](./${entry.filename})${scope}${trail}`,
           );
         }
       }
@@ -261,12 +295,13 @@ export function buildIndexMarkdown(
  *   the meaning; weekdays would just be noise.
  */
 export function buildTitleLine(entry: SummaryEntry): string {
+  const scope = entry.scope ? ` · ${scopeLabelFromSlug(entry.scope)}` : "";
   if (entry.kind === "range") {
-    return `# Range: ${formatDateKey(entry.from)} → ${formatDateKey(entry.to)}`;
+    return `# Range: ${formatDateKey(entry.from)} → ${formatDateKey(entry.to)}${scope}`;
   }
   const iso = formatDateKey(entry.date);
   const weekday = WEEKDAYS_LONG[entry.date.getDay()];
-  return `# ${iso} (${weekday})`;
+  return `# ${iso} (${weekday})${scope}`;
 }
 
 // ─── buildHeaderBlock ────────────────────────────────────────────────────────
@@ -288,10 +323,14 @@ export function buildHeaderBlock(
   const me = entries.find((e) => e.filename === currentFilename);
 
   if (me && me.kind === "daily") {
-    // Walk only the dailies — range entries skipped so the chain reads
-    // as a day-by-day sequence.
+    // Walk only the dailies IN THE SAME SCOPE — range entries skipped so
+    // the chain reads as a day-by-day sequence, and a scoped digest must
+    // not link sideways into another project's (or the whole day's).
+    const scope = me.scope ?? "";
     const dailies = entries
-      .filter((e): e is DailyEntry => e.kind === "daily")
+      .filter(
+        (e): e is DailyEntry => e.kind === "daily" && (e.scope ?? "") === scope,
+      )
       .sort((a, b) => a.date.getTime() - b.date.getTime()); // oldest → newest
 
     const idx = dailies.findIndex((e) => e.filename === currentFilename);

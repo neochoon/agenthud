@@ -86,13 +86,22 @@ afterEach(() => {
 
 // Emits `text` wrapped in a claude stream-json assistant event (what
 // the claude engine's parser consumes), followed by a result event.
-function mockClaudeProcess(text = "OK", exitCode = 0, stderr = "") {
+// `onStdin` captures what the runner writes to the child's stdin — the
+// prompt travels there (never on argv: a multi-line argv cannot pass
+// through the Windows `cmd.exe` shim launch).
+function mockClaudeProcess(
+  text = "OK",
+  exitCode = 0,
+  stderr = "",
+  onStdin?: (chunk: string) => void,
+) {
   const proc = new EventEmitter() as EventEmitter & {
     stdin: PassThrough;
     stdout: Readable;
     stderr: Readable;
   };
   proc.stdin = new PassThrough();
+  if (onStdin) proc.stdin.on("data", (c: Buffer) => onStdin(c.toString()));
   const streamJson =
     `${JSON.stringify({
       type: "assistant",
@@ -315,8 +324,11 @@ describe("runSummary prompt resolution", () => {
     vi.mocked(createWriteStream).mockReturnValue(
       mockStream as unknown as ReturnType<typeof createWriteStream>,
     );
+    let stdin = "";
     vi.mocked(spawn).mockReturnValue(
-      mockClaudeProcess() as unknown as ReturnType<typeof spawn>,
+      mockClaudeProcess("OK", 0, "", (c) => {
+        stdin += c;
+      }) as unknown as ReturnType<typeof spawn>,
     );
 
     await runSummary({
@@ -328,7 +340,10 @@ describe("runSummary prompt resolution", () => {
 
     const callArgs = vi.mocked(spawn).mock.calls[0];
     expect(callArgs[0]).toBe("claude");
-    expect(callArgs[1]).toContain("custom prompt here");
+    // Prompt on stdin, NOT argv (see mockClaudeProcess).
+    expect(callArgs[1]).not.toContain("custom prompt here");
+    expect(stdin).toContain("custom prompt here");
+    expect(stdin).toContain("## test");
   });
 
   it("uses ~/.agenthud/summary-prompt.md when present and no --prompt", async () => {
@@ -346,8 +361,11 @@ describe("runSummary prompt resolution", () => {
     vi.mocked(createWriteStream).mockReturnValue(
       mockStream as unknown as ReturnType<typeof createWriteStream>,
     );
+    let stdin = "";
     vi.mocked(spawn).mockReturnValue(
-      mockClaudeProcess() as unknown as ReturnType<typeof spawn>,
+      mockClaudeProcess("OK", 0, "", (c) => {
+        stdin += c;
+      }) as unknown as ReturnType<typeof spawn>,
     );
 
     await runSummary({
@@ -357,7 +375,8 @@ describe("runSummary prompt resolution", () => {
     });
 
     const callArgs = vi.mocked(spawn).mock.calls[0];
-    expect(callArgs[1]).toContain("user file prompt");
+    expect(callArgs[1]).not.toContain("user file prompt");
+    expect(stdin).toContain("user file prompt");
   });
 
   it("copies built-in template to user dir on first run", async () => {

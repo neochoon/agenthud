@@ -71,6 +71,8 @@ import type { SummaryEngine } from "./summaryEngines.js";
 import {
   cacheMatchesEngine,
   engineMarker,
+  launchSpec,
+  resolveCommandPath,
   resolveSummaryEngine,
 } from "./summaryEngines.js";
 
@@ -331,6 +333,21 @@ interface SpawnEngineResult {
 }
 
 /**
+ * Path to actually spawn for an engine.
+ *
+ * POSIX resolves PATH itself, so the bare command name is correct
+ * there — and keeping it verbatim means a user's `claude` wrapper
+ * script still works. On Windows a bare name does NOT resolve: only
+ * `.exe` is found by name, an npm-installed CLI is a `.cmd` shim, and
+ * Node refuses to spawn a `.cmd`/`.bat` directly (EINVAL). So resolve
+ * the shim's real path and let `launchSpec` route it through cmd.exe.
+ */
+function executableFor(engine: SummaryEngine): string {
+  if (process.platform !== "win32") return engine.command;
+  return resolveCommandPath(engine.command) ?? engine.command;
+}
+
+/**
  * Spawn the resolved summary engine, feed it the report on stdin,
  * collect the summary text (streamed from stdout, or read from the
  * engine's output file for "file"-mode engines like Codex), and
@@ -351,9 +368,13 @@ function spawnEngine(opts: SpawnEngineOpts): Promise<SpawnEngineResult> {
       model: opts.model,
       outFile,
     });
-    const proc = spawn(engine.command, args, {
+    const spec = launchSpec(executableFor(engine), args);
+    const proc = spawn(spec.command, spec.args, {
       stdio: ["pipe", "pipe", "pipe"],
       cwd: agenthudHomeDir(),
+      ...(spec.windowsVerbatimArguments
+        ? { windowsVerbatimArguments: true }
+        : {}),
     });
 
     const parser = engine.makeParser();
@@ -466,9 +487,11 @@ function spawnEngine(opts: SpawnEngineOpts): Promise<SpawnEngineResult> {
       });
     });
 
-    // "stdin"-mode engines (Kiro) ignore stdin once a positional
-    // question is present, so their prompt is kept out of argv and
-    // prepended to the piped payload here instead.
+    // Prompt delivery: every engine ships with `inputMode: "stdin"`,
+    // so the instruction prompt is prepended to the piped report and
+    // argv stays short and single-line (a Windows `.cmd` shim can't
+    // carry a multi-line argument through cmd.exe — see launchSpec).
+    // An out-of-tree "arg"-mode engine still gets the report alone.
     const stdinPayload =
       engine.inputMode === "stdin"
         ? `${opts.prompt}\n\n${opts.stdin}`

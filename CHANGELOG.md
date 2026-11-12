@@ -4,6 +4,18 @@
 
 ### Fixed
 
+- **`agenthud summary` failed on Windows with a bogus "not found" error.** The
+  summary engines are npm-installed CLIs, i.e. `codex.cmd` shims, and Node can
+  neither spawn the bare name (`ENOENT` — `CreateProcess` only resolves `.exe`)
+  nor the shim itself (`EINVAL` — Node refuses to run a batch file). Result: on
+  every Windows machine the run died with `Error: codex not found. Install: npm
+  i -g @openai/codex` even though the CLI was installed and authenticated. The
+  resolver now returns the shim's real path (`PATHEXT`-aware, preferring the
+  `.cmd`, never the extensionless bash shim) and the launch is routed through
+  `cmd.exe /d /s /c` with cmd-specific argument escaping (spaces, quotes, `%`,
+  `!`, `&`, `|`, `<`, `>`, parens, commas, semicolons, `^` at two levels — the
+  `%*` re-expansion in the shim eats one). Verified end to end against a real
+  shim and the real `codex.cmd`.
 - **opencode tool labels** are now canonicalized (`read` → `Read`, `grep` →
   `Grep`, …) and carry per-tool icons, matching the claude/kiro providers
   instead of surfacing raw lowercase names with the default glyph. The

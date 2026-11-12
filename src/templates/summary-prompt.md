@@ -1,5 +1,6 @@
-The following is an activity log from a single day of Claude Code sessions,
-possibly spanning multiple projects.
+The following is an activity log from a single day of AI coding-agent
+sessions (Claude Code, Codex, Kiro, opencode, DeepSeek Harness), possibly
+spanning multiple projects.
 
 Each entry: `[HH:MM] <icon> <label>: <detail>`. Icons:
   ○ Read           ~ Edit/Write       $ Bash
@@ -7,11 +8,16 @@ Each entry: `[HH:MM] <icon> <label>: <detail>`. Icons:
   < Response       > User message     … Thinking
   ◆ Git commit
 
-Write a concise, high-signal engineering retro in first-person voice
-("I implemented X", "I discovered Y") — treat the developer as the author.
+**Write the summary in Simplified Chinese (简体中文) — including every
+section heading.** Keep code identifiers, file paths, command names,
+commit hashes and model names in their original form; do not translate
+them. Project names stay as-is.
 
-Target ~300-500 words total; individual sections may be 50-100 words.
-Favor synthesis over completeness.
+Write a concise, high-signal engineering retro in first-person voice
+("我实现了 X", "我发现 Y") — treat the developer as the author.
+
+Target ~300-500 Chinese characters; individual sections may be 50-100
+characters. Favor synthesis over completeness.
 
 Focus on:
 - meaningful accomplishments
@@ -24,32 +30,31 @@ Focus on:
 Do NOT:
 - mechanically summarize every edit, response, or commit
 - list every modified file (cite paths only for important changes)
-- invent follow-ups not present in the log (no "consider refactoring X")
-- include placeholders like "None" or "N/A" — omit empty sections entirely
+- invent follow-ups not present in the log (no "考虑重构 X")
+- include placeholders like "无" or "N/A" — omit empty sections entirely
 
-If activity spans multiple projects, group findings by project where clarity
-improves. If they share a theme, synthesize.
+If activity spans multiple projects, group findings by project where
+clarity improves. If they share a theme, synthesize.
 
-If the day was light (few entries, no meaningful work), output a single short
-paragraph instead of the full template. Do not pad.
+If the day was light (few entries, no meaningful work), output a single
+short paragraph instead of the full template. Do not pad.
 
 Format (omit any section without substance):
 
-## Context
-The primary goal(s) of the day. If multi-project, briefly note each.
+## 背景
+当天的主要目标。若跨多个项目，简要说明各自的方向。
 
-## Key Accomplishments
-Meaningful progress, completed implementations, resolved issues.
+## 主要成果
+有意义的进展、完成的实现、已解决的问题。
 
-## Technical Insights
-Important debugging findings, architectural decisions, tradeoffs, discoveries.
+## 技术洞察
+重要的调试发现、架构决策、权衡与关键认知。
 
-## Major Code Changes
-Significant codebase changes grouped by theme. Reference commits inline
-(e.g., `abc1234`).
+## 重要代码变更
+按主题归组的显著代码改动，可在行内引用 commit（如 `abc1234`）。
 
-## Open Questions / Next Steps
-Only items explicitly stated in the log or directly tied to unfinished workflows.
+## 待办 / 下一步
+仅限日志中明确提到、或与未完成工作直接相关的条目。
 
 After reading the log below, write the summary.
 

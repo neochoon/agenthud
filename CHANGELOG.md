@@ -53,6 +53,22 @@
 - **Skill / Read / cwd-based project path** edge cases fixed alongside search
   (#201, #204, #205).
 
+### Changed
+- **Summary prompts now ask for Simplified Chinese output.** Both templates
+  (`summary-prompt.md`, `summary-range-prompt.md`) instruct the model to write
+  in 简体中文 and the section headings are Chinese (`背景` / `主要成果` /
+  `技术洞察` / `重要代码变更` / `待办`; range: `区间概览` / `主要成果` /
+  `工作主线` / `反复出现的模式` / `遗留 / 未完成`). Code identifiers, paths,
+  commands, commit hashes and model names stay untranslated. The daily template
+  also no longer says "Claude Code sessions" — it covers all six sources.
+- **The prompt is now part of cache provenance.** The provenance marker gained
+  a `prompt: <fingerprint>` field, so editing the prompt (e.g. changing the
+  output language) regenerates instead of serving text written under the old
+  instructions. A marker WITHOUT the field (written before this change) is
+  still matched on engine + model only — upgrading must not silently re-bill
+  every existing summary — so pass `--force` once to re-render old files in the
+  new language.
+
 ### Added
 - **`agenthud web`** — a browser UI over the same tree and activity data,
   **in Chinese**, built as a three-step flow. **① 勾选工作区**: one checkbox per

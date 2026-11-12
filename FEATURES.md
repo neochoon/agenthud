@@ -217,7 +217,14 @@ those workspaces.
 - Prompt template comes from `~/.agenthud/summary-prompt.md`
   (auto-created on first run from
   `src/templates/summary-prompt.md`); `--prompt` overrides for
-  one run.
+  one run. The shipped template asks for **Simplified Chinese output**
+  with Chinese section headings (`背景` / `主要成果` / `技术洞察` /
+  `重要代码变更` / `待办`); edit the file to change the language or tone.
+- The prompt is part of the cache key: the provenance marker records a
+  `prompt: <fingerprint>`, so editing the template regenerates instead of
+  serving text written under the old instructions. Files written before
+  that field existed are still reused as-is — add `--force` once to
+  re-render them.
 - Token usage line printed at the end (`N in / M out · cache: A
   read, B written · $X.XXXX`) — Claude engine only; Codex/Kiro
   omit it.

@@ -17,6 +17,7 @@ const {
   cacheMatchesEngine,
   escapeWindowsArg,
   launchSpec,
+  promptFingerprint,
   resolveCommandPath,
 } = await import("../../src/data/summaryEngines.js");
 
@@ -388,5 +389,69 @@ describe("resolveCommandPath", () => {
       );
       expect(resolveCommandPath("tool")).toBe(join(FAKE_BIN, "tool.cmd"));
     });
+  });
+});
+
+describe("prompt fingerprint in cache provenance", () => {
+  const promptA = "write in English";
+  const promptB = "用中文输出";
+
+  it("stamps the fingerprint into the marker", () => {
+    const fp = promptFingerprint(promptA);
+    const marker = engineMarker("codex", "gpt-5", fp);
+    expect(marker).toContain(`prompt: ${fp}`);
+    expect(parseEngineMarker(marker)).toEqual({
+      engine: "codex",
+      model: "gpt-5",
+      prompt: fp,
+    });
+  });
+
+  it("omits the field when no prompt is given", () => {
+    expect(engineMarker("claude")).toBe(
+      "<!-- agenthud-engine: claude model: default -->",
+    );
+  });
+
+  it("regenerates when the prompt changed (e.g. output language)", () => {
+    const cached = engineMarker("codex", "default", promptFingerprint(promptA));
+    expect(
+      cacheMatchesEngine(
+        cached,
+        "codex",
+        undefined,
+        promptFingerprint(promptA),
+      ),
+    ).toBe(true);
+    expect(
+      cacheMatchesEngine(
+        cached,
+        "codex",
+        undefined,
+        promptFingerprint(promptB),
+      ),
+    ).toBe(false);
+  });
+
+  it("treats a marker without a fingerprint as engine+model only", () => {
+    // Written before the prompt field existed: upgrading must not
+    // silently re-bill every existing summary.
+    const legacy = "<!-- agenthud-engine: codex model: default -->";
+    expect(cacheMatchesEngine(legacy, "codex", undefined, "deadbeef")).toBe(
+      true,
+    );
+  });
+
+  it("still rejects a different engine or model", () => {
+    const fp = promptFingerprint(promptA);
+    const cached = engineMarker("codex", "gpt-5", fp);
+    expect(cacheMatchesEngine(cached, "claude", "gpt-5", fp)).toBe(false);
+    expect(cacheMatchesEngine(cached, "codex", "gpt-6", fp)).toBe(false);
+  });
+
+  it("is stable for the same text and differs for different text", () => {
+    expect(promptFingerprint("abc")).toBe(promptFingerprint("abc"));
+    expect(promptFingerprint("abc")).not.toBe(promptFingerprint("abd"));
+    expect(promptFingerprint("abc")).toMatch(/^[0-9a-f]{8}$/);
   });
 });

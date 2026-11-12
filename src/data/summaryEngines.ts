@@ -38,6 +38,7 @@
  *    See `launchSpec`/`escapeWindowsArg` below.
  */
 
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { delimiter, join } from "node:path";
 import type { UsageSummary } from "../types/index.js";
@@ -374,47 +375,79 @@ function engineByName(name: string): SummaryEngine | undefined {
 
 // ── Cache provenance ──────────────────────────────────────────────
 //
-// A cached summary is the output of ONE (engine, model). Switching
-// either must regenerate, not silently serve the old engine's text.
-// We stamp a provenance marker into the summary body (separate from
-// the index's backlink block, so regenerateIndex leaves it alone)
-// and compare it on a cache hit.
+// A cached summary is the output of ONE (engine, model, prompt).
+// Switching any of them must regenerate, not silently serve text
+// produced under a different configuration — the prompt matters most
+// visibly (its language decides the output language). We stamp a
+// provenance marker into the summary body (separate from the index's
+// backlink block, so regenerateIndex leaves it alone) and compare it on
+// a cache hit.
 
 const ENGINE_MARKER_RE =
-  /<!--\s*agenthud-engine:\s*([a-z-]+)\s+model:\s*(.+?)\s*-->/i;
+  /<!--\s*agenthud-engine:\s*([a-z-]+)\s+model:\s*(.+?)(?:\s+prompt:\s*([0-9a-f]+))?\s*-->/i;
+
+/** Short, stable fingerprint of a prompt template. Only used to detect
+ * "the prompt changed", so a hash prefix is plenty. */
+export function promptFingerprint(prompt: string): string {
+  return createHash("sha1").update(prompt).digest("hex").slice(0, 8);
+}
 
 /** Build the provenance marker prepended to a freshly generated
- * summary. `model` defaults to the literal "default" when unset. */
-export function engineMarker(engine: string, model?: string): string {
-  return `<!-- agenthud-engine: ${engine} model: ${model ?? "default"} -->`;
+ * summary. `model` defaults to the literal "default" when unset;
+ * `prompt` (a fingerprint) is omitted when the caller has no prompt. */
+export function engineMarker(
+  engine: string,
+  model?: string,
+  prompt?: string,
+): string {
+  const base = `<!-- agenthud-engine: ${engine} model: ${model ?? "default"}`;
+  return prompt ? `${base} prompt: ${prompt} -->` : `${base} -->`;
 }
 
 /** Read the provenance marker back out of a cached summary, or null
- * when the file predates markers. */
+ * when the file predates markers. `prompt` is absent on files written
+ * before the prompt fingerprint existed. */
 export function parseEngineMarker(
   content: string,
-): { engine: string; model: string } | null {
+): { engine: string; model: string; prompt?: string } | null {
   const m = content.match(ENGINE_MARKER_RE);
   if (!m) return null;
-  return { engine: m[1].toLowerCase(), model: m[2] };
+  const out: { engine: string; model: string; prompt?: string } = {
+    engine: m[1].toLowerCase(),
+    model: m[2],
+  };
+  if (m[3]) out.prompt = m[3];
+  return out;
 }
 
 /**
  * True when a cached summary may be reused for a request of
- * (engine, model). A present marker must match both. A LEGACY cache
- * (no marker — written before this feature) is treated as a claude
- * summary, model-agnostic: reusable for claude requests, regenerated
- * for codex/kiro. This avoids needlessly regenerating everyone's
- * existing Claude summaries on upgrade while still honoring switches.
+ * (engine, model, prompt).
+ *
+ * - A marker carrying a prompt fingerprint must match all three, so
+ *   editing the prompt (e.g. switching the output language) regenerates
+ *   instead of serving text written under the old instructions.
+ * - A marker WITHOUT a prompt fingerprint predates that field. It is
+ *   matched on engine + model only, deliberately: upgrading agenthud
+ *   should not silently re-bill every existing summary. Pass `--force`
+ *   once to pick up a prompt change on those files.
+ * - A LEGACY cache (no marker at all) is treated as a claude summary,
+ *   model-agnostic: reusable for claude requests, regenerated for
+ *   codex/kiro.
  */
 export function cacheMatchesEngine(
   content: string,
   engine: string,
   model?: string,
+  prompt?: string,
 ): boolean {
   const prov = parseEngineMarker(content);
   if (!prov) return engine === "claude";
-  return prov.engine === engine && prov.model === (model ?? "default");
+  if (prov.engine !== engine || prov.model !== (model ?? "default")) {
+    return false;
+  }
+  if (prov.prompt && prompt) return prov.prompt === prompt;
+  return true;
 }
 
 /**

@@ -73,6 +73,7 @@ import {
   cacheMatchesEngine,
   engineMarker,
   launchSpec,
+  promptFingerprint,
   resolveCommandPath,
   resolveSummaryEngine,
 } from "./summaryEngines.js";
@@ -342,6 +343,9 @@ interface SpawnEngineOpts {
   streamToStdout: boolean;
   /** Forwarded to the engine's model flag if set. */
   model?: string;
+  /** Prompt fingerprint, stamped into the cache marker so a prompt
+   * change invalidates the cache. */
+  promptHash?: string;
   /**
    * Fires once, when the first chunk of summary text arrives. The
    * caller uses this to stop the "sending to <engine>" stderr ticker
@@ -494,7 +498,7 @@ function spawnEngine(opts: SpawnEngineOpts): Promise<SpawnEngineResult> {
         // later run with a different engine/model regenerates rather
         // than serving stale text. The marker is an HTML comment, inert
         // in rendered markdown and ignored by the index/backlink layer.
-        const cacheBody = `${engineMarker(engine.name, opts.model)}\n\n${assembledText}`;
+        const cacheBody = `${engineMarker(engine.name, opts.model, opts.promptHash)}\n\n${assembledText}`;
         try {
           writeFileSync(tmp, cacheBody, "utf-8");
           renameSync(tmp, opts.cachePath);
@@ -576,14 +580,23 @@ async function generateDailySummary(
   const isToday = isSameLocalDay(opts.date, opts.today);
   const cached = dailySummaryPath(opts.date, opts.scopeToProjects);
   const dateLabel = dateKey(opts.date);
+  // Resolve the prompt BEFORE the cache check so its fingerprint can
+  // participate in cache provenance: editing the prompt (e.g. switching
+  // the output language) must regenerate rather than serve text written
+  // under the old instructions. Reading is side-effect free — the user
+  // file is only materialized further down, on the generate path.
+  const prompt = resolvePrompt("daily", opts.promptOverride);
+  const promptHash = promptFingerprint(prompt);
 
   if (!isToday && !opts.force && existsSync(cached)) {
     try {
       const content = readFileSync(cached, "utf-8");
-      // Only reuse the cache if it was produced by the same engine and
-      // model now being requested; otherwise fall through to regenerate
-      // so a switched engine/model doesn't serve another's stale text.
-      if (cacheMatchesEngine(content, opts.engine.name, opts.model)) {
+      // Only reuse the cache if it was produced by the same engine,
+      // model and prompt now being requested; otherwise fall through to
+      // regenerate so a changed configuration doesn't serve stale text.
+      if (
+        cacheMatchesEngine(content, opts.engine.name, opts.model, promptHash)
+      ) {
         if (opts.streamToStdout) {
           process.stdout.write(content);
           if (!content.endsWith("\n")) process.stdout.write("\n");
@@ -732,7 +745,6 @@ async function generateDailySummary(
     ? startStderrTicker(`sending to ${opts.engine.name}`)
     : null;
 
-  const prompt = resolvePrompt("daily", opts.promptOverride);
   const result = await spawnEngine({
     engine: opts.engine,
     prompt,
@@ -740,6 +752,7 @@ async function generateDailySummary(
     cachePath: cached,
     streamToStdout: opts.streamToStdout,
     model: opts.model,
+    promptHash,
     onFirstChunk: () => {
       if (stopTicker) stopTicker();
     },
@@ -843,6 +856,11 @@ export async function runRangeSummary(
     options.scopeToProjects,
   );
 
+  // Resolve the range prompt up front for the same reason as the daily
+  // path: its fingerprint is part of cache provenance.
+  const metaPrompt = resolvePrompt("range");
+  const metaPromptHash = promptFingerprint(metaPrompt);
+
   if (
     shouldUseRangeCache(
       options.force,
@@ -853,9 +871,11 @@ export async function runRangeSummary(
   ) {
     try {
       const content = readFileSync(rangeCache, "utf-8");
-      // Reuse only when the same engine/model produced it; a switched
-      // engine/model falls through to regenerate.
-      if (cacheMatchesEngine(content, engine.name, options.model)) {
+      // Reuse only when the same engine/model/prompt produced it; a
+      // changed configuration falls through to regenerate.
+      if (
+        cacheMatchesEngine(content, engine.name, options.model, metaPromptHash)
+      ) {
         if (!options.open) {
           process.stdout.write(content);
           if (!content.endsWith("\n")) process.stdout.write("\n");
@@ -1000,7 +1020,6 @@ export async function runRangeSummary(
   // first chunk so it doesn't fight streamed output for the same row.
   const stopMetaTicker = startStderrTicker(`sending to ${engine.name}`);
 
-  const metaPrompt = resolvePrompt("range");
   const metaResult = await spawnEngine({
     engine,
     prompt: metaPrompt,
@@ -1008,6 +1027,7 @@ export async function runRangeSummary(
     cachePath: rangeCache,
     streamToStdout: metaStreams,
     model: options.model,
+    promptHash: metaPromptHash,
     onFirstChunk: () => stopMetaTicker(),
   });
   stopMetaTicker();

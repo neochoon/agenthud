@@ -4,6 +4,23 @@
 
 ### Fixed
 
+- **Concurrent summary runs for the same day+scope collided on scratch files.**
+  The engine's `-o` output path and the cache's `.tmp` path were both derived
+  from the cache path alone (`DATE--<scope>.md.engine-out`), so two runs for the
+  same target — two browser tabs pressing 生成, or a range run racing a daily —
+  shared one file: one read a half-written message while the other unlinked it
+  out from under it. Both names now carry a per-run tag (`<pid>-<random>`), so
+  each run gets its own scratch files and the rename onto the cache path stays
+  the single serialization point. (PR #233 review)
+- **`runRangeSummary` ignored `quiet`.** A range cache hit wrote the whole
+  cached markdown to stdout and narrated on stderr regardless of `quiet`, so the
+  web server — which calls it with `quiet: true` and reads the result back from
+  the cache file — had its own output corrupted. The generate path had the same
+  problem for every progress line: day banners, `N cached / M to generate`,
+  `combining…`, `written to…`, and the stderr ticker. All chatter now goes
+  through one `announce()` guard, matching what the daily path already did.
+  Errors stay unguarded on purpose — quiet means "no chatter", not "no logs".
+  (PR #233 review)
 - **Codex sessions produced zero activities — they were invisible in reports,
   summaries and the activity viewer.** Codex CLI 0.163 moved the transcript from
   `event_msg/user_message` / `agent_message` to role-tagged

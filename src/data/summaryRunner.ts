@@ -46,6 +46,7 @@
  */
 
 import { spawn } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import {
   copyFileSync,
   existsSync,
@@ -437,11 +438,18 @@ function executableFor(engine: SummaryEngine): string {
 function spawnEngine(opts: SpawnEngineOpts): Promise<SpawnEngineResult> {
   return new Promise((resolve) => {
     const engine = opts.engine;
-    // For "file"-mode engines the final answer lands in a temp file
+    // Per-run tag for every scratch file this call creates. Deriving the
+    // names from `cachePath` ALONE made two concurrent runs for the same
+    // date+scope share them — two browser tabs pressing "generate", or a
+    // range run racing a daily. One run then read a half-written message
+    // and the other unlinked the file out from under it. The tag is pid +
+    // randomness: unique per process, unique per concurrent run in it.
+    const runTag = `${process.pid}-${randomBytes(4).toString("hex")}`;
+    // For "file"-mode engines the final answer lands in a scratch file
     // we then read; for "stream"-mode it's parsed from stdout.
     const outFile =
       engine.outputMode === "file" && opts.cachePath
-        ? `${opts.cachePath}.engine-out`
+        ? `${opts.cachePath}.${runTag}.engine-out`
         : undefined;
     const args = engine.buildArgs({
       prompt: opts.prompt,
@@ -542,10 +550,13 @@ function spawnEngine(opts: SpawnEngineOpts): Promise<SpawnEngineResult> {
       // Atomically write the assembled summary to the cache: temp
       // file + rename on success, so a crash mid-generation never
       // leaves a partial file that later reads as a complete summary.
+      // The temp name carries the run tag for the same reason as
+      // `outFile` — a shared `.tmp` let two concurrent runs interleave
+      // partial writes before either renamed.
       const noText = assembledText.trim().length === 0;
       const failed = code !== 0 || noText;
       if (opts.cachePath && !failed) {
-        const tmp = `${opts.cachePath}.tmp`;
+        const tmp = `${opts.cachePath}.${runTag}.tmp`;
         // Stamp the cache with which (engine, model) produced it, so a
         // later run with a different engine/model regenerates rather
         // than serving stale text. The marker is an HTML comment, inert
@@ -917,6 +928,13 @@ export async function runRangeSummary(
   const dates = enumerateDates(options.from, options.to);
   const fromLabel = dateKey(options.from);
   const toLabel = dateKey(options.to);
+  // Progress chatter. `quiet` (the web server) reads the result from the
+  // cache file and surfaces failures itself, so every non-diagnostic
+  // write goes through here. Errors are deliberately NOT routed through
+  // it — quiet means "no chatter", not "no logs".
+  const announce = (msg: string) => {
+    if (!options.quiet) process.stderr.write(msg);
+  };
   const rangeCache = rangeSummaryPath(
     options.from,
     options.to,
@@ -949,14 +967,16 @@ export async function runRangeSummary(
       if (
         cacheMatchesEngine(content, engine.name, options.model, metaPromptHash)
       ) {
-        if (!options.open) {
+        // Same two guards the daily path already applied: `--open` means
+        // the user will read the rendered file anyway, and `quiet` means
+        // the caller wants the text back through the cache file, not
+        // dumped on its stdout.
+        if (!options.open && !options.quiet) {
           process.stdout.write(content);
           if (!content.endsWith("\n")) process.stdout.write("\n");
         }
         // Path last, so it survives a long summary scrolling by.
-        process.stderr.write(
-          `\nrange summary read from cache: ${rangeCache}\n`,
-        );
+        announce(`\nrange summary read from cache: ${rangeCache}\n`);
         try {
           regenerateIndex(summariesDir());
         } catch {
@@ -968,9 +988,7 @@ export async function runRangeSummary(
         }
         return 0;
       }
-      process.stderr.write(
-        `range cache from a different engine/model — regenerating\n`,
-      );
+      announce("range cache from a different engine/model — regenerating\n");
     } catch {
       // fall through to regenerate
     }
@@ -997,10 +1015,8 @@ export async function runRangeSummary(
     else missingCount++;
   }
 
-  process.stderr.write(
-    `range ${fromLabel} → ${toLabel} (${dates.length} days)\n`,
-  );
-  process.stderr.write(`${cachedCount} cached, ${missingCount} to generate\n`);
+  announce(`range ${fromLabel} → ${toLabel} (${dates.length} days)\n`);
+  announce(`${cachedCount} cached, ${missingCount} to generate\n`);
 
   // Generate dailies sequentially. Confirm just-in-time after scan (when --yes is off).
   // Each prompt comes with concrete context (session/activity/commit counts).
@@ -1008,8 +1024,7 @@ export async function runRangeSummary(
   for (const d of dates) {
     const label = dateKey(d);
     const isToday = isSameLocalDay(d, options.today);
-    process.stderr.write(`\n--- ${label} ---\n`);
-
+    announce(`\n--- ${label} ---\n`);
     const willPrompt =
       !options.assumeYes &&
       (isToday ||
@@ -1047,7 +1062,7 @@ export async function runRangeSummary(
       // "the day was empty so we never asked claude". The two look
       // identical at the result-shape level; one neutral message
       // works for both.
-      process.stderr.write(`agenthud: ${label} — skipped.\n`);
+      announce(`agenthud: ${label} — skipped.\n`);
       continue;
     }
     if (res.code !== 0) {
@@ -1058,7 +1073,7 @@ export async function runRangeSummary(
     }
     const text = res.markdown.trim();
     if (text.length === 0 || /^no activity found/i.test(text)) {
-      process.stderr.write(`${label} has no activity — skipping.\n`);
+      announce(`${label} has no activity — skipping.\n`);
       continue;
     }
     dailyMarkdowns.push({ date: d, markdown: text });
@@ -1070,9 +1085,7 @@ export async function runRangeSummary(
     // single-day summary behavior on empty input. Honor `-I` so
     // users running `summary --last 7d -I` as a "navigate to my hub"
     // shortcut still get the index.
-    process.stderr.write(
-      "no daily activity in this range — nothing to combine\n",
-    );
+    announce("no daily activity in this range — nothing to combine\n");
     if (options.openIndex) {
       try {
         regenerateIndex(summariesDir());
@@ -1086,13 +1099,16 @@ export async function runRangeSummary(
 
   const metaInput = buildRangeMetaInput(dailyMarkdowns);
 
-  process.stderr.write(
+  announce(
     `\ncombining ${dailyMarkdowns.length} daily summaries into range summary...\n`,
   );
   const metaStreams = !options.open && !options.quiet;
-  // Same approach as the daily call: ticker always-on, auto-stops on
-  // first chunk so it doesn't fight streamed output for the same row.
-  const stopMetaTicker = startStderrTicker(`sending to ${engine.name}`);
+  // Same approach as the daily call: ticker auto-stops on first chunk so
+  // it doesn't fight streamed output for the same row. Silent callers get
+  // no ticker at all — it is pure progress chatter on stderr.
+  const stopMetaTicker = options.quiet
+    ? null
+    : startStderrTicker(`sending to ${engine.name}`);
 
   const metaResult = await spawnEngine({
     engine,
@@ -1102,18 +1118,18 @@ export async function runRangeSummary(
     streamToStdout: metaStreams,
     model: options.model,
     promptHash: metaPromptHash,
-    onFirstChunk: () => stopMetaTicker(),
+    onFirstChunk: () => stopMetaTicker?.(),
   });
-  stopMetaTicker();
+  stopMetaTicker?.();
 
   if (metaResult.code !== 0) {
     return metaResult.code;
   }
 
-  process.stderr.write("\n");
-  process.stderr.write(`range summary written to ${rangeCache}\n`);
+  announce("\n");
+  announce(`range summary written to ${rangeCache}\n`);
   if (metaResult.usage) {
-    process.stderr.write(`${formatUsage(metaResult.usage)}\n`);
+    announce(`${formatUsage(metaResult.usage)}\n`);
   }
 
   try {

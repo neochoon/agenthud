@@ -29,12 +29,15 @@ For getting started, see [README.md](./README.md).
 | Summaries index hub | `agenthud summary --open-index` / `-I` | v0.12.0 | [Summaries index](#summaries-index) |
 | Subagent visibility in reports | `task` include type | v0.13.0 | [Subagent reporting](#subagent-reporting) |
 | Live event stream | `agenthud follow` | v0.19.x | [Follow](#follow) |
+| Browser UI | `agenthud web` | v0.20.x | [Web UI](#web-ui) |
+| Workspace-scoped report / summary | `--cwd` / `--project` | v0.20.x | [Report](#report) |
 | Global config | `~/.agenthud/config.yaml` | v0.9.0 | [Config](#config) |
 | Effective-options stderr line | (automatic) | v0.12.0 | [Effective options](#effective-options) |
 
 Cross-cutting reference:
 
 - [Keybindings](#keybindings) — full key map (mirrors what `?` shows in-app)
+- [Runtime requirements](#runtime-requirements) — which Node version each source needs
 - [Files & directories](#files--directories) — what lives in `~/.agenthud/`
 - [Environment variables](#environment-variables)
 
@@ -43,7 +46,8 @@ Cross-cutting reference:
 ## Watch
 
 The default mode. Real-time TUI: project tree on top, activity viewer
-on the bottom, both polling `~/.claude/projects/` every ~2 s.
+on the bottom, both polling every agent's session store (see
+[Runtime requirements](#runtime-requirements)) every ~2 s.
 
 **Invocation:** `agenthud` or `agenthud watch` (also `-w`,
 `--watch`).
@@ -128,6 +132,18 @@ humans, JSON for scripts.
 | `--format markdown \| json` | `markdown` | Output format |
 | `--detail-limit N` | `120` | Max chars per activity detail; `0` = unlimited |
 | `--with-git` | off | Merge git commits from each session's project path into the timeline |
+| `--cwd` | off | Only the project containing the current directory |
+| `--project PATH\|NAME` | off | Repeatable. Whitelist of workspaces (absolute paths, or project names unique among discovered projects) |
+
+**Workspace scope:** `--cwd` / `--project` restrict the report to a
+whitelist of projects — pass `--project` more than once to work across
+several at once (`--project agenthud --project desktop_pet`). Resolution
+walks the *discovered* projects (any provider), not `~/.claude/projects/`
+directory names, so a Kiro or DSH workspace scopes correctly; `--cwd`
+picks the deepest project containing the working directory. An unknown
+value exits 1 with the list of known projects, and an ambiguous
+`--project web` (two projects with that name) refuses to guess and asks
+for a path. The resolved whitelist is echoed as `scope = a, b` on stderr.
 
 **Include types:** `user`, `response`, `bash`, `edit`, `thinking`,
 `task`, `read`, `glob`, `commit`. Unknown values error (v0.9.4
@@ -170,11 +186,27 @@ engine**: Claude / Codex / Kiro — see `--engine` below).
 | `--date YYYY-MM-DD \| today \| yesterday \| -Nd` | `today` | Date to summarize |
 | `--engine NAME` | `auto` | Which agent CLI synthesizes the summary: `auto` (first installed of claude → codex → kiro), `claude`, `codex`, `kiro`. Also set via `summary.engine` in config. |
 | `--prompt TEXT` | (template file) | Override prompt inline (daily only) |
+| `--style PATH` | `~/.agenthud/summary-style.md` | Style-reference file to imitate. Also set via `summary.style` (a path, or `false` to disable) |
+| `--no-style` | off | Ignore the style reference for this run |
 | `--force` | off | Regenerate even if cached |
 | `--model NAME` | engine default | Forward to the engine's model flag (e.g. `sonnet`, `gpt-5`, full id) |
 | `-y, --yes` | off | Skip confirmation prompt |
 | `-o, --open` | off | Open the produced summary in OS default app |
 | `-I, --open-index` | off | Open `~/.agenthud/summaries/index.md` |
+| `--cwd` | off | Summarize only the project containing the current directory |
+| `--project PATH\|NAME` | off | Repeatable. Whitelist of workspaces (see [Report](#report)) |
+
+**Workspace scope:** a scoped summary covers the whitelisted projects
+and is cached SEPARATELY —
+`~/.agenthud/summaries/YYYY-MM-DD--<project>-<hash>[+<project>-<hash>].md`
+— so it never overwrites the whole-day digest for the same date, and the
+index lists both (`2026-11-12 (Thu)` and
+`2026-11-12 (Thu) · agenthud + desktop-pet`). The suffix is sorted, so
+the same project set in any order shares one cache file. The backlink
+prev/next chain stays within one scope set, so paging through days never
+jumps between scopes. `scopeToProjects` is applied at discovery, which
+means the payload, the empty-day check and `--with-git` all see only
+those workspaces.
 
 **Behavior:**
 - Builds the markdown payload via `generateReport`. If the day has
@@ -182,11 +214,32 @@ engine**: Claude / Codex / Kiro — see `--engine` below).
   exit 0 without spawning the engine or writing a file (v0.12.2 /
   v0.12.3).
 - Past days are cached at `~/.agenthud/summaries/YYYY-MM-DD.md`
-  and reused on subsequent runs. Today is always regenerated.
+  (scoped: `YYYY-MM-DD--<project>-<hash>.md`) and reused on subsequent
+  runs. Today is always regenerated.
 - Prompt template comes from `~/.agenthud/summary-prompt.md`
   (auto-created on first run from
   `src/templates/summary-prompt.md`); `--prompt` overrides for
-  one run.
+  one run. The shipped template asks for **Simplified Chinese output**
+  in a **weekly-report shape** — `### 工作内容`, project groups numbered
+  `1、` `2、`, items `（1）` `（2）` — and spells out the register rules
+  (omit the subject, 了-suffixed verbs, semicolon-chained parallel
+  actions, close on a state or judgement, state problems plainly).
+  Edit the file to change the language or shape.
+- A **style reference** is prepended to that prompt when the file
+  exists: `~/.agenthud/summary-style.md` by default, `--style <path>` for
+  a one-off, `--no-style` to drop it, `summary.style` in config to point
+  elsewhere or `false` to disable. A missing default file means "off" (no
+  error); an unreadable EXPLICIT path is an error. Capped at 8,000
+  characters, cut at a paragraph break. Feed it a distilled *profile* of
+  your writing, not an archive — tens of KB of real reports costs ~10K
+  input tokens per run and makes the model lift project names and
+  conclusions out of the samples.
+- The prompt is part of the cache key: the provenance marker records a
+  `prompt: <fingerprint>`, so editing the template — or the style
+  reference, which is composed into it — regenerates instead of serving
+  text written under the old instructions. Files written before that
+  field existed are still reused as-is — add `--force` once to re-render
+  them.
 - Token usage line printed at the end (`N in / M out · cache: A
   read, B written · $X.XXXX`) — Claude engine only; Codex/Kiro
   omit it.
@@ -373,6 +426,75 @@ interval (default 2s, `refreshIntervalMs` in config). Broken pipe
 
 **Available since:** v0.19.x.
 
+## Web UI
+
+The same tree and activity viewer as the TUI, in a browser, plus the
+report and summary controls — for people who would rather click than
+memorize keys. **The interface is in Chinese.**
+
+**Invocation:** `agenthud web [--port N] [--open] [--cwd | --project …]`
+
+```bash
+agenthud web                # http://127.0.0.1:7787/?token=…
+agenthud web --port 9000 -o # different port, open the browser
+agenthud web --project a --project b   # start on a workspace whitelist
+agenthud web --cwd          # start scoped to this directory's project
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--port N`, `-p N` | `7787` | Port to listen on; `0` picks a free one |
+| `-o, --open` | off | Open the URL in the default browser |
+| `--cwd` | off | Start scoped to the current directory's project |
+| `--project PATH\|NAME` | off | Repeatable. Start on that project whitelist |
+
+**Layout, and why** — the page is a three-step flow, and only what you can
+act on is open by default:
+
+- **① 勾选工作区** (top, always open, the primary control): one checkbox
+  per discovered project with its session / active counts, plus
+  `全选` / `清空` / `仅活跃`. **At least one workspace must be checked** —
+  the session tree, the report and the summary all show *only* the
+  checked ones. The selection persists in `localStorage`, and the
+  URL/`--project` whitelist seeds it on first load.
+- **② 时间范围** (directly under it): `单日` / `最近 5 天` / `最近 7 天` /
+  `自定义` (two date pickers). The current range and its day count are
+  shown inline; a range over 14 days warns that a range summary costs one
+  model call per day plus one to synthesize.
+- **③ 查看** (right, three tabs): the selected session's activity with
+  click-to-expand tool bodies (Bash output, Read with a dimmed
+  line-number gutter, Edit as a colored diff); the markdown report for
+  the chosen range + whitelist; and a summary pane whose
+  `生成当天摘要` / `生成区间摘要（N 天）` button POSTs to the server and
+  renders the result, with previous summaries collapsed under a
+  `<details>` you open on demand.
+- Only read-only detail is folded away: projects collapse, non-active
+  sessions hide behind `展开 N 个冷会话` (a), tool bodies open on click,
+  the summary history sits behind its `<details>`.
+
+**Behavior:**
+- **Loopback only.** Refuses to bind anything but `127.0.0.1`, and
+  rejects a request whose `Host` header isn't `127.0.0.1:<port>` /
+  `localhost:<port>` — the DNS-rebinding guard.
+- **Token-guarded.** Each run mints a random token, printed as part of
+  the URL; every `/api/*` call needs it (`X-Agenthud-Token`). Another
+  local process, or a stray tab, cannot drive the API without it.
+- The tree polls every 3s using the same discovery the TUI uses, so a
+  session that appears in one appears in the other.
+- `/api/report` takes either `?date=` (one day) or `?from=&to=` (an
+  inclusive range, capped at 62 days); a range returns one document with
+  a `## <date>` section per day. `/api/summary` accepts the same pair and
+  switches to the range runner (per-day dailies, then one synthesis).
+- `GET /api/activity` resolves the file from the server's own discovery;
+  a client-supplied `path` is only checked for consistency, so the
+  endpoint can't be turned into an arbitrary file reader.
+- The summary button POSTs to `/api/summary` and returns the markdown
+  from the cache file; the server calls the runner with `quiet: true`,
+  so nothing is sprayed into its own stdout. Expect 30–90s for a day,
+  longer for a range.
+
+**Available since:** v0.20.x.
+
 ## Config
 
 Global config at `~/.agenthud/config.yaml`. Auto-created on first
@@ -408,6 +530,9 @@ report:
   format: markdown
 
 # Defaults for `agenthud summary` (inherits from report.* when omitted)
+# engine: auto            # auto | claude | codex | kiro
+# model: sonnet           # forwarded to the engine's model flag
+# style: ~/.agenthud/summary-style.md   # or false to disable
 summary: {}
 ```
 
@@ -496,11 +621,29 @@ the `?` overlay renders in-app.
 | `[warm]` | Updated in the last hour | yellow |
 | `[cool]` | Updated earlier today | cyan |
 | `[cold]` | Last updated yesterday or earlier (collapsed by default) | gray |
-| `[working]` | Claude is mid-turn (tool running or about to respond) | green |
-| `[waiting]` | Claude yielded; ball is in your court (incl. `AskUserQuestion`) | magenta |
+| `[working]` | The agent is mid-turn (tool running or about to respond) | green |
+| `[waiting]` | The agent yielded; ball is in your court (incl. `AskUserQuestion`) | magenta |
 
 `[working]` / `[waiting]` replace `[hot]` within the 30-minute window
 (v0.10.0); `warm/cool/cold` stay time-based.
+
+## Runtime requirements
+
+`agenthud` requires **Node.js 20+**. Two session sources depend on a
+built-in Node module that only ships in newer releases; when it is
+absent the provider reports itself unavailable (`isAvailable()` false)
+and is skipped — no error, no crash, the other sources keep working.
+
+| Source | Built-in module used | Minimum Node |
+|---|---|---|
+| Claude Code, Codex CLI, Kiro CLI, Kiro IDE | `node:fs` only | 20 |
+| opencode | `node:sqlite` | 22 |
+| DeepSeek Harness (DSH) | `node:zlib` (zstd) | 22.15 |
+
+`engines` in `package.json` stays at `>=20` on purpose: the binary is
+still useful on Node 20 for four of the five sources. To see what was
+picked up, run `agenthud --once` (per-row provider tag) or
+`agenthud report --format json` (a `provider` field per session).
 
 ## Files & directories
 
@@ -510,12 +653,15 @@ the `?` overlay renders in-app.
 | `~/.agenthud/state.yaml` | Hidden items (app-managed) |
 | `~/.agenthud/summary-prompt.md` | Daily summary prompt template (auto-copied on first run) |
 | `~/.agenthud/summary-range-prompt.md` | Range summary prompt template |
-| `~/.agenthud/summaries/` | Cached daily and range summaries |
+| `~/.agenthud/summary-style.md` | Style reference the summary imitates (optional; absent = off) |
+| `~/.agenthud/summaries/` | Cached daily and range summaries (scoped ones: `DATE--<project>-<hash>.md`) |
 | `~/.agenthud/summaries/index.md` | Auto-generated navigable index |
 | `~/.claude/projects/` | Claude Code session JSONL files (read-only) |
 | `~/.codex/sessions/` | Codex CLI rollout JSONL files (read-only) |
 | `…/Kiro/User/globalStorage/kiro.kiroagent/` | Kiro IDE session + execution files (read-only) |
 | `~/.kiro/sessions/cli/` | Kiro CLI session files (read-only) |
+| `~/.dsh/sessions/` | DSH session logs (`session.v4.jsonl.zstd`, zstd frames — read-only) |
+| `~/.dsh/storages/session_projcache/` | DSH projection cache: titles, model, context gauge, open step (read-only) |
 
 Per-provider on-disk schemas (with `jq` verification commands) are
 documented under [`docs/schemas/`](./docs/schemas/).
@@ -528,6 +674,8 @@ documented under [`docs/schemas/`](./docs/schemas/).
 | `CODEX_SESSIONS_DIR` | Override the Codex sessions directory (default: `~/.codex/sessions`). |
 | `KIRO_SESSIONS_DIR` | Override the Kiro CLI sessions directory (default: `~/.kiro/sessions/cli`). |
 | `KIRO_IDE_SESSIONS_DIR` | Override the Kiro IDE `workspace-sessions` directory. |
+| `DSH_HOME` | Override the DSH data root (default: `~/.dsh`). Sessions and the projection cache are resolved from it. |
+| `DSH_SESSIONS_DIR` | Override the DSH sessions root outright (default: `<DSH_HOME>/sessions`). |
 | `AGENTHUD_HOME` | Override the app data directory (default: `~/.agenthud`). |
 | `WSL_DISTRO_NAME`, `/proc/version` markers | WSL detection (cached for the process; v0.12.4). Affects `--open` opener preference (`wslview` over `xdg-open`) and the cwd-home protection in legacy-config migration. |
 | `NODE_ENV` | Set to `production` by default in the bundled binary to disable React dev-mode profiler accumulation (~12× memory-leak reduction; v0.9.0). |

@@ -60,7 +60,11 @@ import type {
 import { ONE_HOUR_MS, THIRTY_MINUTES_MS } from "../../utils/timeConstants.js";
 import { parseKiroActivitiesFromLines } from "./kiro-activity.js";
 import { pickLatestUserTitle } from "./sessionTitle.js";
-import type { DiscoverOptions, SessionProvider } from "./types.js";
+import {
+  type DiscoverOptions,
+  projectInScope,
+  type SessionProvider,
+} from "./types.js";
 
 export function getKiroSessionsDir(): string {
   return (
@@ -237,12 +241,7 @@ function readRawSessions(
 
     const meta = readMeta(jsonPath);
     if (!meta) continue;
-    if (
-      options?.scopeToProject !== undefined &&
-      meta.cwd !== options.scopeToProject
-    ) {
-      continue;
-    }
+    if (!projectInScope(meta.cwd, options)) continue;
 
     let mtimeMs: number;
     try {

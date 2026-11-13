@@ -15,6 +15,10 @@ const {
   engineMarker,
   parseEngineMarker,
   cacheMatchesEngine,
+  escapeWindowsArg,
+  launchSpec,
+  promptFingerprint,
+  resolveCommandPath,
 } = await import("../../src/data/summaryEngines.js");
 
 const origPath = process.env.PATH;
@@ -48,27 +52,34 @@ function onlyAvailable(...names: string[]): void {
 }
 
 describe("engine arg building", () => {
-  it("claude: stream-json with optional model", () => {
+  it("claude: stream-json with optional model, no positional prompt", () => {
     expect(claudeEngine.buildArgs({ prompt: "P" })).toEqual([
       "-p",
       "--no-session-persistence",
       "--output-format",
       "stream-json",
       "--verbose",
-      "P",
     ]);
     expect(claudeEngine.buildArgs({ prompt: "P", model: "sonnet" })).toContain(
       "--model",
     );
+    // The prompt rides on stdin: argv must stay single-line so the
+    // Windows `.cmd` shim launch can carry it through cmd.exe.
+    expect(claudeEngine.buildArgs({ prompt: "P" })).not.toContain("P");
   });
 
-  it("codex: exec with output file and optional model", () => {
+  it("codex: exec with output file and optional model, no positional prompt", () => {
     const args = codexEngine.buildArgs({ prompt: "P", outFile: "/tmp/out" });
     expect(args[0]).toBe("exec");
     expect(args).toContain("--skip-git-repo-check");
+    // Without --ephemeral every summary call persists a rollout whose cwd
+    // is agenthud's home, which then shows up in agenthud's own tree.
+    expect(args).toContain("--ephemeral");
     expect(args).toContain("-o");
     expect(args).toContain("/tmp/out");
-    expect(args[args.length - 1]).toBe("P");
+    // `codex exec` reads its instructions from stdin when no positional
+    // is given; a positional would also break the Windows shim launch.
+    expect(args).not.toContain("P");
     expect(
       codexEngine.buildArgs({ prompt: "P", model: "gpt-5", outFile: "/x" }),
     ).toContain("-m");
@@ -87,11 +98,10 @@ describe("engine arg building", () => {
 });
 
 describe("engine inputMode", () => {
-  it("kiro takes its prompt via stdin; claude and codex via argv", () => {
+  it("all engines take their prompt via stdin", () => {
+    expect(claudeEngine.inputMode).toBe("stdin");
+    expect(codexEngine.inputMode).toBe("stdin");
     expect(kiroEngine.inputMode).toBe("stdin");
-    // arg-mode engines either omit the field or set it to "arg".
-    expect(claudeEngine.inputMode ?? "arg").toBe("arg");
-    expect(codexEngine.inputMode ?? "arg").toBe("arg");
   });
 });
 
@@ -241,5 +251,207 @@ describe("engine provenance marker", () => {
       expect(cacheMatchesEngine(c, "codex", undefined)).toBe(false);
       expect(cacheMatchesEngine(c, "kiro", undefined)).toBe(false);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Windows shim launching
+//
+// Regression guard for the Windows bug where `agenthud summary` failed
+// with a bogus "codex not found" on every machine: npm installs the CLI
+// as `codex.cmd`, `spawn("codex")` gives ENOENT, and `spawn("codex.cmd")`
+// gives EINVAL. The escape rules below were measured against a real
+// `.cmd` shim forwarding `%*` to Node (the extra `%*` pass is why a
+// caret needs two escape levels), so these expectations are locked.
+// ---------------------------------------------------------------------------
+describe("escapeWindowsArg", () => {
+  it("quotes and escapes a plain argument", () => {
+    expect(escapeWindowsArg("plain")).toBe('^"plain^"');
+  });
+
+  it("escapes spaces so a path survives as one argument", () => {
+    expect(escapeWindowsArg("C:\\Users\\liu zhuo\\out.md")).toBe(
+      '^"C:\\Users\\liu^ zhuo\\out.md^"',
+    );
+  });
+
+  it("escapes cmd metacharacters (% & | < > ( ) , ;)", () => {
+    expect(escapeWindowsArg("e%f")).toBe('^"e^%f^"');
+    expect(escapeWindowsArg("a&b|c")).toBe('^"a^&b^|c^"');
+    expect(escapeWindowsArg("(x)")).toBe('^"^(x^)^"');
+  });
+
+  it("doubles a caret: the shim's %* expansion eats one level", () => {
+    expect(escapeWindowsArg("m^n")).toBe('^"m^^n^"');
+  });
+
+  it("escapes embedded double quotes", () => {
+    expect(escapeWindowsArg('i"j')).toBe('^"i\\^"j^"');
+  });
+
+  it("leaves non-ASCII intact", () => {
+    expect(escapeWindowsArg("中文")).toBe('^"中文^"');
+  });
+});
+
+describe("launchSpec", () => {
+  const asPlatform = (platform: string, fn: () => void) => {
+    const original = Object.getOwnPropertyDescriptor(process, "platform");
+    Object.defineProperty(process, "platform", {
+      value: platform,
+      configurable: true,
+    });
+    try {
+      fn();
+    } finally {
+      if (original) Object.defineProperty(process, "platform", original);
+    }
+  };
+
+  it("passes a POSIX executable through untouched", () => {
+    asPlatform("linux", () => {
+      expect(launchSpec("/usr/local/bin/claude", ["-p", "x"])).toEqual({
+        command: "/usr/local/bin/claude",
+        args: ["-p", "x"],
+      });
+    });
+  });
+
+  it("leaves a real .exe alone on Windows", () => {
+    asPlatform("win32", () => {
+      const spec = launchSpec("C:\\bin\\codex.exe", ["exec"]);
+      expect(spec.command).toBe("C:\\bin\\codex.exe");
+      expect(spec.args).toEqual(["exec"]);
+      expect(spec.windowsVerbatimArguments).toBeUndefined();
+    });
+  });
+
+  it("routes a Windows .cmd shim through cmd.exe with escaped argv", () => {
+    asPlatform("win32", () => {
+      const spec = launchSpec("C:\\npm\\codex.cmd", ["exec", "-o", "/x y"]);
+      expect(spec.command).toBe(process.env.ComSpec || "cmd.exe");
+      expect(spec.args.slice(0, 3)).toEqual(["/d", "/s", "/c"]);
+      expect(spec.args).toHaveLength(4);
+      // Every argv item is quoted and meta-escaped; nothing is left raw.
+      expect(spec.args[3]).toBe(
+        '^"C:\\npm\\codex.cmd^" ^"exec^" ^"-o^" ^"/x^ y^"',
+      );
+      expect(spec.windowsVerbatimArguments).toBe(true);
+    });
+  });
+
+  it("does not shell-wrap a .bat-style path on POSIX", () => {
+    asPlatform("linux", () => {
+      const spec = launchSpec("/tmp/shim.cmd", ["a"]);
+      expect(spec.command).toBe("/tmp/shim.cmd");
+      expect(spec.windowsVerbatimArguments).toBeUndefined();
+    });
+  });
+});
+
+describe("resolveCommandPath", () => {
+  it("returns null when nothing on PATH matches", () => {
+    process.env.PATH = FAKE_BIN;
+    expect(resolveCommandPath("definitely-not-installed")).toBeNull();
+  });
+
+  it("finds the executable on PATH", () => {
+    onlyAvailable("claude");
+    const found = resolveCommandPath("claude");
+    expect(found).not.toBeNull();
+    expect(String(found)).toContain("claude");
+  });
+
+  it("skips an extensionless shim on Windows (not spawnable)", () => {
+    const asPlatform = (platform: string, fn: () => void) => {
+      const original = Object.getOwnPropertyDescriptor(process, "platform");
+      Object.defineProperty(process, "platform", {
+        value: platform,
+        configurable: true,
+      });
+      try {
+        fn();
+      } finally {
+        if (original) Object.defineProperty(process, "platform", original);
+      }
+    };
+    asPlatform("win32", () => {
+      process.env.PATH = FAKE_BIN;
+      // npm writes `codex`, `codex.cmd`, `codex.ps1`; only .cmd/.exe/.bat
+      // can be launched, so the bare shim must be ignored.
+      vi.mocked(existsSync).mockImplementation(
+        (p) => String(p) === join(FAKE_BIN, "tool"),
+      );
+      expect(resolveCommandPath("tool")).toBeNull();
+
+      vi.mocked(existsSync).mockImplementation(
+        (p) => String(p) === join(FAKE_BIN, "tool.cmd"),
+      );
+      expect(resolveCommandPath("tool")).toBe(join(FAKE_BIN, "tool.cmd"));
+    });
+  });
+});
+
+describe("prompt fingerprint in cache provenance", () => {
+  const promptA = "write in English";
+  const promptB = "用中文输出";
+
+  it("stamps the fingerprint into the marker", () => {
+    const fp = promptFingerprint(promptA);
+    const marker = engineMarker("codex", "gpt-5", fp);
+    expect(marker).toContain(`prompt: ${fp}`);
+    expect(parseEngineMarker(marker)).toEqual({
+      engine: "codex",
+      model: "gpt-5",
+      prompt: fp,
+    });
+  });
+
+  it("omits the field when no prompt is given", () => {
+    expect(engineMarker("claude")).toBe(
+      "<!-- agenthud-engine: claude model: default -->",
+    );
+  });
+
+  it("regenerates when the prompt changed (e.g. output language)", () => {
+    const cached = engineMarker("codex", "default", promptFingerprint(promptA));
+    expect(
+      cacheMatchesEngine(
+        cached,
+        "codex",
+        undefined,
+        promptFingerprint(promptA),
+      ),
+    ).toBe(true);
+    expect(
+      cacheMatchesEngine(
+        cached,
+        "codex",
+        undefined,
+        promptFingerprint(promptB),
+      ),
+    ).toBe(false);
+  });
+
+  it("treats a marker without a fingerprint as engine+model only", () => {
+    // Written before the prompt field existed: upgrading must not
+    // silently re-bill every existing summary.
+    const legacy = "<!-- agenthud-engine: codex model: default -->";
+    expect(cacheMatchesEngine(legacy, "codex", undefined, "deadbeef")).toBe(
+      true,
+    );
+  });
+
+  it("still rejects a different engine or model", () => {
+    const fp = promptFingerprint(promptA);
+    const cached = engineMarker("codex", "gpt-5", fp);
+    expect(cacheMatchesEngine(cached, "claude", "gpt-5", fp)).toBe(false);
+    expect(cacheMatchesEngine(cached, "codex", "gpt-6", fp)).toBe(false);
+  });
+
+  it("is stable for the same text and differs for different text", () => {
+    expect(promptFingerprint("abc")).toBe(promptFingerprint("abc"));
+    expect(promptFingerprint("abc")).not.toBe(promptFingerprint("abd"));
+    expect(promptFingerprint("abc")).toMatch(/^[0-9a-f]{8}$/);
   });
 });

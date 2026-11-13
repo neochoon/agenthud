@@ -4,7 +4,7 @@
 [![CI](https://github.com/neochoon/agenthud/actions/workflows/ci.yml/badge.svg)](https://github.com/neochoon/agenthud/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/neochoon/agenthud/branch/main/graph/badge.svg)](https://codecov.io/gh/neochoon/agenthud)
 
-A **heads-up display** for your AI coding agents — **Claude Code**, **OpenAI Codex**, **AWS Kiro**, and **opencode**. AgentHUD reads each agent's on-disk sessions (JSONL files, or opencode's SQLite store) and merges them into one tree, so a project you've touched from several agents shows as a single row with combined sessions and sub-agents.
+A **heads-up display** for your AI coding agents — **Claude Code**, **OpenAI Codex**, **AWS Kiro**, **opencode**, and **DeepSeek Harness (DSH)**. AgentHUD reads each agent's on-disk sessions (JSONL files, opencode's SQLite store, or DSH's zstd-compressed event logs) and merges them into one tree, so a project you've touched from several agents shows as a single row with combined sessions and sub-agents.
 
 ![demo](./demo/live.gif)
 
@@ -14,10 +14,34 @@ It's organized as **three layers, by who's reading** — a human at a glance, a 
 - **`agenthud summary`** — **the daily digest.** Fold a day (or a week) into an LLM engineering summary — a standup-in-one-command habit, via whichever agent CLI you have installed (claude, codex, or kiro-cli, auto-detected).
 - **`agenthud report`** — **the machine layer.** Structured Markdown / JSON. `summary` is literally `report` piped into an agent CLI, so the daily digest isn't a black box — and you can pipe `report` into anything else, too.
 - **`agenthud follow`** — **the live machine feed.** A chronologically-merged stream of every event (activity + state + lifecycle) across all sessions and sub-agents, as human lines or `--json` NDJSON — the read-only substrate a higher-level supervisor can consume. See [FEATURES.md](./FEATURES.md#follow).
+- **`agenthud web`** — **the browser HUD.** The same project tree and activity viewer as a local web page — click a session, expand a tool's output, generate the day's digest — for when keybindings are in the way. Loopback-only and token-guarded. See [FEATURES.md](./FEATURES.md#web-ui).
 
-→ **See [FEATURES.md](./FEATURES.md) for the full surface** — every flag, keybinding, config key, file path, and env var. Per-agent session schemas: [Claude Code](./docs/schemas/claude-session.md) · [Codex CLI](./docs/schemas/codex-session.md) · [Kiro IDE](./docs/schemas/kiro-ide-session.md) · [Kiro CLI](./docs/schemas/kiro-session.md) · [opencode](./docs/schemas/opencode-session.md) (or browse [docs/schemas/](./docs/schemas/)).
+→ **See [FEATURES.md](./FEATURES.md) for the full surface** — every flag, keybinding, config key, file path, and env var. Per-agent session schemas: [Claude Code](./docs/schemas/claude-session.md) · [Codex CLI](./docs/schemas/codex-session.md) · [Kiro IDE](./docs/schemas/kiro-ide-session.md) · [Kiro CLI](./docs/schemas/kiro-session.md) · [opencode](./docs/schemas/opencode-session.md) · [DSH](./docs/schemas/dsh-session.md) (or browse [docs/schemas/](./docs/schemas/)).
 
-Requires Node.js 20+ (opencode sessions need Node 22+ — they're read via the built-in `node:sqlite`; on older Node, opencode is simply skipped and everything else works). Open agenthud in a separate terminal while you work; press `?` inside the TUI for in-app help.
+### Node & agent support
+
+`agenthud` itself needs **Node.js 20+**. Two session sources lean on a
+built-in Node module that only exists in newer releases, so on an older
+Node they report "not detected" instead of failing — everything else
+(including the other agents' projects, `report`, `summary`, `follow`)
+keeps working.
+
+| Agent | Session source | Needs |
+|---|---|---|
+| Claude Code | `~/.claude/projects/*.jsonl` | Node 20+ |
+| Codex CLI | `~/.codex/sessions/**/rollout-*.jsonl` | Node 20+ |
+| Kiro CLI / Kiro IDE | `~/.kiro/sessions/cli/`, `…/kiro.kiroagent/` | Node 20+ |
+| opencode | `opencode.db` — SQLite via `node:sqlite` | **Node 22+** |
+| DeepSeek Harness (DSH) | `<DSH_HOME>/sessions/**/session.v4.jsonl.zstd` — zstd frames via `node:zlib` | **Node 22.15+** |
+
+`package.json` therefore keeps `engines: node >= 20` — bumping it would
+refuse to install on a Node that runs 4 of the 5 sources fine. Check
+which sources were actually picked up with `agenthud --once` (the tree
+shows a per-row provider tag) or `agenthud report --format json` (each
+session carries its `provider`).
+
+Open agenthud in a separate terminal while you work; press `?` inside
+the TUI for in-app help.
 
 ## Try without installing
 
@@ -51,6 +75,13 @@ agenthud summary -oI                      # open the summary + the summaries ind
 agenthud report                           # today's activity as markdown
 agenthud report --format json             # script-readable
 agenthud report --with-git                # merge git commits into the timeline
+
+# 4 · The browser
+agenthud web                              # 中文界面 · 127.0.0.1:7787
+agenthud web -o                           # …and open it
+agenthud report --cwd                     # one workspace only
+agenthud summary --project a --project b  # several workspaces at once
+agenthud summary --cwd                    # …a digest for just that workspace
 ```
 
 ## The live HUD — `agenthud`
@@ -100,7 +131,33 @@ agenthud summary --from 2026-06-01 --to 2026-06-07
 
 The summary runs through an **agent CLI of your choice**. By default it auto-detects the first one installed in `claude → codex → kiro` order; set a default with `summary.engine` in `~/.agenthud/config.yaml`, or override per-run with `--engine <claude|codex|kiro>`. So Claude-, Codex-, and Kiro-only users all get summaries with no extra setup.
 
-Summaries are cached one-file-per-day under `~/.agenthud/summaries/`, cross-linked into a browsable index (`-I` to open it), and stamped with the engine + model that produced them — so switching engines regenerates rather than serving stale text.
+Summaries are cached one-file-per-day under `~/.agenthud/summaries/`, cross-linked into a browsable index (`-I` to open it), and stamped with the engine + model + prompt fingerprint that produced them — so switching engines, editing the prompt, or editing the style reference all regenerate rather than serving stale text.
+
+### Writing in your own voice
+
+A summary is only useful if it reads like something you'd have written. Drop a sample of your own prose in `~/.agenthud/summary-style.md` — a style profile, not a corpus — and it is prepended to both the daily and the range prompt:
+
+```bash
+$ agenthud summary --date yesterday
+prompt = ~/.agenthud/summary-prompt.md
+style reference: ~/.agenthud/summary-style.md (1,833 chars)
+```
+
+```markdown
+### 工作内容
+
+1、agenthud：
+（1）Codex解析修复：定位到Codex 0.163+日志格式变化导致全部会话解析为0条活动，
+    补充了新版消息、工具调用及结果解析，处理了重复记录；实测同一项目已同时
+    包含Codex的133条和DSH的220条活动。
+（2）摘要表达调整：将日摘要和区间摘要改为了简体中文，基于37份周报提炼了
+    表达风格，接入了CLI、配置和前端开关。
+```
+
+- `--style <path>` — use a different file for one run; `--no-style` — drop it.
+- `summary.style: false` in `config.yaml` — never attach one.
+- The file is capped at 8,000 characters (cut at a paragraph break), so a runaway file can't quietly eat the context window. Editing it invalidates the cache, exactly like editing the prompt.
+- **Feed it a profile, not an archive.** Tens of kilobytes of real reports cost ~10K input tokens per run and teach the wrong lesson — the model starts pulling project names and conclusions out of the samples into unrelated summaries. What you want to transfer is register, not substance. The web UI has a checkbox for this next to the engine picker.
 
 ## Scripting & integration — `agenthud report`
 

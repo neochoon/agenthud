@@ -58,7 +58,11 @@ import {
 } from "../../utils/timeConstants.js";
 import { detectLiveState } from "../sessionLiveness.js";
 import { parseActivitiesFromLines, parseModelName } from "./claude-activity.js";
-import type { DiscoverOptions, SessionProvider } from "./types.js";
+import {
+  type DiscoverOptions,
+  projectInScope,
+  type SessionProvider,
+} from "./types.js";
 
 export function getProjectsDir(): string {
   return (
@@ -728,8 +732,6 @@ export function discoverSessions(
 
   const allSessions: SessionNode[] = [];
 
-  const scope = options?.scopeToProject ?? null;
-
   for (const encodedDir of projectDirs) {
     const projectDir = join(projectsDir, encodedDir);
 
@@ -759,7 +761,7 @@ export function discoverSessions(
         // unreadable session file — try the next one
       }
     }
-    if (scope !== null && projectPath !== scope) continue;
+    if (!projectInScope(projectPath, options)) continue;
     const projectName = basename(projectPath);
 
     for (const file of files) {

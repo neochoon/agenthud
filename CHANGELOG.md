@@ -4,6 +4,59 @@
 
 ### Fixed
 
+- **Concurrent summary runs for the same day+scope collided on scratch files.**
+  The engine's `-o` output path and the cache's `.tmp` path were both derived
+  from the cache path alone (`DATE--<scope>.md.engine-out`), so two runs for the
+  same target — two browser tabs pressing 生成, or a range run racing a daily —
+  shared one file: one read a half-written message while the other unlinked it
+  out from under it. Both names now carry a per-run tag (`<pid>-<random>`), so
+  each run gets its own scratch files and the rename onto the cache path stays
+  the single serialization point. (PR #233 review)
+- **`runRangeSummary` ignored `quiet`.** A range cache hit wrote the whole
+  cached markdown to stdout and narrated on stderr regardless of `quiet`, so the
+  web server — which calls it with `quiet: true` and reads the result back from
+  the cache file — had its own output corrupted. The generate path had the same
+  problem for every progress line: day banners, `N cached / M to generate`,
+  `combining…`, `written to…`, and the stderr ticker. All chatter now goes
+  through one `announce()` guard, matching what the daily path already did.
+  Errors stay unguarded on purpose — quiet means "no chatter", not "no logs".
+  (PR #233 review)
+- **Codex sessions produced zero activities — they were invisible in reports,
+  summaries and the activity viewer.** Codex CLI 0.163 moved the transcript from
+  `event_msg/user_message` / `agent_message` to role-tagged
+  `response_item/message` items, and replaced named `exec_command` calls with a
+  single `exec` orchestrator whose `input` is JavaScript. Every rollout in a
+  33-session corpus (0.163 → 0.167.0-alpha) uses the new shape, so the parser
+  matched nothing while still *listing* the session — the tree looked fine and
+  the digests silently contained only the other agents. The parser now reads
+  `response_item/message` (user/assistant; `developer` skipped), the plaintext
+  `reasoning` summaries, and both `function_call` and `custom_tool_call`
+  (unwrapping `tools.exec_command({cmd})` / `tools.apply_patch` to a readable
+  row + the matching `*_output` as its expandable body). `request_user_input*`
+  maps to `AskUserQuestion`, `apply_patch` to `Edit`. Titles and the context
+  gauge were broken by the same change and are fixed with it. The
+  `event_msg/item_completed` mirror is deliberately NOT parsed (it would double
+  every row). Schema doc updated: [docs/schemas/codex-session.md](./docs/schemas/codex-session.md).
+- **Codex summary calls no longer pollute agenthud's own session tree.** Every
+  `agenthud summary --engine codex` run wrote a rollout under
+  `~/.codex/sessions/` whose `cwd` was agenthud's home, so the generated
+  sessions reappeared as a `.agenthud` project in agenthud's own tree (one per
+  run). The codex engine now passes `codex exec --ephemeral` ("run without
+  persisting session files to disk") — the same self-pollution the claude engine
+  already avoided with `-p --no-session-persistence` (v0.9.3). Verified: a run
+  still writes its `-o` output and exits 0, with zero new rollout files.
+- **`agenthud summary` failed on Windows with a bogus "not found" error.** The
+  summary engines are npm-installed CLIs, i.e. `codex.cmd` shims, and Node can
+  neither spawn the bare name (`ENOENT` — `CreateProcess` only resolves `.exe`)
+  nor the shim itself (`EINVAL` — Node refuses to run a batch file). Result: on
+  every Windows machine the run died with `Error: codex not found. Install: npm
+  i -g @openai/codex` even though the CLI was installed and authenticated. The
+  resolver now returns the shim's real path (`PATHEXT`-aware, preferring the
+  `.cmd`, never the extensionless bash shim) and the launch is routed through
+  `cmd.exe /d /s /c` with cmd-specific argument escaping (spaces, quotes, `%`,
+  `!`, `&`, `|`, `<`, `>`, parens, commas, semicolons, `^` at two levels — the
+  `%*` re-expansion in the shim eats one). Verified end to end against a real
+  shim and the real `codex.cmd`.
 - **opencode tool labels** are now canonicalized (`read` → `Read`, `grep` →
   `Grep`, …) and carry per-tool icons, matching the claude/kiro providers
   instead of surfacing raw lowercase names with the default glyph. The
@@ -17,7 +70,95 @@
 - **Skill / Read / cwd-based project path** edge cases fixed alongside search
   (#201, #204, #205).
 
+### Changed
+- **Summary prompts now ask for Simplified Chinese output in a weekly-report
+  shape.** Both templates (`summary-prompt.md`, `summary-range-prompt.md`)
+  instruct the model to write in 简体中文 and drop the old five-section skeleton
+  (`背景` / `主要成果` / `技术洞察` / …) for the shape an engineer's own weekly
+  report uses: `### 工作内容`, then project groups numbered `1、` `2、` with
+  `（1）` `（2）` items inside. The register rules are spelled out — omit the
+  subject (never "我"), 了-suffixed verbs, semicolon-chained parallel actions,
+  close on a state or judgement, state problems plainly, quantify when the log
+  gives numbers, no emoji / `-` bullets / bold-as-heading. Code identifiers,
+  paths, commands, commit hashes and model names stay untranslated. The daily
+  template also no longer says "Claude Code sessions" — it covers all six
+  sources.
+- **The prompt is now part of cache provenance.** The provenance marker gained
+  a `prompt: <fingerprint>` field, so editing the prompt (or the style
+  reference, which is composed into it) regenerates instead of serving text
+  written under the old instructions. A marker WITHOUT the field (written
+  before this change) is still matched on engine + model only — upgrading must
+  not silently re-bill every existing summary — so pass `--force` once to
+  re-render old files in the new language and shape.
+- **Index previews follow the new shape.** `extractContextSnippet` used to take
+  the first non-heading line, which under the weekly-report layout was the
+  project-group header — so every index entry read `agenthud — 1、agenthud：`,
+  repeating the scope label. Group headers are now skipped and item markers
+  (`（1）` / `(1)` / `1）` / `①`) stripped, so the preview is the first item's
+  content. Old five-section summaries preview unchanged.
+
 ### Added
+- **Style reference — write the summary in your own voice.** Put a sample of
+  your own prose in `~/.agenthud/summary-style.md` and it is prepended to both
+  the daily and the range prompt, so the digest imitates how you actually
+  write. `--style <path>` for a one-off file, `--no-style` to drop it,
+  `summary.style: false` (or a path) in `config.yaml`, and a checkbox in the
+  web UI beside the engine picker. A missing default file simply means "off";
+  only an unreadable EXPLICIT path is an error. Capped at 8,000 characters,
+  cut at a paragraph break, so a runaway file can't eat the context window.
+  Deliberately a *profile*, not a corpus: tens of KB of real reports costs
+  ~10K input tokens per run and teaches the model to lift project names and
+  conclusions out of the samples into unrelated summaries.
+  `GET /api/style` reports which file a run would use, so "my style is being
+  picked up" is verifiable without generating anything.
+
+- **`agenthud web`** — a browser UI over the same tree and activity data,
+  **in Chinese**, built as a three-step flow. **① 勾选工作区**: one checkbox per
+  project (with `全选` / `清空` / `仅活跃`); at least one is required and the
+  session tree, report and summary show *only* the checked ones. **② 时间范围**:
+  `单日` / `最近 5 天` / `最近 7 天` / `自定义` date-to-date, with the day count and
+  the model-call cost shown inline. **③ 查看**: 活动 / 报告 / 摘要 tabs, the last
+  generating a day or range digest through the same engine path as the CLI.
+  Only read-only detail is folded away (projects collapse, non-active sessions
+  hide behind `展开 N 个冷会话`, tool bodies open on click, summary history sits
+  under a `<details>`). One self-contained HTML file
+  (`src/server/web-ui.html`, no framework, no CDN, works offline) served by
+  `node:http`, **loopback-only**, with a `Host`-header check (DNS-rebinding
+  guard) and a per-run token that every `/api/*` call must present. Session-file
+  paths in activity requests are validated against current discovery, so the
+  endpoint can't be used to read arbitrary files. `--port`, `--open`, `--cwd`,
+  repeated `--project`.
+- **Date ranges in the web UI** — `/api/report` accepts `?from=&to=` (inclusive,
+  capped at 62 days) and returns one document with a `## <date>` section per day;
+  `/api/summary` accepts the same pair and switches to the range runner (per-day
+  dailies, then one synthesis). An inverted or half-specified range is a 400 with
+  a readable message.
+- **Workspace-scoped report & summary** — `--cwd` (this directory's project)
+  and a REPEATABLE `--project <path|name>` on `report` and `summary` restrict
+  the run to a whitelist of workspaces (`--project a --project b`), so a
+  multi-project day no longer drowns one project's digest and related projects
+  can be summarized together.
+  Resolution is provider-neutral (it walks the *discovered* projects, so Kiro
+  and DSH workspaces work), `--cwd` picks the deepest containing project, and
+  an ambiguous `--project web` errors with the candidate paths instead of
+  guessing. A scoped digest is cached separately
+  (`YYYY-MM-DD--<project>-<hash>.md`) so it never overwrites the whole-day
+  digest; the index labels both and the backlink chain stays within one scope.
+- **DSH (DeepSeek Harness) provider** — agenthud now discovers sessions
+  written by DeepSeek Harness, alongside Claude Code, Codex, Kiro and
+  opencode. DSH stores each session as `<DSH_HOME>/sessions/<encoded-cwd>/
+  <sessionId>/session.v4.jsonl.zstd`: JSONL compressed as **one concatenated
+  zstd frame per append**, a container `node:zlib` will only decode the first
+  frame of, so the provider walks the frame structure itself (RFC 8878) and
+  decodes frame by frame — no new dependency. Discovery reads just the first
+  frame (the session header: id / cwd / parent / delegation depth) plus DSH's
+  own per-session projection cache, so a 171-session corpus refreshes in ~20 ms
+  warm. Sub-agents nest via `parentSession`; titles, model, context gauge and
+  `working`/`waiting` come from the projection cache. User rows are filtered to
+  real human input (`source.kind`), and DSH's snake_case tools are canonicalized
+  (`pwsh` → `Bash`, `read_image` → `Read`, …). Requires Node 22.15+ (built-in
+  zstd); on Node 20 the provider is skipped like opencode under 22. Schema and
+  verification commands: [docs/schemas/dsh-session.md](./docs/schemas/dsh-session.md).
 - **In-pane search (`/`)** — text search scoped to the focused pane, distinct
   from the `f` type-filter. **Search persists**: typing narrows to matches;
   `↵` with no `↑`/`↓` navigation *filter-confirms* (keeps the narrowed view

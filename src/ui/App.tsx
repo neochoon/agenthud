@@ -705,7 +705,7 @@ export function App({
   const migrationWarning = useMemo(() => hasProjectLevelConfig(), []);
 
   const discoverOptions = useMemo(
-    () => (scopeToProject ? { scopeToProject } : undefined),
+    () => (scopeToProject ? { scopeToProjects: [scopeToProject] } : undefined),
     [scopeToProject],
   );
 

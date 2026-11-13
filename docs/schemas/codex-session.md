@@ -155,18 +155,54 @@ message is the session's intent.
 
 | `payload.type` | Shape |
 |---|---|
-| `message` | `{ role: "user"\|"assistant"\|"developer", content: [{ type: "input_text"\|"output_text", text }] }` |
+| `message` | `{ role: "user"\|"assistant"\|"developer", content: [{ type: "input_text"\|"output_text"\|"input_image", text }] }` |
 | `function_call` | `{ name, call_id, arguments }` (arguments is a JSON STRING) |
 | `function_call_output` | `{ call_id, output }` (output is a string; for exec it embeds wall-time + exit code + captured stdout) |
-| `reasoning` | `{ summary, encrypted_content }` |
+| `custom_tool_call` | 0.163+ only — `{ name: "exec", call_id, input }` where `input` is **JavaScript source** (see below) |
+| `custom_tool_call_output` | 0.163+ only — `{ call_id, output: [{ type: "input_text", text }] }` |
+| `reasoning` | `{ summary: [{ type: "summary_text", text }], encrypted_content }` |
 | `tool_search_call` / `tool_search_output` | tool-discovery RPC |
 
 ### Tool names (`function_call.name`)
 
-Observed: `exec_command` (the workhorse — runs shell), plus the
+**Pre-0.163:** `exec_command` (the workhorse — runs shell), plus the
 multi-agent trio `spawn_agent` / `wait_agent` / `close_agent`.
 `exec_command` arguments: `{ cmd, workdir, yield_time_ms,
 max_output_tokens }`.
+
+**0.163+ (verified on 0.163 → 0.167.0-alpha):** named tool calls were
+replaced by a single `exec` **orchestrator** whose `input` is V8 source
+that calls nested tools:
+
+```
+text(await tools.exec_command({cmd:"Get-Content -LiteralPath 'AGENT.md' -Encoding UTF8","max_output_tokens":10000}));
+```
+
+Inner tool names seen in a 33-session corpus: `exec_command` (1200),
+`apply_patch` (333), `write_stdin` (184). The remaining
+`function_call` names are orchestration only: `wait` (86),
+`request_user_input_async` (19), `sleep` (7), `js` (6),
+`request_user_input` (2).
+
+agenthud unwraps this: the inner tool name becomes the row label
+(`exec_command` → `Bash`, `apply_patch` → `Edit`) and its `cmd` /
+`path` becomes the detail (`execInputDetail` in
+`src/data/providers/codex.ts`). `request_user_input_async` carries
+`{ questions: [{ title, options }] }` and maps to `AskUserQuestion`.
+
+### `event_msg/item_completed` is a mirror — do not double count
+
+0.163+ also emits `event_msg` / `item_completed` with
+`item.type ∈ { UserMessage, AgentMessage, CommandExecution }` for the
+UI. It duplicates the `response_item` transcript (the same class of
+duplication as DSH's `tool-call` blocks vs `tool/call` events), so the
+provider parses `response_item` only.
+
+### Reasoning is encrypted
+
+`reasoning` records carry `encrypted_content`; only the `summary`
+blocks are plaintext, and they are frequently empty (702 of 2152 in the
+corpus). Empty ones produce no `Thinking` row.
 
 ## Sub-agents — separate rollout files, linked by id
 
@@ -220,9 +256,9 @@ Implemented in `src/data/providers/codex.ts`.
 | Project grouping | `session_meta.cwd` |
 | Model | latest `turn_context.model` |
 | Context gauge | `token_count.info.last_token_usage.total_tokens / model_context_window` |
-| Row description | first non-`<environment_context>` `user_message.message` |
+| Row description | first non-`<environment_context>` user turn — `response_item/message` role `user` (0.163+), else `event_msg/user_message` |
 | Recency | file mtime |
-| Activities | `event_msg.user_message`/`agent_message`, `response_item.function_call` (exec_command → Bash, spawn_agent → Task) |
+| Activities | `response_item/message` (user/assistant; `developer` skipped), `response_item/reasoning` summary text, `response_item/function_call` + `custom_tool_call` (with `*_output` as the expandable body) |
 | Per-file parse cache | keyed by (path, mtime) — cold rollouts never re-read |
 
 ## Verify the schema yourself
@@ -242,6 +278,10 @@ jq -r 'select(.type=="response_item") | .payload.type' "$F" | sort | uniq -c
 
 # tool names used
 jq -r 'select(.payload.type=="function_call") | .payload.name' "$F" | sort | uniq -c
+
+# 0.163+: inner tool names inside the exec orchestrator's JS
+jq -r 'select(.payload.type=="custom_tool_call") | .payload.input' "$F" \
+  | grep -o 'tools\.[A-Za-z0-9_]*' | sort | uniq -c
 
 # session source (cli vs subagent) across ALL sessions
 for f in "$ROOT"/*/*/*/*.jsonl; do
@@ -264,12 +304,20 @@ If any output surprises you, this doc is wrong — open an issue.
   chronological.
 - `model` is per-turn (`turn_context`), not per-session — a session
   can switch models mid-conversation.
-- The first `user_message` is usually a synthetic
-  `<environment_context>` block; skip it for the title.
+- The first user turn is usually a synthetic `<environment_context>`
+  block (pre-0.163) or a `developer`-role message (0.163+); skip both
+  for the title.
 - `function_call.arguments` and some `function_call_output.output`
   fields are JSON encoded as STRINGS — double-parse.
-- `reasoning` items carry `encrypted_content`; the plaintext
-  reasoning is not recoverable from the rollout.
+- `reasoning` items carry `encrypted_content`; only the `summary`
+  blocks are readable, and often absent.
+- **0.163+ broke the old parser silently.** The transcript moved from
+  `event_msg/user_message` to `response_item/message`, so a parser that
+  only knows the old shape yields ZERO activities while still listing
+  the session — the failure mode is invisible in the tree and shows up
+  as "codex sessions are missing from my report". Verified on a
+  33-session corpus spanning 0.163 → 0.167.0-alpha: none of them still
+  emit `user_message`.
 - Sub-agent depth can exceed 1 (`thread_spawn.depth`); a child
   could spawn its own children. A discovery pass should handle
   arbitrary depth via `parent_thread_id` chains.

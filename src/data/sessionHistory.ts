@@ -8,8 +8,10 @@
  *   without touching the filesystem, while callers that already
  *   have a path stay one-liners.
  * - Provider routing happens here, not in the parser. We sniff the
- *   path: `~/.kiro/sessions/cli/` → Kiro, otherwise → Claude. The
- *   default-to-Claude lets unmodified callers (sessionHistory tests,
+ *   path against each provider's own predicate / configured root
+ *   (opencode's synthetic prefix, DSH's `.jsonl.zstd` + sessions root,
+ *   kiro / kiro-ide / codex roots); anything else defaults to Claude.
+ *   The default lets unmodified callers (sessionHistory tests,
  *   reportGenerator, etc.) work unchanged for Claude paths.
  */
 
@@ -25,6 +27,7 @@ import { dirname } from "node:path";
 import type { ActivityEntry } from "../types/index.js";
 import { claudeProvider } from "./providers/claude.js";
 import { codexProvider, getCodexSessionsDir } from "./providers/codex.js";
+import { dshProvider, isDshSessionPath } from "./providers/dsh.js";
 import { getKiroSessionsDir, kiroProvider } from "./providers/kiro.js";
 import {
   getKiroIdeSessionsDir,
@@ -48,6 +51,10 @@ const norm = (p: string) => p.replace(/\\/g, "/");
 // nodes constructed before an env change. Claude is the default.
 function providerForPath(filePath: string): SessionProvider {
   if (filePath.startsWith(OPENCODE_PATH_PREFIX)) return opencodeProvider;
+  // DSH logs are `.jsonl.zstd` (a compressed multi-frame container) under
+  // the DSH sessions root; the provider's own predicate covers both the
+  // configured root and the suffix, so routing survives an env change.
+  if (isDshSessionPath(filePath)) return dshProvider;
   const p = norm(filePath);
   if (
     p.startsWith(`${norm(getKiroSessionsDir())}/`) ||
@@ -243,15 +250,19 @@ export function parseSessionHistory(filePath: string): ActivityEntry[] {
 
   const provider = providerForPath(filePath);
 
-  // Non-line-delimited (Kiro IDE single JSON doc): always whole-file.
+  // Non-line-delimited (Kiro IDE single JSON doc, DSH zstd frames):
+  // always whole-file. `readRecords` lets a provider own its container
+  // format (DSH has to decode frames, and bounds the decoded window
+  // itself); the rest split plain UTF-8.
   if (!provider.lineDelimited) {
-    let content: string;
+    let lines: string[];
     try {
-      content = readFileSync(filePath, "utf-8");
+      lines = provider.readRecords
+        ? provider.readRecords(filePath)
+        : readFileSync(filePath, "utf-8").trim().split("\n").filter(Boolean);
     } catch {
       return [];
     }
-    const lines = content.trim().split("\n").filter(Boolean);
     const activities = provider.parseActivities(lines, { mtimeMs }).activities;
     return storeEntry(filePath, {
       mtimeMs,

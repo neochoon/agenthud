@@ -8,6 +8,25 @@ see [FEATURES.md](./FEATURES.md).
 
 ## Unreleased (post-0.19.0)
 
+- **Style reference — the digest writes in your voice**: a profile of your own
+  prose at `~/.agenthud/summary-style.md` is prepended to both summary prompts,
+  so the output imitates your register instead of a generic report. The
+  templates themselves were reshaped to a weekly-report layout (project groups
+  numbered `1、`, items `（1）`, subject dropped). `--style` / `--no-style` /
+  `summary.style`, a web-UI checkbox, and an 8,000-char cap; the composed
+  prompt is what gets fingerprinted, so editing the style file invalidates the
+  cache like editing the prompt.
+- **`agenthud web`**: the TUI's two panes — plus report/summary controls — in a
+  Chinese, action-first browser page (workspace whitelist on top, read-only
+  detail collapsed). One self-contained HTML file, loopback-only, token-guarded.
+- **Workspace-scoped `report` / `summary`** (`--cwd` / repeatable `--project`):
+  a whitelist of workspaces at once, cached per scope set so it never replaces
+  the whole-day digest.
+- **DSH (DeepSeek Harness) provider**: a sixth session source joins the tree —
+  built-in zstd multi-frame decoding, sub-agent nesting via `parentSession`,
+  and titles/model/context-gauge/live-state taken from DSH's own projection
+  cache. The provider plug-in layer (`src/data/providers/`) needed one new
+  optional hook (`readRecords`) for container formats that aren't plain JSONL.
 - **agenthud follow**: live merged event stream (activity + state + lifecycle)
   across all sessions and sub-agents, as human-readable lines or NDJSON
   (`--json`); `--since`, `--include`, and `--once` for backfill control — the

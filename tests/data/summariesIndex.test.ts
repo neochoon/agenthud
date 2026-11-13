@@ -307,6 +307,43 @@ describe("extractContextSnippet", () => {
     expect(extractContextSnippet("## Context\n\n## More\n")).toBeNull();
   });
 
+  it("skips a project-group header and strips the item marker", () => {
+    // The weekly-report shape: the group header repeats the scope label
+    // the index already prints, so the teaser must come from the first
+    // item — with its "（1）" marker removed.
+    const content = [
+      "### 工作内容",
+      "",
+      "1、agenthud：",
+      "（1）会话来源接入：增加了DSH session provider，补充了Node 22.15+要求。",
+      "（2）网页功能开发：开发了中文Web UI。",
+      "",
+    ].join("\n");
+    expect(extractContextSnippet(content)).toBe(
+      "会话来源接入：增加了DSH session provider，补充了Node 22.15+要求。",
+    );
+  });
+
+  it("strips every marker form the templates allow", () => {
+    for (const marker of ["（1）", "(1)", "1）", "①"]) {
+      const content = `### 工作内容\n\n1、proj：\n${marker}条目名：内容。\n`;
+      expect(extractContextSnippet(content)).toBe("条目名：内容。");
+    }
+  });
+
+  it("does not mistake a dated prose line for a group header", () => {
+    const content = "2026年11月12日的主要工作：\n\n其他内容。\n";
+    expect(extractContextSnippet(content)).toBe("2026年11月12日的主要工作：");
+  });
+
+  it("still previews an old five-section summary", () => {
+    const content =
+      "## 背景\n\n我围绕 agenthud 完善多来源会话汇总。\n\n## 主要成果\n";
+    expect(extractContextSnippet(content)).toBe(
+      "我围绕 agenthud 完善多来源会话汇总。",
+    );
+  });
+
   it("returns null for a file with only the backlink footer (no body)", () => {
     const content =
       "<!-- agenthud-backlinks-start -->\n[← all](./index.md)\n<!-- agenthud-backlinks-end -->\n";

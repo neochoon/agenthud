@@ -46,6 +46,7 @@
  */
 
 import { spawn } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import {
   copyFileSync,
   existsSync,
@@ -65,14 +66,23 @@ import { agenthudHome } from "../utils/agenthudHome.js";
 import { openInDefaultApp } from "../utils/openInDefaultApp.js";
 import { startStderrTicker } from "../utils/stderrTicker.js";
 import { generateReport } from "./reportGenerator.js";
+import { scopeSuffixFor } from "./scope.js";
 import { discoverSessions } from "./sessions.js";
 import { regenerateIndex } from "./summariesIndex.js";
 import type { SummaryEngine } from "./summaryEngines.js";
 import {
   cacheMatchesEngine,
   engineMarker,
+  launchSpec,
+  promptFingerprint,
+  resolveCommandPath,
   resolveSummaryEngine,
 } from "./summaryEngines.js";
+import {
+  composePromptWithStyle,
+  resolveStyleReference,
+  type StyleReference,
+} from "./summaryStyle.js";
 
 export interface SummaryOptions {
   date: Date;
@@ -95,6 +105,19 @@ export interface SummaryOptions {
   open?: boolean;
   /** Launch ~/.agenthud/summaries/index.md in the OS default app. */
   openIndex?: boolean;
+  /** Whitelist of absolute project paths (see scope.ts). Undefined or
+   * empty = every project of the day. The scope set is part of the cache
+   * filename, so a scoped digest never replaces the whole-day one. */
+  scopeToProjects?: string[];
+  /** Non-interactive caller (the web server): suppress the markdown
+   * stream on stdout and the progress lines on stderr, so the caller can
+   * read the result back from the cache file instead of having it mixed
+   * into its own output. */
+  quiet?: boolean;
+  /** Explicit style-reference file (`--style` / `summary.style`). */
+  stylePath?: string;
+  /** Drop the style reference for this run (`--no-style`). */
+  noStyle?: boolean;
 }
 
 export interface RangeSummaryOptions {
@@ -116,6 +139,15 @@ export interface RangeSummaryOptions {
   open?: boolean;
   /** Launch ~/.agenthud/summaries/index.md in the OS default app. */
   openIndex?: boolean;
+  /** Whitelist of absolute project paths applied to every day of the
+   * range. Undefined or empty = every project. */
+  scopeToProjects?: string[];
+  /** Non-interactive caller: no stdout stream, no progress lines. */
+  quiet?: boolean;
+  /** Explicit style-reference file (`--style` / `summary.style`). */
+  stylePath?: string;
+  /** Drop the style reference for this run (`--no-style`). */
+  noStyle?: boolean;
 }
 
 type PromptKind = "daily" | "range";
@@ -171,16 +203,64 @@ function templatePath(kind: PromptKind): string {
   return join(here, "templates", promptFilename(kind));
 }
 
+/** One-line stderr description of the style reference in effect, or ""
+ * when there is none. Home-relative and forward-slashed so the path reads
+ * the same on Windows as on POSIX. */
+export function formatStyleSource(style: StyleReference): string {
+  if (!style.text || !style.path) return "";
+  const home = homedir();
+  const shown = (
+    style.path.startsWith(home)
+      ? `~${style.path.slice(home.length)}`
+      : style.path
+  ).replace(/\\/g, "/");
+  const chars = style.text.length.toLocaleString("en-US");
+  return `${shown} (${chars} chars${style.truncated ? ", truncated" : ""})`;
+}
+
+/**
+ * Resolve the style reference once per run and report a broken explicit
+ * path. Returns null when the run must abort (only for `--style` pointing
+ * at something unreadable — a missing default file is simply "off").
+ */
+function resolveStyleForRun(
+  opts: { stylePath?: string; noStyle?: boolean },
+  announce: boolean,
+): StyleReference | null {
+  const style = resolveStyleReference({
+    path: opts.stylePath,
+    disabled: opts.noStyle,
+  });
+  if (style.error) {
+    process.stderr.write(`agenthud: ${style.error}\n`);
+    return null;
+  }
+  if (announce) {
+    const label = formatStyleSource(style);
+    if (label) process.stderr.write(`style reference: ${label}\n`);
+  }
+  return style;
+}
+
 function dateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function dailyCachePath(date: Date): string {
-  return join(summariesDir(), `${dateKey(date)}.md`);
+export function dailySummaryPath(date: Date, scopes?: string[]): string {
+  const suffix = scopeSuffixFor(scopes);
+  return join(summariesDir(), `${dateKey(date)}${suffix}.md`);
 }
 
-function rangeCachePath(from: Date, to: Date): string {
-  return join(summariesDir(), `range-${dateKey(from)}_${dateKey(to)}.md`);
+export function rangeSummaryPath(
+  from: Date,
+  to: Date,
+  scopes?: string[],
+): string {
+  const suffix = scopeSuffixFor(scopes);
+  return join(
+    summariesDir(),
+    `range-${dateKey(from)}_${dateKey(to)}${suffix}.md`,
+  );
 }
 
 function isSameLocalDay(a: Date, b: Date): boolean {
@@ -316,6 +396,9 @@ interface SpawnEngineOpts {
   streamToStdout: boolean;
   /** Forwarded to the engine's model flag if set. */
   model?: string;
+  /** Prompt fingerprint, stamped into the cache marker so a prompt
+   * change invalidates the cache. */
+  promptHash?: string;
   /**
    * Fires once, when the first chunk of summary text arrives. The
    * caller uses this to stop the "sending to <engine>" stderr ticker
@@ -331,6 +414,21 @@ interface SpawnEngineResult {
 }
 
 /**
+ * Path to actually spawn for an engine.
+ *
+ * POSIX resolves PATH itself, so the bare command name is correct
+ * there — and keeping it verbatim means a user's `claude` wrapper
+ * script still works. On Windows a bare name does NOT resolve: only
+ * `.exe` is found by name, an npm-installed CLI is a `.cmd` shim, and
+ * Node refuses to spawn a `.cmd`/`.bat` directly (EINVAL). So resolve
+ * the shim's real path and let `launchSpec` route it through cmd.exe.
+ */
+function executableFor(engine: SummaryEngine): string {
+  if (process.platform !== "win32") return engine.command;
+  return resolveCommandPath(engine.command) ?? engine.command;
+}
+
+/**
  * Spawn the resolved summary engine, feed it the report on stdin,
  * collect the summary text (streamed from stdout, or read from the
  * engine's output file for "file"-mode engines like Codex), and
@@ -340,20 +438,31 @@ interface SpawnEngineResult {
 function spawnEngine(opts: SpawnEngineOpts): Promise<SpawnEngineResult> {
   return new Promise((resolve) => {
     const engine = opts.engine;
-    // For "file"-mode engines the final answer lands in a temp file
+    // Per-run tag for every scratch file this call creates. Deriving the
+    // names from `cachePath` ALONE made two concurrent runs for the same
+    // date+scope share them — two browser tabs pressing "generate", or a
+    // range run racing a daily. One run then read a half-written message
+    // and the other unlinked the file out from under it. The tag is pid +
+    // randomness: unique per process, unique per concurrent run in it.
+    const runTag = `${process.pid}-${randomBytes(4).toString("hex")}`;
+    // For "file"-mode engines the final answer lands in a scratch file
     // we then read; for "stream"-mode it's parsed from stdout.
     const outFile =
       engine.outputMode === "file" && opts.cachePath
-        ? `${opts.cachePath}.engine-out`
+        ? `${opts.cachePath}.${runTag}.engine-out`
         : undefined;
     const args = engine.buildArgs({
       prompt: opts.prompt,
       model: opts.model,
       outFile,
     });
-    const proc = spawn(engine.command, args, {
+    const spec = launchSpec(executableFor(engine), args);
+    const proc = spawn(spec.command, spec.args, {
       stdio: ["pipe", "pipe", "pipe"],
       cwd: agenthudHomeDir(),
+      ...(spec.windowsVerbatimArguments
+        ? { windowsVerbatimArguments: true }
+        : {}),
     });
 
     const parser = engine.makeParser();
@@ -441,15 +550,18 @@ function spawnEngine(opts: SpawnEngineOpts): Promise<SpawnEngineResult> {
       // Atomically write the assembled summary to the cache: temp
       // file + rename on success, so a crash mid-generation never
       // leaves a partial file that later reads as a complete summary.
+      // The temp name carries the run tag for the same reason as
+      // `outFile` — a shared `.tmp` let two concurrent runs interleave
+      // partial writes before either renamed.
       const noText = assembledText.trim().length === 0;
       const failed = code !== 0 || noText;
       if (opts.cachePath && !failed) {
-        const tmp = `${opts.cachePath}.tmp`;
+        const tmp = `${opts.cachePath}.${runTag}.tmp`;
         // Stamp the cache with which (engine, model) produced it, so a
         // later run with a different engine/model regenerates rather
         // than serving stale text. The marker is an HTML comment, inert
         // in rendered markdown and ignored by the index/backlink layer.
-        const cacheBody = `${engineMarker(engine.name, opts.model)}\n\n${assembledText}`;
+        const cacheBody = `${engineMarker(engine.name, opts.model, opts.promptHash)}\n\n${assembledText}`;
         try {
           writeFileSync(tmp, cacheBody, "utf-8");
           renameSync(tmp, opts.cachePath);
@@ -466,9 +578,11 @@ function spawnEngine(opts: SpawnEngineOpts): Promise<SpawnEngineResult> {
       });
     });
 
-    // "stdin"-mode engines (Kiro) ignore stdin once a positional
-    // question is present, so their prompt is kept out of argv and
-    // prepended to the piped payload here instead.
+    // Prompt delivery: every engine ships with `inputMode: "stdin"`,
+    // so the instruction prompt is prepended to the piped report and
+    // argv stays short and single-line (a Windows `.cmd` shim can't
+    // carry a multi-line argument through cmd.exe — see launchSpec).
+    // An out-of-tree "arg"-mode engine still gets the report alone.
     const stdinPayload =
       engine.inputMode === "stdin"
         ? `${opts.prompt}\n\n${opts.stdin}`
@@ -502,6 +616,12 @@ interface DailyGenOpts {
   detailLimit: number;
   /** Whether to merge git commits into the LLM payload. */
   withGit: boolean;
+  /** Absolute project paths limiting discovery (whitelist). */
+  scopeToProjects?: string[];
+  /** Style-reference text resolved once by the caller, or null for none.
+   * Folded into the prompt BEFORE it is fingerprinted, so editing the
+   * style file invalidates the cache exactly like editing the prompt. */
+  style: string | null;
 }
 
 /**
@@ -525,16 +645,28 @@ async function generateDailySummary(
   opts: DailyGenOpts,
 ): Promise<DailyGenResult> {
   const isToday = isSameLocalDay(opts.date, opts.today);
-  const cached = dailyCachePath(opts.date);
+  const cached = dailySummaryPath(opts.date, opts.scopeToProjects);
   const dateLabel = dateKey(opts.date);
+  // Resolve the prompt BEFORE the cache check so its fingerprint can
+  // participate in cache provenance: editing the prompt (e.g. switching
+  // the output language) must regenerate rather than serve text written
+  // under the old instructions. Reading is side-effect free — the user
+  // file is only materialized further down, on the generate path.
+  const prompt = composePromptWithStyle(
+    resolvePrompt("daily", opts.promptOverride),
+    opts.style,
+  );
+  const promptHash = promptFingerprint(prompt);
 
   if (!isToday && !opts.force && existsSync(cached)) {
     try {
       const content = readFileSync(cached, "utf-8");
-      // Only reuse the cache if it was produced by the same engine and
-      // model now being requested; otherwise fall through to regenerate
-      // so a switched engine/model doesn't serve another's stale text.
-      if (cacheMatchesEngine(content, opts.engine.name, opts.model)) {
+      // Only reuse the cache if it was produced by the same engine,
+      // model and prompt now being requested; otherwise fall through to
+      // regenerate so a changed configuration doesn't serve stale text.
+      if (
+        cacheMatchesEngine(content, opts.engine.name, opts.model, promptHash)
+      ) {
         if (opts.streamToStdout) {
           process.stdout.write(content);
           if (!content.endsWith("\n")) process.stdout.write("\n");
@@ -573,7 +705,15 @@ async function generateDailySummary(
   ensureUserPromptFile("daily");
 
   const config = loadGlobalConfig();
-  const tree = discoverSessions(config);
+  // A scope is applied at DISCOVERY, so the report the LLM sees contains
+  // only that workspace's sessions — filtering afterwards would leave
+  // the empty-day / git-commit logic looking at the wrong set.
+  const tree = discoverSessions(
+    config,
+    opts.scopeToProjects?.length
+      ? { scopeToProjects: opts.scopeToProjects }
+      : undefined,
+  );
   const flatSessions = [
     ...tree.projects.flatMap((p) => p.sessions),
     ...tree.coldProjects.flatMap((p) => p.sessions),
@@ -675,7 +815,6 @@ async function generateDailySummary(
     ? startStderrTicker(`sending to ${opts.engine.name}`)
     : null;
 
-  const prompt = resolvePrompt("daily", opts.promptOverride);
   const result = await spawnEngine({
     engine: opts.engine,
     prompt,
@@ -683,6 +822,7 @@ async function generateDailySummary(
     cachePath: cached,
     streamToStdout: opts.streamToStdout,
     model: opts.model,
+    promptHash,
     onFirstChunk: () => {
       if (stopTicker) stopTicker();
     },
@@ -721,18 +861,27 @@ export async function runSummary(options: SummaryOptions): Promise<number> {
   // With --open the user is going to read the rendered file in their
   // default app anyway, so streaming the same markdown to the terminal
   // is duplicate noise (and breaks downstream piping). Suppress.
+  // Style is resolved BEFORE the cache check inside generateDailySummary:
+  // it is part of the prompt, hence part of the cache fingerprint.
+  const style = resolveStyleForRun(
+    { stylePath: options.stylePath, noStyle: options.noStyle },
+    !options.quiet,
+  );
+  if (!style) return 1;
   const res = await generateDailySummary({
     date: options.date,
     today: options.today,
     force: options.force,
     promptOverride: options.prompt,
-    streamToStdout: !options.open,
-    announce: true,
+    streamToStdout: !options.open && !options.quiet,
+    announce: !options.quiet,
     engine,
     model: options.model,
     include: options.include,
     detailLimit: options.detailLimit,
     withGit: options.withGit,
+    scopeToProjects: options.scopeToProjects,
+    style: style.text,
   });
   // Regenerate the index when something *changed* on disk (a new
   // daily got written), OR when the user explicitly asked for the
@@ -750,7 +899,9 @@ export async function runSummary(options: SummaryOptions): Promise<number> {
   // `--open` is about *today's result* — nothing to open when we
   // skipped because the day was empty.
   if (options.open && res.code === 0 && !res.skipped) {
-    await openInDefaultApp(dailyCachePath(options.date));
+    await openInDefaultApp(
+      dailySummaryPath(options.date, options.scopeToProjects),
+    );
   }
   // `--open-index` is about *navigating the corpus* — fire it even
   // on empty/skipped days. The user may be running summary purely as
@@ -777,7 +928,29 @@ export async function runRangeSummary(
   const dates = enumerateDates(options.from, options.to);
   const fromLabel = dateKey(options.from);
   const toLabel = dateKey(options.to);
-  const rangeCache = rangeCachePath(options.from, options.to);
+  // Progress chatter. `quiet` (the web server) reads the result from the
+  // cache file and surfaces failures itself, so every non-diagnostic
+  // write goes through here. Errors are deliberately NOT routed through
+  // it — quiet means "no chatter", not "no logs".
+  const announce = (msg: string) => {
+    if (!options.quiet) process.stderr.write(msg);
+  };
+  const rangeCache = rangeSummaryPath(
+    options.from,
+    options.to,
+    options.scopeToProjects,
+  );
+
+  // Resolve the range prompt up front for the same reason as the daily
+  // path: its fingerprint is part of cache provenance. Style is composed
+  // in first, so editing either file invalidates the range cache.
+  const style = resolveStyleForRun(
+    { stylePath: options.stylePath, noStyle: options.noStyle },
+    !options.quiet,
+  );
+  if (!style) return 1;
+  const metaPrompt = composePromptWithStyle(resolvePrompt("range"), style.text);
+  const metaPromptHash = promptFingerprint(metaPrompt);
 
   if (
     shouldUseRangeCache(
@@ -789,17 +962,21 @@ export async function runRangeSummary(
   ) {
     try {
       const content = readFileSync(rangeCache, "utf-8");
-      // Reuse only when the same engine/model produced it; a switched
-      // engine/model falls through to regenerate.
-      if (cacheMatchesEngine(content, engine.name, options.model)) {
-        if (!options.open) {
+      // Reuse only when the same engine/model/prompt produced it; a
+      // changed configuration falls through to regenerate.
+      if (
+        cacheMatchesEngine(content, engine.name, options.model, metaPromptHash)
+      ) {
+        // Same two guards the daily path already applied: `--open` means
+        // the user will read the rendered file anyway, and `quiet` means
+        // the caller wants the text back through the cache file, not
+        // dumped on its stdout.
+        if (!options.open && !options.quiet) {
           process.stdout.write(content);
           if (!content.endsWith("\n")) process.stdout.write("\n");
         }
         // Path last, so it survives a long summary scrolling by.
-        process.stderr.write(
-          `\nrange summary read from cache: ${rangeCache}\n`,
-        );
+        announce(`\nrange summary read from cache: ${rangeCache}\n`);
         try {
           regenerateIndex(summariesDir());
         } catch {
@@ -811,9 +988,7 @@ export async function runRangeSummary(
         }
         return 0;
       }
-      process.stderr.write(
-        `range cache from a different engine/model — regenerating\n`,
-      );
+      announce("range cache from a different engine/model — regenerating\n");
     } catch {
       // fall through to regenerate
     }
@@ -831,15 +1006,17 @@ export async function runRangeSummary(
   let missingCount = 0;
   for (const d of dates) {
     const isToday = isSameLocalDay(d, options.today);
-    if (!options.force && !isToday && existsSync(dailyCachePath(d)))
+    if (
+      !options.force &&
+      !isToday &&
+      existsSync(dailySummaryPath(d, options.scopeToProjects))
+    )
       cachedCount++;
     else missingCount++;
   }
 
-  process.stderr.write(
-    `range ${fromLabel} → ${toLabel} (${dates.length} days)\n`,
-  );
-  process.stderr.write(`${cachedCount} cached, ${missingCount} to generate\n`);
+  announce(`range ${fromLabel} → ${toLabel} (${dates.length} days)\n`);
+  announce(`${cachedCount} cached, ${missingCount} to generate\n`);
 
   // Generate dailies sequentially. Confirm just-in-time after scan (when --yes is off).
   // Each prompt comes with concrete context (session/activity/commit counts).
@@ -847,11 +1024,12 @@ export async function runRangeSummary(
   for (const d of dates) {
     const label = dateKey(d);
     const isToday = isSameLocalDay(d, options.today);
-    process.stderr.write(`\n--- ${label} ---\n`);
-
+    announce(`\n--- ${label} ---\n`);
     const willPrompt =
       !options.assumeYes &&
-      (isToday || options.force || !existsSync(dailyCachePath(d)));
+      (isToday ||
+        options.force ||
+        !existsSync(dailySummaryPath(d, options.scopeToProjects)));
     const confirmer = willPrompt
       ? async () => {
           const hint = isToday ? " (today — regenerated every time)" : "";
@@ -867,7 +1045,7 @@ export async function runRangeSummary(
       // rebuild the range from stale daily markdown.
       force: options.force,
       streamToStdout: false,
-      announce: true,
+      announce: !options.quiet,
       confirmBeforeSpawn: confirmer,
       assumeYes: options.assumeYes,
       engine,
@@ -875,6 +1053,8 @@ export async function runRangeSummary(
       include: options.include,
       detailLimit: options.detailLimit,
       withGit: options.withGit,
+      scopeToProjects: options.scopeToProjects,
+      style: style.text,
     });
 
     if (res.skipped) {
@@ -882,7 +1062,7 @@ export async function runRangeSummary(
       // "the day was empty so we never asked claude". The two look
       // identical at the result-shape level; one neutral message
       // works for both.
-      process.stderr.write(`agenthud: ${label} — skipped.\n`);
+      announce(`agenthud: ${label} — skipped.\n`);
       continue;
     }
     if (res.code !== 0) {
@@ -893,7 +1073,7 @@ export async function runRangeSummary(
     }
     const text = res.markdown.trim();
     if (text.length === 0 || /^no activity found/i.test(text)) {
-      process.stderr.write(`${label} has no activity — skipping.\n`);
+      announce(`${label} has no activity — skipping.\n`);
       continue;
     }
     dailyMarkdowns.push({ date: d, markdown: text });
@@ -905,9 +1085,7 @@ export async function runRangeSummary(
     // single-day summary behavior on empty input. Honor `-I` so
     // users running `summary --last 7d -I` as a "navigate to my hub"
     // shortcut still get the index.
-    process.stderr.write(
-      "no daily activity in this range — nothing to combine\n",
-    );
+    announce("no daily activity in this range — nothing to combine\n");
     if (options.openIndex) {
       try {
         regenerateIndex(summariesDir());
@@ -921,15 +1099,17 @@ export async function runRangeSummary(
 
   const metaInput = buildRangeMetaInput(dailyMarkdowns);
 
-  process.stderr.write(
+  announce(
     `\ncombining ${dailyMarkdowns.length} daily summaries into range summary...\n`,
   );
-  const metaStreams = !options.open;
-  // Same approach as the daily call: ticker always-on, auto-stops on
-  // first chunk so it doesn't fight streamed output for the same row.
-  const stopMetaTicker = startStderrTicker(`sending to ${engine.name}`);
+  const metaStreams = !options.open && !options.quiet;
+  // Same approach as the daily call: ticker auto-stops on first chunk so
+  // it doesn't fight streamed output for the same row. Silent callers get
+  // no ticker at all — it is pure progress chatter on stderr.
+  const stopMetaTicker = options.quiet
+    ? null
+    : startStderrTicker(`sending to ${engine.name}`);
 
-  const metaPrompt = resolvePrompt("range");
   const metaResult = await spawnEngine({
     engine,
     prompt: metaPrompt,
@@ -937,18 +1117,19 @@ export async function runRangeSummary(
     cachePath: rangeCache,
     streamToStdout: metaStreams,
     model: options.model,
-    onFirstChunk: () => stopMetaTicker(),
+    promptHash: metaPromptHash,
+    onFirstChunk: () => stopMetaTicker?.(),
   });
-  stopMetaTicker();
+  stopMetaTicker?.();
 
   if (metaResult.code !== 0) {
     return metaResult.code;
   }
 
-  process.stderr.write("\n");
-  process.stderr.write(`range summary written to ${rangeCache}\n`);
+  announce("\n");
+  announce(`range summary written to ${rangeCache}\n`);
   if (metaResult.usage) {
-    process.stderr.write(`${formatUsage(metaResult.usage)}\n`);
+    announce(`${formatUsage(metaResult.usage)}\n`);
   }
 
   try {

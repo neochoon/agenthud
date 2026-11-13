@@ -43,7 +43,7 @@ const ALL_TYPES = [
 ];
 
 export interface CliOptions {
-  mode: "watch" | "once" | "report" | "summary" | "follow";
+  mode: "watch" | "once" | "report" | "summary" | "follow" | "web";
   command?: "version" | "help";
   error?: string;
   reportDate?: Date;
@@ -61,6 +61,10 @@ export interface CliOptions {
   summaryModel?: string;
   summaryEngine?: string; // from config (summary.engine)
   summaryEngineFlag?: string; // from --engine
+  /** `--style <path>`: style-reference file for this run. */
+  summaryStylePath?: string;
+  /** `--no-style`: drop the style reference for this run. */
+  summaryNoStyle?: boolean;
 
   // Report-shaped options on summary. Resolved as
   // CLI flag → config.summary.X → config.report.X → built-in default.
@@ -74,6 +78,16 @@ export interface CliOptions {
   summaryOpenIndex?: boolean;
   summaryError?: string;
   scopeToCwd?: boolean;
+  /** `--project <path|name>` (repeatable): whitelist of workspaces for
+   * report/summary (resolved against discovered projects in main.ts). */
+  scopeProjects?: string[];
+
+  // web
+  webPort?: number;
+  webOpen?: boolean;
+  webError?: string;
+  webScopeToCwd?: boolean;
+  webScopeProjects?: string[];
 
   // follow
   followSince?: string; // raw --since spec
@@ -99,6 +113,8 @@ const KNOWN_REPORT_FLAGS = new Set([
   "--format",
   "--detail-limit",
   "--with-git",
+  "--cwd",
+  "--project",
 ]);
 const KNOWN_SUMMARY_FLAGS = new Set([
   "--date",
@@ -109,6 +125,8 @@ const KNOWN_SUMMARY_FLAGS = new Set([
   "--force",
   "--model",
   "--engine",
+  "--style",
+  "--no-style",
   "-y",
   "--yes",
   "--include",
@@ -119,6 +137,8 @@ const KNOWN_SUMMARY_FLAGS = new Set([
   "--open",
   "-I",
   "--open-index",
+  "--cwd",
+  "--project",
 ]);
 const KNOWN_FOLLOW_FLAGS = new Set([
   "--since",
@@ -126,7 +146,23 @@ const KNOWN_FOLLOW_FLAGS = new Set([
   "--include",
   "--once",
 ]);
-const KNOWN_SUBCOMMANDS = new Set(["watch", "report", "summary", "follow"]);
+const KNOWN_WEB_FLAGS = new Set([
+  "--port",
+  "-p",
+  "--open",
+  "-o",
+  "--cwd",
+  "--project",
+  "-h",
+  "--help",
+]);
+const KNOWN_SUBCOMMANDS = new Set([
+  "watch",
+  "report",
+  "summary",
+  "follow",
+  "web",
+]);
 
 export function getHelp(): string {
   return `Usage: agenthud [command] [options]
@@ -165,6 +201,9 @@ Commands:
                                 0 = unlimited)
     --with-git                  Merge git commits from each session's
                                 project into the timeline
+    --cwd                       Only this directory's project
+    --project PATH|NAME         Only that project (path, or a unique
+                                project name)
 
   summary [--date DATE | --last Nd | --from DATE --to DATE]
           [--include TYPES] [--detail-limit N] [--with-git]
@@ -189,6 +228,11 @@ Commands:
                                 (e.g. "sonnet", "gpt-5", or a full id)
     --engine NAME               Which agent CLI synthesizes the summary:
                                 auto (default) | claude | codex | kiro
+    --style PATH                Imitate this file's writing style. Defaults
+                                to ~/.agenthud/summary-style.md when that
+                                file exists; editing it invalidates the
+                                cached summary.
+    --no-style                  Ignore the style reference for this run.
     -y, --yes                   Skip confirmation prompts for new daily
                                 summaries
     -o, --open                  Launch the resulting summary in your OS
@@ -197,6 +241,22 @@ Commands:
     -I, --open-index            Launch ~/.agenthud/summaries/index.md
                                 in your OS default app. Combinable with
                                 -o (e.g. -oI opens both).
+    --cwd                       Summarize only this directory's project
+    --project PATH|NAME         Summarize only that project. A scoped
+                                summary is cached separately
+                                (DATE--<project>-<hash>.md), so it never
+                                replaces the whole-day digest.
+
+  web [--port N] [--open] [--cwd | --project PATH|NAME]
+                                Browser UI: the same tree and activity
+                                viewer as the TUI, plus report/summary
+                                controls. Serves on 127.0.0.1 only and
+                                prints a token-guarded URL.
+    --port N, -p N              Port to listen on (default 7787; 0 picks
+                                a free one)
+    -o, --open                  Open the URL in your default browser
+    --cwd                       Start scoped to this directory's project
+    --project PATH|NAME         Start scoped to that project
 
   follow [--since SPEC] [--json] [--include TYPES]
                                 Stream live agent events (activity +
@@ -319,6 +379,20 @@ function todayLocalMidnight(): Date {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
+/** Every value given for a repeatable `--flag value` option, in order. */
+function collectFlagValues(rest: string[], flag: string): string[] {
+  const values: string[] = [];
+  for (let i = 0; i < rest.length; i++) {
+    if (rest[i] !== flag) continue;
+    const val = rest[i + 1];
+    if (val && !val.startsWith("-")) {
+      values.push(val);
+      i++;
+    }
+  }
+  return values;
+}
+
 export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
   // `watch` is the explicit form of the default mode — strip it so the
   // rest of parsing sees the same shape it always has.
@@ -357,6 +431,7 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
       "--include",
       "--format",
       "--detail-limit",
+      "--project",
     ]);
     for (let i = 0; i < rest.length; i++) {
       const arg = rest[i];
@@ -432,6 +507,19 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
     const reportWithGit =
       rest.includes("--with-git") || (config?.report.withGit ?? false);
 
+    // Workspace scope: `--cwd` (this directory's project) or a
+    // repeatable `--project <path|name>` whitelist. Resolved against the
+    // discovered projects in main.ts, where the tree is available.
+    const scopeProjects = collectFlagValues(rest, "--project");
+    if (rest.includes("--project") && scopeProjects.length === 0) {
+      reportError = reportError ?? "Invalid --project: missing value.";
+    }
+    const scopeCwd = rest.includes("--cwd") || undefined;
+    if (scopeCwd && scopeProjects.length > 0) {
+      reportError =
+        reportError ?? "--cwd and --project are mutually exclusive.";
+    }
+
     return {
       mode: "report",
       reportDate,
@@ -440,6 +528,8 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
       reportDetailLimit,
       reportWithGit,
       reportError,
+      scopeToCwd: scopeCwd,
+      scopeProjects,
     };
   }
 
@@ -463,9 +553,11 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
       "--prompt",
       "--model",
       "--engine",
+      "--style",
       "--include",
       "--format",
       "--detail-limit",
+      "--project",
     ]);
 
     for (let i = 0; i < rest.length; i++) {
@@ -594,6 +686,36 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
       }
     }
 
+    // Style reference: `--style PATH` attaches one, `--no-style` drops it,
+    // and with neither flag `summary.style` config decides (unset = use
+    // ~/.agenthud/summary-style.md when it exists).
+    let summaryStylePath: string | undefined;
+    let summaryNoStyle: boolean | undefined;
+    const styleIdx = rest.indexOf("--style");
+    if (styleIdx !== -1) {
+      const val = rest[styleIdx + 1];
+      if (!val) {
+        summaryError =
+          summaryError ??
+          "Invalid --style: missing value (path to a style reference file).";
+      } else {
+        summaryStylePath = val;
+      }
+    }
+    if (rest.includes("--no-style")) {
+      if (summaryStylePath !== undefined) {
+        summaryError =
+          summaryError ?? "--style and --no-style are mutually exclusive.";
+      }
+      summaryNoStyle = true;
+    }
+    if (summaryStylePath === undefined && !summaryNoStyle) {
+      if (config?.summary.style === false) summaryNoStyle = true;
+      else if (typeof config?.summary.style === "string") {
+        summaryStylePath = config.summary.style;
+      }
+    }
+
     if (rest.includes("--force")) summaryForce = true;
     if (rest.includes("-y") || rest.includes("--yes")) summaryAssumeYes = true;
     const summaryOpen =
@@ -671,6 +793,18 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
       summaryModel = config.summary.model;
     }
 
+    // Workspace scope: `--cwd` or a repeatable `--project` whitelist.
+    // Resolved in main.ts against the discovered projects.
+    const scopeProjects = collectFlagValues(rest, "--project");
+    if (rest.includes("--project") && scopeProjects.length === 0) {
+      summaryError = summaryError ?? "Invalid --project: missing value.";
+    }
+    const scopeCwd = rest.includes("--cwd") || undefined;
+    if (scopeCwd && scopeProjects.length > 0) {
+      summaryError =
+        summaryError ?? "--cwd and --project are mutually exclusive.";
+    }
+
     return {
       mode: "summary",
       summaryDate,
@@ -682,6 +816,8 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
       summaryModel,
       summaryEngine: config?.summary.engine,
       summaryEngineFlag,
+      summaryStylePath,
+      summaryNoStyle,
       summaryInclude,
       summaryFormat,
       summaryDetailLimit,
@@ -689,6 +825,71 @@ export function parseArgs(args: string[], config?: GlobalConfig): CliOptions {
       summaryOpen,
       summaryOpenIndex,
       summaryError,
+      scopeToCwd: scopeCwd,
+      scopeProjects,
+    };
+  }
+
+  if (args[0] === "web") {
+    const rest = args.slice(1);
+    let webPort: number | undefined;
+    let webOpen: boolean | undefined;
+    let webScopeToCwd: boolean | undefined;
+    let webScopeProjects: string[] | undefined;
+    let webError: string | undefined;
+
+    const FLAGS_WITH_VALUE = new Set(["--port", "-p", "--project"]);
+    for (let i = 0; i < rest.length; i++) {
+      const arg = rest[i];
+      if (!arg.startsWith("-")) continue;
+      if (!KNOWN_WEB_FLAGS.has(arg)) {
+        webError = `Unknown option: "${arg}". Run agenthud --help for usage.`;
+        break;
+      }
+      if (FLAGS_WITH_VALUE.has(arg)) i++;
+    }
+
+    const portIdx =
+      rest.indexOf("--port") !== -1
+        ? rest.indexOf("--port")
+        : rest.indexOf("-p");
+    if (portIdx !== -1) {
+      const val = rest[portIdx + 1];
+      const n = Number(val);
+      if (
+        !val ||
+        Number.isNaN(n) ||
+        !Number.isInteger(n) ||
+        n < 1 ||
+        n > 65535
+      ) {
+        webError =
+          webError ??
+          `Invalid --port: "${val}". Must be an integer between 1 and 65535.`;
+      } else {
+        webPort = n;
+      }
+    }
+
+    const webProjects = collectFlagValues(rest, "--project");
+    if (rest.includes("--project") && webProjects.length === 0) {
+      webError = webError ?? "Invalid --project: missing value.";
+    }
+    if (webProjects.length > 0) webScopeProjects = webProjects;
+
+    if (rest.includes("--cwd")) webScopeToCwd = true;
+    if (webScopeToCwd && webScopeProjects) {
+      webError = webError ?? "--cwd and --project are mutually exclusive.";
+    }
+    if (rest.includes("--open") || rest.includes("-o")) webOpen = true;
+
+    return {
+      mode: "web",
+      webPort,
+      webOpen,
+      webScopeToCwd,
+      webScopeProjects,
+      webError,
     };
   }
 

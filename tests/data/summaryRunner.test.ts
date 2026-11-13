@@ -86,13 +86,22 @@ afterEach(() => {
 
 // Emits `text` wrapped in a claude stream-json assistant event (what
 // the claude engine's parser consumes), followed by a result event.
-function mockClaudeProcess(text = "OK", exitCode = 0, stderr = "") {
+// `onStdin` captures what the runner writes to the child's stdin — the
+// prompt travels there (never on argv: a multi-line argv cannot pass
+// through the Windows `cmd.exe` shim launch).
+function mockClaudeProcess(
+  text = "OK",
+  exitCode = 0,
+  stderr = "",
+  onStdin?: (chunk: string) => void,
+) {
   const proc = new EventEmitter() as EventEmitter & {
     stdin: PassThrough;
     stdout: Readable;
     stderr: Readable;
   };
   proc.stdin = new PassThrough();
+  if (onStdin) proc.stdin.on("data", (c: Buffer) => onStdin(c.toString()));
   const streamJson =
     `${JSON.stringify({
       type: "assistant",
@@ -315,8 +324,11 @@ describe("runSummary prompt resolution", () => {
     vi.mocked(createWriteStream).mockReturnValue(
       mockStream as unknown as ReturnType<typeof createWriteStream>,
     );
+    let stdin = "";
     vi.mocked(spawn).mockReturnValue(
-      mockClaudeProcess() as unknown as ReturnType<typeof spawn>,
+      mockClaudeProcess("OK", 0, "", (c) => {
+        stdin += c;
+      }) as unknown as ReturnType<typeof spawn>,
     );
 
     await runSummary({
@@ -328,7 +340,10 @@ describe("runSummary prompt resolution", () => {
 
     const callArgs = vi.mocked(spawn).mock.calls[0];
     expect(callArgs[0]).toBe("claude");
-    expect(callArgs[1]).toContain("custom prompt here");
+    // Prompt on stdin, NOT argv (see mockClaudeProcess).
+    expect(callArgs[1]).not.toContain("custom prompt here");
+    expect(stdin).toContain("custom prompt here");
+    expect(stdin).toContain("## test");
   });
 
   it("uses ~/.agenthud/summary-prompt.md when present and no --prompt", async () => {
@@ -346,8 +361,11 @@ describe("runSummary prompt resolution", () => {
     vi.mocked(createWriteStream).mockReturnValue(
       mockStream as unknown as ReturnType<typeof createWriteStream>,
     );
+    let stdin = "";
     vi.mocked(spawn).mockReturnValue(
-      mockClaudeProcess() as unknown as ReturnType<typeof spawn>,
+      mockClaudeProcess("OK", 0, "", (c) => {
+        stdin += c;
+      }) as unknown as ReturnType<typeof spawn>,
     );
 
     await runSummary({
@@ -357,7 +375,8 @@ describe("runSummary prompt resolution", () => {
     });
 
     const callArgs = vi.mocked(spawn).mock.calls[0];
-    expect(callArgs[1]).toContain("user file prompt");
+    expect(callArgs[1]).not.toContain("user file prompt");
+    expect(stdin).toContain("user file prompt");
   });
 
   it("copies built-in template to user dir on first run", async () => {
@@ -564,5 +583,152 @@ describe("runSummary cache write error", () => {
     process.stderr.write = origErr;
     expect(stderrChunks.join("")).toContain("cannot write cache");
     expect(code).toBe(0);
+  });
+});
+
+// ── CodeRabbit review fixes (PR #233) ───────────────────────────────────────
+// Two defects the reviewer flagged as "outside diff range". Both were real:
+// scratch files were named from cachePath alone, so concurrent runs for the
+// same date+scope collided; and the range cache-hit path ignored `quiet`.
+//
+// NOTE: the file-level beforeEach calls vi.clearAllMocks(), which resets
+// CALLS but not IMPLEMENTATIONS. Earlier tests in this file install a
+// throwing writeFileSync and a shared spawn return value, so each block
+// below re-establishes its own baseline.
+
+const { claudeEngine, codexEngine } = await import(
+  "../../src/data/summaryEngines.js"
+);
+
+function resetRunnerMocks(): void {
+  vi.mocked(writeFileSync).mockReset();
+  vi.mocked(readFileSync).mockReset();
+  vi.mocked(existsSync).mockReset();
+  vi.mocked(spawn).mockReset();
+  vi.mocked(resolveSummaryEngine).mockReset();
+  vi.mocked(resolveSummaryEngine).mockImplementation(() => claudeEngine);
+  vi.mocked(writeFileSync).mockReturnValue(undefined);
+  // A FRESH process per spawn: mockReturnValue would hand the second run an
+  // EventEmitter whose "close" already fired, so the run would never settle.
+  vi.mocked(spawn).mockImplementation(
+    () => mockClaudeProcess("", 0) as unknown as ReturnType<typeof spawn>,
+  );
+}
+
+describe("scratch files are per-run, not per-cache-path", () => {
+  beforeEach(resetRunnerMocks);
+
+  it("gives each file-mode run its own engine-out and .tmp names", async () => {
+    // Codex is the "file"-mode engine: it writes its answer to the -o path
+    // we hand it, and the runner reads that path back on close.
+    vi.mocked(resolveSummaryEngine).mockImplementation(() => codexEngine);
+    vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(readFileSync).mockReturnValue(
+      "<!-- agenthud-engine: codex model: default -->\n\n### 工作内容\n\n1、demo：\n（1）做了些事。\n",
+    );
+
+    // Two runs for the SAME date => the same cachePath. That is exactly the
+    // two-browser-tabs case: with a cachePath-derived scratch name the runs
+    // share one file, so one reads a half-written message and the other
+    // unlinks it out from under it.
+    const date = new Date(2026, 4, 14);
+    const today = new Date(2026, 4, 15);
+    for (let i = 0; i < 2; i++) {
+      const code = await runSummary({ date, force: true, today });
+      expect(code).toBe(0);
+    }
+
+    const outPaths = vi
+      .mocked(readFileSync)
+      .mock.calls.map((c) => String(c[0]))
+      .filter((p) => p.endsWith(".engine-out"));
+    const tmpPaths = vi
+      .mocked(writeFileSync)
+      .mock.calls.map((c) => String(c[0]))
+      .filter((p) => p.endsWith(".tmp"));
+
+    expect(outPaths).toHaveLength(2);
+    expect(tmpPaths).toHaveLength(2);
+    // Same cache target...
+    expect(outPaths[0]).toContain("2026-05-14");
+    expect(outPaths[1]).toContain("2026-05-14");
+    // ...but no shared scratch file.
+    expect(outPaths[0]).not.toBe(outPaths[1]);
+    expect(tmpPaths[0]).not.toBe(tmpPaths[1]);
+  });
+});
+
+describe("runRangeSummary honors quiet", () => {
+  beforeEach(resetRunnerMocks);
+
+  // A past range, so shouldUseRangeCache() accepts the cache (today is
+  // never cacheable). The marker carries no `prompt:` field, so
+  // cacheMatchesEngine matches on engine+model alone and we don't have to
+  // reproduce the real prompt hash here.
+  const CACHED =
+    "<!-- agenthud-engine: claude model: default -->\n\n### 工作内容\n\n1、demo：\n（1）做了些事。\n";
+  const rangeOpts = (quiet: boolean) => ({
+    from: new Date(2026, 4, 10),
+    to: new Date(2026, 4, 12),
+    today: new Date(2026, 4, 15),
+    force: false,
+    assumeYes: true,
+    include: ["bash"],
+    detailLimit: 0,
+    withGit: false,
+    quiet,
+  });
+
+  async function captureStdio(fn: () => Promise<unknown>) {
+    const out: string[] = [];
+    const err: string[] = [];
+    const origOut = process.stdout.write.bind(process.stdout);
+    const origErr = process.stderr.write.bind(process.stderr);
+    process.stdout.write = ((c: string | Uint8Array) => {
+      out.push(String(c));
+      return true;
+    }) as typeof process.stdout.write;
+    process.stderr.write = ((c: string | Uint8Array) => {
+      err.push(String(c));
+      return true;
+    }) as typeof process.stderr.write;
+    try {
+      await fn();
+    } finally {
+      process.stdout.write = origOut;
+      process.stderr.write = origErr;
+    }
+    return { out: out.join(""), err: err.join("") };
+  }
+
+  it("writes nothing to stdout or stderr on a cache hit", async () => {
+    const { runRangeSummary } = await import("../../src/data/summaryRunner.js");
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(CACHED);
+
+    const { out, err } = await captureStdio(() =>
+      runRangeSummary(rangeOpts(true)),
+    );
+
+    // The web server reads the result from the cache file; a cache hit
+    // used to dump the whole markdown onto its stdout and narrate on its
+    // stderr, corrupting the caller's own output.
+    expect(out).toBe("");
+    expect(err).toBe("");
+    expect(vi.mocked(spawn)).not.toHaveBeenCalled();
+  });
+
+  it("still streams the cached text and the path when not quiet", async () => {
+    const { runRangeSummary } = await import("../../src/data/summaryRunner.js");
+    vi.mocked(existsSync).mockReturnValue(true);
+    vi.mocked(readFileSync).mockReturnValue(CACHED);
+
+    const { out, err } = await captureStdio(() =>
+      runRangeSummary(rangeOpts(false)),
+    );
+
+    expect(out).toContain("### 工作内容");
+    expect(err).toContain("from cache");
+    expect(vi.mocked(spawn)).not.toHaveBeenCalled();
   });
 });

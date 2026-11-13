@@ -726,3 +726,169 @@ describe("getHelp", () => {
     expect(getHelp()).toContain("follow");
   });
 });
+
+describe("workspace scope flags (report / summary)", () => {
+  it("report --cwd scopes to the current project", () => {
+    const opts = parseArgs(["report", "--cwd"]);
+    expect(opts.mode).toBe("report");
+    expect(opts.scopeToCwd).toBe(true);
+    expect(opts.scopeProjects).toEqual([]);
+  });
+
+  it("report --project carries the value through", () => {
+    const opts = parseArgs(["report", "--project", "agenthud"]);
+    expect(opts.mode).toBe("report");
+    expect(opts.scopeProjects).toEqual(["agenthud"]);
+    expect(opts.scopeToCwd).toBeUndefined();
+  });
+
+  it("--project is repeatable (a whitelist of workspaces)", () => {
+    const opts = parseArgs([
+      "report",
+      "--project",
+      "agenthud",
+      "--project",
+      "desktop_pet",
+    ]);
+    expect(opts.scopeProjects).toEqual(["agenthud", "desktop_pet"]);
+  });
+
+  it("report rejects --project without a value", () => {
+    expect(parseArgs(["report", "--project"]).reportError).toContain(
+      "--project",
+    );
+  });
+
+  it("report rejects --cwd together with --project", () => {
+    const opts = parseArgs(["report", "--cwd", "--project", "x"]);
+    expect(opts.reportError).toContain("mutually exclusive");
+  });
+
+  it("summary --cwd and --project parse like report", () => {
+    expect(parseArgs(["summary", "--cwd"]).scopeToCwd).toBe(true);
+    expect(
+      parseArgs([
+        "summary",
+        "--project",
+        "C:\\file\\sometime\\agenthud",
+        "--project",
+        "web",
+      ]).scopeProjects,
+    ).toEqual(["C:\\file\\sometime\\agenthud", "web"]);
+  });
+
+  it("summary still rejects unknown flags", () => {
+    expect(parseArgs(["summary", "--scope", "x"]).summaryError).toContain(
+      "Unknown option",
+    );
+  });
+});
+
+describe("web subcommand", () => {
+  it("defaults to the built-in port and no auto-open", () => {
+    expect(parseArgs(["web"])).toEqual({ mode: "web" });
+  });
+
+  it("parses --port (and the -p alias)", () => {
+    expect(parseArgs(["web", "--port", "9000"]).webPort).toBe(9000);
+    expect(parseArgs(["web", "-p", "9001"]).webPort).toBe(9001);
+  });
+
+  it("rejects an out-of-range or non-numeric port", () => {
+    expect(parseArgs(["web", "--port", "0"]).webError).toContain("--port");
+    expect(parseArgs(["web", "--port", "abc"]).webError).toContain("--port");
+    expect(parseArgs(["web", "--port"]).webError).toContain("--port");
+  });
+
+  it("parses --open and the scope flags", () => {
+    expect(parseArgs(["web", "--open"]).webOpen).toBe(true);
+    expect(parseArgs(["web", "--cwd"]).webScopeToCwd).toBe(true);
+    expect(
+      parseArgs(["web", "--project", "agenthud", "--project", "web"])
+        .webScopeProjects,
+    ).toEqual(["agenthud", "web"]);
+  });
+
+  it("rejects --cwd with --project", () => {
+    expect(parseArgs(["web", "--cwd", "--project", "x"]).webError).toContain(
+      "mutually exclusive",
+    );
+  });
+
+  it("rejects unknown flags", () => {
+    expect(parseArgs(["web", "--serve"]).webError).toContain("Unknown option");
+  });
+});
+
+describe("style reference flags (summary)", () => {
+  it("defaults to neither flag, leaving config/default in charge", () => {
+    const opts = parseArgs(["summary"]);
+    expect(opts.summaryStylePath).toBeUndefined();
+    expect(opts.summaryNoStyle).toBeUndefined();
+    expect(opts.summaryError).toBeUndefined();
+  });
+
+  it("--style carries the path through", () => {
+    const opts = parseArgs(["summary", "--style", "./my-style.md"]);
+    expect(opts.summaryStylePath).toBe("./my-style.md");
+    expect(opts.summaryNoStyle).toBeUndefined();
+  });
+
+  it("--no-style sets the kill switch", () => {
+    const opts = parseArgs(["summary", "--no-style"]);
+    expect(opts.summaryNoStyle).toBe(true);
+    expect(opts.summaryStylePath).toBeUndefined();
+  });
+
+  it("rejects --style without a value", () => {
+    expect(parseArgs(["summary", "--style"]).summaryError).toContain("--style");
+  });
+
+  it("rejects --style together with --no-style", () => {
+    expect(
+      parseArgs(["summary", "--style", "a.md", "--no-style"]).summaryError,
+    ).toContain("mutually exclusive");
+  });
+
+  it("takes the path from summary.style when no flag is given", () => {
+    const opts = parseArgs(
+      ["summary"],
+      makeConfig({ summary: { style: "~/notes/style.md" } }),
+    );
+    expect(opts.summaryStylePath).toBe("~/notes/style.md");
+  });
+
+  it("turns summary.style: false into --no-style", () => {
+    const opts = parseArgs(
+      ["summary"],
+      makeConfig({ summary: { style: false } }),
+    );
+    expect(opts.summaryNoStyle).toBe(true);
+    expect(opts.summaryStylePath).toBeUndefined();
+  });
+
+  it("lets --style override a configured path", () => {
+    const opts = parseArgs(
+      ["summary", "--style", "./flag.md"],
+      makeConfig({ summary: { style: "~/config.md" } }),
+    );
+    expect(opts.summaryStylePath).toBe("./flag.md");
+  });
+
+  it("lets --no-style override a configured path", () => {
+    const opts = parseArgs(
+      ["summary", "--no-style"],
+      makeConfig({ summary: { style: "~/config.md" } }),
+    );
+    expect(opts.summaryNoStyle).toBe(true);
+    expect(opts.summaryStylePath).toBeUndefined();
+  });
+
+  it("does not swallow the next flag as the --style value", () => {
+    // --style is in FLAGS_WITH_VALUE, so the value skip must not make the
+    // parser miss a later --force.
+    const opts = parseArgs(["summary", "--style", "x.md", "--force"]);
+    expect(opts.summaryStylePath).toBe("x.md");
+    expect(opts.summaryForce).toBe(true);
+  });
+});

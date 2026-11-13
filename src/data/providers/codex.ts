@@ -54,7 +54,13 @@ import type {
 import { ICONS } from "../../types/index.js";
 import { ONE_HOUR_MS, THIRTY_MINUTES_MS } from "../../utils/timeConstants.js";
 import { pickLatestUserTitle } from "./sessionTitle.js";
-import type { ParseResult, SessionProvider } from "./types.js";
+import { canonicalToolLabel, iconForCanonicalLabel } from "./toolLabels.js";
+import {
+  type DiscoverOptions,
+  type ParseResult,
+  projectInScope,
+  type SessionProvider,
+} from "./types.js";
 
 export function getCodexSessionsDir(): string {
   return (
@@ -79,6 +85,14 @@ function getSessionStatus(mtimeMs: number): SessionStatus {
   return "cold";
 }
 
+/** A `content` block inside a `response_item/message`. Newer Codex
+ * builds (0.163+) moved the transcript from `event_msg/user_message`
+ * to role-tagged message items with typed content blocks. */
+interface CodexContentBlock {
+  type?: string;
+  text?: string;
+}
+
 interface CodexRecord {
   type?: string;
   timestamp?: string;
@@ -94,21 +108,49 @@ interface CodexRecord {
     cli_version?: string;
     // turn_context
     model?: string;
-    // event_msg / user_message
+    // event_msg / user_message (legacy) and event_msg / agent_message
     message?: string;
     // event_msg / token_count
     info?: {
       last_token_usage?: { total_tokens?: number };
       model_context_window?: number;
     };
-    // response_item / function_call
+    // response_item / message (0.163+): role-tagged transcript item
+    role?: string;
+    content?: CodexContentBlock[];
+    // response_item / reasoning: plaintext summary blocks (the raw
+    // reasoning is encrypted, so only these are readable)
+    summary?: CodexContentBlock[];
+    // response_item / function_call + custom_tool_call
     name?: string;
     arguments?: string;
+    call_id?: string;
+    /** custom_tool_call: JavaScript source (`text(await tools.exec_command({cmd:"…"}))`) */
+    input?: string;
+    /** *_tool_call_output: string or content blocks */
+    output?: string | CodexContentBlock[];
   };
 }
 
 function isEnvContext(text: string): boolean {
   return text.trimStart().startsWith("<environment_context>");
+}
+
+/** Join the text of a `response_item/message` content array. Codex uses
+ * `input_text` for user/developer turns and `output_text` for the
+ * assistant's, so both are accepted; images are ignored. */
+function messageText(blocks: CodexContentBlock[] | undefined): string {
+  if (!Array.isArray(blocks)) return "";
+  return blocks
+    .filter(
+      (b) =>
+        b &&
+        (b.type === "input_text" || b.type === "output_text") &&
+        typeof b.text === "string",
+    )
+    .map((b) => b.text as string)
+    .join("\n")
+    .trim();
 }
 
 interface CodexMeta {
@@ -197,6 +239,13 @@ function parseMeta(path: string, mtimeMs: number): CodexMeta | null {
             };
           }
         }
+      } else if (rec.type === "response_item" && p.type === "message") {
+        // 0.163+ transcript: role-tagged items. `developer` is the system
+        // prompt and would otherwise become every session's title.
+        if (p.role === "user") {
+          const text = messageText(p.content);
+          if (text) userMessages.push(text);
+        }
       }
     }
 
@@ -272,7 +321,10 @@ function makeNode(
   return node;
 }
 
-function discoverCodexSessions(config: GlobalConfig): SessionTree {
+function discoverCodexSessions(
+  config: GlobalConfig,
+  options?: DiscoverOptions,
+): SessionTree {
   const root = getCodexSessionsDir();
   const empty: SessionTree = {
     projects: [],
@@ -332,6 +384,7 @@ function discoverCodexSessions(config: GlobalConfig): SessionTree {
       `${projectName}/${meta.id}`,
     );
     const hidden = projectHidden || sessionHidden;
+    if (!projectInScope(meta.cwd, options)) continue;
     const node = makeNode(meta, filePath, mtimeMs, hidden);
     nodesById.set(meta.id, node);
     if (hidden) {
@@ -435,10 +488,113 @@ function spawnDetail(args: string | undefined): string {
   }
 }
 
+/**
+ * Readable summary of a `custom_tool_call`'s JavaScript input.
+ *
+ * 0.163+ replaced named tool calls with a single `exec` orchestrator
+ * whose `input` is V8 source, e.g.
+ *
+ *   text(await tools.exec_command({cmd:"Get-Content 'AGENT.md'"}))
+ *
+ * The useful part for a HUD row is the innermost tool name and, for a
+ * shell call, its `cmd`. Falls back to the first source line so an
+ * unrecognized orchestration still shows *something*.
+ */
+export function execInputDetail(input: string | undefined): {
+  tool: string;
+  detail: string;
+} {
+  if (!input) return { tool: "exec", detail: "" };
+  const call = /tools\.([A-Za-z0-9_]+)\s*\(/.exec(input);
+  const tool = call ? call[1] : "exec";
+  const cmd =
+    /\bcmd\s*:\s*("((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)')/.exec(input) ??
+    /\bcommand\s*:\s*("((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)')/.exec(input);
+  let detail = "";
+  if (cmd) {
+    detail = (cmd[2] ?? cmd[3] ?? "").replace(/\\(["'\\])/g, "$1");
+  } else {
+    const q =
+      /\b(?:path|file_path|query|pattern|url|prompt|message)\s*:\s*("((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)')/.exec(
+        input,
+      );
+    if (q) detail = (q[2] ?? q[3] ?? "").replace(/\\(["'\\])/g, "$1");
+  }
+  return { tool, detail };
+}
+
+/** Text of a tool output payload (string, or an array of content blocks). */
+function outputText(output: string | CodexContentBlock[] | undefined): string {
+  if (typeof output === "string") return output;
+  if (!Array.isArray(output)) return "";
+  return output
+    .filter((b) => b && typeof b.text === "string")
+    .map((b) => b.text as string)
+    .join("\n");
+}
+
+/** First string value in a JSON arguments blob — a readable one-liner
+ * for a tool we have no dedicated mapping for. */
+function firstArgText(args: string | undefined): string {
+  if (!args) return "";
+  try {
+    const parsed = JSON.parse(args) as unknown;
+    if (parsed && typeof parsed === "object") {
+      for (const value of Object.values(parsed as Record<string, unknown>)) {
+        if (typeof value === "string" && value.trim()) {
+          return value.split("\n")[0] ?? "";
+        }
+      }
+    }
+  } catch {
+    // not JSON — fall through
+  }
+  return "";
+}
+
+/** `request_user_input_async` carries its prompt as
+ * `{questions:[{title, options}]}`; the title is what the user reads. */
+function askDetail(args: string | undefined): string {
+  if (!args) return "";
+  try {
+    const parsed = JSON.parse(args) as {
+      questions?: Array<{ title?: string; question?: string }>;
+    };
+    const q = parsed.questions?.[0];
+    return (q?.title ?? q?.question ?? "").split("\n")[0] ?? "";
+  } catch {
+    return "";
+  }
+}
+
 export function parseCodexActivities(lines: string[]): ParseResult {
   const activities: ActivityEntry[] = [];
   let modelName: string | null = null;
   let sessionStartTime: Date | null = null;
+
+  // Pass 1: tool outputs, so a call row can show what it returned. Codex
+  // links them by `call_id`; the two record kinds use different shapes
+  // (`output` string vs content blocks).
+  const outputs = new Map<string, string>();
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    let rec: CodexRecord;
+    try {
+      rec = JSON.parse(line) as CodexRecord;
+    } catch {
+      continue;
+    }
+    const p = rec.payload;
+    if (!p || rec.type !== "response_item") continue;
+    if (
+      (p.type === "custom_tool_call_output" ||
+        p.type === "function_call_output") &&
+      typeof p.call_id === "string"
+    ) {
+      const text = outputText(p.output);
+      if (text) outputs.set(p.call_id, text);
+    }
+  }
 
   for (const line of lines) {
     if (!line.trim()) continue;
@@ -455,7 +611,12 @@ export function parseCodexActivities(lines: string[]): ParseResult {
 
     if (rec.type === "turn_context" && typeof p.model === "string") {
       modelName = p.model;
-    } else if (rec.type === "event_msg") {
+      continue;
+    }
+
+    if (rec.type === "event_msg") {
+      // Legacy (pre-0.163) transcript records. Kept so old rollouts and
+      // fixtures still parse.
       if (p.type === "user_message" && typeof p.message === "string") {
         if (!p.message.trim() || isEnvContext(p.message)) continue;
         activities.push({
@@ -477,25 +638,96 @@ export function parseCodexActivities(lines: string[]): ParseResult {
           detailBody: p.message,
         });
       }
-    } else if (rec.type === "response_item" && p.type === "function_call") {
-      if (p.name === "exec_command") {
-        activities.push({
-          timestamp: ts,
-          type: "tool",
-          icon: ICONS.Bash,
-          label: "Bash",
-          detail: execDetail(p.arguments),
-        });
-      } else if (p.name === "spawn_agent") {
-        activities.push({
-          timestamp: ts,
-          type: "tool",
-          icon: ICONS.Task,
-          label: "Task",
-          detail: spawnDetail(p.arguments),
-        });
+      // token_count / task_started / task_complete / item_completed:
+      // `item_completed` mirrors the message + tool items above (the same
+      // duplication DSH has between tool-call blocks and tool events), so
+      // counting it would double every row.
+      continue;
+    }
+
+    if (rec.type !== "response_item") continue;
+
+    // 0.163+ transcript: role-tagged messages.
+    if (p.type === "message") {
+      if (p.role !== "user" && p.role !== "assistant") continue; // developer/system
+      const text = messageText(p.content);
+      if (!text || isEnvContext(text)) continue;
+      activities.push({
+        timestamp: ts,
+        type: p.role === "user" ? "user" : "response",
+        icon: p.role === "user" ? ICONS.User : ICONS.Response,
+        label: p.role === "user" ? "User" : "Response",
+        detail: text.split("\n")[0] ?? "",
+        detailBody: text,
+      });
+      continue;
+    }
+
+    // Reasoning is encrypted; only the plaintext summary blocks are
+    // readable, and they are frequently absent — skip those.
+    if (p.type === "reasoning") {
+      const text = (p.summary ?? [])
+        .filter((b) => b && typeof b.text === "string")
+        .map((b) => b.text as string)
+        .join("\n")
+        .trim();
+      if (!text) continue;
+      activities.push({
+        timestamp: ts,
+        type: "thinking",
+        icon: ICONS.Thinking,
+        label: "Thinking",
+        detail: text.split("\n")[0] ?? "",
+        detailBody: text.includes("\n") ? text : undefined,
+      });
+      continue;
+    }
+
+    // Tool calls: the legacy named form and the 0.163+ `exec` orchestrator.
+    if (p.type === "custom_tool_call" || p.type === "function_call") {
+      const rawName = p.name ?? "";
+      let label: string;
+      let detail: string;
+      if (p.type === "custom_tool_call" && rawName === "exec") {
+        const parsed = execInputDetail(p.input);
+        label = canonicalToolLabel(parsed.tool);
+        detail = parsed.detail;
+      } else if (rawName === "exec_command") {
+        label = "Bash";
+        detail = execDetail(p.arguments);
+      } else if (rawName === "spawn_agent") {
+        label = "Task";
+        detail = spawnDetail(p.arguments);
+      } else {
+        label = canonicalToolLabel(rawName || "tool");
+        detail =
+          label === "AskUserQuestion"
+            ? askDetail(p.arguments) || execDetail(p.arguments)
+            : execDetail(p.arguments) || firstArgText(p.arguments);
       }
-      // wait_agent / close_agent are bookkeeping — skip.
+      // `wait` is bookkeeping, not work the user cares to see.
+      if (label === "TodoWrite" || label === "wait") continue;
+
+      const body = p.call_id ? outputs.get(p.call_id) : undefined;
+      const last = activities[activities.length - 1];
+      if (
+        last &&
+        last.type === "tool" &&
+        last.label === label &&
+        last.detail === detail
+      ) {
+        last.count = (last.count ?? 1) + 1;
+        last.timestamp = ts;
+        continue;
+      }
+      activities.push({
+        timestamp: ts,
+        type: "tool",
+        icon: iconForCanonicalLabel(label),
+        label,
+        detail,
+        ...(body ? { detailBody: body, detailKind: "code" as const } : {}),
+      });
     }
   }
 

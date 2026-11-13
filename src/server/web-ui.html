@@ -1,0 +1,1343 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgentHUD · 工作区看板</title>
+<style>
+  :root {
+    --bg: #0b0e14;
+    --panel: #111621;
+    --panel-2: #161c29;
+    --line: #232b3a;
+    --text: #d7deeb;
+    --dim: #8994a8;
+    --dim-2: #5d6779;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --magenta: #db61a2;
+    --yellow: #d29922;
+    --cyan: #39c5cf;
+    --violet: #a371f7;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 13px/1.5 var(--sans); overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  button, input, select { font: inherit; color: inherit; }
+  button {
+    background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+    border-radius: 6px; padding: 4px 10px; cursor: pointer;
+  }
+  button:hover { border-color: #3a465e; background: #1b2231; }
+  button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 1px;
+  }
+  button.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+  button.primary:hover { background: #2f7ff5; }
+  button:disabled { opacity: .5; cursor: default; }
+  .mono { font-family: var(--mono); }
+  .dim { color: var(--dim); }
+  .tiny { font-size: 11px; }
+  /* Inline checkbox inside a toolbar: keeps the label on one row with the
+     selects instead of wrapping like the workspace cards do. */
+  .chk {
+    display: inline-flex; align-items: center; gap: 5px;
+    color: var(--dim); font-size: 12px; cursor: pointer;
+    user-select: none; white-space: nowrap;
+  }
+  .chk input { margin: 0; cursor: pointer; }
+  .chk.off { opacity: .55; }
+
+  /* ---------- 顶部 ---------- */
+  header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 8px 14px; border-bottom: 1px solid var(--line); background: var(--panel);
+    flex: 0 0 auto;
+  }
+  .brand { font-weight: 700; letter-spacing: .3px; }
+  .brand span { color: var(--accent); }
+  .header-spacer { flex: 1; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: 2px 10px; color: var(--dim); font-size: 12px;
+    background: var(--panel-2);
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dim-2); }
+  .dot.live { background: var(--green); box-shadow: 0 0 6px var(--green); }
+
+  /* ---------- 工作区（主操作区） ---------- */
+  #workspacePanel {
+    border-bottom: 1px solid var(--line); background: var(--panel);
+    flex: 0 0 auto;
+  }
+  #workspacePanel.collapsed #workspaceBody { display: none; }
+  .panel-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 14px; cursor: pointer; user-select: none;
+  }
+  .panel-head h2 { margin: 0; font-size: 13px; font-weight: 600; }
+  .panel-head .caret { color: var(--dim); width: 12px; display: inline-block; }
+  .panel-head .summary { color: var(--dim); font-size: 12px; }
+  .panel-head .actions { margin-left: auto; display: flex; gap: 6px; }
+  .panel-head .actions button { padding: 2px 8px; font-size: 12px; }
+  #workspaceBody {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    padding: 0 14px 10px; max-height: 30vh; overflow: auto;
+  }
+  .ws {
+    display: flex; align-items: flex-start; gap: 8px;
+    border: 1px solid var(--line); background: var(--panel-2);
+    border-radius: 8px; padding: 6px 10px; cursor: pointer;
+    min-width: 190px; max-width: 330px;
+  }
+  .ws:hover { border-color: #3a465e; }
+  .ws.on { border-color: var(--accent); background: #10233d; }
+  .ws input { margin: 2px 0 0; accent-color: var(--accent); }
+  .ws .name { font-weight: 600; }
+  .ws .path { color: var(--dim-2); font-size: 11px; font-family: var(--mono); word-break: break-all; }
+  .ws .meta { color: var(--dim); font-size: 11px; }
+  .ws .meta b { color: var(--text); font-weight: 600; }
+
+  /* ---------- 时间范围（② ） ---------- */
+  #dateBar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 7px 14px; border-bottom: 1px solid var(--line); background: var(--panel);
+    flex: 0 0 auto;
+  }
+  #dateBar .step {
+    font-size: 12px; font-weight: 600; color: var(--text);
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  #dateBar .step .num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 16px; height: 16px; border-radius: 50%; background: var(--accent);
+    color: #06101f; font-size: 10px; font-weight: 700;
+  }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+  .seg button {
+    border: 0; border-radius: 0; background: var(--panel-2); color: var(--dim);
+    padding: 4px 11px; font-size: 12px;
+  }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button.on { background: #1f6feb; color: #fff; }
+  #dateBar input[type="date"] {
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px;
+    padding: 3px 8px; color: var(--text);
+  }
+  #dateBar[data-mode="day"] .range-only { display: none; }
+  #dateBar .range-hint { color: var(--dim); font-size: 12px; margin-left: auto; }
+  .warn { color: var(--yellow); }
+  .needs-scope {
+    padding: 18px 14px; color: var(--dim); font-size: 12px; line-height: 1.7;
+  }
+  .needs-scope b { color: var(--accent); }
+
+  /* ---------- 主体 ---------- */
+  main { flex: 1 1 auto; display: flex; min-height: 0; }
+  #treePane {
+    width: 340px; flex: 0 0 340px; border-right: 1px solid var(--line);
+    background: var(--panel); display: flex; flex-direction: column; min-height: 0;
+  }
+  .pane-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 12px; border-bottom: 1px solid var(--line); flex: 0 0 auto;
+  }
+  .pane-head h2 { margin: 0; font-size: 12px; font-weight: 600; color: var(--dim); text-transform: none; }
+  #filter {
+    flex: 1; min-width: 0; background: var(--panel-2); border: 1px solid var(--line);
+    border-radius: 6px; padding: 3px 8px; font-size: 12px;
+  }
+  #tree { flex: 1 1 auto; overflow: auto; padding: 6px 0 20px; }
+  .proj { border-bottom: 1px solid #1a2130; }
+  .proj-head {
+    display: flex; align-items: center; gap: 8px; padding: 6px 12px;
+    cursor: pointer; user-select: none;
+  }
+  .proj-head:hover { background: #141a26; }
+  .proj-head .caret { color: var(--dim-2); width: 10px; }
+  .proj-head .pname { font-weight: 600; }
+  .proj-head .pcount { color: var(--dim-2); font-size: 11px; margin-left: auto; }
+  .sess {
+    display: flex; align-items: center; gap: 8px; padding: 4px 12px 4px 26px;
+    cursor: pointer; border-left: 2px solid transparent;
+  }
+  .sess:hover { background: #141a26; }
+  .sess.sel { background: #10233d; border-left-color: var(--accent); }
+  .sess .sid { font-family: var(--mono); color: var(--dim); font-size: 11px; }
+  .sess .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sess .right { color: var(--dim-2); font-size: 11px; font-family: var(--mono); white-space: nowrap; }
+  .sess.sub { padding-left: 40px; }
+  .badge {
+    font-size: 10px; padding: 0 5px; border-radius: 4px; border: 1px solid currentColor;
+    line-height: 15px; white-space: nowrap;
+  }
+  .b-working { color: var(--green); }
+  .b-waiting { color: var(--magenta); }
+  .b-hot { color: var(--green); }
+  .b-warm { color: var(--yellow); }
+  .b-cool { color: var(--cyan); }
+  .b-cold { color: var(--dim-2); }
+  .ptag { font-size: 10px; color: var(--dim-2); }
+  .more {
+    padding: 3px 12px 3px 26px; color: var(--dim-2); font-size: 11px;
+    cursor: pointer; user-select: none;
+  }
+  .more:hover { color: var(--accent); }
+
+  /* ---------- 右侧 ---------- */
+  #contentPane { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .tabs { display: flex; gap: 4px; padding: 7px 12px; border-bottom: 1px solid var(--line); background: var(--panel); flex: 0 0 auto; }
+  .tab {
+    padding: 4px 12px; border-radius: 6px; border: 1px solid transparent;
+    background: transparent; color: var(--dim); cursor: pointer;
+  }
+  .tab.on { background: var(--panel-2); border-color: var(--line); color: var(--text); }
+  .tab .k { color: var(--dim-2); font-size: 10px; margin-left: 6px; }
+  .pane { flex: 1 1 auto; overflow: auto; padding: 10px 14px 40px; min-height: 0; }
+  .pane[hidden] { display: none; }
+  .empty { color: var(--dim-2); padding: 24px 4px; }
+  .act {
+    display: flex; gap: 8px; padding: 2px 4px; border-radius: 4px;
+    font-family: var(--mono); font-size: 12px; align-items: baseline;
+  }
+  .act .t { color: var(--dim-2); }
+  .act .ic { color: var(--dim); width: 12px; text-align: center; }
+  .act .lbl { color: var(--accent); white-space: nowrap; }
+  .act .det { color: var(--text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .act .cnt { color: var(--dim-2); }
+  .act.hasbody { cursor: pointer; }
+  .act.hasbody:hover { background: #141a26; }
+  .act.u .lbl { color: var(--green); }
+  .act.r .lbl { color: var(--text); }
+  .act.th .lbl { color: var(--dim); }
+  .act-body {
+    margin: 2px 0 8px 28px; padding: 8px 10px; background: #0d1219;
+    border: 1px solid var(--line); border-radius: 6px; overflow: auto; max-height: 46vh;
+  }
+  .act-body pre { margin: 0; font-family: var(--mono); font-size: 12px; white-space: pre; color: #c9d4e4; }
+  .act-body pre .gutter { color: var(--dim-2); }
+  .act-body pre .add { color: var(--green); }
+  .act-body pre .del { color: #f85149; }
+  .md { max-width: 1000px; }
+  .md h1 { font-size: 18px; margin: 16px 0 8px; }
+  .md h2 { font-size: 15px; margin: 14px 0 6px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+  .md h3 { font-size: 13px; margin: 12px 0 4px; color: var(--dim); }
+  .md p { margin: 6px 0; }
+  .md ul, .md ol { margin: 6px 0 6px 20px; padding: 0; }
+  .md li { margin: 2px 0; }
+  .md code { background: #0d1219; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; font-family: var(--mono); font-size: 12px; }
+  .md pre { background: #0d1219; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; overflow: auto; }
+  .md pre code { background: none; border: 0; padding: 0; }
+  .md hr { border: 0; border-top: 1px solid var(--line); margin: 12px 0; }
+  .md a { color: var(--accent); }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .toolbar label { color: var(--dim); font-size: 12px; }
+  .toolbar input[type="date"], .toolbar select {
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px;
+  }
+  .note { color: var(--dim); font-size: 12px; margin-top: 8px; }
+  .spinner {
+    display: inline-block; width: 12px; height: 12px; border-radius: 50%;
+    border: 2px solid var(--line); border-top-color: var(--accent);
+    animation: spin .8s linear infinite; vertical-align: -2px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  details.hist { margin-top: 14px; }
+  details.hist summary { cursor: pointer; color: var(--dim); font-size: 12px; }
+  details.hist ul { margin: 8px 0 0 4px; padding: 0; list-style: none; }
+  details.hist li { padding: 3px 0; font-size: 12px; }
+  details.hist button { background: none; border: 0; color: var(--accent); padding: 0; cursor: pointer; }
+  #banner {
+    display: none; padding: 7px 14px; background: #3d1d1d; color: #ffb4b4;
+    border-bottom: 1px solid #5a2a2a; font-size: 12px;
+  }
+  #banner.on { display: block; }
+  /* 帮助浮层 */
+  #help {
+    position: fixed; inset: 0; background: rgba(4, 6, 10, .78); display: none;
+    align-items: center; justify-content: center; z-index: 20;
+  }
+  #help.on { display: flex; }
+  #help .box {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 16px 20px; max-width: 560px; width: calc(100% - 40px);
+  }
+  #help h3 { margin: 0 0 10px; font-size: 14px; }
+  #help table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  #help td { padding: 3px 0; vertical-align: top; }
+  #help td:first-child { width: 130px; color: var(--accent); font-family: var(--mono); }
+  .footer {
+    flex: 0 0 auto; border-top: 1px solid var(--line); background: var(--panel);
+    padding: 5px 14px; color: var(--dim-2); font-size: 11px;
+    display: flex; gap: 12px; align-items: center;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">Agent<span>HUD</span></div>
+  <span class="pill" title="每 3 秒自动刷新"><span class="dot" id="liveDot"></span><span id="liveText">连接中…</span></span>
+  <span class="pill mono" id="scopePill">未选工作区</span>
+  <div class="header-spacer"></div>
+  <button id="refreshBtn" title="立即刷新（r）">刷新</button>
+  <button id="helpBtn" title="快捷键（?）" aria-label="快捷键">?</button>
+</header>
+
+<div id="banner" role="alert"></div>
+
+<!-- ① 工作区白名单：主操作区，默认展开 -->
+<section id="workspacePanel">
+  <div class="panel-head" id="wsHead">
+    <span class="caret" id="wsCaret">▾</span>
+    <span class="step"><span class="num">1</span></span>
+    <h2>勾选工作区</h2>
+    <span class="summary" id="wsSummary">必须至少勾选一个</span>
+    <span class="actions">
+      <button id="wsActive" title="只选有活跃会话的工作区">仅活跃</button>
+      <button id="wsAll">全选</button>
+      <button id="wsNone">清空</button>
+    </span>
+  </div>
+  <div id="workspaceBody"></div>
+</section>
+
+<!-- ② 时间范围：单日 / 最近 N 天 / 自定义区间 -->
+<section id="dateBar" data-mode="day">
+  <span class="step"><span class="num">2</span>时间范围</span>
+  <div class="seg" id="rangeSeg" role="group" aria-label="时间范围">
+    <button data-mode="day" class="on">单日</button>
+    <button data-mode="5d">最近 5 天</button>
+    <button data-mode="7d">最近 7 天</button>
+    <button data-mode="custom">自定义</button>
+  </div>
+  <input type="date" id="dateOne" aria-label="日期">
+  <span class="range-only"><input type="date" id="dateFrom" aria-label="起始日期">
+    <span class="dim">至</span>
+    <input type="date" id="dateTo" aria-label="结束日期"></span>
+  <span class="range-hint" id="rangeHint">—</span>
+</section>
+
+<main>
+  <aside id="treePane">
+    <div class="pane-head">
+      <h2>会话</h2>
+      <input id="filter" placeholder="过滤（/）" aria-label="过滤会话">
+    </div>
+    <div id="tree"></div>
+  </aside>
+  <section id="contentPane">
+    <div class="tabs" role="tablist">
+      <span class="dim tiny" style="align-self:center;margin-right:6px"><span style="color:var(--accent);font-weight:700">3</span> 查看</span>
+      <button class="tab on" data-tab="activity" role="tab">活动<span class="k">1</span></button>
+      <button class="tab" data-tab="report" role="tab">报告<span class="k">2</span></button>
+      <button class="tab" data-tab="summary" role="tab">摘要<span class="k">3</span></button>
+    </div>
+    <div class="pane" id="paneActivity" role="tabpanel"></div>
+    <div class="pane" id="paneReport" role="tabpanel" hidden></div>
+    <div class="pane" id="paneSummary" role="tabpanel" hidden></div>
+  </section>
+</main>
+
+<div class="footer">
+  <span id="footerCounts">—</span>
+  <span class="dim" id="footerScope"></span>
+  <span style="margin-left:auto">? 快捷键 · r 刷新 · 1/2/3 切换标签</span>
+</div>
+
+<div id="help" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+  <div class="box">
+    <h3 id="helpTitle">快捷键</h3>
+    <table>
+      <tr><td>1 / 2 / 3</td><td>切换「活动 / 报告 / 摘要」</td></tr>
+      <tr><td>r</td><td>立即刷新会话树</td></tr>
+      <tr><td>/</td><td>跳到过滤框</td></tr>
+      <tr><td>j / k</td><td>在会话列表中上下移动</td></tr>
+      <tr><td>Enter</td><td>展开/收起项目，或展开当前会话的活动正文</td></tr>
+      <tr><td>a</td><td>显示/隐藏冷会话</td></tr>
+      <tr><td>g / G</td><td>活动流跳到最旧 / 最新</td></tr>
+      <tr><td>Esc</td><td>关闭浮层</td></tr>
+      <tr><td>?</td><td>显示/关闭本帮助</td></tr>
+    </table>
+    <p class="note">操作顺序：① 在顶部勾选工作区（可多选，必须至少一个）→ ② 选时间范围（单日 / 最近 5 天 / 最近 7 天 / 自定义区间）→ ③ 在右侧看活动、报告或生成摘要。会话树只显示已勾选的工作区。</p>
+    <p class="note" style="text-align:right"><button id="helpClose">关闭</button></p>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- 基础 ----------
+  var TOKEN = new URLSearchParams(location.search).get("token") || "";
+  var SCOPE_KEY = "agenthud.scopes";
+  var RANGE_KEY = "agenthud.range";
+  var state = {
+    tree: null,
+    scopes: [],
+    scopesTouched: false,
+    collapsedProjects: {},
+    showCold: false,
+    selected: null,
+    activities: [],
+    expanded: {},
+    filter: "",
+    tab: "activity",
+    rangeMode: "day",
+    date: todayIso(),
+    from: todayIso(),
+    to: todayIso(),
+    actSeq: 0,
+    reportSeq: 0,
+    summaryBusy: false,
+    helpOpen: false,
+    lastTreeAt: 0
+  };
+
+  var els = {
+    tree: document.getElementById("tree"),
+    filter: document.getElementById("filter"),
+    workspaceBody: document.getElementById("workspaceBody"),
+    workspacePanel: document.getElementById("workspacePanel"),
+    wsHead: document.getElementById("wsHead"),
+    wsCaret: document.getElementById("wsCaret"),
+    wsSummary: document.getElementById("wsSummary"),
+    scopePill: document.getElementById("scopePill"),
+    dateBar: document.getElementById("dateBar"),
+    dateOne: document.getElementById("dateOne"),
+    dateFrom: document.getElementById("dateFrom"),
+    dateTo: document.getElementById("dateTo"),
+    rangeSeg: document.getElementById("rangeSeg"),
+    rangeHint: document.getElementById("rangeHint"),
+    liveDot: document.getElementById("liveDot"),
+    liveText: document.getElementById("liveText"),
+    paneActivity: document.getElementById("paneActivity"),
+    paneReport: document.getElementById("paneReport"),
+    paneSummary: document.getElementById("paneSummary"),
+    banner: document.getElementById("banner"),
+    footerCounts: document.getElementById("footerCounts"),
+    footerScope: document.getElementById("footerScope"),
+    help: document.getElementById("help")
+  };
+
+  function todayIso() {
+    var d = new Date();
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  }
+  function pad(n) { return String(n).padStart(2, "0"); }
+  function esc(s) {
+    return String(s === null || s === undefined ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+  function age(ms) {
+    var s = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+    if (s < 60) return s + "秒";
+    if (s < 3600) return Math.floor(s / 60) + "分";
+    if (s < 86400) return Math.floor(s / 3600) + "小时";
+    return Math.floor(s / 86400) + "天";
+  }
+  function showBanner(msg) {
+    els.banner.textContent = msg;
+    els.banner.className = "on";
+  }
+  function clearBanner() { els.banner.className = ""; els.banner.textContent = ""; }
+
+  function api(path, init) {
+    var opts = Object.assign({}, init || {});
+    opts.headers = Object.assign({ "X-Agenthud-Token": TOKEN }, (init && init.headers) || {});
+    return fetch(path, opts).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (body) {
+        if (!res.ok || body.ok === false) {
+          throw new Error(body.error || ("HTTP " + res.status));
+        }
+        return body;
+      });
+    });
+  }
+
+  if (!TOKEN) {
+    document.body.innerHTML =
+      '<div style="margin:auto;padding:40px;text-align:center;color:#8994a8">' +
+      "<h2>缺少访问令牌</h2><p>请打开 <code>agenthud web</code> 在终端里打印的完整地址（带 ?token=…）。</p></div>";
+    return;
+  }
+
+  // ---------- 时间范围 ----------
+  function addDays(iso, delta) {
+    var parts = iso.split("-");
+    var d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    d.setDate(d.getDate() + delta);
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  }
+  function lastN(n) {
+    var end = todayIso();
+    return { from: addDays(end, -(n - 1)), to: end };
+  }
+  function effectiveRange() {
+    if (state.rangeMode === "5d") return lastN(5);
+    if (state.rangeMode === "7d") return lastN(7);
+    if (state.rangeMode === "custom") {
+      var from = state.from || todayIso();
+      var to = state.to || todayIso();
+      return from <= to ? { from: from, to: to } : { from: to, to: from };
+    }
+    return { from: state.date, to: state.date };
+  }
+  function isRange() {
+    var r = effectiveRange();
+    return r.from !== r.to;
+  }
+  function rangeDays() {
+    var r = effectiveRange();
+    var n = 1;
+    var cur = r.from;
+    while (cur < r.to && n < 400) { cur = addDays(cur, 1); n += 1; }
+    return n;
+  }
+  function updateRangeUi() {
+    els.dateBar.setAttribute("data-mode", state.rangeMode);
+    Array.prototype.forEach.call(els.rangeSeg.querySelectorAll("button"), function (b) {
+      b.classList.toggle("on", b.getAttribute("data-mode") === state.rangeMode);
+    });
+    els.dateOne.value = state.date;
+    els.dateFrom.value = state.from;
+    els.dateTo.value = state.to;
+    var r = effectiveRange();
+    var days = rangeDays();
+    els.rangeHint.className = "range-hint";
+    if (state.rangeMode === "day") {
+      els.rangeHint.textContent = "当前：" + r.from;
+    } else if (r.from > r.to) {
+      els.rangeHint.className = "range-hint warn";
+      els.rangeHint.textContent = "起始日期晚于结束日期，已互换";
+    } else {
+      els.rangeHint.textContent = "当前：" + r.from + " → " + r.to + "（" + days + " 天）";
+      if (state.rangeMode !== "day" && days > 14) {
+        els.rangeHint.className = "range-hint warn";
+        els.rangeHint.textContent += " · 区间摘要需要 " + (days + 1) + " 次模型调用";
+      }
+    }
+    try {
+      localStorage.setItem(RANGE_KEY, JSON.stringify({
+        mode: state.rangeMode, date: state.date, from: state.from, to: state.to
+      }));
+    } catch (e) {}
+  }
+  function loadRangeState() {
+    try {
+      var raw = localStorage.getItem(RANGE_KEY);
+      if (!raw) return;
+      var v = JSON.parse(raw);
+      if (v && typeof v.mode === "string") state.rangeMode = v.mode;
+      if (v && typeof v.date === "string") state.date = v.date;
+      if (v && typeof v.from === "string") state.from = v.from;
+      if (v && typeof v.to === "string") state.to = v.to;
+    } catch (e) {}
+  }
+  loadRangeState();
+  updateRangeUi();
+
+  // ---------- 工作区（主操作） ----------
+  function projects() { return (state.tree && state.tree.projects) || []; }
+
+  function activeCount(project) {
+    var n = 0;
+    (project.sessions || []).forEach(function (s) {
+      if (s.live || s.status === "hot" || s.status === "warm") n += 1;
+    });
+    return n;
+  }
+  function sessionCount(project) {
+    var n = 0;
+    (project.sessions || []).forEach(function (s) {
+      n += 1 + ((s.subAgents || []).length);
+    });
+    return n;
+  }
+  function scopeSet() {
+    var set = {};
+    state.scopes.forEach(function (p) { set[p] = true; });
+    return set;
+  }
+  function visibleProjects() {
+    // 严格白名单：没勾选就什么都不显示（顶部会提示去勾选）。
+    var set = scopeSet();
+    if (state.scopes.length === 0) return [];
+    var pw = state.filter.trim().toLowerCase();
+    return projects().filter(function (p) {
+      if (!set[p.path]) return false;
+      if (!pw) return true;
+      if ((p.name || "").toLowerCase().indexOf(pw) >= 0) return true;
+      if ((p.path || "").toLowerCase().indexOf(pw) >= 0) return true;
+      return (p.sessions || []).some(function (s) {
+        return ((s.title || "") + " " + s.id).toLowerCase().indexOf(pw) >= 0;
+      });
+    });
+  }
+
+  function renderWorkspaces() {
+    var list = projects();
+    var frag = document.createDocumentFragment();
+    list.forEach(function (p) {
+      var on = state.scopes.indexOf(p.path) >= 0;
+      var box = document.createElement("label");
+      box.className = "ws" + (on ? " on" : "");
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = on;
+      cb.setAttribute("aria-label", "选择工作区 " + (p.name || p.path));
+      cb.addEventListener("change", function () {
+        toggleScope(p.path, cb.checked);
+      });
+      var text = document.createElement("div");
+      var active = activeCount(p);
+      text.innerHTML =
+        '<div class="name">' + esc(p.name || "(未命名)") + "</div>" +
+        '<div class="path">' + esc(p.path) + "</div>" +
+        '<div class="meta">' + sessionCount(p) + " 个会话 · <b>" + active + "</b> 个活跃</div>";
+      box.appendChild(cb);
+      box.appendChild(text);
+      frag.appendChild(box);
+    });
+    els.workspaceBody.replaceChildren(frag);
+    els.wsSummary.textContent = state.scopes.length
+      ? "已选 " + state.scopes.length + " / " + list.length + " 个工作区"
+      : "必须至少勾选一个（共 " + list.length + " 个）";
+    els.scopePill.textContent = state.scopes.length
+      ? "已选 " + state.scopes.length + " 个工作区"
+      : "未选工作区";
+    els.footerScope.textContent = state.scopes.length
+      ? "范围：" + state.scopes.map(function (p) {
+          var hit = list.filter(function (x) { return x.path === p; })[0];
+          return hit ? hit.name : p;
+        }).join(" + ")
+      : "范围：未选工作区";
+  }
+
+  function toggleScope(path, on) {
+    state.scopesTouched = true;
+    var i = state.scopes.indexOf(path);
+    if (on && i < 0) state.scopes.push(path);
+    if (!on && i >= 0) state.scopes.splice(i, 1);
+    try { localStorage.setItem(SCOPE_KEY, JSON.stringify(state.scopes)); } catch (e) {}
+    renderWorkspaces();
+    renderTree();
+    if (state.tab !== "activity") refreshTab();
+  }
+
+  function setScopes(next) {
+    state.scopesTouched = true;
+    state.scopes = next.slice();
+    try { localStorage.setItem(SCOPE_KEY, JSON.stringify(state.scopes)); } catch (e) {}
+    renderWorkspaces();
+    renderTree();
+    if (state.tab !== "activity") refreshTab();
+  }
+
+  // ---------- 会话树 ----------
+  function renderTree() {
+    var list = visibleProjects();
+    var frag = document.createDocumentFragment();
+    if (state.scopes.length === 0) {
+      var hint = document.createElement("div");
+      hint.className = "needs-scope";
+      hint.innerHTML =
+        "<b>先在上方勾选工作区</b><br>" +
+        "会话树只显示白名单里的工作区。可以点「仅活跃」快速选中正在跑的项目，或「全选」。";
+      frag.appendChild(hint);
+      els.tree.replaceChildren(frag);
+      return;
+    }
+    if (!list.length) {
+      var none = document.createElement("div");
+      none.className = "empty";
+      none.textContent = state.tree ? "没有匹配的会话（试试清掉过滤词）" : "加载中…";
+      frag.appendChild(none);
+    }
+    list.forEach(function (project) {
+      var collapsed = state.collapsedProjects[project.path] === true;
+      var head = document.createElement("div");
+      head.className = "proj-head";
+      head.setAttribute("role", "button");
+      head.setAttribute("tabindex", "0");
+      var sessions = (project.sessions || []).slice();
+      var hot = sessions.filter(function (s) { return s.live || s.status === "hot" || s.status === "warm"; });
+      var cold = sessions.filter(function (s) { return !(s.live || s.status === "hot" || s.status === "warm"); });
+      head.innerHTML =
+        '<span class="caret">' + (collapsed ? "▸" : "▾") + "</span>" +
+        '<span class="pname">' + esc(project.name || "(未命名)") + "</span>" +
+        '<span class="pcount">' + sessions.length + " 会话" + (hot.length ? " · " + hot.length + " 活跃" : "") + "</span>";
+      head.addEventListener("click", function () {
+        state.collapsedProjects[project.path] = !collapsed;
+        renderTree();
+      });
+      var wrap = document.createElement("div");
+      wrap.className = "proj";
+      wrap.appendChild(head);
+      if (!collapsed) {
+        var shown = state.showCold ? sessions : hot;
+        if (!shown.length) {
+          var e = document.createElement("div");
+          e.className = "empty tiny";
+          e.style.padding = "4px 12px 6px 26px";
+          e.textContent = state.showCold ? "（无会话）" : "（无活跃会话，按 a 显示冷会话）";
+          wrap.appendChild(e);
+        }
+        shown
+          .sort(function (a, b) { return b.lastModifiedMs - a.lastModifiedMs; })
+          .forEach(function (s) {
+            wrap.appendChild(sessionRow(s, false));
+            (s.subAgents || []).forEach(function (sub) {
+              wrap.appendChild(sessionRow(sub, true));
+            });
+          });
+        var hiddenCount = sessions.length - shown.length;
+        if (!state.showCold && hiddenCount > 0) {
+          var more = document.createElement("div");
+          more.className = "more";
+          more.textContent = "展开 " + hiddenCount + " 个冷会话（a）";
+          more.addEventListener("click", function () {
+            state.showCold = true;
+            renderTree();
+          });
+          wrap.appendChild(more);
+        }
+      }
+      frag.appendChild(wrap);
+    });
+    els.tree.replaceChildren(frag);
+  }
+
+  function sessionRow(s, isSub) {
+    var row = document.createElement("div");
+    row.className = "sess" + (isSub ? " sub" : "") + (state.selected && state.selected.id === s.id ? " sel" : "");
+    row.setAttribute("data-id", s.id);
+    row.setAttribute("role", "button");
+    row.setAttribute("tabindex", "0");
+    var badge = s.live === "working"
+      ? '<span class="badge b-working">运行中</span>'
+      : s.live === "waiting"
+        ? '<span class="badge b-waiting">等待你</span>'
+        : '<span class="badge b-' + esc(s.status) + '">' + statusLabel(s.status) + "</span>";
+    var ctx = s.ctxPercent === null || s.ctxPercent === undefined ? "" : " " + s.ctxPercent + "%";
+    row.innerHTML =
+      (isSub ? '<span class="ptag">└</span>' : "") +
+      '<span class="sid">#' + esc(s.short) + "</span>" +
+      badge +
+      '<span class="title">' + esc(s.title || "(无标题)") + "</span>" +
+      (s.provider ? '<span class="ptag">' + esc(s.provider) + "</span>" : "") +
+      '<span class="right">' + age(s.lastModifiedMs) + ctx + "</span>";
+    row.addEventListener("click", function () { selectSession(s); });
+    row.addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); selectSession(s); }
+    });
+    return row;
+  }
+
+  function statusLabel(status) {
+    return { hot: "活跃", warm: "较新", cool: "今天", cold: "较早" }[status] || status;
+  }
+
+  function selectSession(s) {
+    state.selected = s;
+    state.expanded = {};
+    state.activities = [];
+    setTab("activity");
+    renderTree();
+    loadActivity();
+  }
+
+  // ---------- 活动 ----------
+  function loadActivity() {
+    if (!state.selected) return;
+    var seq = ++state.actSeq;
+    var s = state.selected;
+    els.paneActivity.innerHTML = '<div class="empty">加载活动…</div>';
+    api("/api/activity?id=" + encodeURIComponent(s.id) +
+        "&path=" + encodeURIComponent(s.filePath || ""))
+      .then(function (data) {
+        if (seq !== state.actSeq) return;
+        state.activities = data.activities || [];
+        renderActivity(true);
+      })
+      .catch(function (err) {
+        if (seq !== state.actSeq) return;
+        els.paneActivity.innerHTML = '<div class="empty">' + esc(err.message) + "</div>";
+      });
+  }
+
+  function renderActivity(scrollBottom) {
+    var s = state.selected;
+    if (!s) {
+      els.paneActivity.innerHTML = '<div class="empty">从左侧选择一个会话</div>';
+      return;
+    }
+    var head = document.createElement("div");
+    head.className = "toolbar";
+    head.innerHTML =
+      "<span>" + esc(s.title || s.id) + "</span>" +
+      '<span class="dim tiny mono">' + esc(s.id) + " · " + esc(s.provider || "-") +
+      (s.model ? " · " + esc(s.model) : "") + "</span>" +
+      '<span class="dim tiny">' + state.activities.length + " 条活动</span>";
+    var frag = document.createDocumentFragment();
+    frag.appendChild(head);
+    state.activities.forEach(function (a, i) {
+      frag.appendChild(activityRow(a, i));
+      if (state.expanded[i]) frag.appendChild(bodyNode(a));
+    });
+    if (!state.activities.length) {
+      var e = document.createElement("div");
+      e.className = "empty";
+      e.textContent = "这个会话没有可显示的活动";
+      frag.appendChild(e);
+    }
+    els.paneActivity.replaceChildren(frag);
+    if (scrollBottom) els.paneActivity.scrollTop = els.paneActivity.scrollHeight;
+  }
+
+  function activityRow(a, index) {
+    var row = document.createElement("div");
+    var kind = a.type === "user" ? "u" : a.type === "response" ? "r" : a.type === "thinking" ? "th" : "tool";
+    row.className = "act " + kind + (a.body ? " hasbody" : "");
+    row.setAttribute("data-index", index);
+    row.innerHTML =
+      '<span class="t">' + esc(a.time) + "</span>" +
+      '<span class="ic">' + esc(a.icon || "") + "</span>" +
+      '<span class="lbl">' + esc(a.label) + "</span>" +
+      '<span class="det">' + esc(a.detail || "") + "</span>" +
+      (a.count && a.count > 1 ? '<span class="cnt">×' + a.count + "</span>" : "");
+    if (a.body) {
+      row.addEventListener("click", function () { toggleBody(index); });
+    }
+    return row;
+  }
+
+  function toggleBody(index) {
+    var a = state.activities[index];
+    if (!a || !a.body) return;
+    if (state.expanded[index]) {
+      delete state.expanded[index];
+      renderActivity(false);
+      return;
+    }
+    state.expanded[index] = true;
+    renderActivity(false);
+  }
+
+  function bodyNode(a) {
+    var wrap = document.createElement("div");
+    wrap.className = "act-body";
+    var pre = document.createElement("pre");
+    if (a.bodyKind === "diff") {
+      pre.innerHTML = a.body.split("\n").map(function (line) {
+        var cls = line.charAt(0) === "+" ? "add" : line.charAt(0) === "-" ? "del" : "";
+        return cls ? '<span class="' + cls + '">' + esc(line) + "</span>" : esc(line);
+      }).join("\n");
+    } else if (a.numbered) {
+      pre.innerHTML = a.body.split("\n").map(function (line) {
+        var m = /^(\s*\d+: )([\s\S]*)$/.exec(line);
+        return m ? '<span class="gutter">' + esc(m[1]) + "</span>" + esc(m[2]) : esc(line);
+      }).join("\n");
+    } else {
+      pre.textContent = a.body;
+    }
+    wrap.appendChild(pre);
+    return wrap;
+  }
+
+  // ---------- 报告 ----------
+  function loadReport() {
+    var seq = ++state.reportSeq;
+    if (!state.scopes.length) {
+      els.paneReport.innerHTML =
+        '<div class="needs-scope"><b>请先勾选工作区</b><br>报告只统计白名单里的工作区。</div>';
+      return;
+    }
+    var range = effectiveRange();
+    els.paneReport.innerHTML = '<div class="empty">生成报告…</div>';
+    var params = new URLSearchParams();
+    params.set("format", "markdown");
+    if (range.from === range.to) params.set("date", range.from);
+    else {
+      params.set("from", range.from);
+      params.set("to", range.to);
+    }
+    state.scopes.forEach(function (p) { params.append("scope", p); });
+    api("/api/report?" + params.toString())
+      .then(function (data) {
+        if (seq !== state.reportSeq) return;
+        var box = document.createElement("div");
+        box.className = "md";
+        box.innerHTML = mdToHtml(data.content || "（无活动）");
+        els.paneReport.replaceChildren(box);
+      })
+      .catch(function (err) {
+        if (seq !== state.reportSeq) return;
+        els.paneReport.innerHTML = '<div class="empty">' + esc(err.message) + "</div>";
+      });
+  }
+
+  // ---------- 摘要 ----------
+  function renderSummaryPane() {
+    var frag = document.createDocumentFragment();
+    var range = effectiveRange();
+    var days = rangeDays();
+    var bar = document.createElement("div");
+    bar.className = "toolbar";
+    bar.innerHTML =
+      '<label for="engine">引擎</label>' +
+      '<select id="engine">' +
+      '<option value="auto">自动</option><option value="codex">codex</option>' +
+      '<option value="claude">claude</option><option value="kiro">kiro</option></select>' +
+      '<label class="chk" for="useStyle" title="让摘要模仿 ~/.agenthud/summary-style.md 里的写法">' +
+      '<input type="checkbox" id="useStyle" checked> 参考我的表达风格</label>' +
+      '<button class="primary" id="genBtn"></button>' +
+      '<span class="dim tiny" id="genState"></span>';
+    frag.appendChild(bar);
+    var note = document.createElement("div");
+    note.className = "note";
+    note.id = "sumNote";
+    note.textContent = state.scopes.length
+      ? "范围：" + state.scopes.length + " 个工作区 · " +
+        (range.from === range.to ? range.from : range.from + " → " + range.to + "（" + days + " 天）") +
+        (range.from === range.to ? "" : " · 共 " + (days + 1) + " 次模型调用")
+      : "请先在上方勾选工作区";
+    frag.appendChild(note);
+    var out = document.createElement("div");
+    out.className = "md";
+    out.id = "summaryOut";
+    out.innerHTML = state.scopes.length
+      ? '<div class="empty">点上面的按钮，按「已选工作区 + 当前时间范围」生成摘要（单日约 30–90 秒）。</div>'
+      : '<div class="needs-scope"><b>请先勾选工作区</b><br>摘要只统计白名单里的工作区。</div>';
+    frag.appendChild(out);
+
+    var hist = document.createElement("details");
+    hist.className = "hist";
+    hist.innerHTML = "<summary>已有摘要（点击加载）</summary><ul id=\"histList\"></ul>";
+    frag.appendChild(hist);
+    els.paneSummary.replaceChildren(frag);
+
+    var btn = bar.querySelector("#genBtn");
+    btn.textContent = range.from === range.to
+      ? "生成当天摘要"
+      : "生成区间摘要（" + days + " 天）";
+    btn.disabled = state.scopes.length === 0;
+    btn.addEventListener("click", generateSummary);
+    hist.addEventListener("toggle", function () {
+      if (hist.open) loadHistory();
+    });
+
+    // Report which style file the run will actually use, so "已启用" is
+    // verifiable instead of assumed. No style file → dim the toggle.
+    var styleCb = bar.querySelector("#useStyle");
+    api("/api/style")
+      .then(function (s) {
+        var ok = s.path && s.chars > 0;
+        styleCb.checked = !!ok;
+        styleCb.closest(".chk").classList.toggle("off", !ok);
+        if (ok) {
+          var shown = s.path.replace(/\\/g, "/");
+          note.textContent +=
+            " · 风格参考 " + shown.split("/").pop() + "（" + s.chars + " 字" +
+            (s.truncated ? "，已截断" : "") + "）";
+          note.title = shown;
+        } else {
+          styleCb.disabled = true;
+          note.textContent += " · 未找到 summary-style.md，风格参考不可用";
+        }
+      })
+      .catch(function () {
+        // Style is an enhancement — a failed probe must not break the pane.
+        styleCb.checked = false;
+      });
+  }
+
+  function generateSummary() {
+    if (state.summaryBusy) return;
+    if (!state.scopes.length) {
+      showBanner("请先在上方勾选至少一个工作区");
+      return;
+    }
+    var engineEl = els.paneSummary.querySelector("#engine");
+    var btn = els.paneSummary.querySelector("#genBtn");
+    var stateEl = els.paneSummary.querySelector("#genState");
+    var out = els.paneSummary.querySelector("#summaryOut");
+    var range = effectiveRange();
+    state.summaryBusy = true;
+    btn.disabled = true;
+    var started = Date.now();
+    stateEl.innerHTML = '<span class="spinner"></span> 生成中… 0s';
+    var timer = setInterval(function () {
+      stateEl.innerHTML = '<span class="spinner"></span> 生成中… ' +
+        Math.floor((Date.now() - started) / 1000) + "s";
+    }, 1000);
+
+    var payload = {
+      scopes: state.scopes,
+      engine: engineEl ? engineEl.value : "auto"
+    };
+    // Only send the negative: omitting `style` lets config.yaml and the
+    // default ~/.agenthud/summary-style.md decide, which is what "checked"
+    // means. Unchecked is an explicit override.
+    var styleCb = els.paneSummary.querySelector("#useStyle");
+    if (styleCb && !styleCb.checked) payload.style = false;
+    if (range.from === range.to) payload.date = range.from;
+    else { payload.from = range.from; payload.to = range.to; }
+
+    api("/api/summary", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload)
+    })
+      .then(function (data) {
+        stateEl.textContent = data.empty
+          ? "该日期没有活动，未生成"
+          : (data.fromCache ? "已命中缓存" : "已生成");
+        out.innerHTML = mdToHtml(data.markdown || "（空）");
+        if (data.cachePath) {
+          var p = document.createElement("div");
+          p.className = "note mono";
+          p.textContent = "已写入：" + data.cachePath + (data.fromCache ? "（缓存）" : "");
+          out.appendChild(p);
+        }
+      })
+      .catch(function (err) {
+        stateEl.textContent = "";
+        out.innerHTML = '<div class="empty">生成失败：' + esc(err.message) + "</div>";
+      })
+      .finally(function () {
+        clearInterval(timer);
+        state.summaryBusy = false;
+        btn.disabled = false;
+      });
+  }
+
+  function loadHistory() {
+    var list = els.paneSummary.querySelector("#histList");
+    if (!list) return;
+    api("/api/summaries")
+      .then(function (data) {
+        var entries = (data.entries || []).slice().reverse();
+        if (!entries.length) {
+          list.innerHTML = '<li class="dim">暂无</li>';
+          return;
+        }
+        var frag = document.createDocumentFragment();
+        entries.slice(0, 60).forEach(function (e) {
+          var li = document.createElement("li");
+          var btn = document.createElement("button");
+          btn.textContent = e.date + (e.scope ? " · " + e.scope : "") + (e.kind === "range" ? "（区间）" : "");
+          btn.addEventListener("click", function () { openSummaryFile(e.filename); });
+          li.appendChild(btn);
+          frag.appendChild(li);
+        });
+        list.replaceChildren(frag);
+      })
+      .catch(function (err) {
+        list.innerHTML = '<li class="dim">' + esc(err.message) + "</li>";
+      });
+  }
+
+  function openSummaryFile(name) {
+    var out = els.paneSummary.querySelector("#summaryOut");
+    api("/api/summary?name=" + encodeURIComponent(name))
+      .then(function (data) {
+        out.innerHTML = mdToHtml(data.markdown || "（空）");
+        out.scrollIntoView({ block: "start" });
+      })
+      .catch(function (err) {
+        out.innerHTML = '<div class="empty">' + esc(err.message) + "</div>";
+      });
+  }
+
+  // ---------- Markdown（极简渲染，先转义再加标记） ----------
+  function inline(raw) {
+    var out = "";
+    var idx = 0;
+    var re = /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(\[[^\]\n]*\]\([^)\s]+\))/g;
+    var m;
+    while ((m = re.exec(raw)) !== null) {
+      out += esc(raw.slice(idx, m.index));
+      if (m[1]) out += "<code>" + esc(m[1].slice(1, -1)) + "</code>";
+      else if (m[2]) out += "<strong>" + esc(m[2].slice(2, -2)) + "</strong>";
+      else if (m[3]) {
+        var mm = /^\[([^\]]*)\]\(([^)\s]+)\)$/.exec(m[3]);
+        if (mm && /^(https?:|\.|\/|#)/.test(mm[2])) {
+          out += '<a href="' + esc(mm[2]) + '" target="_blank" rel="noopener noreferrer">' + esc(mm[1]) + "</a>";
+        } else {
+          out += esc(m[3]);
+        }
+      }
+      idx = re.lastIndex;
+    }
+    return out + esc(raw.slice(idx));
+  }
+
+  function mdToHtml(src) {
+    var lines = String(src || "").replace(/\r\n?/g, "\n").split("\n");
+    var out = [];
+    var i = 0;
+    while (i < lines.length) {
+      var line = lines[i];
+      if (/^\s*```/.test(line)) {
+        var code = [];
+        i += 1;
+        while (i < lines.length && !/^\s*```/.test(lines[i])) { code.push(lines[i]); i += 1; }
+        i += 1;
+        out.push("<pre><code>" + esc(code.join("\n")) + "</code></pre>");
+        continue;
+      }
+      if (!line.trim()) { i += 1; continue; }
+      var h = /^(#{1,6})\s+(.*)$/.exec(line);
+      if (h) {
+        out.push("<h" + h[1].length + ">" + inline(h[2]) + "</h" + h[1].length + ">");
+        i += 1;
+        continue;
+      }
+      if (/^\s*(---|\*\*\*|___)\s*$/.test(line)) { out.push("<hr>"); i += 1; continue; }
+      if (/^\s*[-*+]\s+/.test(line)) {
+        var items = [];
+        while (i < lines.length && /^\s*[-*+]\s+/.test(lines[i])) {
+          items.push(lines[i].replace(/^\s*[-*+]\s+/, ""));
+          i += 1;
+        }
+        out.push("<ul>" + items.map(function (t) { return "<li>" + inline(t) + "</li>"; }).join("") + "</ul>");
+        continue;
+      }
+      if (/^\s*\d+[.)]\s+/.test(line)) {
+        var oitems = [];
+        while (i < lines.length && /^\s*\d+[.)]\s+/.test(lines[i])) {
+          oitems.push(lines[i].replace(/^\s*\d+[.)]\s+/, ""));
+          i += 1;
+        }
+        out.push("<ol>" + oitems.map(function (t) { return "<li>" + inline(t) + "</li>"; }).join("") + "</ol>");
+        continue;
+      }
+      out.push("<p>" + inline(line) + "</p>");
+      i += 1;
+    }
+    return out.join("");
+  }
+
+  // ---------- 标签 / 刷新 ----------
+  function setTab(tab) {
+    state.tab = tab;
+    Array.prototype.forEach.call(document.querySelectorAll(".tab"), function (b) {
+      b.classList.toggle("on", b.getAttribute("data-tab") === tab);
+    });
+    els.paneActivity.hidden = tab !== "activity";
+    els.paneReport.hidden = tab !== "report";
+    els.paneSummary.hidden = tab !== "summary";
+    if (tab === "activity" && state.selected && !state.activities.length) loadActivity();
+    if (tab !== "activity") refreshTab();
+  }
+
+  function refreshTab() {
+    if (state.tab === "report") loadReport();
+    else if (state.tab === "summary") {
+      // 已经渲染过就只更新按钮/说明，避免把正在看的结果刷掉
+      if (els.paneSummary.querySelector("#genBtn")) updateSummaryMeta();
+      else renderSummaryPane();
+    }
+  }
+
+  /** 让摘要面板的按钮文案与提示跟随「工作区 + 时间范围」。 */
+  function updateSummaryMeta() {
+    var btn = els.paneSummary.querySelector("#genBtn");
+    var note = els.paneSummary.querySelector("#sumNote");
+    if (!btn) return;
+    var range = effectiveRange();
+    var days = rangeDays();
+    btn.textContent = range.from === range.to
+      ? "生成当天摘要"
+      : "生成区间摘要（" + days + " 天）";
+    btn.disabled = state.scopes.length === 0;
+    if (note) {
+      note.textContent = state.scopes.length
+        ? "范围：" + state.scopes.length + " 个工作区 · " +
+          (range.from === range.to ? range.from : range.from + " → " + range.to + "（" + days + " 天）") +
+          (range.from === range.to ? "" : " · 共 " + (days + 1) + " 次模型调用")
+        : "请先在上方勾选工作区";
+    }
+  }
+
+  function loadTree() {
+    return api("/api/tree")
+      .then(function (tree) {
+        state.tree = tree;
+        state.lastTreeAt = Date.now();
+        els.liveDot.className = "dot live";
+        els.liveText.textContent = "已连接";
+        clearBanner();
+        applyInitialScopes(tree);
+        renderWorkspaces();
+        renderTree();
+        els.footerCounts.textContent =
+          (tree.projects || []).length + " 个工作区 · " + tree.totalCount + " 个会话" +
+          (tree.hidden && tree.hidden.total ? " · 隐藏 " + tree.hidden.total : "");
+        // 选中的会话可能已消失
+        if (state.selected) {
+          var still = null;
+          (tree.projects || []).forEach(function (p) {
+            (p.sessions || []).forEach(function (s) {
+              if (s.id === state.selected.id) still = s;
+              (s.subAgents || []).forEach(function (x) { if (x.id === state.selected.id) still = x; });
+            });
+          });
+          if (still) state.selected = still;
+          else state.selected = null;
+        }
+      })
+      .catch(function (err) {
+        els.liveDot.className = "dot";
+        els.liveText.textContent = "连接断开";
+        showBanner("无法读取会话： " + err.message);
+      });
+  }
+
+  function applyInitialScopes(tree) {
+    if (state.scopesTouched) return;
+    var stored = null;
+    try { stored = localStorage.getItem(SCOPE_KEY); } catch (e) {}
+    if (stored) {
+      try {
+        var parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) { state.scopes = parsed.filter(function (p) { return typeof p === "string"; }); state.scopesTouched = true; return; }
+      } catch (e) {}
+    }
+    if (tree.initialScopes && tree.initialScopes.length) {
+      state.scopes = tree.initialScopes.slice();
+      state.scopesTouched = true;
+    }
+  }
+
+  // ---------- 事件 ----------
+  document.getElementById("refreshBtn").addEventListener("click", function () {
+    loadTree().then(function () { if (state.tab !== "activity") refreshTab(); });
+  });
+  // 时间范围：单日 / 最近 5 天 / 最近 7 天 / 自定义区间
+  Array.prototype.forEach.call(els.rangeSeg.querySelectorAll("button"), function (b) {
+    b.addEventListener("click", function () {
+      state.rangeMode = b.getAttribute("data-mode");
+      if (state.rangeMode === "custom" && (!state.from || !state.to)) {
+        var week = lastN(7);
+        state.from = week.from;
+        state.to = week.to;
+      }
+      updateRangeUi();
+      refreshTab();
+    });
+  });
+  els.dateOne.addEventListener("change", function () {
+    state.date = els.dateOne.value || todayIso();
+    updateRangeUi();
+    refreshTab();
+  });
+  els.dateFrom.addEventListener("change", function () {
+    state.from = els.dateFrom.value || todayIso();
+    updateRangeUi();
+    refreshTab();
+  });
+  els.dateTo.addEventListener("change", function () {
+    state.to = els.dateTo.value || todayIso();
+    updateRangeUi();
+    refreshTab();
+  });
+  els.filter.addEventListener("input", function () {
+    state.filter = els.filter.value;
+    renderTree();
+  });
+  els.wsHead.addEventListener("click", function (ev) {
+    if (ev.target.closest("button")) return;
+    els.workspacePanel.classList.toggle("collapsed");
+    els.wsCaret.textContent = els.workspacePanel.classList.contains("collapsed") ? "▸" : "▾";
+  });
+  document.getElementById("wsAll").addEventListener("click", function (ev) {
+    ev.stopPropagation();
+    setScopes(projects().map(function (p) { return p.path; }));
+  });
+  document.getElementById("wsNone").addEventListener("click", function (ev) {
+    ev.stopPropagation();
+    setScopes([]);
+  });
+  document.getElementById("wsActive").addEventListener("click", function (ev) {
+    ev.stopPropagation();
+    setScopes(projects().filter(function (p) { return activeCount(p) > 0; }).map(function (p) { return p.path; }));
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll(".tab"), function (btn) {
+    btn.addEventListener("click", function () { setTab(btn.getAttribute("data-tab")); });
+  });
+
+  var helpBtn = document.getElementById("helpBtn");
+  function toggleHelp(force) {
+    var on = force === undefined ? !state.helpOpen : force;
+    state.helpOpen = on;
+    els.help.classList.toggle("on", on);
+  }
+  helpBtn.addEventListener("click", function () { toggleHelp(); });
+  document.getElementById("helpClose").addEventListener("click", function () { toggleHelp(false); });
+  els.help.addEventListener("click", function (ev) {
+    if (ev.target === els.help) toggleHelp(false);
+  });
+
+  document.addEventListener("keydown", function (ev) {
+    var typing = /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName);
+    if (ev.key === "Escape") {
+      if (state.helpOpen) { toggleHelp(false); return; }
+      if (typing) { document.activeElement.blur(); return; }
+      return;
+    }
+    if (ev.key === "?" && !typing) { ev.preventDefault(); toggleHelp(); return; }
+    if (typing) return;
+    if (ev.key === "1" || ev.key === "2" || ev.key === "3") {
+      setTab(["activity", "report", "summary"][Number(ev.key) - 1]);
+      return;
+    }
+    if (ev.key === "r") { ev.preventDefault(); loadTree().then(function () { if (state.tab !== "activity") refreshTab(); }); return; }
+    if (ev.key === "/") { ev.preventDefault(); els.filter.focus(); els.filter.select(); return; }
+    if (ev.key === "a") { state.showCold = !state.showCold; renderTree(); return; }
+    if (ev.key === "g") { els.paneActivity.scrollTop = 0; return; }
+    if (ev.key === "G") { els.paneActivity.scrollTop = els.paneActivity.scrollHeight; return; }
+    if (ev.key === "j" || ev.key === "k") { moveSelection(ev.key === "j" ? 1 : -1); return; }
+  });
+
+  function moveSelection(delta) {
+    var rows = Array.prototype.slice.call(els.tree.querySelectorAll(".sess"));
+    if (!rows.length) return;
+    var current = rows.findIndex(function (r) { return r.classList.contains("sel"); });
+    var next = Math.max(0, Math.min(rows.length - 1, current < 0 ? 0 : current + delta));
+    var id = rows[next].getAttribute("data-id");
+    var found = null;
+    (state.tree.projects || []).forEach(function (p) {
+      (p.sessions || []).forEach(function (s) {
+        if (s.id === id) found = s;
+        (s.subAgents || []).forEach(function (x) { if (x.id === id) found = x; });
+      });
+    });
+    if (found) { selectSession(found); rows[next].scrollIntoView({ block: "nearest" }); }
+  }
+
+  // ---------- 轮询 ----------
+  loadTree();
+  setInterval(function () {
+    if (document.hidden) return;
+    loadTree();
+    if (state.selected && state.tab === "activity") loadActivity();
+  }, 3000);
+  setInterval(function () {
+    if (document.hidden) return;
+    if (state.tree) renderTree();
+  }, 10000);
+})();
+</script>
+</body>
+</html>

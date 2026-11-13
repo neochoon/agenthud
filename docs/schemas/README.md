@@ -13,11 +13,12 @@ sessions to catch anything we missed.
 | Kiro IDE     | [kiro-ide-session.md](./kiro-ide-session.md)    | `<app-storage>/Kiro/User/globalStorage/kiro.kiroagent/workspace-sessions/` |
 | Codex CLI    | [codex-session.md](./codex-session.md)          | `~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<uuid>.jsonl` |
 | opencode     | [opencode-session.md](./opencode-session.md)    | `${XDG_DATA_HOME:-~/.local/share}/opencode/opencode.db` (SQLite, not files) |
+| DSH          | [dsh-session.md](./dsh-session.md)              | `<DSH_HOME>/sessions/{encoded-cwd}/{sessionId}/session.v4.jsonl.zstd` (zstd frames) |
 
-> Implemented as providers today: **Claude Code, Kiro CLI, Kiro
-> IDE, Codex CLI.** opencode is documented but **not yet implemented**
-> — it is SQLite-backed (a DB query, not a file scan), so it needs a
-> SQLite reader and a read-only access path the other providers don't.
+> Implemented as providers today: **Claude Code, Kiro CLI, Kiro IDE,
+> Codex CLI, opencode, DSH.** DSH needs Node 22.15+ (`node:zlib`
+> zstd); on Node 20 it reports itself unavailable rather than
+> crashing. opencode needs Node 22 for the same reason (`node:sqlite`).
 
 ## How to keep these in sync
 

@@ -37,7 +37,12 @@ import type {
 import { ICONS } from "../../types/index.js";
 import { ONE_HOUR_MS, THIRTY_MINUTES_MS } from "../../utils/timeConstants.js";
 import { canonicalToolLabel, iconForCanonicalLabel } from "./toolLabels.js";
-import type { DiscoverOptions, ParseResult, SessionProvider } from "./types.js";
+import {
+  type DiscoverOptions,
+  type ParseResult,
+  projectInScope,
+  type SessionProvider,
+} from "./types.js";
 
 export const OPENCODE_PATH_PREFIX = "opencode:";
 
@@ -294,9 +299,7 @@ function discoverSessions(
     // Top-level sessions first.
     for (const row of rows) {
       if (row.parent_id && byId.has(row.parent_id)) continue; // child
-      if (options?.scopeToProject && row.directory !== options.scopeToProject) {
-        continue;
-      }
+      if (!projectInScope(row.directory, options)) continue;
       const projectName = basename(row.directory);
       const hidden =
         config.hiddenProjects.includes(projectName) ||

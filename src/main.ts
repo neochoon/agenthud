@@ -38,6 +38,7 @@ import {
 } from "./cli.js";
 import { loadGlobalConfig } from "./config/globalConfig.js";
 import { generateReport } from "./data/reportGenerator.js";
+import { projectRefsFromTree, resolveScopes } from "./data/scope.js";
 import {
   decodeProjectPath,
   discoverSessions,
@@ -89,6 +90,31 @@ function flushStdout(): Promise<void> {
   return new Promise((resolve) => {
     process.stdout.write("", () => resolve());
   });
+}
+
+/**
+ * Turn `--cwd` / repeated `--project` values into a concrete whitelist of
+ * project paths, or exit with the resolver's (actionable) error.
+ * Resolving against the DISCOVERED projects keeps this provider-neutral:
+ * a DSH or Kiro project has no encoded Claude directory to walk.
+ */
+function resolveScopeOrExit(opts: {
+  cwd?: boolean;
+  projects?: string[];
+}): string[] | undefined {
+  const wanted = opts.projects ?? [];
+  if (!opts.cwd && wanted.length === 0) return undefined;
+  const refs = projectRefsFromTree(discoverSessions(globalConfig));
+  const requests = opts.cwd
+    ? [{ kind: "cwd" as const, cwd: process.cwd() }]
+    : wanted.map((value) => ({ kind: "ref" as const, value }));
+  const result = resolveScopes(requests, refs);
+  if (!result.ok) {
+    process.stderr.write(`agenthud: ${result.error}\n`);
+    process.exit(1);
+  }
+  process.stderr.write(`scope = ${result.projectPaths.join(", ")}\n`);
+  return result.projectPaths;
 }
 
 if (options.error) {
@@ -144,7 +170,14 @@ if (options.mode === "report") {
       format: options.reportFormat,
     })}\n`,
   );
-  const tree = discoverSessions(globalConfig);
+  const scope = resolveScopeOrExit({
+    cwd: options.scopeToCwd,
+    projects: options.scopeProjects,
+  });
+  const tree = discoverSessions(
+    globalConfig,
+    scope ? { scopeToProjects: scope } : undefined,
+  );
   const flatSessions = [
     ...tree.projects.flatMap((p) => p.sessions),
     ...tree.coldProjects.flatMap((p) => p.sessions),
@@ -183,6 +216,10 @@ if (options.mode === "summary") {
     )}\n`,
   );
   const today = new Date();
+  const scope = resolveScopeOrExit({
+    cwd: options.scopeToCwd,
+    projects: options.scopeProjects,
+  });
   if (options.summaryFrom && options.summaryTo) {
     const exitCode = await runRangeSummary({
       from: options.summaryFrom,
@@ -198,6 +235,9 @@ if (options.mode === "summary") {
       withGit: options.summaryWithGit!,
       open: options.summaryOpen,
       openIndex: options.summaryOpenIndex,
+      scopeToProjects: scope,
+      stylePath: options.summaryStylePath,
+      noStyle: options.summaryNoStyle,
     });
     await flushStdout();
     process.exit(exitCode);
@@ -215,9 +255,53 @@ if (options.mode === "summary") {
     withGit: options.summaryWithGit!,
     open: options.summaryOpen,
     openIndex: options.summaryOpenIndex,
+    scopeToProjects: scope,
+    stylePath: options.summaryStylePath,
+    noStyle: options.summaryNoStyle,
   });
   await flushStdout();
   process.exit(exitCode);
+}
+
+if (options.mode === "web") {
+  if (options.webError) {
+    process.stderr.write(`agenthud: ${options.webError}\n`);
+    process.exit(1);
+  }
+  const scope = resolveScopeOrExit({
+    cwd: options.webScopeToCwd,
+    projects: options.webScopeProjects,
+  });
+  const { startWebServer } = await import("./server/webServer.js");
+  let handle: Awaited<ReturnType<typeof startWebServer>>;
+  try {
+    handle = await startWebServer({
+      config: globalConfig,
+      port: options.webPort,
+      openBrowser: options.webOpen,
+      scopeToProjects: scope,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const code = (err as NodeJS.ErrnoException).code;
+    process.stderr.write(
+      code === "EADDRINUSE"
+        ? `agenthud: port ${options.webPort ?? 7787} is already in use — pass --port N (or --port 0 for a free one)\n`
+        : `agenthud: web server failed to start: ${message}\n`,
+    );
+    process.exit(1);
+  }
+  process.stdout.write(`agenthud web → ${handle.url}\n`);
+  process.stdout.write("loopback only · Ctrl+C to stop\n");
+  await new Promise<void>((resolve) => {
+    const stop = () => {
+      void handle.close().then(() => resolve());
+    };
+    process.on("SIGINT", stop);
+    process.on("SIGTERM", stop);
+  });
+  await flushStdout();
+  process.exit(0);
 }
 
 if (options.mode === "follow") {

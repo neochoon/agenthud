@@ -1,5 +1,6 @@
-The following is an activity log from a single day of Claude Code sessions,
-possibly spanning multiple projects.
+The following is an activity log from a single day of AI coding-agent
+sessions (Claude Code, Codex, Kiro, opencode, DeepSeek Harness), possibly
+spanning multiple projects.
 
 Each entry: `[HH:MM] <icon> <label>: <detail>`. Icons:
   ○ Read           ~ Edit/Write       $ Bash
@@ -7,11 +8,43 @@ Each entry: `[HH:MM] <icon> <label>: <detail>`. Icons:
   < Response       > User message     … Thinking
   ◆ Git commit
 
-Write a concise, high-signal engineering retro in first-person voice
-("I implemented X", "I discovered Y") — treat the developer as the author.
+**Write the summary in Simplified Chinese (简体中文).** Keep code
+identifiers, file paths, command names, commit hashes and model names in
+their original form; do not translate them. Project names stay as-is.
 
-Target ~300-500 words total; individual sections may be 50-100 words.
-Favor synthesis over completeness.
+## Voice
+
+Write it the way the author writes their own weekly engineering reports.
+A style reference may be attached at the very top of this prompt; if it
+is, imitate it. Either way these defaults apply:
+
+- 省略主语。不要写"我""我们""本人"。直接以动词开头：
+  「开发了…」「修复了…」「搭建了…」。
+- 动词用"了"收尾：开发了 / 修复了 / 完成了 / 搭建了 / 增加了 / 优化了 /
+  完善了 / 梳理了 / 整理了 / 实现了 / 验证了 / 删去了 / 归并了 /
+  迁入了 / 重写了 / 补充了。
+- 一条一件事。用逗号把动作和它的目的串起来，并列动作用"；"分隔——
+  一条常常是一整句长句，而不是几个碎片。
+- 收尾给状态或判断：「目前…」「已…」「初步…」「后续需…」「暂不…」
+  「等待…」「正在排查」。
+- 问题照实说，不软化：「效果较差」「根因未定位」「存在约 17% 的 QP
+  回退，后续需…」。
+- 日志里有数字就用数字：「平均误差在 5cm 内」「延迟从 0.073ms 增大为
+  0.178ms」、百分比、方差、秒数。
+- 不要 emoji，不要 "-" 列表符号，不要用粗体当小标题。
+- 不要报告腔：禁止「旨在 / 致力于 / 赋能 / 闭环打通 / 全面提升」这类词。
+
+## Structure
+
+按项目分组。项目组用 `1、` `2、` 编号，后接项目名和全角冒号；组内条目用
+`（1）` `（2）` 编号；条目下再有分点时用 `1）` `2）` 或 `① ②`。
+
+推荐条目形态是「这次做的事的名字：具体内容」，例如
+「RTK定位融合：新增串口RTK读取，将RTK数据转发至控制进程；…」。
+
+组内条目之间不空行；组与组之间空一行。
+
+Target ~300-500 Chinese characters. Favor synthesis over completeness.
 
 Focus on:
 - meaningful accomplishments
@@ -24,32 +57,22 @@ Focus on:
 Do NOT:
 - mechanically summarize every edit, response, or commit
 - list every modified file (cite paths only for important changes)
-- invent follow-ups not present in the log (no "consider refactoring X")
-- include placeholders like "None" or "N/A" — omit empty sections entirely
+- invent follow-ups not present in the log (no "考虑重构 X")
+- include placeholders like "无" or "N/A" — omit empty groups entirely
 
-If activity spans multiple projects, group findings by project where clarity
-improves. If they share a theme, synthesize.
+If the day was light (few entries, no meaningful work), output a single
+short paragraph instead of the numbered structure. Do not pad.
 
-If the day was light (few entries, no meaningful work), output a single short
-paragraph instead of the full template. Do not pad.
+Format (drop any group with no substance):
 
-Format (omit any section without substance):
+### 工作内容
 
-## Context
-The primary goal(s) of the day. If multi-project, briefly note each.
+1、<项目名>：
+（1）<条目>：<内容>
+（2）<条目>：<内容>
 
-## Key Accomplishments
-Meaningful progress, completed implementations, resolved issues.
-
-## Technical Insights
-Important debugging findings, architectural decisions, tradeoffs, discoveries.
-
-## Major Code Changes
-Significant codebase changes grouped by theme. Reference commits inline
-(e.g., `abc1234`).
-
-## Open Questions / Next Steps
-Only items explicitly stated in the log or directly tied to unfinished workflows.
+2、<项目名>：
+（1）<条目>：<内容>
 
 After reading the log below, write the summary.
 
